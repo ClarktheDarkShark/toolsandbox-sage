@@ -18,28 +18,32 @@ case "$SIZE" in
   dev30) EXPECTED_TASKS=30 ;;
 esac
 readonly EXPECTED_TASKS
-if [[ "$EXECUTION_MODE" != "native-only" && "$EXECUTION_MODE" != "frozen-only" && "$EXECUTION_MODE" != "development-only" ]]; then
-  echo "Execution mode must be native-only, frozen-only, or development-only." >&2
+if [[ "$EXECUTION_MODE" != "native-only" && "$EXECUTION_MODE" != "frozen-only" && "$EXECUTION_MODE" != "development-only" && "$EXECUTION_MODE" != "development-transfer" ]]; then
+  echo "Execution mode must be native-only, frozen-only, development-only, or development-transfer." >&2
   exit 2
 fi
-if [[ "$SIZE" != "full" && "$EXECUTION_MODE" != "development-only" ]]; then
+if [[ "$SIZE" != "full" && "$EXECUTION_MODE" != "development-only" && "$EXECUTION_MODE" != "development-transfer" ]]; then
   echo "Development cohorts require execution mode development-only." >&2
   exit 2
 fi
-if [[ "$EXECUTION_MODE" == "development-only" && "$SIZE" == "full" ]]; then
-  echo "development-only cannot run the publication cohort." >&2
+if [[ ( "$EXECUTION_MODE" == "development-only" || "$EXECUTION_MODE" == "development-transfer" ) && "$SIZE" == "full" ]]; then
+  echo "Development execution modes cannot run the publication cohort." >&2
+  exit 2
+fi
+if [[ "$EXECUTION_MODE" == "development-transfer" && "$SIZE" != "dev30" ]]; then
+  echo "development-transfer is defined only for the disjoint dev30 cohort." >&2
   exit 2
 fi
 if [[ "$PUBLICATION_GATE_PURPOSE" != "release-sample" && "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" && "$PUBLICATION_GATE_PURPOSE" != "development-diagnostic" ]]; then
   echo "Gate purpose must be release-sample, campaign-inclusion, or development-diagnostic." >&2
   exit 2
 fi
-if [[ "$EXECUTION_MODE" == "development-only" && "$PUBLICATION_GATE_PURPOSE" != "development-diagnostic" ]]; then
+if [[ ( "$EXECUTION_MODE" == "development-only" || "$EXECUTION_MODE" == "development-transfer" ) && "$PUBLICATION_GATE_PURPOSE" != "development-diagnostic" ]]; then
   echo "Development cohorts require gate purpose development-diagnostic." >&2
   exit 2
 fi
-if [[ "$EXECUTION_MODE" != "development-only" && "$PUBLICATION_GATE_PURPOSE" == "development-diagnostic" ]]; then
-  echo "Gate purpose development-diagnostic requires execution mode development-only." >&2
+if [[ "$EXECUTION_MODE" != "development-only" && "$EXECUTION_MODE" != "development-transfer" && "$PUBLICATION_GATE_PURPOSE" == "development-diagnostic" ]]; then
+  echo "Gate purpose development-diagnostic requires a development execution mode." >&2
   exit 2
 fi
 if [[ -n "${RESUME_RUN_ROOT:-}" || -n "${RESUME_COMPLETED_LIMIT:-}" ]]; then
@@ -179,6 +183,7 @@ export TOOLSANDBOX_RAPID_CACHE_MODE="read_only"
 export TOOLSANDBOX_RAPID_CACHE_PATH="${TOOLSANDBOX_RAPID_CACHE_PATH:-artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json}"
 PINNED_RAPID_FIXTURE_SHA256="eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
 PINNED_BENCHMARK_SHA256="21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec"
+VALIDATION_THRESHOLDS="docs/sage_protocol/publication_validation_thresholds_v4.json"
 LIFECYCLE_FAULT_FIXTURE="docs/sage_protocol/fixtures/historical_faulty_safe_action_registry.json"
 PINNED_LIFECYCLE_FAULT_FIXTURE_SHA256="285604ee15dcb3b066816267ef1730bb40dffab7a9880160ddd885b2894a5630"
 export CONTROL_CACHE="off"
@@ -196,7 +201,7 @@ if [[ "$RAPID_FIXTURE_SHA256" != "$PINNED_RAPID_FIXTURE_SHA256" ]]; then
   exit 1
 fi
 
-if [[ "$EXECUTION_MODE" == "development-only" ]]; then
+if [[ "$EXECUTION_MODE" == "development-only" || "$EXECUTION_MODE" == "development-transfer" ]]; then
   DEFAULT_RUN_STAMP="lifecycle_repair_${SIZE}_$(date +%Y%m%d_%H%M%S)"
   DEFAULT_OUTPUT_ROOT="outputs/lifecycle_repair"
   DEFAULT_ARTIFACT_ROOT="artifacts/lifecycle_repair"
@@ -211,13 +216,15 @@ ARTIFACT_ROOT="${SAGE_ARTIFACT_ROOT:-$DEFAULT_ARTIFACT_ROOT/$RUN_STAMP}"
 MANIFEST="${SAGE_BENCHMARK_MANIFEST:-docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json}"
 if [[ "$EXECUTION_MODE" == "development-only" ]]; then
   MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_${SIZE}.json"
+elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
+  MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_transfer_dev30.json"
 fi
 if [[ ! -f "$MANIFEST" ]]; then
   echo "Required publication benchmark is missing: $MANIFEST" >&2
   exit 1
 fi
 MANIFEST_SHA256="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$MANIFEST")"
-if [[ "$EXECUTION_MODE" != "development-only" && "$MANIFEST_SHA256" != "$PINNED_BENCHMARK_SHA256" ]]; then
+if [[ "$EXECUTION_MODE" != "development-only" && "$EXECUTION_MODE" != "development-transfer" && "$MANIFEST_SHA256" != "$PINNED_BENCHMARK_SHA256" ]]; then
   echo "Publication benchmark hash mismatch: expected $PINNED_BENCHMARK_SHA256, observed $MANIFEST_SHA256" >&2
   exit 1
 fi
@@ -231,6 +238,12 @@ if [[ "$EXECUTION_MODE" == "native-only" ]]; then
 elif [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
   ARM="frozen_registry"
   RUN_MODE="full_benchmark"
+  GENERATION="off"
+  SAGE_POLICY="none"
+  REFLECTION_EXPECTATION="not-applicable"
+elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
+  ARM="lifecycle_repair_transfer_diagnostic"
+  RUN_MODE="transfer_30"
   GENERATION="off"
   SAGE_POLICY="none"
   REFLECTION_EXPECTATION="not-applicable"
@@ -252,6 +265,7 @@ mkdir -p "$ARM_ARTIFACTS" "$(dirname "$COMMAND_FILE")" "$ARM_OUTPUT"
 
 LIFECYCLE_FAULT_FIXTURE_SHA256=""
 DEVELOPMENT_FAULT_INJECTION="false"
+REGISTRY_TRANSFER_SOURCE_RUN=""
 if [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
   SOURCE_REGISTRY="${RESUME_REGISTRY_CHECKPOINT:-}"
   if [[ -z "$SOURCE_REGISTRY" || ! -f "$SOURCE_REGISTRY/registry_manifest.json" ]]; then
@@ -260,6 +274,30 @@ if [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
   fi
   if [[ -e "$REGISTRY_DIR" || -L "$REGISTRY_DIR" ]]; then
     echo "Frozen publication registry target must not exist before its checkpoint is installed: $REGISTRY_DIR" >&2
+    exit 1
+  fi
+  mkdir -p "$REGISTRY_DIR"
+  cp -R "$SOURCE_REGISTRY"/. "$REGISTRY_DIR"/
+elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
+  REGISTRY_TRANSFER_SOURCE_RUN="${LIFECYCLE_TRANSFER_SOURCE_RUN:-}"
+  if [[ -z "$REGISTRY_TRANSFER_SOURCE_RUN" ]]; then
+    echo "development-transfer requires LIFECYCLE_TRANSFER_SOURCE_RUN." >&2
+    exit 1
+  fi
+  REGISTRY_TRANSFER_SOURCE_RUN="$($PYTHON_EXECUTABLE -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN")"
+  if [[ ! -f "$REGISTRY_TRANSFER_SOURCE_RUN/protocol_manifest.json" || ! -f "$REGISTRY_TRANSFER_SOURCE_RUN/lifecycle_repair_validation_report.json" ]]; then
+    echo "Transfer source must be the exact completed dev10 run root." >&2
+    exit 1
+  fi
+  "$PYTHON_EXECUTABLE" scripts/verify_lifecycle_repair_run.py \
+    --search-root "$REGISTRY_TRANSFER_SOURCE_RUN" --expected-tasks 10
+  SOURCE_REGISTRY="$($PYTHON_EXECUTABLE -c 'import json, pathlib, sys; p=pathlib.Path(sys.argv[1]); raw=pathlib.Path(json.loads(p.read_text())["registry_dir"]); print((raw if raw.is_absolute() else pathlib.Path.cwd() / raw).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN/protocol_manifest.json")"
+  if [[ ! -f "$SOURCE_REGISTRY/registry_manifest.json" ]]; then
+    echo "Passing dev10 source does not contain its declared final registry." >&2
+    exit 1
+  fi
+  if [[ -e "$REGISTRY_DIR" || -L "$REGISTRY_DIR" ]]; then
+    echo "Development transfer registry target must not exist: $REGISTRY_DIR" >&2
     exit 1
   fi
   mkdir -p "$REGISTRY_DIR"
@@ -309,6 +347,11 @@ CMD=(
 )
 if [[ "$EXECUTION_MODE" == "development-only" ]]; then
   CMD+=(--allow-low-quality-cohort)
+elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
+  CMD+=(
+    --allow-low-quality-cohort
+    --registry-transfer-source-run "$REGISTRY_TRANSFER_SOURCE_RUN"
+  )
 fi
 {
   echo "study_id=${SIZE}_$RUN_STAMP"
@@ -316,6 +359,9 @@ fi
   echo "generation=$GENERATION"
   echo "sage_policy=$SAGE_POLICY"
   echo "actor_selection_mode=policy"
+  echo "control_condition=matched_policy_wrapper_without_generated_tools"
+  echo "control_agent_runtime=sage_wrapped"
+  echo "control_generated_tools_enabled=false"
   echo "run_mode=$RUN_MODE"
   echo "model=gpt-4o-mini"
   echo "python_executable=$PYTHON_EXECUTABLE"
@@ -361,6 +407,7 @@ fi
   echo "development_fault_injection=$DEVELOPMENT_FAULT_INJECTION"
   echo "development_fault_fixture=$([[ "$DEVELOPMENT_FAULT_INJECTION" == "true" ]] && echo "$LIFECYCLE_FAULT_FIXTURE" || true)"
   echo "development_fault_fixture_sha256=$LIFECYCLE_FAULT_FIXTURE_SHA256"
+  echo "registry_transfer_source_run=$REGISTRY_TRANSFER_SOURCE_RUN"
   printf 'command='
   printf '%q ' "${CMD[@]}"
   printf '\n'
@@ -372,7 +419,7 @@ echo "[$ARM] output: $ARM_OUTPUT"
 echo "[$ARM] log: $LOG_FILE"
 "${CMD[@]}" 2>&1 | tee "$LOG_FILE"
 
-if [[ "$EXECUTION_MODE" == "development-only" ]]; then
+if [[ "$EXECUTION_MODE" == "development-only" || "$EXECUTION_MODE" == "development-transfer" ]]; then
   "$PYTHON_EXECUTABLE" scripts/verify_lifecycle_repair_run.py \
     --search-root "$ARM_OUTPUT" \
     --expected-tasks "$EXPECTED_TASKS" | tee -a "$LOG_FILE"
@@ -382,5 +429,10 @@ else
     --expected-tasks "$EXPECTED_TASKS" \
     --expect-reflection "$REFLECTION_EXPECTATION" \
     --gate-purpose "$PUBLICATION_GATE_PURPOSE" | tee -a "$LOG_FILE"
+  if [[ "$EXECUTION_MODE" == "native-only" && "$PUBLICATION_GATE_PURPOSE" == "release-sample" ]]; then
+    "$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py \
+      --search-root "$ARM_OUTPUT" \
+      --thresholds "$VALIDATION_THRESHOLDS" | tee -a "$LOG_FILE"
+  fi
 fi
 echo "Strict fresh-control run complete: ${SIZE}_$RUN_STAMP"

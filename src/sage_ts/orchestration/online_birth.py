@@ -8,7 +8,7 @@ import os
 import re
 import time
 from collections import Counter
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
@@ -18,7 +18,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
     CapabilityObservation,
     classify_visible_task_observations,
 )
-from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
+from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import (
@@ -26,7 +26,11 @@ from sage_ts.generation.tool_spec import (
     ToolFamily,
 )
 from sage_ts.orchestration.checkpoints import append_jsonl
-from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
+from sage_ts.registry.manifest import (
+    RegistryEntry,
+    code_hash,
+    has_current_validation_proof,
+)
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
@@ -40,7 +44,7 @@ class GeneratedToolFactory(Protocol):
 
 
 CampaignEventHook = Callable[[str, dict[str, Any]], None]
-RepairAcknowledgementHook = Callable[[str, int, str, str], dict[str, Any]]
+RepairAcknowledgementHook = Callable[..., dict[str, Any]]
 
 
 def suggested_tool_name(canonical_key: str) -> str | None:
@@ -93,6 +97,191 @@ POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME = "self_evolution_tool_repair_requests.j
 POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME = (
     "self_evolution_tool_repair_acknowledgements.jsonl"
 )
+POST_DEPLOYMENT_REPAIR_PUBLIC_EVIDENCE_FIELDS = frozenset(
+    {
+        "called_count",
+        "visible_count",
+        "public_visible_context_count",
+        "contract_failure_count",
+        "failed_count",
+    }
+)
+_PROHIBITED_REPAIR_PAYLOAD_EXACT_KEYS = frozenset(
+    {
+        "scenario_name",
+        "scenario_names",
+        "scenario_id",
+        "scenario_ids",
+        "task_id",
+        "task_ids",
+        "expected_answer",
+        "expected_answers",
+        "gold_answer",
+        "gold_answers",
+        "reference_answer",
+        "reference_answers",
+        "target_state",
+        "expected_target_state",
+        "evaluator_trace",
+        "evaluator_traces",
+        "evaluator_result",
+        "evaluator_results",
+    }
+)
+_PROHIBITED_REPAIR_PROMPT_TOKENS = (
+    "candidate_outcome",
+    "control_outcome",
+    "outcome_similarity",
+    "success_flip",
+    "task_id",
+    "scenario_id",
+    "expected_answer",
+    "target_state",
+    "evaluator_trace",
+)
+_GENERIC_REPAIR_CONTEXT_PATTERN = re.compile(
+    r"post_deployment_repair\(kind=(?:implementation|metadata);"
+    r"family=[a-z0-9_.:-]+\)"
+)
+_SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def _metadata_implementation_proof(
+    *,
+    source_code_hash: str,
+    replacement_code_hash: str | None,
+    replacement_activated: bool,
+    model_authored_code_change_discarded: bool,
+) -> dict[str, Any]:
+    """Describe whether a metadata-only repair preserved executable behavior."""
+
+    source_hash = str(source_code_hash or "").strip().lower()
+    replacement_hash = (
+        str(replacement_code_hash or "").strip().lower()
+        if replacement_code_hash is not None
+        else None
+    )
+    source_valid = _SHA256_HEX_PATTERN.fullmatch(source_hash) is not None
+    replacement_valid = bool(
+        replacement_hash and _SHA256_HEX_PATTERN.fullmatch(replacement_hash) is not None
+    )
+    implementation_preserved = bool(
+        source_valid
+        and (
+            (not replacement_activated and replacement_hash is None)
+            or (
+                replacement_activated
+                and replacement_valid
+                and replacement_hash == source_hash
+            )
+        )
+    )
+    return {
+        "proof_schema_version": 1,
+        "repair_kind": "metadata",
+        "source_code_hash": source_hash,
+        "replacement_code_hash": replacement_hash,
+        "replacement_activated": replacement_activated,
+        "implementation_preserved": implementation_preserved,
+        "model_authored_code_change_discarded": (model_authored_code_change_discarded),
+    }
+
+
+def prohibited_repair_payload_paths(
+    payload: Any,
+    *,
+    allow_generic_root_scenario_name: bool = False,
+) -> tuple[str, ...]:
+    """Recursively locate evaluator-private fields in a repair payload.
+
+    Aggregate execution/adoption counts and prospective task ordinals are public
+    operational evidence. Scenario/task identifiers, evaluator artifacts, and
+    scalar reward values are not generator inputs. ``scenario_name`` is allowed
+    only for the required, synthetic ``ToolGenerationRequest`` context label.
+    """
+
+    violations: list[str] = []
+
+    def visit(value: Any, path: tuple[str, ...]) -> None:
+        if isinstance(value, dict):
+            for raw_key, child in value.items():
+                key = re.sub(r"[^a-z0-9]+", "_", str(raw_key).strip().lower()).strip(
+                    "_"
+                )
+                compact_key = key.replace("_", "")
+                child_path = (*path, str(raw_key))
+                generic_root_label = bool(
+                    allow_generic_root_scenario_name
+                    and not path
+                    and key == "scenario_name"
+                    and isinstance(child, str)
+                    and _GENERIC_REPAIR_CONTEXT_PATTERN.fullmatch(child)
+                )
+                prohibited = bool(
+                    key in _PROHIBITED_REPAIR_PAYLOAD_EXACT_KEYS
+                    or compact_key in {"scenarioname", "scenarionames"}
+                    or key.endswith(
+                        (
+                            "_scenario_id",
+                            "_scenario_ids",
+                            "_task_id",
+                            "_task_ids",
+                        )
+                    )
+                    or compact_key.endswith(
+                        ("scenarioid", "scenarioids", "taskid", "taskids")
+                    )
+                    or "expectedanswer" in compact_key
+                    or "targetstate" in compact_key
+                    or "evaluatortrace" in compact_key
+                    or "outcome" in compact_key
+                    or "successflip" in compact_key
+                )
+                if prohibited and not generic_root_label:
+                    violations.append("$." + ".".join(child_path))
+                visit(child, child_path)
+        elif isinstance(value, (list, tuple)):
+            for index, child in enumerate(value):
+                visit(child, (*path, f"[{index}]"))
+
+    visit(payload, ())
+    return tuple(dict.fromkeys(violations))
+
+
+def _assert_repair_payload_safe(
+    payload: Any,
+    *,
+    label: str,
+    allow_generic_root_scenario_name: bool = False,
+) -> None:
+    violations = prohibited_repair_payload_paths(
+        payload,
+        allow_generic_root_scenario_name=allow_generic_root_scenario_name,
+    )
+    if violations:
+        raise ValueError(
+            f"{label} contains prohibited evaluator-private fields: "
+            + ", ".join(violations)
+        )
+
+
+def _assert_repair_generation_request_safe(request: ToolGenerationRequest) -> None:
+    """Audit both the structured request and the exact generator-facing prompt."""
+
+    _assert_repair_payload_safe(
+        asdict(request),
+        label="post-deployment repair generation request",
+        allow_generic_root_scenario_name=True,
+    )
+    prompt = request.prompt().lower()
+    prompt_violations = [
+        token for token in _PROHIBITED_REPAIR_PROMPT_TOKENS if token in prompt
+    ]
+    if prompt_violations:
+        raise ValueError(
+            "post-deployment repair generator prompt contains prohibited "
+            "evaluator-private field tokens: " + ", ".join(prompt_violations)
+        )
 
 
 def _native_action_observation_priority(
@@ -188,57 +377,6 @@ FIRST_OBSERVATION_BIRTH_KEYS = frozenset(
         "validation:prepare_safe_action_or_abstain",
     }
 )
-CHAIN_ROUTING_FAMILIES_BY_KEY = {
-    "composite:plan_contact_lookup_query": (
-        "update_contact_relationship_with_relationship_twice",
-        "update_contact_relationship_with_relationship",
-        "remove_contact_by_phone",
-    ),
-    "composite:plan_contact_update_from_id": (
-        "update_contact_with_id_and_phone_number",
-        "contact_id_update_argument_planning",
-    ),
-    "composite:prepare_direct_contact_action_args": (
-        "remove_contact_with_id",
-        "send_message_with_phone_number_and_content",
-        "add_contact_with_name_and_phone_number",
-        "update_contact_with_id_and_phone_number",
-    ),
-    "composite:plan_send_message_contact_lookup": (
-        "send_message_with_contact_content",
-        "send_message_with_contact_content_cellular_off",
-    ),
-    "state_precondition:location_service_recovery_sequence": (
-        "turn_on_location_low_battery_mode",
-        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
-        "weather_lookup",
-        "find_distance",
-    ),
-    "state_precondition:plan_device_state_action_sequence": (
-        "cellular_off",
-        "wifi_off",
-        "turn_on_wifi_low_battery_mode",
-        "turn_on_cellular_low_battery_mode",
-        "turn_on_location_low_battery_mode",
-        "send_message_with_contact_content_cellular_off",
-        "find_days_till_holiday_wifi_off",
-        "add_reminder_content_and_week_delta_and_time_and_location_low_battery_mode",
-    ),
-    "composite:select_message_counterparty_for_contact_update": (
-        "modify_contact_with_message_recency",
-        "modify_contact_with_message_recency_alt",
-    ),
-    "derived_value:resolve_search_window_or_bounds": (
-        "search_reminder_with_creation_recency_yesterday",
-        "search_reminder_with_recency_yesterday",
-        "search_reminder_with_recency_upcoming",
-        "search_message_with_recency_latest",
-        "search_message_with_recency_oldest",
-        "modify_reminder_with_recency_latest",
-        "remove_reminder_with_recency_latest",
-    ),
-}
-
 VISIBLE_ROUTING_FAMILIES_BY_KEY = {
     "canonicalizer:next_weekday_time_to_timestamp": (
         "weekday_time",
@@ -576,42 +714,38 @@ def _observation_family_key(observation: CapabilityObservation) -> str:
     value = str(observation.task_family_key or "").strip()
     if value:
         return value
-    return base_task_family(observation.scenario_name)
+    # Non-visible trace observations use their public capability identifier.
+    # A private benchmark scenario name must never become generation/routing
+    # metadata merely because a caller omitted a visible family label.
+    return _normalize_family_label(observation.canonical_key.replace(":", "_"))
 
 
-SCENARIO_LIKE_LABEL_PREFIXES = (
-    "add_reminder_",
-    "remove_reminder_",
-    "modify_reminder_",
-    "search_reminder_",
-    "add_contact_",
-    "remove_contact_",
-    "modify_contact_",
-    "update_contact_",
-    "search_message_",
-    "search_sender_",
-    "send_message_",
-    "search_phone_",
-    "search_name_",
-    "search_relationship_",
-    "find_days_",
-    "find_distance_",
-    "find_holiday_",
-    "find_thanksgiving_",
-    "find_phone_",
-    "find_temperature",
-    "convert_currency",
-    "get_wifi",
-    "get_cellular",
-    "wifi_off",
-    "cellular_off",
-    "turn_on_",
+SCENARIO_VARIANT_MARKERS = (
+    "distraction_tools",
+    "arg_description_scrambled",
+    "arg_type_scrambled",
+    "tool_description_scrambled",
+    "tool_name_scrambled",
+    "insufficient_information",
+    "multiple_user_turn",
+    "all_tools",
 )
 
 
 def _scenario_like_label(item: str) -> bool:
+    """Identify dataset/robustness labels by shape, not benchmark prefixes."""
+
     value = str(item or "").strip().lower()
-    return value.startswith(SCENARIO_LIKE_LABEL_PREFIXES)
+    if not value:
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+    segments = tuple(part for part in normalized.split("_") if part)
+    return bool(
+        any(marker in normalized for marker in SCENARIO_VARIANT_MARKERS)
+        or re.search(r"(?:^|_)\d+_distraction(?:_|$)", normalized)
+        or len(segments) >= 9
+        or len(normalized) > 80
+    )
 
 
 def _normalize_family_label(label: str) -> str:
@@ -643,12 +777,13 @@ def _normalize_live_birth_routing_metadata(
 ) -> GeneratedTool:
     """Stabilize generated routing metadata before validation and registry save.
 
-    Generation models sometimes emit full robustness-variant scenario names as
+    Generation models sometimes emit full robustness-variant scenario labels as
     ``applicable_task_families``. Those names are valid evidence lineage, but
     they are too narrow for natural reuse and can hide an otherwise useful
-    helper on later tasks from the same base family. Normalize them into base
-    family labels derived only from visible scenario names, and add the same
-    labels as trigger tokens so routing does not depend on exact variants.
+    helper on later tasks from the same semantic family. Normalize them into
+    labels derived from visible task context or public capability identifiers,
+    and add the same labels as trigger tokens so routing never depends on a
+    private benchmark name.
     """
 
     family_candidates: list[str] = []
@@ -660,13 +795,11 @@ def _normalize_live_birth_routing_metadata(
         family_candidates.extend(_expanded_family_labels(item))
     if observation.task_family_key:
         family_candidates.extend(_expanded_family_labels(observation.task_family_key))
-    if not visible_context_observation:
-        family_candidates.extend(_expanded_family_labels(observation.scenario_name))
-        for item in CHAIN_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
-            family_candidates.extend(_expanded_family_labels(item))
-    else:
+    if visible_context_observation:
         for item in VISIBLE_ROUTING_FAMILIES_BY_KEY.get(observation.canonical_key, ()):
             family_candidates.extend(_expanded_family_labels(item))
+    elif not family_candidates:
+        family_candidates.extend(_expanded_family_labels(observation.canonical_key))
     normalized_families = _dedupe_nonempty(family_candidates)
     if not normalized_families:
         return tool
@@ -740,7 +873,7 @@ def _resolve_window_validation_examples() -> tuple[ToolExample, ...]:
         ToolExample(
             {
                 "current_timestamp": 1700000000.0,
-                "phrase": "todo item I made yesterday",
+                "phrase": "sample reminder created yesterday",
                 "target_domain": "reminder",
                 "timestamp_intent": "creation",
                 "direction": "yesterday",
@@ -887,28 +1020,31 @@ def _prepare_location_validation_examples() -> tuple[ToolExample, ...]:
     return (
         ToolExample(
             {
-                "user_request": "Add a reminder to buy milk at Whole Foods on Stevens Creek tomorrow.",
+                "user_request": (
+                    "Add a reminder to collect supplies at Example Market on "
+                    "Fiction Avenue tomorrow."
+                ),
                 "location_phrase": "",
                 "latitude": 0.0,
                 "longitude": 0.0,
             },
             {
                 "search_location_kwargs": {
-                    "location": "Whole Foods on Stevens Creek",
+                    "location": "Example Market on Fiction Avenue",
                 },
                 "should_call_downstream_tool": True,
                 "downstream_tool_name": "search_location_around_lat_lon",
                 "downstream_tool_kwargs": {
-                    "location": "Whole Foods on Stevens Creek",
+                    "location": "Example Market on Fiction Avenue",
                 },
-                "location_query": "Whole Foods on Stevens Creek",
+                "location_query": "Example Market on Fiction Avenue",
                 "abstain_reason": "",
             },
         ),
         ToolExample(
             {
-                "user_request": "Add a reminder to buy milk at Whole Foods.",
-                "location_phrase": "Whole Foods",
+                "user_request": "Add a reminder to collect notes at Sample Library.",
+                "location_phrase": "Sample Library",
                 "latitude": 0.0,
                 "longitude": 0.0,
             },
@@ -917,36 +1053,36 @@ def _prepare_location_validation_examples() -> tuple[ToolExample, ...]:
                 "should_call_downstream_tool": False,
                 "downstream_tool_name": "",
                 "downstream_tool_kwargs": {},
-                "location_query": "Whole Foods",
+                "location_query": "Sample Library",
                 "abstain_reason": "missing_reminder_time_before_location_lookup",
             },
             held_out=True,
         ),
         ToolExample(
             {
-                "user_request": "Whole Foods on Stevens Creek",
-                "location_phrase": "Whole Foods",
+                "user_request": "Sample Library on Fiction Boulevard",
+                "location_phrase": "Sample Library",
                 "latitude": 0.0,
                 "longitude": 0.0,
             },
             {
                 "search_location_kwargs": {
-                    "location": "Whole Foods on Stevens Creek",
+                    "location": "Sample Library on Fiction Boulevard",
                 },
                 "should_call_downstream_tool": True,
                 "downstream_tool_name": "search_location_around_lat_lon",
                 "downstream_tool_kwargs": {
-                    "location": "Whole Foods on Stevens Creek",
+                    "location": "Sample Library on Fiction Boulevard",
                 },
-                "location_query": "Whole Foods on Stevens Creek",
+                "location_query": "Sample Library on Fiction Boulevard",
                 "abstain_reason": "",
             },
             held_out=True,
         ),
         ToolExample(
             {
-                "user_request": "Find a Whole Foods near me.",
-                "location_phrase": "Whole Foods",
+                "user_request": "Find an Example Market near me.",
+                "location_phrase": "Example Market",
                 "latitude": 0.0,
                 "longitude": 0.0,
             },
@@ -955,31 +1091,31 @@ def _prepare_location_validation_examples() -> tuple[ToolExample, ...]:
                 "should_call_downstream_tool": True,
                 "downstream_tool_name": "get_current_location",
                 "downstream_tool_kwargs": {},
-                "location_query": "Whole Foods",
+                "location_query": "Example Market",
                 "abstain_reason": "need_current_coordinates_for_broad_location_query",
             },
         ),
         ToolExample(
             {
-                "user_request": "Find a Whole Foods near me.",
-                "location_phrase": "Whole Foods",
-                "latitude": 37.323,
-                "longitude": -122.032,
+                "user_request": "Find a Sample Library near me.",
+                "location_phrase": "Sample Library",
+                "latitude": 35.123,
+                "longitude": -80.456,
             },
             {
                 "search_location_kwargs": {
-                    "location": "Whole Foods",
-                    "latitude": 37.323,
-                    "longitude": -122.032,
+                    "location": "Sample Library",
+                    "latitude": 35.123,
+                    "longitude": -80.456,
                 },
                 "should_call_downstream_tool": True,
                 "downstream_tool_name": "search_location_around_lat_lon",
                 "downstream_tool_kwargs": {
-                    "location": "Whole Foods",
-                    "latitude": 37.323,
-                    "longitude": -122.032,
+                    "location": "Sample Library",
+                    "latitude": 35.123,
+                    "longitude": -80.456,
                 },
-                "location_query": "Whole Foods",
+                "location_query": "Sample Library",
                 "abstain_reason": "",
             },
             held_out=True,
@@ -1073,7 +1209,7 @@ class OnlineBirthController:
     generated_keys: set[str] = field(default_factory=set)
     rejected_counts: Counter[str] = field(default_factory=Counter)
     max_rejections_per_key: int = MAX_REJECTIONS_PER_TOOL_KEY
-    failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
+    failure_memory_path: Path | None = None
     pre_scenario_visible_observations: set[str] = field(default_factory=set)
     observations_by_tool_name: dict[str, CapabilityObservation] = field(
         default_factory=dict
@@ -1215,26 +1351,30 @@ class OnlineBirthController:
         tool_name: str,
         version: int,
         status: str,
+        implementation_proof: dict[str, Any] | None = None,
     ) -> None:
         """Durably close a transaction recovered before hooks are constructed."""
 
         if not request_id or not tool_name or version < 1:
             return
+        event: dict[str, Any] = {
+            "event": "post_deployment_tool_repair_acknowledged",
+            "schema_version": 1,
+            "request_id": request_id,
+            "tool_name": tool_name,
+            "new_version": version,
+            "status": status,
+            "acknowledged_after_completed_count": self.last_completed_count,
+            "eligible_from_completed_count": self.last_completed_count + 1,
+            "future_tasks_only": True,
+            "triggering_task_replay_allowed": False,
+            "recovered_transaction": True,
+        }
+        if implementation_proof is not None:
+            event["implementation_proof"] = implementation_proof
         append_jsonl(
             self.output_dir / POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME,
-            {
-                "event": "post_deployment_tool_repair_acknowledged",
-                "schema_version": 1,
-                "request_id": request_id,
-                "tool_name": tool_name,
-                "new_version": version,
-                "status": status,
-                "acknowledged_after_completed_count": self.last_completed_count,
-                "eligible_from_completed_count": self.last_completed_count + 1,
-                "future_tasks_only": True,
-                "triggering_task_replay_allowed": False,
-                "recovered_transaction": True,
-            },
+            event,
         )
 
     def _load_repair_state(self) -> None:
@@ -1247,7 +1387,15 @@ class OnlineBirthController:
                 pending = payload.get("pending_repair_requests")
                 if isinstance(pending, list):
                     self.pending_repair_requests = [
-                        dict(item) for item in pending if isinstance(item, dict)
+                        sanitized
+                        for item in pending
+                        if isinstance(item, dict)
+                        and (
+                            sanitized := self._sanitize_post_deployment_repair_request(
+                                item
+                            )
+                        )
+                        is not None
                     ]
                 handled = payload.get("handled_repair_request_ids")
                 if isinstance(handled, list):
@@ -1398,6 +1546,31 @@ class OnlineBirthController:
                         tool_name=tool_name,
                         version=acknowledgement_version,
                         status="rejected",
+                        implementation_proof=(
+                            _metadata_implementation_proof(
+                                source_code_hash=str(
+                                    transaction.get("source_code_hash") or ""
+                                ),
+                                replacement_code_hash=(
+                                    entry.stored_code_hash
+                                    if entry is not None
+                                    and entry.version == target_version
+                                    else None
+                                ),
+                                replacement_activated=bool(
+                                    entry is not None
+                                    and entry.version == target_version
+                                ),
+                                model_authored_code_change_discarded=bool(
+                                    (
+                                        transaction.get("metadata_implementation_proof")
+                                        or {}
+                                    ).get("model_authored_code_change_discarded", False)
+                                ),
+                            )
+                            if transaction.get("repair_kind") == "metadata"
+                            else None
+                        ),
                     )
                 self._event(
                     "post_deployment_tool_repair_transaction_recovered",
@@ -1438,7 +1611,7 @@ class OnlineBirthController:
                     and not entry.retired
                     and entry.birth_scenario.startswith("post_deployment_repair:")
                 ):
-                    self.canary_state_by_tool[tool_name] = self._prepared_canary_state(
+                    recovered_canary = self._prepared_canary_state(
                         request_id=request_id,
                         tool_version=version,
                         source_tool_version=max(version - 1, 1),
@@ -1450,6 +1623,24 @@ class OnlineBirthController:
                             default=self.last_completed_count + 1,
                         ),
                     )
+                    if request.get("repair_kind") == "metadata":
+                        recovered_canary["metadata_implementation_proof"] = (
+                            _metadata_implementation_proof(
+                                source_code_hash=str(
+                                    request.get("source_code_hash") or ""
+                                ),
+                                replacement_code_hash=entry.stored_code_hash,
+                                replacement_activated=True,
+                                model_authored_code_change_discarded=bool(
+                                    row.get("implementation_proof", {}).get(
+                                        "model_authored_code_change_discarded", False
+                                    )
+                                    if isinstance(row.get("implementation_proof"), dict)
+                                    else False
+                                ),
+                            )
+                        )
+                    self.canary_state_by_tool[tool_name] = recovered_canary
                 else:
                     if (
                         entry is not None
@@ -1463,6 +1654,18 @@ class OnlineBirthController:
                             tool_name=tool_name,
                             version=version,
                             status="rolled_back",
+                            implementation_proof=(
+                                _metadata_implementation_proof(
+                                    source_code_hash=str(
+                                        request.get("source_code_hash") or ""
+                                    ),
+                                    replacement_code_hash=None,
+                                    replacement_activated=False,
+                                    model_authored_code_change_discarded=False,
+                                )
+                                if request.get("repair_kind") == "metadata"
+                                else None
+                            ),
                         )
                 self.handled_repair_request_ids.add(request_id)
 
@@ -1472,13 +1675,15 @@ class OnlineBirthController:
         }
         for row in request_rows:
             request_id = str(row.get("request_id") or "")
+            sanitized = self._sanitize_post_deployment_repair_request(row)
             if (
                 request_id
+                and sanitized is not None
                 and request_id not in acknowledged_ids
                 and request_id not in self.handled_repair_request_ids
                 and request_id not in pending_ids
             ):
-                self.pending_repair_requests.append(dict(row))
+                self.pending_repair_requests.append(sanitized)
                 pending_ids.add(request_id)
         self._write_repair_state()
 
@@ -1594,94 +1799,20 @@ class OnlineBirthController:
             str(item.get("request_id") or "") for item in self.pending_repair_requests
         }
         for raw_request in requests:
-            request_id = str(raw_request.get("request_id") or "").strip()
-            tool_name = str(raw_request.get("tool_name") or "").strip()
-            repair_kind = str(raw_request.get("repair_kind") or "").strip()
+            sanitized = self._sanitize_post_deployment_repair_request(
+                raw_request,
+                visible_task_family=visible_task_family,
+            )
+            if sanitized is None:
+                continue
+            request_id = str(sanitized["request_id"])
+            tool_name = str(sanitized["tool_name"])
+            repair_kind = str(sanitized["repair_kind"])
             if (
-                not request_id
-                or not tool_name
-                or repair_kind not in {"implementation", "metadata"}
-                or not bool(raw_request.get("future_tasks_only"))
-                or bool(raw_request.get("triggering_task_replay_allowed"))
-                or request_id in self.handled_repair_request_ids
+                request_id in self.handled_repair_request_ids
                 or request_id in already_pending
             ):
                 continue
-            raw_evidence = raw_request.get("public_evidence")
-            public_evidence = (
-                {
-                    str(key): value
-                    for key, value in raw_evidence.items()
-                    if str(key)
-                    in {
-                        "called_count",
-                        "visible_count",
-                        "public_visible_context_count",
-                        "candidate_outcome_observation_count",
-                        "candidate_outcome_mean",
-                        "candidate_outcome_success_rate",
-                        "contract_failure_count",
-                        "success_flip_count",
-                        "failed_count",
-                    }
-                    and isinstance(value, (bool, int, float, type(None)))
-                }
-                if isinstance(raw_evidence, dict)
-                else {}
-            )
-            trusted_target_family = self._trusted_target_task_family(
-                tool_name,
-                raw_request.get("target_task_family"),
-                visible_task_family=visible_task_family,
-            )
-            raw_trigger_count = raw_request.get("trigger_completed_count")
-            raw_eligible_count = raw_request.get("eligible_from_completed_count")
-            trigger_count_valid = bool(
-                isinstance(raw_trigger_count, int)
-                and not isinstance(raw_trigger_count, bool)
-                and raw_trigger_count >= 0
-            )
-            eligible_count_valid = bool(
-                isinstance(raw_eligible_count, int)
-                and not isinstance(raw_eligible_count, bool)
-                and raw_eligible_count > 0
-                and trigger_count_valid
-                and raw_eligible_count > raw_trigger_count
-            )
-            sanitized = {
-                "request_id": request_id,
-                "request_key": str(raw_request.get("request_key") or request_id),
-                "repair_kind": repair_kind,
-                "tool_name": tool_name,
-                "source_tool_version": raw_request.get("source_tool_version"),
-                "target_task_family": trusted_target_family,
-                "trigger_reason_codes": [
-                    str(item)
-                    for item in raw_request.get("trigger_reason_codes", [])
-                    if str(item)
-                    in {
-                        "deterministic_public_contract_failure",
-                        "repeated_generated_tool_execution_failure",
-                        "unresolved_generated_tool_execution_failure",
-                        "repeated_visible_not_called",
-                        "visible_repeatedly_without_adoption",
-                    }
-                ],
-                "trigger_completed_count": (
-                    raw_trigger_count if trigger_count_valid else None
-                ),
-                "eligible_from_completed_count": (
-                    raw_eligible_count if eligible_count_valid else None
-                ),
-                "repair_request_validation_error": (
-                    None
-                    if trigger_count_valid and eligible_count_valid
-                    else "invalid_future_task_completed_count"
-                ),
-                "future_tasks_only": True,
-                "triggering_task_replay_allowed": False,
-                "public_evidence": public_evidence,
-            }
             self.pending_repair_requests.append(sanitized)
             already_pending.add(request_id)
             queued.append(request_id)
@@ -1702,6 +1833,112 @@ class OnlineBirthController:
         if queued:
             self._write_repair_state()
         return tuple(queued)
+
+    def _sanitize_post_deployment_repair_request(
+        self,
+        raw_request: dict[str, Any],
+        *,
+        visible_task_family: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Build the only repair-request shape allowed to reach generation."""
+
+        request_id = str(raw_request.get("request_id") or "").strip()
+        tool_name = str(raw_request.get("tool_name") or "").strip()
+        repair_kind = str(raw_request.get("repair_kind") or "").strip()
+        source_code_hash = (
+            str(raw_request.get("source_code_hash") or "").strip().lower()
+        )
+        if (
+            not request_id
+            or not tool_name
+            or repair_kind not in {"implementation", "metadata"}
+            or (
+                repair_kind == "metadata"
+                and _SHA256_HEX_PATTERN.fullmatch(source_code_hash) is None
+            )
+            or not bool(raw_request.get("future_tasks_only"))
+            or bool(raw_request.get("triggering_task_replay_allowed"))
+        ):
+            return None
+
+        raw_evidence = raw_request.get("public_evidence")
+        public_evidence = (
+            {
+                str(key): value
+                for key, value in raw_evidence.items()
+                if str(key) in POST_DEPLOYMENT_REPAIR_PUBLIC_EVIDENCE_FIELDS
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+                and value >= 0
+            }
+            if isinstance(raw_evidence, dict)
+            else {}
+        )
+        trusted_target_family = self._trusted_target_task_family(
+            tool_name,
+            raw_request.get("target_task_family"),
+            visible_task_family=visible_task_family,
+        )
+        raw_trigger_count = raw_request.get("trigger_completed_count")
+        raw_eligible_count = raw_request.get("eligible_from_completed_count")
+        trigger_count_valid = bool(
+            isinstance(raw_trigger_count, int)
+            and not isinstance(raw_trigger_count, bool)
+            and raw_trigger_count >= 0
+        )
+        eligible_count_valid = bool(
+            isinstance(raw_eligible_count, int)
+            and not isinstance(raw_eligible_count, bool)
+            and raw_eligible_count > 0
+            and trigger_count_valid
+            and raw_eligible_count > raw_trigger_count
+        )
+        sanitized = {
+            "request_id": request_id,
+            "repair_kind": repair_kind,
+            "tool_name": tool_name,
+            "source_code_hash": (
+                source_code_hash if repair_kind == "metadata" else None
+            ),
+            "source_tool_version": (
+                raw_request.get("source_tool_version")
+                if isinstance(raw_request.get("source_tool_version"), int)
+                and not isinstance(raw_request.get("source_tool_version"), bool)
+                else None
+            ),
+            "target_task_family": trusted_target_family,
+            "trigger_reason_codes": [
+                str(item)
+                for item in raw_request.get("trigger_reason_codes", [])
+                if str(item)
+                in {
+                    "deterministic_public_contract_failure",
+                    "repeated_generated_tool_execution_failure",
+                    "unresolved_generated_tool_execution_failure",
+                    "repeated_visible_not_called",
+                    "visible_repeatedly_without_adoption",
+                }
+            ],
+            "trigger_completed_count": (
+                raw_trigger_count if trigger_count_valid else None
+            ),
+            "eligible_from_completed_count": (
+                raw_eligible_count if eligible_count_valid else None
+            ),
+            "repair_request_validation_error": (
+                None
+                if trigger_count_valid and eligible_count_valid
+                else "invalid_future_task_completed_count"
+            ),
+            "future_tasks_only": True,
+            "triggering_task_replay_allowed": False,
+            "public_evidence": public_evidence,
+        }
+        _assert_repair_payload_safe(
+            sanitized,
+            label="sanitized post-deployment repair request",
+        )
+        return sanitized
 
     def contract_failures_for_tools(
         self, tool_names: list[str] | tuple[str, ...]
@@ -1792,13 +2029,20 @@ class OnlineBirthController:
                     "decision_uses_score": False,
                 }
                 self._event(decision["event"], decision)
-                if acknowledge is not None and request_id:
-                    acknowledge(
-                        tool_name,
-                        acknowledgement_version,
-                        request_id,
-                        "rolled_back",
-                    )
+                acknowledged = self._acknowledge_repair_without_escaping(
+                    acknowledge,
+                    tool_name=tool_name,
+                    version=acknowledgement_version,
+                    request_id=request_id,
+                    status="rolled_back",
+                    implementation_proof=(
+                        state.get("metadata_implementation_proof")
+                        if isinstance(state.get("metadata_implementation_proof"), dict)
+                        else None
+                    ),
+                )
+                if not acknowledged:
+                    continue
                 if request_id:
                     self.handled_repair_request_ids.add(request_id)
                 self.canary_state_by_tool.pop(tool_name, None)
@@ -2027,13 +2271,20 @@ class OnlineBirthController:
                 "decision_uses_score": False,
             }
             self._event(event_name, decision)
-            if acknowledge is not None:
-                acknowledge(
-                    tool_name,
-                    entry.version,
-                    state["request_id"],
-                    status,
-                )
+            acknowledged = self._acknowledge_repair_without_escaping(
+                acknowledge,
+                tool_name=tool_name,
+                version=entry.version,
+                request_id=str(state["request_id"]),
+                status=status,
+                implementation_proof=(
+                    state.get("metadata_implementation_proof")
+                    if isinstance(state.get("metadata_implementation_proof"), dict)
+                    else None
+                ),
+            )
+            if not acknowledged:
+                continue
             self.canary_state_by_tool.pop(tool_name, None)
             decisions.append(decision)
         self._write_repair_state()
@@ -2061,6 +2312,10 @@ class OnlineBirthController:
         scenario_label = observation.task_context_label or observation.scenario_name
         inadequacy_evidence = observation.to_inadequacy_evidence().to_json()
         if lifecycle_request is not None:
+            _assert_repair_payload_safe(
+                lifecycle_request,
+                label="queued post-deployment repair request",
+            )
             repair_kind = str(lifecycle_request.get("repair_kind") or "implementation")
             target_family = str(
                 lifecycle_request.get("target_task_family") or "unclassified"
@@ -2075,14 +2330,7 @@ class OnlineBirthController:
                 {
                     key: value
                     for key, value in raw_public_evidence.items()
-                    if key
-                    in {
-                        "called_count",
-                        "visible_count",
-                        "public_visible_context_count",
-                        "contract_failure_count",
-                        "failed_count",
-                    }
+                    if key in POST_DEPLOYMENT_REPAIR_PUBLIC_EVIDENCE_FIELDS
                 }
                 if isinstance(raw_public_evidence, dict)
                 else {}
@@ -2099,17 +2347,19 @@ class OnlineBirthController:
                     ),
                     "public_aggregate_evidence": prompt_safe_public_evidence,
                     "future_tasks_only": True,
-                    "task_specific_expected_values_available": False,
                 },
             }
             cluster_context = {
+                key: value
+                for key, value in cluster_context.items()
+                if key not in {"scenarios", "source_task_ids_available"}
+            }
+            cluster_context = {
                 **cluster_context,
-                "scenarios": [],
-                "source_task_ids_available": False,
                 "repair_kind": repair_kind,
                 "target_task_family": target_family,
             }
-        return ToolGenerationRequest(
+        request = ToolGenerationRequest(
             scenario_name=scenario_label,
             observation=observation.observation,
             allowed_families=observation.allowed_families,
@@ -2135,6 +2385,9 @@ class OnlineBirthController:
             ),
             shortfall_cluster_context=cluster_context,
         )
+        if lifecycle_request is not None:
+            _assert_repair_generation_request_safe(request)
+        return request
 
     def _remove_pending_repair_request(self, request_id: str) -> None:
         self.pending_repair_requests = [
@@ -2151,11 +2404,21 @@ class OnlineBirthController:
         version: int,
         request_id: str,
         status: str,
+        implementation_proof: dict[str, Any] | None = None,
     ) -> bool:
         if acknowledge is None or not request_id or not tool_name:
             return True
         try:
-            acknowledge(tool_name, max(version, 1), request_id, status)
+            if implementation_proof is None:
+                acknowledge(tool_name, max(version, 1), request_id, status)
+            else:
+                acknowledge(
+                    tool_name,
+                    max(version, 1),
+                    request_id,
+                    status,
+                    implementation_proof,
+                )
         except Exception as exc:
             self._event(
                 "post_deployment_tool_repair_acknowledgement_failed",
@@ -2179,6 +2442,7 @@ class OnlineBirthController:
         event_name: str = "post_deployment_tool_repair_retired",
         error: BaseException | None = None,
         retire_current: bool = True,
+        implementation_proof: dict[str, Any] | None = None,
     ) -> None:
         request_id = str(lifecycle_request.get("request_id") or "")
         tool_name = str(lifecycle_request.get("tool_name") or "")
@@ -2210,6 +2474,23 @@ class OnlineBirthController:
             version=source_version,
             request_id=request_id,
             status="rejected",
+            implementation_proof=(
+                implementation_proof
+                or _metadata_implementation_proof(
+                    source_code_hash=str(
+                        lifecycle_request.get("source_code_hash") or ""
+                    ),
+                    replacement_code_hash=None,
+                    replacement_activated=False,
+                    model_authored_code_change_discarded=bool(
+                        lifecycle_request.get(
+                            "model_authored_code_change_discarded", False
+                        )
+                    ),
+                )
+                if lifecycle_request.get("repair_kind") == "metadata"
+                else None
+            ),
         )
         if acknowledged:
             self._remove_pending_repair_request(request_id)
@@ -2244,6 +2525,7 @@ class OnlineBirthController:
             lifecycle_request = dict(raw_lifecycle_request)
             request_id = str(lifecycle_request.get("request_id") or "")
             tool_name = str(lifecycle_request.get("tool_name") or "")
+            repair_kind = str(lifecycle_request.get("repair_kind") or "")
             trigger_count = lifecycle_request.get("trigger_completed_count")
             eligible_count = lifecycle_request.get("eligible_from_completed_count")
             valid_ordinals = bool(
@@ -2314,6 +2596,20 @@ class OnlineBirthController:
                     retire_current=False,
                 )
                 continue
+            source_code_hash = (
+                str(lifecycle_request.get("source_code_hash") or "").strip().lower()
+            )
+            if repair_kind == "metadata" and (
+                not entry.code_hash_verified
+                or entry.stored_code_hash != source_code_hash
+                or code_hash(entry.tool.code) != source_code_hash
+            ):
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="metadata_source_implementation_hash_mismatch",
+                    acknowledge=acknowledge,
+                )
+                continue
             if observation is None:
                 self._event(
                     "post_deployment_tool_repair_deferred",
@@ -2336,7 +2632,10 @@ class OnlineBirthController:
                     "request_id": request_id,
                     "tool_name": tool_name,
                     "source_tool_version": entry.version,
-                    "repair_kind": lifecycle_request.get("repair_kind"),
+                    "repair_kind": repair_kind,
+                    "source_code_hash": (
+                        source_code_hash if repair_kind == "metadata" else None
+                    ),
                     "completed_count": completed_count,
                     "eligible_from_completed_count": eligible_count,
                     "future_tasks_only": True,
@@ -2380,6 +2679,7 @@ class OnlineBirthController:
 
             best_tool: GeneratedTool | None = None
             best_validation: ValidationResult | None = None
+            model_authored_code_change_discarded = False
             seed_tool = entry.tool
             seed_errors = tuple(
                 dict.fromkeys(
@@ -2423,12 +2723,47 @@ class OnlineBirthController:
                 ] = []
                 for candidate_index, raw_candidate in enumerate(candidates):
                     try:
+                        if repair_kind == "metadata" and (
+                            raw_candidate.code != entry.tool.code
+                            or code_hash(raw_candidate.code) != source_code_hash
+                        ):
+                            model_authored_code_change_discarded = True
+                            lifecycle_request[
+                                "model_authored_code_change_discarded"
+                            ] = True
+                            self._event(
+                                "post_deployment_metadata_code_change_discarded",
+                                {
+                                    "request_id": request_id,
+                                    "tool_name": tool_name,
+                                    "attempt": attempt,
+                                    "candidate_index": candidate_index,
+                                    "source_code_hash": source_code_hash,
+                                    "model_candidate_code_hash": code_hash(
+                                        raw_candidate.code
+                                    ),
+                                    "executable_candidate_code_hash": source_code_hash,
+                                    "model_authored_code_executed": False,
+                                },
+                            )
+                            raw_candidate = replace(
+                                raw_candidate,
+                                code=entry.tool.code,
+                            )
                         candidate = _normalize_live_birth_routing_metadata(
                             raw_candidate,
                             observation,
                             base_task_families,
                         )
-                        if candidate.spec.tool_name != tool_name:
+                        if repair_kind == "metadata" and (
+                            candidate.code != entry.tool.code
+                            or code_hash(candidate.code) != source_code_hash
+                        ):
+                            validation = ValidationResult(
+                                False,
+                                ("metadata_repair_changed_executable_implementation",),
+                            )
+                        elif candidate.spec.tool_name != tool_name:
                             validation = ValidationResult(
                                 False,
                                 ("post_deployment_repair_changed_tool_name",),
@@ -2467,6 +2802,16 @@ class OnlineBirthController:
                         "attempt": attempt,
                         "candidate_count": len(candidate_results),
                         "accepted": validation.accepted,
+                        "implementation_code_preserved": (
+                            code_hash(candidate.code) == source_code_hash
+                            if repair_kind == "metadata"
+                            else None
+                        ),
+                        "model_authored_code_change_discarded": (
+                            model_authored_code_change_discarded
+                            if repair_kind == "metadata"
+                            else None
+                        ),
                         "error_labels": list(_repair_prompt_errors(validation.errors)),
                     },
                 )
@@ -2496,6 +2841,16 @@ class OnlineBirthController:
                     acknowledge=acknowledge,
                 )
                 continue
+            if repair_kind == "metadata" and (
+                best_tool.code != entry.tool.code
+                or code_hash(best_tool.code) != source_code_hash
+            ):
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="metadata_repair_changed_executable_implementation",
+                    acknowledge=acknowledge,
+                )
+                continue
 
             birth_scenario = (
                 "post_deployment_repair:"
@@ -2506,6 +2861,16 @@ class OnlineBirthController:
                 best_validation,
                 birth_scenario=birth_scenario,
             )
+            if repair_kind == "metadata" and (
+                replacement.stored_code_hash != source_code_hash
+                or not replacement.code_hash_verified
+            ):
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="metadata_replacement_implementation_hash_mismatch",
+                    acknowledge=acknowledge,
+                )
+                continue
             target_version = entry.version + 1
             canary_state = self._prepared_canary_state(
                 request_id=request_id,
@@ -2514,6 +2879,20 @@ class OnlineBirthController:
                 target_task_family=str(lifecycle_request["target_task_family"]),
                 eligible_from_completed_count=eligible_count,
             )
+            metadata_proof = (
+                _metadata_implementation_proof(
+                    source_code_hash=source_code_hash,
+                    replacement_code_hash=replacement.stored_code_hash,
+                    replacement_activated=True,
+                    model_authored_code_change_discarded=(
+                        model_authored_code_change_discarded
+                    ),
+                )
+                if repair_kind == "metadata"
+                else None
+            )
+            if metadata_proof is not None:
+                canary_state["metadata_implementation_proof"] = metadata_proof
             self.repair_transactions_by_tool[tool_name] = {
                 "phase": "canary_prepared",
                 "request_id": request_id,
@@ -2523,7 +2902,12 @@ class OnlineBirthController:
                 "target_task_family": lifecycle_request["target_task_family"],
                 "eligible_from_completed_count": eligible_count,
                 "prepared_after_completed_count": completed_count,
+                "repair_kind": repair_kind,
+                "source_code_hash": (
+                    source_code_hash if repair_kind == "metadata" else None
+                ),
                 "replacement_code_hash": replacement.stored_code_hash,
+                "metadata_implementation_proof": metadata_proof,
                 "canary_state": canary_state,
             }
             # This write is the transaction boundary: an active vN+1 must never
@@ -2538,6 +2922,14 @@ class OnlineBirthController:
                     or saved_entry.retired
                     or saved_entry.birth_scenario != birth_scenario
                     or saved_entry.stored_code_hash != replacement.stored_code_hash
+                    or (
+                        repair_kind == "metadata"
+                        and (
+                            saved_entry.tool.code != entry.tool.code
+                            or saved_entry.stored_code_hash != source_code_hash
+                            or not saved_entry.code_hash_verified
+                        )
+                    )
                 ):
                     raise RuntimeError("activated repair version did not match lineage")
                 snapshot_dir = self.output_dir / "generated_tool_snapshots"
@@ -2545,11 +2937,33 @@ class OnlineBirthController:
                 snapshot_path = snapshot_dir / f"{tool_name}_v{saved_entry.version}.py"
                 snapshot_path.write_text(best_tool.code + "\n", encoding="utf-8")
             except Exception as exc:
+                current_after_failure = self.store.get(tool_name)
+                replacement_activated = bool(
+                    current_after_failure is not None
+                    and current_after_failure.version == target_version
+                )
+                activation_failure_proof = (
+                    _metadata_implementation_proof(
+                        source_code_hash=source_code_hash,
+                        replacement_code_hash=(
+                            current_after_failure.stored_code_hash
+                            if replacement_activated
+                            else None
+                        ),
+                        replacement_activated=replacement_activated,
+                        model_authored_code_change_discarded=(
+                            model_authored_code_change_discarded
+                        ),
+                    )
+                    if repair_kind == "metadata"
+                    else None
+                )
                 self._reject_pending_repair(
                     lifecycle_request,
                     reason="repair_activation_failed",
                     acknowledge=acknowledge,
                     error=exc,
+                    implementation_proof=activation_failure_proof,
                 )
                 continue
 
@@ -2567,6 +2981,24 @@ class OnlineBirthController:
                     "source_tool_version": entry.version,
                     "new_tool_version": saved_entry.version,
                     "repair_kind": lifecycle_request.get("repair_kind"),
+                    "source_code_hash": (
+                        source_code_hash if repair_kind == "metadata" else None
+                    ),
+                    "replacement_code_hash": (
+                        saved_entry.stored_code_hash
+                        if repair_kind == "metadata"
+                        else None
+                    ),
+                    "implementation_preserved": (
+                        metadata_proof["implementation_preserved"]
+                        if metadata_proof is not None
+                        else None
+                    ),
+                    "model_authored_code_change_discarded": (
+                        model_authored_code_change_discarded
+                        if repair_kind == "metadata"
+                        else None
+                    ),
                     "snapshot_path": str(snapshot_path),
                     "canary_eligible_from_next_task": True,
                     "eligible_from_completed_count": eligible_count,
@@ -2580,6 +3012,7 @@ class OnlineBirthController:
                 version=saved_entry.version,
                 request_id=request_id,
                 status="canary_pending",
+                implementation_proof=metadata_proof,
             )
         self._write_repair_state()
         return tuple(accepted_tools)
@@ -2634,12 +3067,28 @@ class OnlineBirthController:
                 self.output_dir / "post_deployment_lifecycle_finalization.jsonl",
                 decision,
             )
-            if acknowledge is not None and request_id and tool_name:
-                acknowledge(tool_name, version, request_id, "rejected")
-            if request_id:
+            acknowledged = self._acknowledge_repair_without_escaping(
+                acknowledge,
+                tool_name=tool_name,
+                version=version,
+                request_id=request_id,
+                status="rejected",
+                implementation_proof=(
+                    _metadata_implementation_proof(
+                        source_code_hash=str(request.get("source_code_hash") or ""),
+                        replacement_code_hash=None,
+                        replacement_activated=False,
+                        model_authored_code_change_discarded=False,
+                    )
+                    if request.get("repair_kind") == "metadata"
+                    else None
+                ),
+            )
+            if acknowledged and request_id:
                 self.handled_repair_request_ids.add(request_id)
             decisions.append(decision)
-        self.pending_repair_requests.clear()
+            if acknowledged:
+                self._remove_pending_repair_request(request_id)
 
         for tool_name, state in list(self.canary_state_by_tool.items()):
             request_id = str(state.get("request_id") or "")
@@ -2723,11 +3172,22 @@ class OnlineBirthController:
                 self.output_dir / "post_deployment_lifecycle_finalization.jsonl",
                 decision,
             )
-            if acknowledge is not None and request_id:
-                acknowledge(tool_name, version, request_id, "rolled_back")
-            if request_id:
+            acknowledged = self._acknowledge_repair_without_escaping(
+                acknowledge,
+                tool_name=tool_name,
+                version=version,
+                request_id=request_id,
+                status="rolled_back",
+                implementation_proof=(
+                    state.get("metadata_implementation_proof")
+                    if isinstance(state.get("metadata_implementation_proof"), dict)
+                    else None
+                ),
+            )
+            if acknowledged and request_id:
                 self.handled_repair_request_ids.add(request_id)
-            self.canary_state_by_tool.pop(tool_name, None)
+            if acknowledged:
+                self.canary_state_by_tool.pop(tool_name, None)
             decisions.append(decision)
 
         self._write_repair_state()
@@ -2922,11 +3382,9 @@ class OnlineBirthController:
             "repeated_failed_tool_calls": list(observation.repeated_failed_tool_calls),
             "failed_tool_calls": list(observation.failed_tool_calls),
             "inadequacy_signals": list(observation.inadequacy_signals),
-            "current_helper_fit": (
-                ()
-                if observation.task_context_label
-                else expected_helper_fit(observation.scenario_name)
-            ),
+            # Do not consult evaluation-side benchmark prefix maps. Current fit
+            # is established by public capability metadata and validation only.
+            "current_helper_fit": (),
             "positive_applicability_example_count": sum(
                 1
                 for item in observation.validation_examples

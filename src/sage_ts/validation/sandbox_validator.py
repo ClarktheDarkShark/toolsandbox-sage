@@ -83,6 +83,7 @@ _ABSTENTION_DECISION_KEYS = (
     "abstain_reason",
     "final_answer_recommendation",
 )
+_ABSTENTION_DECISION_KEY_SET = frozenset(_ABSTENTION_DECISION_KEYS)
 
 _CAPABILITY_ALIASES = {
     "search_contacts": "contact_lookup",
@@ -173,6 +174,36 @@ _FACT_PHRASE_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
 }
 
+_DEFICIT_PHRASE_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("missing",),
+    ("unavailable",),
+    ("absent",),
+    ("unresolved",),
+    ("unknown",),
+    ("ambiguous",),
+    ("unclear",),
+    ("insufficient",),
+    ("incomplete",),
+    ("cannot",),
+    ("can", "t"),
+    ("unable",),
+    ("need",),
+    ("needs",),
+    ("needed",),
+    ("require",),
+    ("requires",),
+    ("required",),
+    ("not", "available"),
+    ("not", "provided"),
+    ("not", "specified"),
+    ("not", "known"),
+    ("not", "enough"),
+    ("no", "access"),
+    ("please", "provide"),
+    ("please", "specify"),
+    ("please", "clarify"),
+)
+
 
 def _canonical_semantic_label(value: Any) -> str:
     text = str(value or "").strip().lower()
@@ -216,6 +247,35 @@ def _recommendation_mentions_fact(recommendation: str, fact: str) -> bool:
     return any(all(token in text for token in group) for group in groups if group)
 
 
+def _recommendation_expresses_deficit(recommendation: str) -> bool:
+    """Require abstention prose to state that a prerequisite is not satisfied."""
+
+    ordered_tokens = re.findall(r"[a-z0-9]+", recommendation.lower())
+    normalized = " ".join(ordered_tokens)
+    # Do not treat a deficit word as sufficient when the sentence explicitly
+    # negates it or says that the supposedly missing prerequisite succeeded.  The
+    # old unordered-token check accepted both "lookup is not needed" and "the
+    # missing lookup succeeded", which state the opposite of a safe abstention.
+    negated_deficit = re.search(
+        r"\b(?:not|no longer) (?:missing|unavailable|absent|unresolved|unknown|"
+        r"ambiguous|unclear|insufficient|incomplete|needed|required)\b",
+        normalized,
+    )
+    contradicted_deficit = re.search(
+        r"\b(?:missing|unavailable|absent|unresolved|unknown|ambiguous|unclear|"
+        r"insufficient|incomplete|needed|required)\b(?: [a-z0-9]+){0,6} "
+        r"(?:succeeded|succeeds|available|present|resolved|complete|completed|"
+        r"provided|found|works|working)\b",
+        normalized,
+    )
+    if negated_deficit or contradicted_deficit:
+        return False
+    tokens = set(ordered_tokens)
+    return any(
+        all(token in tokens for token in group) for group in _DEFICIT_PHRASE_GROUPS
+    )
+
+
 def _required_recommendation_facts(expected: dict[str, Any]) -> tuple[str, ...]:
     facts = list(_semantic_labels(expected.get("missing_information")))
     reason = _canonical_abstain_reason(expected.get("abstain_reason"))
@@ -239,13 +299,31 @@ def _raw_structured_abstention_errors(
         return (f"{label}_raw_abstention_expected_not_object",)
 
     errors: list[str] = []
+    actual_keys = set(actual)
+    if actual_keys != _ABSTENTION_DECISION_KEY_SET:
+        missing_keys = sorted(_ABSTENTION_DECISION_KEY_SET - actual_keys)
+        extra_keys = sorted(
+            repr(key) for key in actual_keys - _ABSTENTION_DECISION_KEY_SET
+        )
+        if missing_keys:
+            errors.append(f"{label}_raw_missing_keys:{','.join(missing_keys)}")
+        if extra_keys:
+            errors.append(f"{label}_raw_extra_keys:{','.join(extra_keys)}")
     for key in _ABSTENTION_DECISION_KEYS:
         if key not in actual:
             errors.append(f"{label}_raw_missing_key:{key}")
 
-    expected_should_abstain = bool(expected.get("should_abstain"))
-    actual_should_abstain = bool(actual.get("should_abstain"))
-    if actual_should_abstain != expected_should_abstain:
+    expected_should_abstain = expected.get("should_abstain")
+    actual_should_abstain = actual.get("should_abstain")
+    if type(actual_should_abstain) is not bool:
+        errors.append(f"{label}_raw_should_abstain_not_bool")
+    if type(expected_should_abstain) is not bool:
+        errors.append(f"{label}_raw_expected_should_abstain_not_bool")
+    if (
+        type(actual_should_abstain) is bool
+        and type(expected_should_abstain) is bool
+        and actual_should_abstain != expected_should_abstain
+    ):
         errors.append(
             f"{label}_raw_should_abstain:{actual_should_abstain!r}"
             f"!={expected_should_abstain!r}"
@@ -262,6 +340,10 @@ def _raw_structured_abstention_errors(
                 f"!={sorted(expected_items)!r}"
             )
 
+    for key in ("safe_next_action", "final_answer_recommendation", "abstain_reason"):
+        if not isinstance(actual.get(key), str):
+            errors.append(f"{label}_raw_{key}_not_string")
+
     actual_next_action = _canonical_semantic_label(actual.get("safe_next_action"))
     expected_next_action = _canonical_semantic_label(expected.get("safe_next_action"))
     if actual_next_action != expected_next_action:
@@ -277,11 +359,18 @@ def _raw_structured_abstention_errors(
             f"{label}_raw_abstain_reason:{actual_reason!r}!={expected_reason!r}"
         )
 
-    recommendation = str(actual.get("final_answer_recommendation") or "").strip()
-    if expected_should_abstain:
+    raw_recommendation = actual.get("final_answer_recommendation")
+    recommendation = (
+        raw_recommendation.strip() if isinstance(raw_recommendation, str) else ""
+    )
+    if expected_should_abstain is True:
         if not recommendation:
             errors.append(f"{label}_raw_final_recommendation_missing")
         else:
+            if not _recommendation_expresses_deficit(recommendation):
+                errors.append(
+                    f"{label}_raw_final_recommendation_missing_deficit_semantics"
+                )
             missing_facts = [
                 fact
                 for fact in _required_recommendation_facts(expected)
@@ -358,8 +447,16 @@ def _blind_abstention_result_errors(
     if not isinstance(actual, dict):
         return (f"{label}_output_not_object",)
     errors: list[str] = []
-    if not bool(actual.get("should_abstain")):
+    actual_keys = set(actual)
+    if actual_keys != _ABSTENTION_DECISION_KEY_SET:
+        errors.append(f"{label}_output_keys")
+    if type(actual.get("should_abstain")) is not bool:
+        errors.append(f"{label}_should_abstain_not_bool")
+    elif actual["should_abstain"] is not True:
         errors.append(f"{label}_should_abstain")
+    for key in ("safe_next_action", "final_answer_recommendation", "abstain_reason"):
+        if not isinstance(actual.get(key), str):
+            errors.append(f"{label}_{key}_not_string")
     if _canonical_semantic_label(actual.get("safe_next_action")) != (
         "ask_user_or_abstain"
     ):
@@ -379,6 +476,8 @@ def _blind_abstention_result_errors(
         recommendation, required_fact
     ):
         errors.append(f"{label}_final_recommendation_fact")
+    if recommendation and not _recommendation_expresses_deficit(recommendation):
+        errors.append(f"{label}_final_recommendation_deficit_semantics")
     return tuple(errors)
 
 
@@ -455,6 +554,8 @@ def _validate_blind_abstention_properties(
             available_values = list(available_raw)
         else:
             available_values = []
+        target = str(inputs.get("target_identifier") or "").strip()
+        action = inputs.get("requested_action")
         for capability_index, capability in enumerate(required_items):
             reduced_available = [
                 item
@@ -483,8 +584,32 @@ def _validate_blind_abstention_properties(
                 )
             )
 
-        target = str(inputs.get("target_identifier") or "").strip()
-        action = inputs.get("requested_action")
+            # Capability availability is the first safety gate. Withholding a
+            # capability and a mutating action's target at the same time must
+            # therefore retain the capability-specific abstention decision.
+            if target and _action_requires_target(action):
+                combined_variant = dict(variant)
+                combined_variant["target_identifier"] = ""
+                try:
+                    combined_actual = function(**combined_variant)
+                except Exception as exc:
+                    errors.append(
+                        f"blind_property_{index}_missing_capability_"
+                        f"{capability_index}_and_target_error:"
+                        f"{type(exc).__name__}"
+                    )
+                else:
+                    errors.extend(
+                        _blind_abstention_result_errors(
+                            f"blind_property_{index}_missing_capability_"
+                            f"{capability_index}_and_target",
+                            combined_actual,
+                            required_fact=capability,
+                            expected_reason="missing_required_original_tool",
+                            require_original_tool_fact=True,
+                        )
+                    )
+
         if target and _action_requires_target(action):
             variant = dict(inputs)
             variant["target_identifier"] = ""

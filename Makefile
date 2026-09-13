@@ -11,13 +11,13 @@ SAMPLE_REPORT ?=
 ANALYSIS_OUTPUT ?=
 EVIDENCE_DATA ?=
 TABLE_OUTPUT ?=
-VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v3.json
+VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v4.json
 
 COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 
 .PHONY: \
 	compile lint test-core test lifecycle-mechanics package \
-	paper-online paper-frozen lifecycle-dev10 lifecycle-dev30 sample full \
+	paper-online paper-frozen lifecycle-dev10 lifecycle-dev30 lifecycle-transfer-dev30 sample full \
 	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
@@ -37,7 +37,10 @@ test-core:
 	$(COMMON_ENV) $(PYTHON) -m pytest \
 		tests/unit/test_sage_run_adapter.py \
 		tests/unit/test_toolsandbox_adapter.py \
+		tests/unit/test_actor_visible_inventory.py \
+		tests/unit/test_actor_visible_policy_catalog.py \
 		tests/unit/test_openai_toolsandbox_roles.py \
+		tests/unit/test_inadequacy_classifier_integrity.py \
 		tests/unit/test_online_birth.py \
 		tests/unit/test_tool_generator.py \
 		tests/unit/test_control_baseline_cache.py \
@@ -97,6 +100,14 @@ lifecycle-dev10:
 
 lifecycle-dev30:
 	bash scripts/run_native_action_4omini_ab.sh dev30 $(PORT) development-only development-diagnostic
+
+# Validate the exact promoted registry from a passing dev10 on the disjoint
+# dev30 cohort, with generation and lifecycle mutation disabled.
+lifecycle-transfer-dev30:
+	@test -n "$(SOURCE_DEV10_RUN)" || \
+		(echo "Set SOURCE_DEV10_RUN to the exact passing dev10 run root." >&2; exit 2)
+	LIFECYCLE_TRANSFER_SOURCE_RUN="$(SOURCE_DEV10_RUN)" \
+		bash scripts/run_native_action_4omini_ab.sh dev30 $(PORT) development-transfer development-diagnostic
 
 sample: paper-online
 

@@ -13,27 +13,32 @@ from sage_ts.adequacy.inadequacy_classifier import (
     _relative_day_time_timestamp_observation,
     _reminder_optional_location_argument_observation,
     _resolve_search_window_or_bounds_observation,
+    _safe_action_or_abstain_observation,
+    _send_message_contact_lookup_observation,
     _visible_task_signals,
     classify_visible_task_observations,
+    visible_task_context_from_scenario,
 )
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import (
-    CHAIN_ROUTING_FAMILIES_BY_KEY,
     FIRST_OBSERVATION_BIRTH_KEYS,
     OnlineBirthController,
     _advances_repair_case_frontier,
     _complements_validated_native_action,
     _native_action_observation_priority,
+    _scenario_like_label,
     _validation_error_case_labels,
     _validation_failure_score,
 )
 from sage_ts.registry.store import RegistryStore
+from sage_ts.runtime.actor_visible_inventory import actor_visible_tool_inventory
 from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
     RoleType,
+    ScenarioCategories,
 )
 from tool_sandbox.common.scenario import Scenario
 
@@ -47,13 +52,13 @@ _CONTACT_LOOKUP_TOOL_NAME = "plan_contact_lookup_query"
 def test_contact_update_counterparty_helper_does_not_route_to_answer_only_sender_lookup() -> (
     None
 ):
-    families = CHAIN_ROUTING_FAMILIES_BY_KEY[
+    families = online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
         "composite:select_message_counterparty_for_contact_update"
     ]
 
-    assert "modify_contact_with_message_recency" in families
-    assert "modify_contact_with_message_recency_alt" in families
-    assert "search_sender_phone_number_with_content" not in families
+    assert "message_counterparty_update" in families
+    assert "modify_contact" in families
+    assert "sender_phone_number_answer" not in families
 
 
 def test_first_observation_birth_includes_direct_status_and_day_distance() -> None:
@@ -72,18 +77,21 @@ def test_first_observation_birth_includes_direct_status_and_day_distance() -> No
 
 
 def test_decomposed_recency_tools_route_only_to_matching_visible_signals() -> None:
-    assert (
-        CHAIN_ROUTING_FAMILIES_BY_KEY.get(
-            "derived_value:prepare_upcoming_reminder_search_args", ()
-        )
-        == ()
-    )
     assert online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
         "derived_value:prepare_upcoming_reminder_search_args"
     ] == ("upcoming_reminder_search",)
     assert online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
         "derived_value:prepare_past_reminder_recency_search_args"
     ] == ("past_reminder_recency_search",)
+
+
+def test_scenario_like_labels_are_detected_by_shape_not_task_prefix() -> None:
+    assert _scenario_like_label(
+        "arbitrary_operation_missing_capability_3_distraction_tools_tool_name_scrambled"
+    )
+    assert _scenario_like_label("any_family_insufficient_information")
+    assert not _scenario_like_label("bounded_recency_search")
+    assert not _scenario_like_label("message_counterparty_update")
 
 
 def test_visible_context_contact_phone_mutation_is_not_external_lookup() -> None:
@@ -307,6 +315,76 @@ def test_visible_reminder_relative_time_births_timestamp_tool_without_scenario_n
 
     assert "canonicalizer:relative_day_time_timestamp" in keys
     assert "composite:prepare_reminder_creation_args" in keys
+
+
+def test_scrambled_native_names_do_not_enter_visible_lifecycle_context(
+    monkeypatch,
+) -> None:
+    context = ExecutionContext(
+        tool_allow_list=["search_contacts", "modify_contact", "end_conversation"],
+        tool_augmentation_list=[ScenarioCategories.TOOL_NAME_SCRAMBLED],
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "Who are my friends?",
+            }
+        ],
+    )
+    scenario = Scenario(starting_context=context)
+    inventory_reads: list[bool] = []
+    original_get_available_tools = context.get_available_tools
+
+    def tracked_get_available_tools(*, scrambling_allowed: bool):
+        inventory_reads.append(scrambling_allowed)
+        return original_get_available_tools(scrambling_allowed=scrambling_allowed)
+
+    monkeypatch.setattr(context, "get_available_tools", tracked_get_available_tools)
+
+    visible = visible_task_context_from_scenario(scenario)
+    inventory = actor_visible_tool_inventory(context)
+    routing_text = visible.routing_text()
+    generation_label = visible.generation_label()
+
+    assert set(visible.available_tools) == {
+        context.get_agent_facing_tool_name("search_contacts"),
+        context.get_agent_facing_tool_name("modify_contact"),
+    }
+    assert context.get_agent_facing_tool_name("end_conversation") not in inventory.names
+    assert "search_contacts" not in routing_text
+    assert "modify_contact" not in routing_text
+    assert "end_conversation" not in routing_text
+    assert "search_contacts" not in generation_label
+    assert "modify_contact" not in generation_label
+    public_schema_text = " ".join(inventory.schema_json)
+    assert "search_contacts" not in public_schema_text
+    assert "modify_contact" not in public_schema_text
+    assert "end_conversation" not in public_schema_text
+    assert inventory_reads and all(inventory_reads)
+    # Classification still works because capability tags come only from the
+    # descriptions and parameter names in the actor-visible schemas.
+    assert "contact_lookup" in visible.signals
+    assert "relationship_batch_update" in visible.signals
+
+
+def test_named_recipient_generation_examples_are_synthetic() -> None:
+    examples = (
+        *_safe_action_or_abstain_observation("synthetic").validation_examples,
+        *_send_message_contact_lookup_observation("synthetic").validation_examples,
+    )
+    serialized = json.dumps(
+        [
+            {"inputs": example.inputs, "expected": example.expected}
+            for example in examples
+        ]
+    ).lower()
+
+    assert "fredrik" not in serialized
+    assert "thordendal" not in serialized
+    assert "new album" not in serialized
 
 
 def test_visible_context_stock_lookup_birth_signal_from_request_text() -> None:

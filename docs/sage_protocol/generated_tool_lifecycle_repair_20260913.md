@@ -37,11 +37,33 @@ Lifecycle implementation decisions use public tool contracts, generated-tool
 execution status, public semantic-family labels, adoption counts, and the
 audited v9 post-task scalar outcome. The paper-era v1 value remains a separately
 reported comparability diagnostic and is not mixed into prospective decisions.
-Lifecycle components do not receive scenario identifiers, expected answers,
-target state, or evaluator traces. The fresh control result can support paired
-analysis and family routing, but it is not included in an implementation-repair
-prompt. The triggering task is never made available to the replacement as a
-repair example.
+Lifecycle decisions and repair prompts do not consume scenario identifiers,
+expected answers, target state, or evaluator traces. The controller retains the
+scenario key only to join each task to its same-run control row and to write the
+run's audit trail. The fresh control result can support paired analysis and
+family routing, but it is not included in an implementation-repair prompt. The
+triggering task is never made available to the replacement as a repair example.
+
+The paired control uses the same `sage_wrapped` policy actor and model as SAGE,
+but has no generated tools or generated-tool lifecycle. It is therefore the
+matched policy-wrapper-without-generated-tools control, not the untouched
+upstream ToolSandbox actor. Protocol and per-arm manifests record this runtime
+identity, and strict verification rejects either arm if it drifts.
+
+Generation prompts use synthetic contract examples. Explicitly held-out
+validator cases are removed before prompt construction, and the exact prompt is
+audited immediately before model inference. Repair queues are reduced to public
+operational counts and task-independent reason codes; recursive guards reject
+scenario/task identifiers, expected or reference answers, target state,
+evaluator traces, outcome values, and success-flip values at persistence,
+request-construction, and prompt boundaries.
+
+Tool-name scrambling is also an information boundary. Classification, routing,
+and policy selection consume the same actor-visible names, descriptions, and
+parameter schemas that ToolSandbox sends to the model. A native capability is
+inferred only when that public schema identifies it unambiguously; otherwise it
+remains opaque. ToolSandbox's private alias map is used only after selection to
+dispatch the chosen visible name, never to choose, filter, or force a tool.
 
 ## Contact-dependency use case
 
@@ -72,18 +94,35 @@ strengthened validator.
    restart persistence, and held-out-value secrecy.
 2. Run the exposed 10-task development cohort to check targeted generation and
    execution mechanics.
-3. Run the disjoint exposed 30-task development cohort to check broader
-   behavior and working-tool non-regression.
+3. Transfer the complete content-addressed registry from the passing 10-task
+   run into the disjoint 30-task cohort with generation and repair disabled.
+   Require the exact promoted tool to generalize and the registry to remain
+   byte-identical, while four unrelated tasks remain exact with no negative
+   outcome delta. An independently seeded 30-task repair run is a separate
+   repair-process replication and cannot substitute for this transfer check.
 4. Freeze the code, then run a fresh-control, no-cache 1,032-task validation.
-5. If SAGE outcome exceeds `0.80` with zero exceptions and all integrity checks
-   pass, count that run as replication 1 and run nine additional isolated
-   replications.
+5. Apply the content-addressed schema-v4 adaptive technical-readiness gate. The
+   audited-v9 SAGE mean over all 1,032 tasks must be strictly greater than
+   `0.80`—equality fails—with zero exceptions and all integrity checks passing.
+   If it passes, count that run as replication 1 and run nine additional
+   isolated replications.
+
+Every ladder verifier reads the raw per-task conversation and execution
+context, rehydrates the ToolSandbox state, and recomputes the applicable outcome
+contracts. It reconstructs generated-tool visibility, attempts, failures, and
+successful calls from the trajectory rather than accepting those claims from a
+summary sidecar. For the development lifecycle claim, each called version and
+code hash is additionally bound to the ordered after-task registry checkpoint.
 
 The 10-task and 30-task cohorts are development diagnostics, not publication
 evidence or unseen test sets. Prior investigation has exposed the full
 ToolSandbox benchmark as well; the final ten runs estimate stochastic
 performance on that disclosed benchmark. A lifecycle-off ablation is required
 to attribute a performance change specifically to the new repair lifecycle.
+Because the first full run is an explicit adaptive gate and a failed gate can
+lead to further code changes, the resulting ten-run distribution is technical
+validation of the frozen accepted system, not a preregistered or unseen-test
+estimate. The gate history and every superseded run must remain preserved.
 
 The strict full-run launcher forbids partial-row resume. Exact recovery of an
 in-progress canary after copying only part of a run into a new output directory

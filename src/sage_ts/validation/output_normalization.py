@@ -45,6 +45,94 @@ def _append_unique(values: list[str], value: str) -> None:
         values.append(value)
 
 
+def _looks_like_personal_location_lookup(value: Any) -> bool:
+    """Recognize a current/self location lookup from compositional terms."""
+
+    text = str(value or "").lower().replace("_", " ").replace("-", " ")
+    words = set(re.findall(r"[a-z]+", text))
+    location_subject = bool(words & {"city", "location", "place", "town", "where"})
+    personal_context = bool(words & {"current", "here", "i", "me", "my"})
+    lookup_intent = bool(
+        words
+        & {
+            "determine",
+            "find",
+            "get",
+            "identify",
+            "locate",
+            "lookup",
+            "what",
+            "where",
+            "which",
+        }
+    )
+    return (
+        location_subject and personal_context and (lookup_intent or "current" in words)
+    )
+
+
+_DEVICE_SETTING_SERVICES = (
+    (
+        re.compile(r"\b(?:cellular(?:\s+service)?|mobile\s+data)\b"),
+        "set_cellular_service_status",
+        "cellular",
+    ),
+    (
+        re.compile(r"\b(?:wi\s*fi|wireless\s+network)\b"),
+        "set_wifi_status",
+        "wifi",
+    ),
+    (
+        re.compile(r"\blocation(?:\s+(?:access|services?))?\b"),
+        "set_location_service_status",
+        "location",
+    ),
+    (
+        re.compile(
+            r"\b(?:battery\s+saver|low\s+battery\s+mode|power\s+saving\s+mode)\b"
+        ),
+        "set_low_battery_mode_status",
+        "low_battery",
+    ),
+)
+
+
+def _direct_device_setting_action(text: str) -> tuple[str, bool, str] | None:
+    """Parse an imperative device-state change without enumerating sentences."""
+
+    normalized = " ".join(str(text or "").lower().replace("-", " ").split())
+    for pattern, tool_name, service in _DEVICE_SETTING_SERVICES:
+        match = pattern.search(normalized)
+        if match is None:
+            continue
+        before = normalized[: match.start()]
+        after = normalized[match.end() :]
+        direct_verb = re.search(
+            r"\b(activate|deactivate|disable|enable)\s+(?:(?:my|the)\s+)?$",
+            before,
+        )
+        desired_on: bool | None = None
+        if direct_verb:
+            desired_on = direct_verb.group(1) in {"activate", "enable"}
+        toggle_before = re.search(
+            r"\b(?:set|switch|turn)\s+(?:(?:my|the)\s+)?$",
+            before,
+        )
+        state_after = re.match(r"\s+(?:back\s+)?(off|on)\b", after)
+        if toggle_before and state_after:
+            desired_on = state_after.group(1) == "on"
+        state_before = re.search(
+            r"\b(?:switch|turn)\s+(off|on)\s+(?:the\s+)?$",
+            before,
+        )
+        if state_before:
+            desired_on = state_before.group(1) == "on"
+        if desired_on is not None:
+            state = "on" if desired_on else "off"
+            return tool_name, desired_on, f"set_{service}_{state}"
+    return None
+
+
 def _normalize_constraint_value(field_name: str, value: Any) -> str:
     text = str(value)
     lowered_field = field_name.lower()
@@ -429,14 +517,13 @@ def _normalize_validation_abstention_output(
             "get_current_location": "location_lookup",
             "get_current_city": "location_lookup",
             "find_current_city": "location_lookup",
-            "current_city": "location_lookup",
-            "current_location": "location_lookup",
-            "get_my_current_city": "location_lookup",
-            "get_my_current_location": "location_lookup",
-            "where_am_i": "location_lookup",
-            "what_city_am_i_in": "location_lookup",
         }
-        return mapping.get(text, mapping.get(normalized_text, text))
+        mapped = mapping.get(text, mapping.get(normalized_text))
+        if mapped:
+            return mapped
+        if _looks_like_personal_location_lookup(normalized_text):
+            return "location_lookup"
+        return text
 
     normalized = dict(value)
     missing_information = [
@@ -477,15 +564,8 @@ def _normalize_validation_abstention_output(
             _append_unique(required_original_tools, "contact_lookup")
     if action == "location_lookup" and "location_lookup" not in required_original_tools:
         required_original_tools.append("location_lookup")
-    if not required_original_tools and any(
-        phrase in user_request_lower
-        for phrase in (
-            "current city",
-            "current location",
-            "where am i",
-            "what city am i",
-            "which city am i",
-        )
+    if not required_original_tools and _looks_like_personal_location_lookup(
+        user_request_lower
     ):
         action = "location_lookup"
         required_original_tools.append("location_lookup")
@@ -616,6 +696,9 @@ def _normalize_state_precondition_output(
         str((inputs or {}).get(key) or "")
         for key in ("user_request", "visible_state_or_error", "visible_state_summary")
     ).lower()
+    direct_setting_action = _direct_device_setting_action(
+        str((inputs or {}).get("user_request") or "")
+    )
 
     def has_any(*markers: str) -> bool:
         return any(marker in visible_text for marker in markers)
@@ -645,122 +728,15 @@ def _normalize_state_precondition_output(
 
     if not sequence:
         inferred_sequence: list[dict[str, Any]] = []
-        direct_state_actions = [
-            (
-                "set_cellular_service_status",
-                True,
-                "set_cellular_on",
-                (
-                    "turn on cellular",
-                    "turn cellular on",
-                    "enable cellular",
-                    "turn on cellular service",
-                    "turn cellular service on",
-                    "enable cellular service",
-                ),
-            ),
-            (
-                "set_cellular_service_status",
-                False,
-                "set_cellular_off",
-                (
-                    "turn off cellular",
-                    "turn cellular off",
-                    "disable cellular",
-                    "turn off cellular service",
-                    "turn cellular service off",
-                    "disable cellular service",
-                ),
-            ),
-            (
-                "set_wifi_status",
-                True,
-                "set_wifi_on",
-                (
-                    "turn on wifi",
-                    "turn wifi on",
-                    "enable wifi",
-                    "turn on wi-fi",
-                    "turn wi-fi on",
-                    "enable wi-fi",
-                ),
-            ),
-            (
-                "set_wifi_status",
-                False,
-                "set_wifi_off",
-                (
-                    "turn off wifi",
-                    "turn wifi off",
-                    "disable wifi",
-                    "turn off wi-fi",
-                    "turn wi-fi off",
-                    "disable wi-fi",
-                ),
-            ),
-            (
-                "set_location_service_status",
-                True,
-                "set_location_on",
-                (
-                    "turn on location",
-                    "turn location on",
-                    "enable location",
-                    "turn on location service",
-                    "turn location service on",
-                    "enable location service",
-                    "turn on location services",
-                    "turn location services on",
-                    "enable location services",
-                ),
-            ),
-            (
-                "set_location_service_status",
-                False,
-                "set_location_off",
-                (
-                    "turn off location",
-                    "turn location off",
-                    "disable location",
-                    "turn off location service",
-                    "turn location service off",
-                    "disable location service",
-                    "turn off location services",
-                    "turn location services off",
-                    "disable location services",
-                ),
-            ),
-            (
-                "set_low_battery_mode_status",
-                True,
-                "set_low_battery_on",
-                (
-                    "turn on low battery mode",
-                    "turn low battery mode on",
-                    "enable low battery mode",
-                ),
-            ),
-            (
-                "set_low_battery_mode_status",
-                False,
-                "set_low_battery_off",
-                (
-                    "turn off low battery mode",
-                    "turn low battery mode off",
-                    "disable low battery mode",
-                ),
-            ),
-        ]
-        for tool_name, on_value, reason, markers in direct_state_actions:
-            if has_any(*markers):
-                inferred_sequence.append(
-                    {
-                        "tool_name": tool_name,
-                        "arguments": {"on": on_value},
-                        "reason": reason,
-                    }
-                )
-                break
+        if direct_setting_action is not None:
+            tool_name, on_value, reason = direct_setting_action
+            inferred_sequence.append(
+                {
+                    "tool_name": tool_name,
+                    "arguments": {"on": on_value},
+                    "reason": reason,
+                }
+            )
         cellular_blocked = has_any(
             "cellular service is not enabled",
             "cellular service not enabled",
@@ -908,29 +884,7 @@ def _normalize_state_precondition_output(
         normalized["final_response_recommendation"] = final_response
     if final_response in {"Device state has been updated.", "Completed action."}:
         final_response = ""
-    direct_setting_request = any(
-        marker in visible_text
-        for marker in (
-            "turn on wifi",
-            "turn wifi on",
-            "enable wifi",
-            "turn off wifi",
-            "turn wifi off",
-            "disable wifi",
-            "turn on cellular",
-            "turn cellular on",
-            "enable cellular",
-            "turn off cellular",
-            "turn cellular off",
-            "disable cellular",
-            "turn on location",
-            "turn location on",
-            "enable location",
-            "turn off location",
-            "turn location off",
-            "disable location",
-        )
-    )
+    direct_setting_request = direct_setting_action is not None
     downstream_precondition = (not direct_setting_request) and (
         "permissionerror" in visible_text
         or "not enabled" in visible_text

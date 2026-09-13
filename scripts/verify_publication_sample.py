@@ -29,7 +29,7 @@ PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = (
 )
 
 DEFAULT_THRESHOLDS = Path(
-    "docs/sage_protocol/publication_validation_thresholds_v3.json"
+    "docs/sage_protocol/publication_validation_thresholds_v4.json"
 )
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -212,7 +212,10 @@ def _expected_paper_subset_names(
 
     scenarios = resolve_scenarios(
         desired_scenario_names=names,
-        preferred_tool_backend=ToolBackend.DEFAULT,
+        # ``strenum``'s ``auto()`` value is mis-inferred as the literal
+        # ``"auto"`` by the publication-pinned mypy.  Constructing the enum
+        # from its stable serialized value preserves the exact runtime value.
+        preferred_tool_backend=ToolBackend("DEFAULT"),
     )
     selected: list[str] = []
     for name in names:
@@ -260,10 +263,13 @@ def verify_sample(
     no_regression = _object(
         thresholds, "required_no_regression", "validation thresholds"
     )
+    technical_readiness = _object(
+        thresholds, "required_technical_readiness", "validation thresholds"
+    )
     historical = _object(thresholds, "historical_reference", "validation thresholds")
     report_only = _object(thresholds, "report_only", "validation thresholds")
-    if thresholds.get("schema_version") != 3:
-        raise ValueError("Validation thresholds schema version is not 3.")
+    if thresholds.get("schema_version") != 4:
+        raise ValueError("Validation thresholds schema version is not 4.")
     if thresholds.get("performance_endpoint_policy") != "dual_scoped_outcome_endpoints":
         raise ValueError("Validation thresholds do not declare dual scoped endpoints.")
     if (
@@ -271,7 +277,11 @@ def verify_sample(
         != "descriptive_only_never_a_release_gate"
     ):
         raise ValueError("Validation thresholds do not make canonical report-only.")
-    if any("canonical" in field for field in no_regression):
+    if any(
+        "canonical" in field
+        for section in (no_regression, technical_readiness)
+        for field in section
+    ):
         raise ValueError("Canonical/reference similarity must not be a release gate.")
     _verify_historical_reference(historical)
 
@@ -574,6 +584,11 @@ def verify_sample(
         "audited_current_minimum_relative_outcome_lift_percent_over_same_run_control",
         "required_no_regression",
     )
+    audited_candidate_exclusive_floor = _unit_interval_number(
+        technical_readiness,
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive",
+        "required_technical_readiness",
+    )
     gate(
         "paper_comparable_candidate_outcome_historical_floor",
         paper_candidate_mean >= paper_floor,
@@ -585,6 +600,17 @@ def verify_sample(
         audited_lift_percent >= audited_lift_floor,
         audited_lift_percent,
         {"minimum_percent": audited_lift_floor},
+    )
+    gate(
+        "audited_current_candidate_outcome_strict_technical_readiness_floor",
+        audited_candidate_mean > audited_candidate_exclusive_floor,
+        audited_candidate_mean,
+        {
+            "operator": ">",
+            "threshold": audited_candidate_exclusive_floor,
+            "task_count": expected_tasks,
+            "evaluator_version": audited_version,
+        },
     )
     for field, threshold_field in (
         ("accepted_tool_count", "minimum_accepted_tool_count"),
@@ -604,7 +630,7 @@ def verify_sample(
         "report_only",
     )
     result = {
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "pass" if not failures else "fail",
         "purpose": thresholds.get("purpose"),
         "publication_gate_purpose": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
@@ -652,13 +678,25 @@ def verify_sample(
             },
         },
         "historical_reference": historical,
+        "technical_readiness": {
+            "status": "pass"
+            if audited_candidate_mean > audited_candidate_exclusive_floor
+            else "fail",
+            "candidate_mean": audited_candidate_mean,
+            "operator": ">",
+            "threshold": audited_candidate_exclusive_floor,
+            "task_count": expected_tasks,
+            "evaluator_version": audited_version,
+        },
         "gates": gates,
         "failed_gates": failures,
         "interpretation": (
-            "Engineering validation only; final paper inference remains pending "
+            "Adaptive technical-readiness validation only; final paper inference "
+            "remains pending "
             "the predeclared 10-pair strict fresh-control campaign. Audited v9 "
-            "all-task outcomes define current same-run lift; the exact 800-task "
-            "paper evaluator subset alone is compared with historical outcomes."
+            "all-task SAGE outcome must be strictly greater than 0.80 and retain "
+            "the current same-run lift; the exact 800-task paper evaluator subset "
+            "alone is compared with historical outcomes."
         ),
     }
     destination = output_path or (run_root / "publication_validation_report.json")

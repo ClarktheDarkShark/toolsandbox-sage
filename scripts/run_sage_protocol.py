@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable, cast
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
+from sage_ts.adapters.role_factory import SAGE_WRAPPED_AGENT_RUNTIME
 from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
 from sage_ts.campaign.artifacts import (
@@ -75,6 +76,7 @@ MODES = (
     "online_build_500",
     "online_build_full",
     # Frozen transfer checks
+    "transfer_30",
     "transfer_40",
     "transfer_60",
     "transfer_100",
@@ -91,6 +93,9 @@ SAGE_POLICY_NONE = "none"
 SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
 ACTOR_SELECTION_MODE = "policy"
+MATCHED_CONTROL_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
+MATCHED_CANDIDATE_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
+MATCHED_CONTROL_CONDITION = "matched_policy_wrapper_without_generated_tools"
 PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
 PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
 PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC = "development-diagnostic"
@@ -203,6 +208,7 @@ def _is_frozen_transfer_mode(mode: str) -> bool:
     """Modes that should default to generation disabled."""
 
     frozen_modes = {
+        "transfer_30",
         "transfer_40",
         "transfer_60",
         "transfer_100",
@@ -807,18 +813,11 @@ def _validated_external_fixture(
     }
 
 
-def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str, Any]:
-    """Snapshot registry state so failed gated runs cannot contaminate follow-ups."""
-    gate_dir = run_root / "registry_gate"
-    gate_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = registry_dir / "registry_manifest.json"
-    snapshot_path = gate_dir / "registry_manifest_before_run.json"
-    # ``Path.exists`` follows symlinks and therefore misses a dangling path.
-    # A strict fresh registry must distinguish every pre-existing filesystem
-    # object from an actually absent path.
-    directory_existed = os.path.lexists(registry_dir)
+def _registry_inventory(registry_dir: Path) -> list[dict[str, Any]]:
+    """Return a content-addressed inventory for every registry object."""
+
     inventory: list[dict[str, Any]] = []
-    if directory_existed:
+    if os.path.lexists(registry_dir):
         for path in sorted(registry_dir.rglob("*")):
             relative_path = path.relative_to(registry_dir).as_posix()
             if path.is_symlink():
@@ -841,6 +840,26 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
                 )
             else:
                 inventory.append({"path": relative_path, "kind": "other"})
+    return inventory
+
+
+def _inventory_sha256(inventory: list[dict[str, Any]]) -> str:
+    return hashlib.sha256(
+        json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str, Any]:
+    """Snapshot registry state so failed gated runs cannot contaminate follow-ups."""
+    gate_dir = run_root / "registry_gate"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = registry_dir / "registry_manifest.json"
+    snapshot_path = gate_dir / "registry_manifest_before_run.json"
+    # ``Path.exists`` follows symlinks and therefore misses a dangling path.
+    # A strict fresh registry must distinguish every pre-existing filesystem
+    # object from an actually absent path.
+    directory_existed = os.path.lexists(registry_dir)
+    inventory = _registry_inventory(registry_dir)
     existed = manifest_path.exists()
     if existed:
         shutil.copy2(manifest_path, snapshot_path)
@@ -852,14 +871,125 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
         "registry_directory_existed_before_run": directory_existed,
         "registry_inventory_before_run": inventory,
         "registry_inventory_count_before_run": len(inventory),
-        "registry_inventory_sha256": hashlib.sha256(
-            json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest(),
+        "registry_inventory_sha256": _inventory_sha256(inventory),
     }
     (gate_dir / "registry_gate_snapshot.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
     )
     return metadata
+
+
+def _resolve_run_declared_path(run_root: Path, raw_value: Any, label: str) -> Path:
+    if not isinstance(raw_value, str) or not raw_value.strip():
+        raise ValueError(f"Source dev10 protocol does not declare {label}.")
+    raw_path = Path(raw_value)
+    if raw_path.is_absolute():
+        return raw_path.resolve()
+    candidates = (Path.cwd() / raw_path, run_root / raw_path)
+    existing = {candidate.resolve() for candidate in candidates if candidate.exists()}
+    if len(existing) != 1:
+        raise ValueError(
+            f"Source dev10 {label} path is missing or ambiguous: {raw_value!r}."
+        )
+    return existing.pop()
+
+
+def _registry_transfer_provenance(
+    *,
+    source_run_root: Path,
+    installed_registry_dir: Path,
+    installed_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """Fail before model calls unless an exact passing dev10 registry was installed."""
+
+    source_run_root = source_run_root.resolve()
+    source_protocol_path = source_run_root / "protocol_manifest.json"
+    source_report_path = source_run_root / "lifecycle_repair_validation_report.json"
+    if not source_protocol_path.is_file() or not source_report_path.is_file():
+        raise ValueError(
+            "Frozen lifecycle transfer source is not an exact completed dev10 run."
+        )
+    source_protocol = json.loads(source_protocol_path.read_text(encoding="utf-8"))
+    source_report = json.loads(source_report_path.read_text(encoding="utf-8"))
+    if (
+        source_report.get("status") != "pass"
+        or source_report.get("manifest_type")
+        != "development_diagnostic_lifecycle_repair_dev10"
+        or source_report.get("expected_tasks") != 10
+    ):
+        raise ValueError("Frozen lifecycle transfer requires a passing dev10 report.")
+    source_registry_dir = _resolve_run_declared_path(
+        source_run_root, source_protocol.get("registry_dir"), "registry_dir"
+    )
+    source_inventory = _registry_inventory(source_registry_dir)
+    installed_inventory = installed_snapshot.get("registry_inventory_before_run")
+    if source_inventory != installed_inventory:
+        raise ValueError(
+            "Installed transfer registry is not byte-identical to the dev10 source."
+        )
+    if any(item.get("kind") not in {"directory", "file"} for item in source_inventory):
+        raise ValueError(
+            "Frozen lifecycle transfer registry contains a non-regular object."
+        )
+    source_inventory_sha256 = _inventory_sha256(source_inventory)
+    if installed_snapshot.get("registry_inventory_sha256") != source_inventory_sha256:
+        raise ValueError(
+            "Installed transfer registry inventory digest is inconsistent."
+        )
+
+    source_manifest_path = source_registry_dir / "registry_manifest.json"
+    source_manifest_sha256 = _digest_file(source_manifest_path)
+    if (
+        source_protocol.get("registry_manifest_digest_after_run")
+        != source_manifest_sha256
+    ):
+        raise ValueError("Source dev10 registry no longer matches its protocol digest.")
+    source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+    tools = source_manifest.get("tools") if isinstance(source_manifest, dict) else None
+    entry = (
+        tools.get("prepare_safe_action_or_abstain") if isinstance(tools, dict) else None
+    )
+    tool = entry.get("tool") if isinstance(entry, dict) else None
+    spec = tool.get("spec") if isinstance(tool, dict) else None
+    code = tool.get("code") if isinstance(tool, dict) else None
+    stored_code_hash = entry.get("code_hash") if isinstance(entry, dict) else None
+    if (
+        not isinstance(entry, dict)
+        or entry.get("retired") is not False
+        or not isinstance(entry.get("version"), int)
+        or isinstance(entry.get("version"), bool)
+        or int(entry["version"]) < 2
+        or not isinstance(spec, dict)
+        or not isinstance(code, str)
+        or not isinstance(stored_code_hash, str)
+        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_code_hash
+    ):
+        raise ValueError(
+            "Passing dev10 source does not contain a valid active repaired helper."
+        )
+    spec_sha256 = hashlib.sha256(
+        json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "mode": "frozen_promoted_registry_transfer",
+        "source_run_root": str(source_run_root),
+        "source_protocol_path": str(source_protocol_path),
+        "source_protocol_sha256": _digest_file(source_protocol_path),
+        "source_validation_report_path": str(source_report_path),
+        "source_validation_report_sha256": _digest_file(source_report_path),
+        "source_registry_dir": str(source_registry_dir),
+        "source_registry_inventory_count": len(source_inventory),
+        "source_registry_inventory_sha256": source_inventory_sha256,
+        "installed_registry_dir": str(installed_registry_dir.resolve()),
+        "installed_registry_inventory_sha256": source_inventory_sha256,
+        "target_tool": {
+            "tool_name": "prepare_safe_action_or_abstain",
+            "version": entry["version"],
+            "retired": False,
+            "code_hash": stored_code_hash,
+            "public_spec_sha256": spec_sha256,
+        },
+    }
 
 
 def _restore_registry_after_failed_gate(
@@ -1252,6 +1382,7 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 processes=1,
                 run_type=f"{params['mode']}_control",
                 base_tool_policy=str(params["base_tool_policy"]),
+                agent_runtime=MATCHED_CONTROL_AGENT_RUNTIME,
                 resume_from_dir=Path(params["control_resume_dir"])
                 if params.get("control_resume_dir")
                 else None,
@@ -1361,6 +1492,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 run_type=f"{params['mode']}_candidate",
                 recurrence_threshold=int(params["recurrence_threshold"]),
                 base_tool_policy=str(params["base_tool_policy"]),
+                agent_runtime=MATCHED_CANDIDATE_AGENT_RUNTIME,
                 resume_from_dir=Path(params["candidate_resume_dir"])
                 if params.get("candidate_resume_dir")
                 else None,
@@ -1530,6 +1662,14 @@ def main() -> None:
         ),
     )
     parser.add_argument("--registry-dir", type=Path)
+    parser.add_argument(
+        "--registry-transfer-source-run",
+        type=Path,
+        help=(
+            "Exact passing dev10 run root supplying the immutable registry for "
+            "the development-only frozen transfer_30 lane."
+        ),
+    )
     parser.add_argument(
         "-o",
         "--output-root",
@@ -1766,6 +1906,25 @@ def main() -> None:
     elif _is_frozen_transfer_mode(args.mode):
         generation_enabled = False
     frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
+    if args.mode == "transfer_30":
+        if args.registry_transfer_source_run is None:
+            raise SystemExit(
+                "transfer_30 requires --registry-transfer-source-run from a "
+                "passing dev10 diagnostic."
+            )
+        if generation_enabled:
+            raise SystemExit("transfer_30 requires generation and repair to be off.")
+        registry_transfer_provenance = _registry_transfer_provenance(
+            source_run_root=args.registry_transfer_source_run,
+            installed_registry_dir=registry_dir,
+            installed_snapshot=registry_gate_snapshot,
+        )
+    else:
+        if args.registry_transfer_source_run is not None:
+            raise SystemExit(
+                "--registry-transfer-source-run is valid only with transfer_30."
+            )
+        registry_transfer_provenance = None
     effective_sage_policy = _resolve_sage_policy_preset(
         args.sage_policy,
         generation_enabled=generation_enabled,
@@ -1889,6 +2048,13 @@ def main() -> None:
             "sage_policy_requested": args.sage_policy,
             "sage_policy_env": sage_policy_env,
             "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_condition": MATCHED_CONTROL_CONDITION,
+            "control_agent_runtime": MATCHED_CONTROL_AGENT_RUNTIME,
+            "control_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_generated_tools_enabled": False,
+            "candidate_agent_runtime": MATCHED_CANDIDATE_AGENT_RUNTIME,
+            "candidate_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "candidate_generated_tools_enabled": generation_enabled,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
             "parallel_arms": effective_parallel_arms,
@@ -1996,6 +2162,13 @@ def main() -> None:
             "sage_policy": effective_sage_policy,
             "sage_policy_requested": args.sage_policy,
             "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_condition": MATCHED_CONTROL_CONDITION,
+            "control_agent_runtime": MATCHED_CONTROL_AGENT_RUNTIME,
+            "control_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_generated_tools_enabled": False,
+            "candidate_agent_runtime": MATCHED_CANDIDATE_AGENT_RUNTIME,
+            "candidate_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "candidate_generated_tools_enabled": generation_enabled,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
             "parallel_arms": effective_parallel_arms,
@@ -2293,6 +2466,7 @@ def main() -> None:
                     processes=1,
                     run_type=f"{args.mode}_control",
                     base_tool_policy=UPSTREAM_POLICY,
+                    agent_runtime=MATCHED_CONTROL_AGENT_RUNTIME,
                 ),
                 manifest_path=args.manifest,
             )
@@ -2328,6 +2502,7 @@ def main() -> None:
                     processes=1,
                     run_type=f"{args.mode}_control",
                     base_tool_policy=UPSTREAM_POLICY,
+                    agent_runtime=MATCHED_CONTROL_AGENT_RUNTIME,
                     resume_from_dir=control_resume_dir
                     if fresh_control_scenarios == scenario_names
                     else None,
@@ -2354,6 +2529,7 @@ def main() -> None:
                         processes=1,
                         run_type=f"{args.mode}_control",
                         base_tool_policy=UPSTREAM_POLICY,
+                        agent_runtime=MATCHED_CONTROL_AGENT_RUNTIME,
                     ),
                     manifest_path=args.manifest,
                 )
@@ -2431,6 +2607,7 @@ def main() -> None:
                 run_type=f"{args.mode}_candidate",
                 recurrence_threshold=args.recurrence_threshold,
                 base_tool_policy=UPSTREAM_POLICY,
+                agent_runtime=MATCHED_CANDIDATE_AGENT_RUNTIME,
                 resume_from_dir=candidate_resume_dir,
                 resume_completed_limit=resume_completed_limit,
                 manifest_path=args.manifest,
@@ -2572,7 +2749,7 @@ def main() -> None:
         update_task(
             "reproduce_clean_recency_birth", "completed", root=args.artifact_root
         )
-    elif args.mode in {"transfer_40", "transfer_60", "transfer_100"}:
+    elif args.mode in {"transfer_30", "transfer_40", "transfer_60", "transfer_100"}:
         update_task("frozen_registry_transfer", "completed", root=args.artifact_root)
     refresh_dashboard("comparison", "complete")
     if publication_provenance is not None:
@@ -2595,6 +2772,13 @@ def main() -> None:
         "sage_policy_requested": args.sage_policy,
         "sage_policy_env": sage_policy_env,
         "actor_selection_mode": ACTOR_SELECTION_MODE,
+        "control_condition": MATCHED_CONTROL_CONDITION,
+        "control_agent_runtime": MATCHED_CONTROL_AGENT_RUNTIME,
+        "control_actor_selection_mode": ACTOR_SELECTION_MODE,
+        "control_generated_tools_enabled": False,
+        "candidate_agent_runtime": MATCHED_CANDIDATE_AGENT_RUNTIME,
+        "candidate_actor_selection_mode": ACTOR_SELECTION_MODE,
+        "candidate_generated_tools_enabled": generation_enabled,
         "reporting_outcome_evaluator": reporting_outcome_evaluator,
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "timezone": os.environ.get("TZ"),
@@ -2606,6 +2790,8 @@ def main() -> None:
         "candidate_dir": str(candidate_dir),
         "registry_dir": str(registry_dir),
         "registry_gate_snapshot": registry_gate_snapshot,
+        "registry_transfer_provenance": registry_transfer_provenance,
+        "lifecycle_mutation_enabled": generation_enabled,
         "registry_gate_restore": registry_gate_restore,
         "registry_manifest_digest_after_run": _digest_file(
             registry_dir / "registry_manifest.json"
@@ -2748,6 +2934,13 @@ def main() -> None:
                 "abort" if args.require_fresh_control else "fallback_to_base_scenario"
             ),
             "actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_condition": MATCHED_CONTROL_CONDITION,
+            "control_agent_runtime": MATCHED_CONTROL_AGENT_RUNTIME,
+            "control_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "control_generated_tools_enabled": False,
+            "candidate_agent_runtime": MATCHED_CANDIDATE_AGENT_RUNTIME,
+            "candidate_actor_selection_mode": ACTOR_SELECTION_MODE,
+            "candidate_generated_tools_enabled": generation_enabled,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
             "timezone": os.environ.get("TZ"),

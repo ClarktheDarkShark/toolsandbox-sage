@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sage_ts.adapters.role_factory import SAGE_WRAPPED_AGENT_RUNTIME
 from sage_ts.adapters.toolsandbox_adapter import (
     EventHook,
     ProgressHook,
@@ -44,7 +45,11 @@ from tool_sandbox.common.scenario import Scenario
 def _online_birth_feedback_result(result: dict[str, object]) -> dict[str, object]:
     """Expose only the audited outcome as prospective tool-birth reward."""
 
-    trace_result = dict(result)
+    trace_result = {
+        key: result[key]
+        for key in ("similarity", "outcome_similarity", "exception_type")
+        if key in result
+    }
     audited_outcome = result.get("outcome_similarity")
     if audited_outcome is not None:
         trace_result["online_birth_outcome_source"] = "audited_outcome"
@@ -758,13 +763,14 @@ class SageRunConfig:
     run_type: str = "sage_online"
     recurrence_threshold: int = 2
     base_tool_policy: str = UPSTREAM_POLICY
+    agent_runtime: str = SAGE_WRAPPED_AGENT_RUNTIME
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
     manifest_path: Path = Path("")
     reflection_control_rows: dict[str, dict[str, Any]] | None = None
     require_fresh_reflection_control: bool = False
     reflection_control_channel: Any | None = None
-    failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
+    failure_memory_path: Path | None = None
     fail_on_scenario_transform_error: bool = False
 
 
@@ -914,8 +920,11 @@ def run_sage_with_registry(
 
         loaded_entries = store.load_entries()
         retained_tools_loaded = sorted(loaded_entries)
+        # Routing sees only capabilities inferred from the same actor-facing
+        # schemas used above.  In particular, opaque ToolSandbox aliases are not
+        # reversed into hidden native names for selection decisions.
         available_base_tools = set(
-            scenario.starting_context.get_available_tools(scrambling_allowed=False)
+            getattr(visible_task_context, "semantic_tool_capabilities", ())
         )
         lifecycle_state = load_tool_lifecycle_routing_state(store.root)
         _routed_entries, routing_decisions = route_registry_entries(
@@ -954,8 +963,13 @@ def run_sage_with_registry(
             scenario_name=name,
             task_context_text=routing_context_text,
             task_family_key=routing_family_key,
+            available_base_tools=available_base_tools,
         )
         enhanced_tool_order = list(enhanced.starting_context.name_to_tool)
+        # Internal attribution only, after routing is complete: registry entries
+        # are keyed by execution name, so identify which generated tools were
+        # actually injected under those keys.  This set is never added to task
+        # context or generator input; the public log below uses actor-facing names.
         available_tools = set(
             enhanced.starting_context.get_available_tools(scrambling_allowed=False)
         )
@@ -1011,7 +1025,7 @@ def run_sage_with_registry(
                 ),
                 "available_tools": sorted(
                     enhanced.starting_context.get_available_tools(
-                        scrambling_allowed=False
+                        scrambling_allowed=True
                     )
                 ),
                 "generated_tools": generated_tools,
@@ -1390,6 +1404,7 @@ def run_sage_with_registry(
             processes=1,
             run_type=config.run_type,
             base_tool_policy=config.base_tool_policy,
+            agent_runtime=config.agent_runtime,
             resume_from_dir=config.resume_from_dir,
             resume_completed_limit=config.resume_completed_limit,
             fail_on_scenario_transform_error=(config.fail_on_scenario_transform_error),

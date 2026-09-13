@@ -87,6 +87,26 @@ def test_online_birth_feedback_result_uses_only_audited_outcome(
     assert selected["online_birth_outcome_source"] == expected_source
 
 
+def test_online_birth_feedback_result_drops_evaluator_private_payloads() -> None:
+    selected = _online_birth_feedback_result(
+        {
+            "similarity": 0.5,
+            "outcome_similarity": 0.75,
+            "exception_type": None,
+            "outcome_checks": [{"expected_answer": "PRIVATE"}],
+            "target_state": {"secret": True},
+            "messages": [{"role": "system", "content": "PRIVATE"}],
+        }
+    )
+
+    assert selected == {
+        "similarity": 0.5,
+        "outcome_similarity": 0.75,
+        "exception_type": None,
+        "online_birth_outcome_source": "audited_outcome",
+    }
+
+
 def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

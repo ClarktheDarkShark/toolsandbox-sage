@@ -34,7 +34,10 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.message_conversion import Message
 from tool_sandbox.common.scenario import Scenario
-from tool_sandbox.common.tool_conversion import convert_to_openai_tool
+from tool_sandbox.common.tool_conversion import (
+    convert_to_openai_tool,
+    convert_to_openai_tools,
+)
 from tool_sandbox.roles.execution_environment import respond_to_single_message
 
 
@@ -1860,6 +1863,10 @@ def test_lifecycle_hides_negative_called_subset_family(
                     "prepare_reminder_creation_args": {
                         "decision": "needs_route_repair",
                         "harmful_called_count": 2,
+                        "sole_generated_call_count": 2,
+                        "attributable_harmful_call_count": 2,
+                        "attributable_helpful_call_count": 0,
+                        "route_repair_families": ["reminder_create"],
                         "harmful_called_scenarios": [
                             "reminder_create",
                             "reminder_create_alt",
@@ -2262,8 +2269,11 @@ def test_registry_tools_emit_toolsandbox_trace(tmp_path: Path) -> None:
 def test_generated_tools_support_toolsandbox_name_scrambling(tmp_path: Path) -> None:
     store = _registry_with_canonicalizer(tmp_path)
     context = ExecutionContext(
-        tool_allow_list=["end_conversation"],
+        tool_allow_list=["search_contacts"],
         tool_augmentation_list=[ScenarioCategories.TOOL_NAME_SCRAMBLED],
+    )
+    native_alias_before_injection = context.get_agent_facing_tool_name(
+        "search_contacts"
     )
     enhanced = Scenario(starting_context=context)
     inject_registry_tools_into_context(
@@ -2271,9 +2281,24 @@ def test_generated_tools_support_toolsandbox_name_scrambling(tmp_path: Path) -> 
         store.load_entries().values(),
     )
 
-    available_tools = enhanced.starting_context.get_available_tools(
-        scrambling_allowed=True
-    )
+    with new_context(enhanced.starting_context):
+        available_tools = enhanced.starting_context.get_available_tools(
+            scrambling_allowed=True
+        )
+        schemas = convert_to_openai_tools(available_tools)
 
     execution_names = {tool.__name__ for tool in available_tools.values()}
     assert "canonicalize_connectivity_label" in execution_names
+    assert "canonicalize_connectivity_label" in available_tools
+
+    native_alias = enhanced.starting_context.get_agent_facing_tool_name(
+        "search_contacts"
+    )
+    assert native_alias == native_alias_before_injection
+    assert native_alias != "search_contacts"
+    assert native_alias in available_tools
+    assert "search_contacts" not in available_tools
+
+    schema_names = {schema["function"]["name"] for schema in schemas}
+    assert "canonicalize_connectivity_label" in schema_names
+    assert native_alias in schema_names

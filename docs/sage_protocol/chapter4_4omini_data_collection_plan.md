@@ -122,6 +122,16 @@ The preparer rejects a dirty Git tree, a failing or modified sample report,
 any benchmark or fixture hash mismatch, and any replication count other than
 exactly ten online plus ten frozen runs.
 
+For the researcher-authorized final lifecycle campaign only, preparation may
+add `--sample-as-rep01`. That explicit option binds the passing release sample
+as immutable online rep01 and launches only rep02-rep10. The final aggregate
+still contains ten online replications, but it must be reported as adaptive,
+selection-conditioned descriptive evidence—not preregistered confirmatory
+inference—because rep01 was selected after passing the technical-readiness
+gate. Full binding and launch semantics are specified in
+`docs/sage_protocol/adaptive_sample_as_rep01_campaign.md`. Omitting the option
+preserves the default separate-sample-plus-ten-new-runs design.
+
 Verify the resulting manifest before execution:
 
 ```bash

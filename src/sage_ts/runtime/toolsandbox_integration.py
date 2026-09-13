@@ -20,6 +20,7 @@ from sage_ts.generation.complete_tools import (
 from sage_ts.generation.tool_spec import ToolFamily, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
+from sage_ts.runtime.actor_visible_inventory import actor_visible_tool_inventory
 from sage_ts.runtime.routing_scorer import (
     DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
     RuntimeRoutingDecision,
@@ -1000,10 +1001,14 @@ def _native_action_google_docstring(entry: RegistryEntry) -> str:
     spec = entry.tool.spec
     dict_input_keys = _dict_input_keys(entry)
     native_action_names = native_action_names_for_tool(entry.tool)
+    action_summary = (
+        f" ({', '.join(native_action_names)})" if native_action_names else ""
+    )
     lines = [
         (
             f"{spec.description} This generated composite completes one final "
-            "action by delegating to an approved native ToolSandbox tool. The "
+            "action by delegating to an approved native ToolSandbox tool"
+            f"{action_summary}. The "
             "native tool remains the state-changing implementation. If this "
             "tool confirms success, do not repeat the native action."
         ),
@@ -1335,9 +1340,25 @@ def inject_registry_tools_into_context(
             context.tool_allow_list = injected + [
                 tool for tool in context.tool_allow_list if tool not in set(injected)
             ]
-        context._actual_to_scrambled_tool_name = get_scrambled_tool_names(
-            context.name_to_tool.values()
-        )
+        scrambled_names = get_scrambled_tool_names(context.name_to_tool.values())
+        # ToolSandbox's name-scrambling benchmark applies to its native inventory.
+        # SAGE owns the generated contracts and must be able to refer to their
+        # public registry identities on later actor turns.  Keep those names public
+        # while leaving every native ToolSandbox mapping unchanged.
+        native_aliases = {
+            alias
+            for actual_name, alias in scrambled_names.items()
+            if actual_name not in compiled_by_name
+        }
+        generated_alias_collisions = native_aliases & set(compiled_by_name)
+        if generated_alias_collisions:
+            raise ValueError(
+                "generated tool name collides with a native scrambled alias: "
+                f"{sorted(generated_alias_collisions)}"
+            )
+        for tool_name in compiled_by_name:
+            scrambled_names[tool_name] = tool_name
+        context._actual_to_scrambled_tool_name = scrambled_names
         context._scrambled_to_actual_tool_name = {
             value: key for key, value in context._actual_to_scrambled_tool_name.items()
         }
@@ -2060,60 +2081,13 @@ def _lifecycle_visibility_override(
     route_repair_families = {
         str(item) for item in row.get("route_repair_families", []) if item
     }
-    harmful_scenarios = [
-        str(item) for item in row.get("harmful_called_scenarios", []) if item
-    ]
-    harmful_count = row.get("harmful_called_count")
-    try:
-        harmful_count_int = int(harmful_count)
-    except (TypeError, ValueError):
-        harmful_count_int = len(harmful_scenarios)
-    helpful_families = [
-        str(item) for item in row.get("helpful_called_families", []) if item
-    ]
-    harmful_families_list = [
-        str(item) for item in row.get("harmful_called_families", []) if item
-    ]
-    if not harmful_families_list:
-        harmful_families_list = harmful_scenarios
-    if not helpful_families:
-        helpful_families = [
-            str(item) for item in row.get("helpful_called_scenarios", []) if item
-        ]
-
-    def same_family(value: str) -> bool:
-        family = str(value or "")
-        return family == scenario_family or base_task_family(family) == scenario_family
-
-    harmful_family_count = sum(1 for item in harmful_families_list if same_family(item))
-    helpful_family_count = sum(1 for item in helpful_families if same_family(item))
-    if decision == "retain_with_route_repair":
-        if scenario_name in harmful_scenarios:
-            return False, "lifecycle_suppressed_exact_harmful_called_scenario"
-        if (
-            harmful_family_count >= 2
-            and harmful_family_count > helpful_family_count
-            and scenario_family in route_repair_families
-        ):
-            return False, "lifecycle_suppressed_harmful_called_family"
-        return None
-
-    if scenario_family in route_repair_families:
-        if harmful_family_count < 2:
-            return None
-        if harmful_family_count and harmful_family_count <= helpful_family_count:
-            return None
-        return False, "lifecycle_suppressed_harmful_called_family"
     if decision not in {
+        "retain_with_route_repair",
         "needs_route_repair",
         "needs_repair",
     }:
         return None
-
-    harmful_families = {base_task_family(str(item)) for item in harmful_families_list}
-    if scenario_family in harmful_families:
-        if harmful_family_count < 2 and harmful_count_int < 2:
-            return None
+    if scenario_family in route_repair_families:
         return False, "lifecycle_suppressed_harmful_called_family"
     return None
 
@@ -2440,12 +2414,19 @@ def with_registry_tools(
     scenario_name: str | None = None,
     task_context_text: str | None = None,
     task_family_key: str | None = None,
+    available_base_tools: set[str] | None = None,
 ) -> Scenario:
     """Return a scenario copy whose starting context includes registry tools."""
     scenario_copy = copy.deepcopy(scenario)
-    available_base_tools = set(
-        scenario_copy.starting_context.get_available_tools(scrambling_allowed=False)
-    )
+    if available_base_tools is None:
+        # Infer compatibility from public schemas.  This is conservative when a
+        # schema is intentionally uninformative and never consults the callable's
+        # hidden execution-facing name.
+        available_base_tools = set(
+            actor_visible_tool_inventory(
+                scenario_copy.starting_context
+            ).semantic_capabilities
+        )
     entries, _decisions = route_registry_entries(
         store.load_entries(),
         scenario_name,

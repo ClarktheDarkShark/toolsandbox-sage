@@ -40,7 +40,7 @@ def _thresholds(tmp_path: Path) -> Path:
     _write_json(
         path,
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "purpose": "test",
             "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
             "canonical_metric_policy": "descriptive_only_never_a_release_gate",
@@ -80,6 +80,9 @@ def _thresholds(tmp_path: Path) -> Path:
                 "minimum_accepted_tool_count": 1,
                 "minimum_tool_reuse_event_count": 1,
                 "minimum_generated_tool_called_scenario_count": 1,
+            },
+            "required_technical_readiness": {
+                "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
             },
             "historical_reference": {
                 "paper_comparable_candidate_outcome_mean": 0.75,
@@ -121,7 +124,7 @@ def _row(
 def _comparison(
     tmp_path: Path,
     *,
-    audited_candidate_outcome: float = 0.80,
+    audited_candidate_outcome: float = 0.81,
     paper_candidate_outcome: float = 0.80,
     candidate_canonical: float | None = 0.80,
     paper_version: str = PAPER_VERSION,
@@ -215,7 +218,7 @@ def test_sample_verifier_separates_audited_lift_from_paper_historical_gate(
 ) -> None:
     run_root = _comparison(
         tmp_path,
-        audited_candidate_outcome=0.78,
+        audited_candidate_outcome=0.81,
         paper_candidate_outcome=0.80,
     )
     _stub_integrity(monkeypatch, run_root)
@@ -226,15 +229,84 @@ def test_sample_verifier_separates_audited_lift_from_paper_historical_gate(
     )
 
     assert result["status"] == "pass"
+    assert result["schema_version"] == 4
     assert result["publication_gate_purpose"] == "release-sample"
     assert result["metrics"]["audited_current_all_tasks"][
         "same_run_relative_lift_percent"
-    ] == pytest.approx(56.0)
+    ] == pytest.approx(62.0)
     assert result["metrics"]["paper_comparable_historical_subset"][
         "candidate_mean"
     ] == pytest.approx(0.80)
     assert all("canonical" not in name for name in result["gates"])
     assert (run_root / "publication_validation_report.json").is_file()
+
+
+def test_sample_verifier_strict_technical_readiness_boundary_fails_at_point_80(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _comparison(tmp_path, audited_candidate_outcome=0.80)
+    _stub_integrity(monkeypatch, run_root)
+
+    with pytest.raises(
+        ValueError,
+        match="audited_current_candidate_outcome_strict_technical_readiness_floor",
+    ):
+        sample_verifier.verify_sample(
+            tmp_path,
+            thresholds_path=_thresholds(tmp_path),
+        )
+
+    report = json.loads(
+        (run_root / "publication_validation_report.json").read_text(encoding="utf-8")
+    )
+    gate = report["gates"][
+        "audited_current_candidate_outcome_strict_technical_readiness_floor"
+    ]
+    assert gate == {
+        "passed": False,
+        "observed": 0.8,
+        "required": {
+            "operator": ">",
+            "threshold": 0.8,
+            "task_count": 2,
+            "evaluator_version": AUDITED_VERSION,
+        },
+    }
+
+
+def test_sample_verifier_strict_technical_readiness_boundary_passes_above_point_80(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _comparison(tmp_path, audited_candidate_outcome=0.800001)
+    _stub_integrity(monkeypatch, run_root)
+
+    result = sample_verifier.verify_sample(
+        tmp_path,
+        thresholds_path=_thresholds(tmp_path),
+    )
+
+    assert result["technical_readiness"]["status"] == "pass"
+    assert result["technical_readiness"]["candidate_mean"] == pytest.approx(0.800001)
+
+
+def test_sample_verifier_rejects_missing_technical_readiness_declaration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _comparison(tmp_path)
+    _stub_integrity(monkeypatch, run_root)
+    thresholds_path = _thresholds(tmp_path)
+    thresholds = json.loads(thresholds_path.read_text(encoding="utf-8"))
+    thresholds.pop("required_technical_readiness")
+    _write_json(thresholds_path, thresholds)
+
+    with pytest.raises(ValueError, match="required_technical_readiness"):
+        sample_verifier.verify_sample(
+            tmp_path,
+            thresholds_path=thresholds_path,
+        )
 
 
 def test_sample_verifier_never_uses_canonical_as_a_release_gate(

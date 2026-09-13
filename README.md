@@ -65,6 +65,14 @@ The model still supplies tool arguments, consumes results, and produces the user
 response. The controller decides which tool the model must call at policy-covered
 steps. Run manifests record `actor_selection_mode="policy"` explicitly.
 
+The primary control is a matched non-learning control, not the untouched
+ToolSandbox actor. Both arms use the same `sage_wrapped` policy actor and model;
+the control receives no generated tools or tool-generation lifecycle, while the
+SAGE arm does. Manifests record
+`control_condition="matched_policy_wrapper_without_generated_tools"` and each
+arm's runtime so this estimand cannot be confused with the separately available
+pure-ToolSandbox diagnostic.
+
 The other critical components are:
 
 - visible-context inadequacy classification and candidate admission;
@@ -84,6 +92,15 @@ caused the failure. The prospective protocol, evidence boundary, contact-tool
 use case, and validation ladder are documented in
 [`docs/sage_protocol/generated_tool_lifecycle_repair_20260913.md`](docs/sage_protocol/generated_tool_lifecycle_repair_20260913.md).
 
+The lifecycle is fail-closed at two research-integrity boundaries. Generation
+uses synthetic public examples and strips held-out validator cases before model
+inference; repair requests cannot contain task/scenario identifiers, expected
+answers, target state, evaluator traces, outcome values, or success flips.
+Under ToolSandbox name scrambling, classification, routing, and policy choices
+derive only from the names and schemas exposed to the actor. Ambiguous opaque
+tools remain opaque; the private alias map is reserved for execution after a
+visible tool has already been selected.
+
 These mechanisms remain intact. Cleanup removed obsolete reporting, cohort,
 registry-migration, cache-accounting, and dashboard patch utilities that are not
 reachable from the production runner. Chapter 4 aggregation remains available
@@ -99,7 +116,9 @@ endpoint, while the legacy measurement is diagnostic only:
 
 - `outcome_similarity` is computed by audited v9 for all 1,032 tasks. It is the
   current same-run outcome endpoint, supplies the control-to-SAGE lift gate,
-  and is the prospective birth, routing, repair, and canary feedback signal;
+  is subject to the adaptive technical-readiness requirement that the SAGE mean
+  be strictly greater than `0.80`, and is the prospective birth, routing,
+  repair, and canary feedback signal;
 - `online_feedback_outcome_similarity` is computed by paper-era v1 on its exact
   ordered 800-task applicability subset. It is the only endpoint compared with
   the historical paper range, but it does not control the prospective repair
@@ -193,16 +212,25 @@ make paper-online
 The canonical launcher:
 
 - requires a clean Git tree and the exact publication environment;
-- starts the non-learning control and policy-directed SAGE in isolated,
-  concurrent child processes;
+- starts the matched policy-wrapper control without generated tools and the
+  policy-directed SAGE treatment in isolated, concurrent child processes;
 - streams each uncached control row to SAGE at the matching task boundary;
 - starts SAGE from an empty run-local registry;
 - disables application control, response, task, and persistent output replay;
 - uses the fixed clock and hash-pinned read-only external-service fixture;
 - creates `dashboard/task_compare.html`, verifies the server root and served
-  bytes, and opens it in the external browser before either model process; and
+  bytes, and opens it in the external browser before either model process;
 - verifies task order, complete one-to-one coverage, process overlap, evaluator
-  identity, reflection provenance, cache state, and runtime exceptions.
+  identity, reflection provenance, cache state, and runtime exceptions; and
+- requires every saved conversation and execution context, independently
+  recomputes both outcome endpoints, and reconstructs generated-tool exposure
+  and calls from those raw trajectories instead of trusting result summaries.
+
+For an online release sample, the launcher then automatically applies the
+content-addressed schema-v4 sample gate. The complete audited-v9 SAGE mean must
+be strictly greater than `0.80`; exactly `0.80` does not pass. This is an
+adaptive technical-readiness gate for deciding whether to freeze and proceed,
+not a rule for excluding outcome-low but integrity-valid campaign repetitions.
 
 OpenAI may still report provider-managed prompt-prefix cached input tokens. That
 does not replay a response or task outcome and is recorded separately.
@@ -214,6 +242,9 @@ development-only ladder:
 make lifecycle-mechanics
 make lifecycle-dev10 PORT=64620
 make lifecycle-dev30 PORT=64621
+make lifecycle-transfer-dev30 \
+  SOURCE_DEV10_RUN=outputs/lifecycle_repair/<dev10>/lifecycle_repair_diagnostic/<run> \
+  PORT=64622
 ```
 
 The 10- and 30-task runs deliberately seed the pinned historical faulty
@@ -221,10 +252,27 @@ abstention helper so they can prove fail, repair-or-retire, prospective canary,
 and unrelated-task preservation. Their manifests and verifier mark them as
 development diagnostics; they cannot qualify as publication runs.
 
+The separate transfer target is the generalization check. It first reverifies
+the exact dev10 source, then copies its complete registry and routing sidecars
+into a fresh run-local directory. It runs the disjoint 30-task cohort with live
+generation and lifecycle repair disabled. Verification requires byte-identical
+registry state before and after, the exact promoted helper on every target
+call, fresh parallel matched-control execution, and four unrelated tasks with
+exact outcomes, the helper hidden, and no negative outcome delta. The ordinary
+`lifecycle-dev30` target remains an independent repair-process replication; it
+does not prove transfer of dev10's model-authored repair.
+
+The development verifier also binds each observed generated-tool call to the
+ordered after-task registry checkpoint and verifies that checkpoint's version
+and source-code hash. This distinguishes a prospective repaired-version call
+from an earlier faulty-version call in the lifecycle evidence.
+
 To verify an already completed run:
 
 ```bash
 make verify-publication \
+  RUN=outputs/publication_validation/<run-stamp>/native_action
+make verify-sample \
   RUN=outputs/publication_validation/<run-stamp>/native_action
 ```
 

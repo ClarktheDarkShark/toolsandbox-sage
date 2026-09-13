@@ -1,8 +1,24 @@
 import json
 from dataclasses import dataclass
 
+import pytest
+
 from sage_ts.adapters.openai_agent_adapter import ChatRequest
 from sage_ts.adequacy.inadequacy_classifier import (
+    CapabilityObservation,
+    _add_contact_argument_observation,
+    _address_answer_extraction_observation,
+    _broad_location_search_argument_observation,
+    _device_status_lookup_observation,
+    _distance_answer_extraction_observation,
+    _external_service_answer_extraction_observation,
+    _holiday_search_args_observation,
+    _location_search_argument_observation,
+    _message_counterparty_search_plan_observation,
+    _plan_device_state_action_sequence_observation,
+    _reminder_creation_finalizer_observation,
+    _resolve_search_window_or_bounds_observation,
+    _stock_symbol_extraction_observation,
     _temperature_answer_extraction_observation,
 )
 from sage_ts.generation.tool_generator import (
@@ -10,7 +26,11 @@ from sage_ts.generation.tool_generator import (
     ToolGenerationRequest,
     ToolGenerator,
     _model_authored_contract_rules,
+    _model_authored_final_repair_directive,
+    _model_authored_generation_prompt,
 )
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.orchestration.online_birth import _model_visible_generation_examples
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
 
@@ -52,6 +72,129 @@ class FakeCompleter:
                 "code": "def normalize_label(label: str) -> str:\n    return label.strip().lower()\n",
             }
         )
+
+
+def _serialized_model_visible_contract(
+    observation: CapabilityObservation,
+    *,
+    suggested_tool_name: str,
+) -> str:
+    visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    request = ToolGenerationRequest(
+        scenario_name="synthetic_visible_task_context",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": example.inputs,
+                "expected": example.expected,
+                "held_out": False,
+                "negative_applicability": example.negative_applicability,
+            }
+            for example in visible_examples
+        ),
+        suggested_tool_name=suggested_tool_name,
+    )
+    return _model_authored_generation_prompt(request)
+
+
+def test_model_visible_contracts_do_not_serialize_benchmark_literals() -> None:
+    observations = (
+        (_device_status_lookup_observation("synthetic"), "plan_device_status_lookup"),
+        (
+            _plan_device_state_action_sequence_observation("synthetic"),
+            "plan_device_state_action_sequence_v3",
+        ),
+        (
+            _reminder_creation_finalizer_observation("synthetic"),
+            "prepare_reminder_creation_args",
+        ),
+        (
+            _location_search_argument_observation("synthetic"),
+            "prepare_specific_location_search_args",
+        ),
+        (
+            _broad_location_search_argument_observation("synthetic"),
+            "prepare_broad_location_search_args",
+        ),
+        (
+            _add_contact_argument_observation("synthetic"),
+            "prepare_add_contact_args",
+        ),
+        (
+            _resolve_search_window_or_bounds_observation("synthetic"),
+            "resolve_search_window_or_bounds",
+        ),
+        (
+            _holiday_search_args_observation("synthetic"),
+            "prepare_holiday_search_args",
+        ),
+        (
+            _message_counterparty_search_plan_observation("synthetic"),
+            "plan_message_counterparty_search",
+        ),
+        (_stock_symbol_extraction_observation("synthetic"), "extract_stock_symbol"),
+        (
+            _address_answer_extraction_observation("synthetic"),
+            "extract_address_result",
+        ),
+        (
+            _external_service_answer_extraction_observation("synthetic"),
+            "extract_service_answer_field",
+        ),
+        (
+            _distance_answer_extraction_observation("synthetic"),
+            "extract_distance_result",
+        ),
+        (
+            _temperature_answer_extraction_observation("synthetic"),
+            "extract_temperature_result",
+        ),
+    )
+    serialized = "\n".join(
+        _serialized_model_visible_contract(
+            observation,
+            suggested_tool_name=suggested_tool_name,
+        )
+        for observation, suggested_tool_name in observations
+    )
+    prohibited = (
+        "whole foods",
+        "stevens creek",
+        "golden gate bridge",
+        "stephen sondheim",
+        "+19876543210",
+        "one apple park way",
+        "67.96238310230461",
+        "grand canyon",
+        "wifi is on.",
+        "wifi has been turned on.",
+        "location service has been turned on.",
+        "buy tickets",
+        "buy chocolate milk",
+        "1777380998",
+        "todo item i made yesterday",
+        "thanksgiving",
+        "christmas day",
+        "homer s",
+        "+10000000000",
+        "nasdaq:aapl",
+        "you want",
+        "how many days is it till",
+        "what is the timestamp for",
+        "how far am i from the",
+        "creek",
+        "update_contact_with_id_and_phone_number",
+        "your most recent message says",
+        "your oldest message says",
+        "the phone number for",
+        "you are approximately",
+    )
+
+    lowered = serialized.lower()
+    assert [literal for literal in prohibited if literal in lowered] == []
 
 
 def test_tool_generator_authors_each_tool_fresh() -> None:
@@ -130,6 +273,195 @@ def test_repair_analysis_is_memoized_only_within_generator_instance(
     assert completer.calls == calls_before_repair_analysis + 2
 
 
+def test_validation_abstention_repair_final_directive() -> None:
+    hidden_task = "private_held_out_task_DO_NOT_DISCLOSE_9107"
+    hidden_answer = "private_held_out_answer_DO_NOT_DISCLOSE_2841"
+    examples = (
+        ToolExample(
+            inputs={
+                "user_request": "Update a record",
+                "requested_action": "modify_record",
+                "target_identifier": "",
+                "required_original_tools": ["record_update"],
+                "available_original_tools": ["record_update"],
+                "visible_records_count": 0,
+            },
+            expected={
+                "should_abstain": True,
+                "missing_information": ["target_identifier"],
+                "required_original_tools": ["record_update"],
+                "safe_next_action": "ask_user_or_abstain",
+                "final_answer_recommendation": (
+                    "Cannot continue without a target identifier."
+                ),
+                "abstain_reason": "missing_target_identifier",
+            },
+        ),
+        ToolExample(
+            inputs={
+                "user_request": hidden_task,
+                "requested_action": "lookup_record",
+                "target_identifier": hidden_answer,
+                "required_original_tools": [hidden_answer],
+                "available_original_tools": [hidden_answer],
+                "visible_records_count": 1,
+            },
+            expected={
+                "should_abstain": False,
+                "missing_information": [],
+                "required_original_tools": [hidden_answer],
+                "safe_next_action": "continue_with_original_tool",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+    )
+    model_visible_examples = _model_visible_generation_examples(examples)
+    request = ToolGenerationRequest(
+        scenario_name=(
+            "post_deployment_repair(kind=implementation;family=record_safety)"
+        ),
+        observation=(
+            "Use public capability, target, and ambiguity rules to decide whether "
+            "an action may continue."
+        ),
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in model_visible_examples
+        ),
+        suggested_tool_name="decide_safe_action",
+    )
+    spec = ToolSpec(
+        tool_name="decide_safe_action",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        description="Decide whether visible public prerequisites permit an action.",
+        inputs=(
+            ToolInput("user_request", "str", "Visible user request."),
+            ToolInput("requested_action", "str", "Visible requested action."),
+            ToolInput("target_identifier", "str", "Visible target."),
+            ToolInput("required_original_tools", "list", "Required capabilities."),
+            ToolInput("available_original_tools", "list", "Available capabilities."),
+            ToolInput("visible_records_count", "int", "Visible matching records."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_abstain": {"type": "boolean"},
+                "missing_information": {"type": "array"},
+                "required_original_tools": {"type": "array"},
+                "safe_next_action": {"type": "string"},
+                "final_answer_recommendation": {"type": "string"},
+                "abstain_reason": {"type": "string"},
+            },
+        },
+        generalization_rationale="The same ordered checks apply across action families.",
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+    )
+    rejected = GeneratedTool(
+        spec=spec,
+        code=(
+            "def decide_safe_action(user_request: str, requested_action: str, "
+            "target_identifier: str, required_original_tools: list, "
+            "available_original_tools: list, visible_records_count: int) -> dict:\n"
+            "    return {}\n"
+        ),
+    )
+
+    class CapturingCompleter:
+        model = "fake-model"
+
+        def __init__(self) -> None:
+            self.requests: list[ChatRequest] = []
+
+        def complete(self, chat_request: ChatRequest) -> str:
+            self.requests.append(chat_request)
+            # Even a nonconforming multi-candidate response is narrowed to the one
+            # coherent validation-helper candidate requested by the prompt.
+            return json.dumps({"candidates": [rejected.to_json(), rejected.to_json()]})
+
+    completer = CapturingCompleter()
+    generator = ToolGenerator(completer=completer)
+    errors = (
+        "held_out_0_raw_should_abstain",
+        "blind_property_0_missing_capability_0_final_recommendation_fact",
+    )
+
+    repaired = generator.repair_candidates(request, rejected, errors)
+
+    assert len(repaired) == 1
+    assert len(completer.requests) == 1
+    prompt = completer.requests[0].user
+    directive = _model_authored_final_repair_directive(request, errors)
+    assert prompt.endswith(directive)
+    assert '"candidate_count": 1' in prompt
+    assert "Return exactly one complete JSON repair object" in directive
+    assert "exactly these six keys" in directive
+    assert "names every missing capability" in directive
+    assert "explicitly says target identifier" in directive
+    assert "explicitly names ambiguity or multiple matches" in directive
+    step_positions = [directive.index(f"STEP {index}:") for index in range(1, 7)]
+    assert step_positions == sorted(step_positions)
+    assert hidden_task not in prompt
+    assert hidden_answer not in prompt
+
+
+@pytest.mark.parametrize(
+    ("code_suffix", "errors", "prohibited_token"),
+    [
+        (
+            "\n# expected_answer=PRIVATE_SENTINEL",
+            ("public_validation_failed",),
+            "expected_answer",
+        ),
+        ("", ("task_id=PRIVATE_SENTINEL",), "task_id"),
+    ],
+)
+def test_post_deployment_repair_audits_exact_prompt_before_inference(
+    code_suffix: str,
+    errors: tuple[str, ...],
+    prohibited_token: str,
+) -> None:
+    class RecordingCompleter(FakeCompleter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.requests: list[ChatRequest] = []
+
+        def complete(self, request: ChatRequest) -> str:
+            self.requests.append(request)
+            return super().complete(request)
+
+    completer = RecordingCompleter()
+    generator = ToolGenerator(completer=completer)
+    ordinary_request = ToolGenerationRequest(
+        scenario_name="ordinary_visible_context",
+        observation="Normalize a visible public label.",
+        allowed_families=("canonicalizer",),
+        suggested_tool_name="normalize_label",
+    )
+    rejected = generator.generate(ordinary_request)
+    rejected = GeneratedTool(spec=rejected.spec, code=rejected.code + code_suffix)
+    repair_request = ToolGenerationRequest(
+        scenario_name="post_deployment_repair(kind=implementation;family=labels)",
+        observation="Repair visible public label normalization.",
+        allowed_families=("canonicalizer",),
+        suggested_tool_name="normalize_label",
+    )
+
+    with pytest.raises(ValueError, match=prohibited_token):
+        generator.repair_candidates(repair_request, rejected, errors)
+
+    assert all("PRIVATE_SENTINEL" not in request.user for request in completer.requests)
+
+
 def test_generation_request_includes_reusable_name_hint() -> None:
     request = ToolGenerationRequest(
         scenario_name="find_temperature_f_with_location_alt",
@@ -147,7 +479,7 @@ def test_temperature_generation_contract_finishes_visible_conversion() -> None:
 
     assert observation.failed_tool_calls == ("search_weather_around_lat_lon",)
     assert first.inputs["requested_metric"] == "current"
-    assert first.expected["answer_value"] == "70.7"
+    assert first.expected["answer_value"] == "65.12"
     assert first.expected["answer_unit"] == "Fahrenheit"
     assert first.expected["should_call_downstream_tool"] is False
     assert first.expected["downstream_tool_name"] == ""
@@ -157,10 +489,10 @@ def test_temperature_generation_contract_finishes_visible_conversion() -> None:
         for example in observation.validation_examples
         if example.inputs.get("requested_metric") == "min"
     )
-    assert low_case.inputs["service_payload"]["result"] == 15.1
-    assert low_case.inputs["service_payload"]["current_temperature"] == 15.1
-    assert low_case.inputs["service_payload"]["min_temperature"] == 8.9
-    assert low_case.expected["answer_value"] == "48.02"
+    assert low_case.inputs["service_payload"]["result"] == 14.6
+    assert low_case.inputs["service_payload"]["current_temperature"] == 14.6
+    assert low_case.inputs["service_payload"]["min_temperature"] == 7.3
+    assert low_case.expected["answer_value"] == "45.14"
     assert low_case.expected["exact_final_answer"].startswith("The min temperature")
 
 
@@ -209,10 +541,10 @@ def test_device_sequence_guidance_uses_visible_contract_not_scenario_name() -> N
     assert "one recovery action" not in guidance
 
 
-def test_add_contact_contract_parses_to_my_contact_phone_phrase() -> None:
+def test_add_contact_contract_parses_visible_contact_phone_phrase() -> None:
     generator = ToolGenerator(completer=FakeCompleter())
     request = ToolGenerationRequest(
-        scenario_name="add_contact_with_name_and_phone_number_10_distraction_tools",
+        scenario_name="synthetic_visible_add_contact_context",
         observation="Prepare add_contact arguments from visible name and phone.",
         allowed_families=("composite_workflow_helper",),
         suggested_tool_name="prepare_add_contact_args",
@@ -226,22 +558,22 @@ def test_add_contact_contract_parses_to_my_contact_phone_phrase() -> None:
             ToolExample(
                 {
                     "user_request": (
-                        "Add Stephen Sondheim to my contact, his phone_number is "
-                        "+19876543210"
+                        "Add Casey Example to my contact, their phone_number is "
+                        "+12025550147"
                     )
                 },
                 {
                     "add_contact_kwargs": {
-                        "name": "Stephen Sondheim",
-                        "phone_number": "+19876543210",
+                        "name": "Casey Example",
+                        "phone_number": "+12025550147",
                     },
                     "should_call_downstream_tool": True,
                     "downstream_tool_name": "add_contact",
                     "downstream_tool_kwargs": {
-                        "name": "Stephen Sondheim",
-                        "phone_number": "+19876543210",
+                        "name": "Casey Example",
+                        "phone_number": "+12025550147",
                     },
-                    "normalized_phone_number": "+19876543210",
+                    "normalized_phone_number": "+12025550147",
                     "abstain_reason": "",
                 },
             ),
@@ -256,8 +588,8 @@ def test_generation_request_preserves_negative_applicability_metadata() -> None:
         allowed_families=("derived_value_calculator",),
         validation_examples=(
             {
-                "inputs": {"stock_payload": {"symbol": "NASDAQ:AAPL"}},
-                "expected": "AAPL",
+                "inputs": {"stock_payload": {"symbol": "NASDAQ:EXMP"}},
+                "expected": "EXMP",
                 "held_out": False,
                 "negative_applicability": False,
             },

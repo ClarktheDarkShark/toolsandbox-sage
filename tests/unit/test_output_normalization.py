@@ -64,6 +64,58 @@ def test_structured_state_sequence_normalizes_control_fields() -> None:
     assert normalized["continue_original_task_after_sequence"] is True
 
 
+def test_state_sequence_composes_device_service_action_terms() -> None:
+    cases = (
+        (
+            "Please activate the wireless network.",
+            "set_wifi_status",
+            True,
+        ),
+        ("Deactivate mobile data now.", "set_cellular_service_status", False),
+        ("Switch location access off.", "set_location_service_status", False),
+        ("Set battery saver on.", "set_low_battery_mode_status", True),
+    )
+
+    for user_request, expected_tool, expected_on in cases:
+        normalized = normalize_generated_tool_output(
+            _state_sequence_tool(),
+            {
+                "tool_name": "",
+                "arguments": {},
+                "should_call": False,
+                "reason": "",
+                "action_sequence": [],
+                "final_response_recommendation": "",
+                "continue_original_task_after_sequence": False,
+                "abstain_reason": "unsupported",
+            },
+            inputs={"user_request": user_request},
+        )
+
+        assert normalized["action_sequence"][0]["tool_name"] == expected_tool
+        assert normalized["action_sequence"][0]["arguments"] == {"on": expected_on}
+
+
+def test_state_sequence_does_not_join_unrelated_action_and_state_terms() -> None:
+    normalized = normalize_generated_tool_output(
+        _state_sequence_tool(),
+        {
+            "tool_name": "",
+            "arguments": {},
+            "should_call": False,
+            "reason": "",
+            "action_sequence": [],
+            "final_response_recommendation": "",
+            "continue_original_task_after_sequence": False,
+            "abstain_reason": "unsupported",
+        },
+        inputs={"user_request": "Set a reminder while the wireless network is off."},
+    )
+
+    assert normalized["action_sequence"] == []
+    assert normalized["should_call"] is False
+
+
 def test_derived_value_abstention_does_not_synthesize_visible_fallback() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(

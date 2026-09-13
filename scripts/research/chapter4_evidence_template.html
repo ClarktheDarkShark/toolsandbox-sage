@@ -189,6 +189,22 @@
       font-size: 17px;
     }
 
+    .study-design-notice {
+      margin-top: 12px;
+      border: 1px solid rgba(241, 189, 87, .5);
+      border-left: 4px solid var(--amber);
+      border-radius: 7px;
+      background: rgba(241, 189, 87, .08);
+      color: var(--white-soft);
+      padding: 12px 15px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .study-design-notice[hidden] {
+      display: none;
+    }
+
     .section-head {
       margin: 22px 0 10px;
       display: flex;
@@ -966,9 +982,11 @@
       </div>
     </section>
 
+    <aside class="study-design-notice" id="studyDesignNotice" hidden></aside>
+
     <div class="section-head">
       <h2>Hypothesis Evidence</h2>
-      <p>H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. The called-task analysis is selection-conditioned and descriptive; v1 on the exact 800-task subset is historical comparison only.</p>
+      <p id="hypothesisSectionDescription">H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. The called-task analysis is selection-conditioned and descriptive; v1 on the exact 800-task subset is historical comparison only.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
@@ -1125,6 +1143,12 @@
         `${campaign.completed_runs} of ${campaign.expected_runs} full runs complete`;
       document.getElementById("pairedCount").textContent =
         `${Number(campaign.audited_current_matched_observations || 0).toLocaleString()} / ${Number(campaign.paper_comparable_matched_observations || 0).toLocaleString()}`;
+      const designNotice = document.getElementById("studyDesignNotice");
+      designNotice.textContent = campaign.study_design_notice || "";
+      designNotice.hidden = !campaign.study_design_notice;
+      document.getElementById("hypothesisSectionDescription").textContent =
+        campaign.hypothesis_section_description ||
+        "H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks.";
       document.getElementById("footerNote").textContent =
         `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
 

@@ -32,6 +32,10 @@ PAPER_ENDPOINT_NAME = "paper_comparable_historical_subset"
 OUTCOME_EVALUATOR_SOURCE = Path("src/sage_ts/evaluation/outcome_score.py")
 RESEARCHER_SAMPLE_WAIVER_STATUS = "waived_by_researcher"
 RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION = "explicit_prepare_cli"
+SAMPLE_AS_REP01_ACCOUNTING_MODE = "passing_release_sample_as_online_rep01_plus_nine_new"
+ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE = (
+    "adaptive_selection_conditioned_descriptive_only"
+)
 _DASHBOARD_WRITE_LOCK = threading.Lock()
 
 H1_THRESHOLD_PERCENT = 80.0
@@ -331,14 +335,23 @@ def _load_dual_endpoint_spec(
     ):
         raise ValueError("Sample-validation threshold bytes changed.")
     thresholds = _load_json(thresholds_path)
+    threshold_schema_version = thresholds.get("schema_version")
     if (
-        thresholds.get("schema_version") != 3
+        threshold_schema_version not in {3, 4}
         or thresholds.get("performance_endpoint_policy")
         != "dual_scoped_outcome_endpoints"
         or thresholds.get("canonical_metric_policy")
         != "descriptive_only_never_a_release_gate"
     ):
-        raise ValueError("Sample report does not pin the dual-endpoint v3 policy.")
+        raise ValueError("Sample report does not pin a dual-endpoint v3/v4 policy.")
+    if threshold_schema_version == 4 and thresholds.get(
+        "required_technical_readiness"
+    ) != {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+    }:
+        raise ValueError(
+            "Sample report does not pin the strict v4 technical-readiness gate."
+        )
     endpoints = thresholds.get("performance_endpoints")
     historical = thresholds.get("historical_reference")
     benchmark = thresholds.get("benchmark")
@@ -1821,6 +1834,16 @@ def build_evidence_data(
         else declared_expected_frozen
     )
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
+    replication_accounting = campaign_manifest.get("replication_accounting")
+    adaptive_sample_distribution = (
+        isinstance(replication_accounting, dict)
+        and replication_accounting.get("mode") == SAMPLE_AS_REP01_ACCOUNTING_MODE
+    )
+    campaign_analysis_role = (
+        ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE
+        if adaptive_sample_distribution
+        else "confirmatory_two_way_run_task_clustered"
+    )
     h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
     h2_threshold = _safe_float(statistical_plan.get("hypothesis_2_threshold_percent"))
     h3_threshold = _safe_float(statistical_plan.get("hypothesis_3_threshold_percent"))
@@ -2209,6 +2232,11 @@ def build_evidence_data(
         complete=online_complete,
         alpha=0.05,
     )
+    if adaptive_sample_distribution:
+        if retention is not None and online_complete and frozen_complete:
+            h1_status = "descriptive_only"
+        if overall_outcome_lift is not None and online_complete:
+            h2_status = "descriptive_only"
     h3_status = "descriptive_only" if called_lift is not None else "pending"
 
     tools, tool_totals = _tool_records(completed_online)
@@ -2328,20 +2356,25 @@ def build_evidence_data(
         )
         if run is not None and run.complete and not eligible
     )
-    campaign_inference_complete = (
+    campaign_distribution_complete = (
         online_complete
         and frozen_complete
         and len(loaded_pairs) == expected_online
         and active_run_count == 0
         and excluded_completed_artifact_count == 0
     )
+    campaign_inference_complete = (
+        campaign_distribution_complete and not adaptive_sample_distribution
+    )
     manifest_status = str(campaign_manifest.get("status") or "")
     status_label = (
         "Legacy / non-confirmatory"
         if endpoint_spec is None
         and any(online or frozen for _, online, frozen in loaded_pairs)
+        else "Complete · adaptive descriptive"
+        if campaign_distribution_complete and adaptive_sample_distribution
         else "Complete"
-        if campaign_inference_complete
+        if campaign_distribution_complete
         else "Incomplete"
         if manifest_status in {"complete", "incomplete"}
         or excluded_completed_artifact_count
@@ -2363,7 +2396,11 @@ def build_evidence_data(
         {
             "id": "Hypothesis 1",
             "title": "Reusable generated tools preserve online-build gains",
-            "analysis_role": "confirmatory_run_paired",
+            "analysis_role": (
+                ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE
+                if adaptive_sample_distribution
+                else "confirmatory_run_paired"
+            ),
             "decision_rule": {
                 "estimate_requirement": f"gain_retention_percent >= {h1_threshold:g}",
                 "uncertainty_requirement": (
@@ -2441,7 +2478,7 @@ def build_evidence_data(
         {
             "id": "Hypothesis 2",
             "title": "SAGE improves audited all-task outcome over baseline",
-            "analysis_role": "confirmatory_two_way_run_task_clustered",
+            "analysis_role": campaign_analysis_role,
             "decision_rule": {
                 "target_contrast": (
                     f"candidate_mean - {h2_multiplier:.6g} * control_mean"
@@ -2913,7 +2950,7 @@ def build_evidence_data(
     sage_successes = sum(value >= 1.0 - 1e-12 for value in candidate_outcomes)
     statistics = {
         "mean_delta": overall_outcome_delta,
-        "analysis_role": "confirmatory_two_way_run_task_clustered",
+        "analysis_role": campaign_analysis_role,
         "decision_rule": {
             "target_contrast": f"candidate_mean - {h2_multiplier:.6g} * control_mean",
             "two_way_bootstrap_lower_must_exceed": 0.0,
@@ -3218,6 +3255,28 @@ def build_evidence_data(
         "completed_frozen_runs": len(completed_frozen),
         "excluded_completed_artifacts": excluded_completed_artifact_count,
         "inference_complete": campaign_inference_complete,
+        "distribution_complete": campaign_distribution_complete,
+        "analysis_role": campaign_analysis_role,
+        "preregistered_inference_eligible": not adaptive_sample_distribution,
+        "replication_accounting": (
+            dict(replication_accounting)
+            if isinstance(replication_accounting, dict)
+            else {}
+        ),
+        "study_design_notice": (
+            str(replication_accounting.get("selection_conditioning_notice") or "")
+            if adaptive_sample_distribution and isinstance(replication_accounting, dict)
+            else ""
+        ),
+        "hypothesis_section_description": (
+            "All ten runs are aggregated, but rep01 was selected after passing the "
+            "release gate. H1/H2 estimates and uncertainty are adaptive, "
+            "selection-conditioned descriptions—not preregistered inference."
+            if adaptive_sample_distribution
+            else "H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. "
+            "The called-task analysis is selection-conditioned and descriptive; v1 "
+            "on the exact 800-task subset is historical comparison only."
+        ),
         "manifest_status": manifest_status,
         "progress_percent": (
             min(100.0, recorded_task_progress / expected_task_progress * 100.0)
@@ -3228,7 +3287,12 @@ def build_evidence_data(
             "Legacy artifacts loaded for diagnosis only; dual-endpoint "
             "attestations are absent"
             if endpoint_spec is None
-            else f"{complete_run_count} of {expected_run_count} verified runs included"
+            else (
+                "Adaptive / selection-conditioned; not preregistered inference · "
+                if adaptive_sample_distribution
+                else ""
+            )
+            + f"{complete_run_count} of {expected_run_count} verified runs included"
             + (f" · {active_run_count} active" if active_run_count else "")
             + (
                 f" · {excluded_completed_artifact_count} completed artifact(s) excluded"
@@ -3256,7 +3320,9 @@ def build_evidence_data(
             else "legacy_single_endpoint"
         ),
         "inference_exclusion_reason": (
-            None
+            "release_sample_selected_as_rep01_after_passing_technical_readiness_gate"
+            if adaptive_sample_distribution
+            else None
             if endpoint_spec is not None
             else "missing_dual_endpoint_sample_and_run_attestations"
         ),

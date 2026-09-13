@@ -23,10 +23,15 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
+from sage_ts.adapters.actor_visible_policy_catalog import (
+    ActorVisiblePolicyCatalog,
+    actor_visible_policy_catalog_scope,
+    build_actor_visible_policy_catalog,
+    current_actor_visible_policy_catalog,
+)
 from sage_ts.config.models import reasoning_effort_kwargs, resolve_model_name
 from sage_ts.config.openai_client import build_robust_openai_client
 from sage_ts.evaluation.llm_usage import record_chat_completion_usage
-from tool_sandbox.common.execution_context import get_current_context
 from tool_sandbox.common.utils import all_logging_disabled
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
 from tool_sandbox.roles.openai_api_user import OpenAIAPIUser
@@ -285,26 +290,37 @@ def _tool_names(
 def _agent_facing_tool_name(tool_name: str) -> str:
     if not tool_name:
         return tool_name
-    try:
-        return str(get_current_context().get_agent_facing_tool_name(tool_name))
-    except Exception:
-        return tool_name
+    catalog = current_actor_visible_policy_catalog()
+    return catalog.visible_name(tool_name) if catalog is not None else tool_name
 
 
 def _execution_facing_tool_name(tool_name: str) -> str:
+    """Return a schema-derived semantic name, never a private runtime identity."""
+
     if not tool_name:
         return tool_name
-    try:
-        mapped = str(get_current_context().get_execution_facing_tool_name(tool_name))
-    except Exception:
-        mapped = tool_name
+    catalog = current_actor_visible_policy_catalog()
+    mapped = catalog.semantic_name(tool_name) if catalog is not None else tool_name
     if mapped.startswith("functions."):
         return mapped.split(".", 1)[1]
     return mapped
 
 
+def _actor_visible_catalog_for_tools(
+    openai_tools: object,
+) -> ActorVisiblePolicyCatalog:
+    active = current_actor_visible_policy_catalog()
+    if active is not None:
+        return active
+    return build_actor_visible_policy_catalog(
+        openai_tools,
+        known_semantic_capabilities=ORIGINAL_TOOLSANDBOX_TOOL_NAMES,
+    )
+
+
 def _tool_names_execution_facing(openai_tools: object) -> set[str]:
-    return {_execution_facing_tool_name(name) for name in _tool_names(openai_tools)}
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
+    return {catalog.semantic_name(name) for name in _tool_names(openai_tools)}
 
 
 def _tool_input_names_execution_facing(
@@ -313,13 +329,14 @@ def _tool_input_names_execution_facing(
 ) -> set[str]:
     if openai_tools is NOT_GIVEN:
         return set()
-    target = _execution_facing_tool_name(execution_tool_name)
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
+    target = catalog.semantic_name(execution_tool_name)
     for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
         function = tool.get("function", {})
         if not isinstance(function, Mapping):
             continue
         name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
+        if not isinstance(name, str) or catalog.semantic_name(name) != target:
             continue
         parameters = function.get("parameters", {})
         properties: object = {}
@@ -335,13 +352,14 @@ def _tool_output_names_execution_facing(
 ) -> set[str]:
     if openai_tools is NOT_GIVEN:
         return set()
-    target = _execution_facing_tool_name(execution_tool_name)
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
+    target = catalog.semantic_name(execution_tool_name)
     for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
         function = tool.get("function", {})
         if not isinstance(function, Mapping):
             continue
         name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
+        if not isinstance(name, str) or catalog.semantic_name(name) != target:
             continue
         parameters = function.get("parameters", {})
         output_schema: object = function.get("output_schema", {})
@@ -360,23 +378,35 @@ def _tool_description_execution_facing(
 ) -> str:
     if openai_tools is NOT_GIVEN:
         return ""
-    target = _execution_facing_tool_name(execution_tool_name)
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
+    target = catalog.semantic_name(execution_tool_name)
     for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
         function = tool.get("function", {})
         if not isinstance(function, Mapping):
             continue
         name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
+        if not isinstance(name, str) or catalog.semantic_name(name) != target:
             continue
         return str(function.get("description") or "")
     return ""
 
 
 def _tool_name_for_call(openai_tools: object, execution_tool_name: str) -> str:
-    for name in _tool_names(openai_tools):
-        if _execution_facing_tool_name(name) == execution_tool_name:
-            return name
-    return _agent_facing_tool_name(execution_tool_name)
+    if openai_tools is NOT_GIVEN:
+        return ""
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
+    target = catalog.semantic_name(execution_tool_name)
+    matches: list[str] = []
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, Mapping):
+            continue
+        name = function.get("name")
+        if isinstance(name, str) and catalog.semantic_name(name) == target:
+            matches.append(name)
+    # Never choose arbitrarily between two actor-visible schemas that appear to
+    # provide the same capability.
+    return matches[0] if len(matches) == 1 else ""
 
 
 def _message_already_called_tool(
@@ -634,10 +664,23 @@ def _device_status_completion_tool_choice(
 def _generated_tool_names_execution_facing(openai_tools: object) -> list[str]:
     if openai_tools is NOT_GIVEN:
         return []
+    catalog = _actor_visible_catalog_for_tools(openai_tools)
     generated: list[str] = []
-    for tool_name in _tool_names(openai_tools):
-        execution_name = _execution_facing_tool_name(tool_name)
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        function = tool.get("function", {})
+        if not isinstance(function, Mapping):
+            continue
+        tool_name = function.get("name")
+        if not isinstance(tool_name, str):
+            continue
+        execution_name = catalog.semantic_name(tool_name)
         if execution_name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
+            continue
+        if not catalog.is_generated(tool_name) and re.fullmatch(
+            r"[a-z][a-z0-9_]*_\d+", tool_name
+        ):
+            # An opaque ToolSandbox alias with no public SAGE marker is an
+            # unknown native/distraction schema, not a generated tool.
             continue
         generated.append(execution_name)
     return generated
@@ -648,7 +691,15 @@ def _tool_schema_execution_name(tool: Mapping[str, Any]) -> str:
     if not isinstance(function, Mapping):
         return ""
     name = function.get("name")
-    return _execution_facing_tool_name(str(name or "")) if isinstance(name, str) else ""
+    if not isinstance(name, str):
+        return ""
+    catalog = current_actor_visible_policy_catalog()
+    if catalog is None:
+        catalog = build_actor_visible_policy_catalog(
+            (tool,),
+            known_semantic_capabilities=ORIGINAL_TOOLSANDBOX_TOOL_NAMES,
+        )
+    return catalog.semantic_name(str(name or ""))
 
 
 def _last_tool_call_index(openai_messages: object, tool_name: str) -> int:
@@ -838,9 +889,15 @@ def _dynamic_generated_tool_schema_filter(
             keep_generated.add(_execution_facing_tool_name(tool_name))
 
     filtered: list[ChatCompletionToolParam] = []
+    catalog = _actor_visible_catalog_for_tools(tools)
     for tool in tools:
-        tool_name = _tool_schema_execution_name(cast(Mapping[str, Any], tool))
-        if not tool_name or tool_name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
+        raw_tool = cast(Mapping[str, Any], tool)
+        function = raw_tool.get("function", {})
+        visible_name = (
+            str(function.get("name") or "") if isinstance(function, Mapping) else ""
+        )
+        tool_name = _tool_schema_execution_name(raw_tool)
+        if not tool_name or not catalog.is_generated(visible_name):
             filtered.append(tool)
             continue
         if tool_name in keep_generated:
@@ -871,12 +928,6 @@ def _generated_tool_uses_native_action(
     tool_name: str,
 ) -> bool:
     execution_name = _execution_facing_tool_name(tool_name)
-    try:
-        runtime_tool = get_current_context().name_to_tool.get(execution_name)
-    except Exception:
-        runtime_tool = None
-    if bool(getattr(runtime_tool, "sage_native_action_delegation", False)):
-        return True
     for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
         if _tool_schema_execution_name(tool) != execution_name:
             continue
@@ -908,19 +959,16 @@ def _generated_tool_native_action_names(
     if not _generated_tool_uses_native_action(openai_tools, tool_name):
         return set()
     execution_tool_name = _execution_facing_tool_name(tool_name)
-    try:
-        runtime_tool = get_current_context().name_to_tool.get(execution_tool_name)
-    except Exception:
-        runtime_tool = None
-    declared = getattr(runtime_tool, "sage_native_action_names", ())
-    if isinstance(declared, str):
-        declared = (declared,)
-    return {
-        execution_name
-        for action_name in declared or ()
-        if (execution_name := _execution_facing_tool_name(str(action_name)))
-        in ORIGINAL_TOOLSANDBOX_TOOL_NAMES
-    }
+    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
+        if _tool_schema_execution_name(tool) != execution_tool_name:
+            continue
+        schema_text = _tool_schema_text(tool)
+        return {
+            action_name
+            for action_name in ORIGINAL_SIDE_EFFECT_TOOL_NAMES
+            if re.search(rf"\b{re.escape(action_name)}\b", schema_text)
+        }
+    return set()
 
 
 def _hide_wrapped_native_action_schemas(
@@ -4910,13 +4958,18 @@ def _known_relationship_label(value: object) -> str:
 
 def _relationship_from_lookup_prompt(text: str) -> str:
     lower = " ".join(text.lower().replace("_", " ").replace("-", " ").split())
-    match = re.search(r"\bwho\s+are\s+my\s+([a-z]+)\b", lower)
-    if match:
-        return _known_relationship_label(match.group(1))
-    match = re.search(r"\bmy\s+([a-z]+)\b", lower)
-    if match:
-        return _known_relationship_label(match.group(1))
+    for match in re.finditer(r"\bmy\s+([a-z]+)\b", lower):
+        relationship = _known_relationship_label(match.group(1))
+        if relationship:
+            return relationship
     return ""
+
+
+def _requests_relationship_contact_names(text: str) -> bool:
+    """Recognize a relationship-to-person lookup by its semantic components."""
+
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    return bool(words & {"identify", "identity", "name", "who", "whom"})
 
 
 def _relationship_batch_request(openai_messages: object) -> dict[str, str] | None:
@@ -5470,15 +5523,13 @@ def _lookup_planner_actor_policy_message(
             "scalar lookup constraint; the helper only prepares the lookup and "
             "does not perform the side effect. Relationship phrases and "
             "phone-number phrases count as scalar constraints for lookup "
-            "planning. "
-            "A relationship phrase supplied by the user is a valid lookup "
+            "planning. A relationship phrase supplied by the user is a valid lookup "
             "constraint; do not ask for a person's name before searching by that "
-            "visible relationship constraint. For requests like 'what is the "
-            "name of my boss', call the helper with relationship='boss' and "
-            "requested_field='name'. For requests like 'what is my relationship "
-            "with +15550100', call it with the phone_number and "
-            "requested_field='relationship'; do not reject plus-prefixed digits "
-            "as placeholders. For delete/remove/update requests that identify a "
+            "visible relationship constraint. For a name-field lookup constrained "
+            "by a relationship, pass that relationship and requested_field='name'. "
+            "For a relationship-field lookup constrained by a phone number, pass "
+            "that phone number and requested_field='relationship'; do not reject "
+            "plus-prefixed digits as placeholders. For delete/remove/update requests that identify a "
             "contact by phone number, call it with that phone_number and "
             "requested_field='person_id'. "
             "When calling the lookup planner, pass only scalar constraints "
@@ -5677,8 +5728,8 @@ def _search_window_actor_policy_message(
             "or no criteria when a recency phrase can be converted into bounds. "
             "For reminder questions asking what todo/reminder/task/item was "
             "made, created, or added yesterday, use timestamp_intent='creation' "
-            "and pass the visible user phrase with the object wording preserved, "
-            "such as 'todo item I made yesterday'. Do not rewrite a plain "
+            "and pass the visible user phrase with its original object wording "
+            "preserved. Do not rewrite a plain "
             "reminder/todo request into 'made yesterday' or 'created yesterday' "
             "unless the user used made/created/added wording. If the user asks "
             "what todo/reminder they made, created, or added yesterday, do not "
@@ -6565,9 +6616,6 @@ def _next_service_direct_completion_response(
             "turn it on",
             "turn it off",
         )
-    ) or (
-        target_service == "cellular"
-        and any(token in user_request for token in ("cellphone signal", "phone signal"))
     )
     downstream = any(
         token in user_request
@@ -6584,7 +6632,9 @@ def _next_service_direct_completion_response(
     )
     if not direct_state or (downstream and "get it on" not in user_request):
         return None
-    final_response = f"{label} has been turned {'on' if on_value else 'off'}."
+    final_response = (
+        f"Requested {label.lower()} state: {'enabled' if on_value else 'disabled'}."
+    )
     return latest_name, final_response
 
 
@@ -8723,7 +8773,7 @@ def _contact_creation_completion_actor_policy_message(
             contact_name = str(kwargs.get("name") or "").strip()
     if not contact_name:
         return None
-    confirmation = f"{contact_name} has been added to your contact."
+    confirmation = f"Contact creation succeeded for: {contact_name}."
     return {
         "role": "system",
         "content": (
@@ -8866,7 +8916,7 @@ def _message_contact_lookup_completion_actor_policy_message(
         content = str(planner_args.get("message_content") or "").strip()
     if not content:
         return None
-    confirmation = f"Your message to {recipient} has been sent saying: {content}"
+    confirmation = f"Message delivery succeeded for {recipient}; content: {content}"
     return {
         "role": "system",
         "content": (
@@ -9383,7 +9433,6 @@ def _looks_like_street_or_place_phrase(value: str) -> bool:
         " way",
         " center",
         " centre",
-        " creek",
         " mall",
         " plaza",
         " square",
@@ -9929,9 +9978,9 @@ def _message_counterparty_update_completion_actor_policy_message(
         return None
     direction = _message_counterparty_direction_from_request(openai_messages)
     if direction == "received":
-        subject = "the person who last sent you a message"
+        subject = "the contact selected from your received-message history"
     elif direction == "sent":
-        subject = "the last person you sent a message to"
+        subject = "the contact selected from your sent-message history"
     else:
         subject = "the contact selected from the latest visible message"
     confirmation = f"The phone number of {subject} has been updated to {phone}."
@@ -10483,7 +10532,13 @@ def _with_selector_actor_policy(
     ]
     if not policies:
         return openai_messages
-    policy_messages = [cast(OpenAIMessage, policy) for policy in policies]
+    policy_messages = [
+        cast(
+            OpenAIMessage,
+            _with_actor_visible_tool_references(policy, openai_tools),
+        )
+        for policy in policies
+    ]
     insert_at = 0
     for index, message in enumerate(openai_messages):
         if message.get("role") != "system":
@@ -10492,6 +10547,32 @@ def _with_selector_actor_policy(
     else:
         insert_at = len(openai_messages)
     return openai_messages[:insert_at] + policy_messages + openai_messages[insert_at:]
+
+
+def _with_actor_visible_tool_references(
+    policy: Mapping[str, str],
+    openai_tools: object,
+) -> dict[str, str]:
+    """Render native tool references using only aliases in the sent schemas."""
+
+    rendered = dict(policy)
+    content = str(rendered.get("content") or "")
+    sent_names = _tool_names(openai_tools)
+    for capability in sorted(
+        ORIGINAL_TOOLSANDBOX_TOOL_NAMES,
+        key=len,
+        reverse=True,
+    ):
+        pattern = rf"(?<![A-Za-z0-9_]){re.escape(capability)}(?![A-Za-z0-9_])"
+        if re.search(pattern, content) is None:
+            continue
+        visible_name = _tool_name_for_call(openai_tools, capability)
+        replacement = (
+            visible_name if visible_name in sent_names else capability.replace("_", " ")
+        )
+        content = re.sub(pattern, replacement, content)
+    rendered["content"] = content
+    return rendered
 
 
 def _shared_task_closure_actor_policy_message(
@@ -10629,41 +10710,14 @@ def _contact_lookup_request(
                 "relationship": "",
                 "requested_field": "phone_number",
             }
-        relationship_plural_match = re.search(
-            r"\bwho\s+are\s+my\s+([a-z][a-z _-]{1,40})\??$",
-            lower,
-        )
-        if relationship_plural_match:
-            relationship = _known_relationship_label(
-                relationship_plural_match.group(1).strip(" ?.!").replace("_", " ")
-            )
-            if relationship:
-                return {
-                    "contact_name": "",
-                    "phone_number": "",
-                    "relationship": relationship,
-                    "requested_field": "name",
-                }
-        relationship_match = re.search(
-            r"\b(?:name of|who is|who's|what is the name of)\s+my\s+([a-z][a-z _-]{1,40})\??$",
-            lower,
-        )
-        if relationship_match and (
-            "name" in lower or lower.startswith(("who is", "who's"))
-        ):
-            relationship = relationship_match.group(1).strip(" ?.!").replace("_", " ")
-            if relationship and relationship not in {
-                "contact",
-                "phone",
-                "name",
-                "relationship",
-            }:
-                return {
-                    "contact_name": "",
-                    "phone_number": "",
-                    "relationship": relationship,
-                    "requested_field": "name",
-                }
+        relationship = _relationship_from_lookup_prompt(lower)
+        if relationship and _requests_relationship_contact_names(lower):
+            return {
+                "contact_name": "",
+                "phone_number": "",
+                "relationship": relationship,
+                "requested_field": "name",
+            }
     return None
 
 
@@ -11365,34 +11419,9 @@ def _latest_self_person_id_from_contacts(openai_messages: object) -> str:
     return ""
 
 
-KNOWN_HOLIDAY_LABELS: tuple[str, ...] = (
-    "Christmas Day",
-    "Thanksgiving",
-    "Halloween",
-    "New Year's Day",
-    "Labor Day",
-    "Memorial Day",
-    "Independence Day",
-)
-
-
-def _known_holiday_label_from_text(text: str) -> str | None:
-    lower = text.lower().replace("’", "'")
-    for known in KNOWN_HOLIDAY_LABELS:
-        if known.lower().replace("’", "'") in lower:
-            return known
-    if re.search(r"\bchristmas\b", lower):
-        return "Christmas Day"
-    if re.search(r"\bnew years?\b", lower):
-        return "New Year's Day"
-    return None
-
-
 def _holiday_context_label(openai_messages: object) -> str | None:
-    for text in reversed(_all_user_texts(openai_messages)):
-        label = _known_holiday_label_from_text(text)
-        if label:
-            return label
+    """Return the visible holiday label passed to the original search tool."""
+
     for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
         tool_calls = message.get("tool_calls")
         if not isinstance(tool_calls, list):
@@ -11409,7 +11438,7 @@ def _holiday_context_label(openai_messages: object) -> str | None:
             ):
                 continue
             args = _parse_mapping_payload(function.get("arguments"))
-            label = _known_holiday_label_from_text(str(args.get("holiday_name") or ""))
+            label = " ".join(str(args.get("holiday_name") or "").strip().split())
             if label:
                 return label
     return None
@@ -11544,7 +11573,7 @@ def _service_answer_text(
             if openai_messages is not None
             else "the destination"
         )
-        return f"You are approximately {display_value} {display_unit} away from {destination}."
+        return f"Distance to {destination}: {display_value} {display_unit}."
     if (
         ("temperature" in kind or "temp" in kind)
         and openai_messages is not None
@@ -11618,7 +11647,14 @@ def _clean_lookup_query_fragment(raw: str) -> str:
         flags=re.IGNORECASE,
     )
     value = re.sub(
-        r"\b(?:please|thanks|thank you|resolve any issue alone)\b.*$",
+        r"\b(?:please|thanks|thank you)\b.*$",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        r"\b(?:resolve|handle|fix)\b.{0,40}"
+        r"\b(?:alone|yourself|independently|on\s+your\s+own)\b.*$",
         "",
         value,
         flags=re.IGNORECASE,
@@ -11779,7 +11815,7 @@ def _reminder_location_parts(openai_messages: object) -> dict[str, str] | None:
             continue
         content_prefix = stripped[: location_match.start()].strip(" ,.;:")
         followup_content_match = re.search(
-            r"\bto\s+(?P<content>.+?)\s+at\s+(?:that\s+)?whole\s+foods\b",
+            r"\bto\s+(?P<content>.+?)\s+at\s+that\s+[^.!?]+$",
             stripped,
             flags=re.IGNORECASE,
         )
@@ -11812,12 +11848,7 @@ def _location_query_is_specific(query: str) -> bool:
     if not lower:
         return False
     return bool(
-        re.search(
-            r"\b(?:ave|avenue|blvd|boulevard|creek|dr|drive|rd|road|st|street|"
-            r"way|ln|lane|ct|court|mckinley|stevens|cupertino|sunnyvale|"
-            r"santa clara|palm desert)\b",
-            lower,
-        )
+        _looks_like_street_or_place_phrase(lower)
         or "," in lower
         or re.search(r"\d", lower)
     )
@@ -11849,14 +11880,12 @@ def _location_record_token_score(record: Mapping[str, Any], query: str) -> int:
         if token
         not in {
             "the",
-            "one",
+            "a",
+            "an",
             "at",
             "on",
             "near",
             "in",
-            "whole",
-            "foods",
-            "market",
         }
     }
     if not query_tokens:
@@ -11950,14 +11979,30 @@ def _safe_action_capability(value: str) -> str:
         "set_low_battery_mode_status": "device_setting_update",
         "set_wifi_status": "device_setting_update",
         "set_cellular_service_status": "device_setting_update",
-        "current_city": "location_lookup",
-        "current_location": "location_lookup",
-        "get_my_current_city": "location_lookup",
-        "get_my_current_location": "location_lookup",
-        "where_am_i": "location_lookup",
-        "what_city_am_i_in": "location_lookup",
     }
-    return mapping.get(text, mapping.get(normalized_text, text))
+    mapped = mapping.get(text, mapping.get(normalized_text))
+    if mapped:
+        return mapped
+    words = set(re.findall(r"[a-z]+", normalized_text))
+    location_subject = bool(words & {"city", "location", "place", "town", "where"})
+    personal_context = bool(words & {"current", "here", "i", "me", "my"})
+    lookup_intent = bool(
+        words
+        & {
+            "determine",
+            "find",
+            "get",
+            "identify",
+            "locate",
+            "lookup",
+            "what",
+            "where",
+            "which",
+        }
+    )
+    if location_subject and personal_context and (lookup_intent or "current" in words):
+        return "location_lookup"
+    return text
 
 
 def _ground_safe_abstention_available_tools(
@@ -12541,7 +12586,23 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_messages: list[OpenAIMessage],
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
     ) -> ChatCompletion:
-        """Run inference, with opt-in diagnostic tool forcing for adoption tests."""
+        """Run policy inference using only the schemas exposed to the actor."""
+
+        catalog = build_actor_visible_policy_catalog(
+            openai_tools,
+            known_semantic_capabilities=ORIGINAL_TOOLSANDBOX_TOOL_NAMES,
+        )
+        with actor_visible_policy_catalog_scope(catalog):
+            return self._model_inference_with_actor_visible_catalog(
+                openai_messages,
+                openai_tools,
+            )
+
+    def _model_inference_with_actor_visible_catalog(
+        self,
+        openai_messages: list[OpenAIMessage],
+        openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
+    ) -> ChatCompletion:
         prompted_messages = _with_selector_actor_policy(openai_messages, openai_tools)
         completion_tool_free_turn = _helper_answer_completion_tool_free_turn(
             openai_messages,
@@ -12606,9 +12667,9 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 routed_openai_tools=openai_tools,
                 selected_tool_name=retry_tool_choice,
             )
-            if retry_tool_choice and _execution_facing_tool_name(
-                retry_tool_choice
-            ) not in _tool_names_execution_facing(prompt_openai_tools):
+            if retry_tool_choice and retry_tool_choice not in _tool_names(
+                prompt_openai_tools
+            ):
                 retry_tool_choice = None
         retry_tool_choice_used = False
 

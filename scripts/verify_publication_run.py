@@ -4,22 +4,42 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib
 import json
 import math
+import os
+import random
 import re
 import subprocess
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator, cast
 
+from sage_ts.adapters.role_factory import (
+    SAGE_WRAPPED_AGENT_RUNTIME as SAGE_WRAPPED_AGENT_RUNTIME,
+)
+from sage_ts.adapters.toolsandbox_adapter import DEFAULT_TOOL_BACKEND
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.online_feedback_score import (
     ONLINE_FEEDBACK_EVALUATOR_VERSION as ONLINE_FEEDBACK_EVALUATOR_VERSION,
 )
+from sage_ts.evaluation.online_feedback_score import (
+    compute_outcome_score as compute_online_feedback_score,
+)
+from sage_ts.evaluation.outcome_score import (
+    compute_outcome_score as compute_audited_outcome_score,
+)
 from sage_ts.evaluation.outcome_score import (
     outcome_evaluator_manifest as outcome_evaluator_manifest,
 )
+from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
+from tool_sandbox.cli.utils import resolve_scenarios
+from tool_sandbox.common.evaluation import Milestone, Minefield
+from tool_sandbox.common.execution_context import ExecutionContext
+from tool_sandbox.common.message_conversion import serialize_to_conversation
+from tool_sandbox.common.scenario import Scenario
 
 PINNED_RAPID_FIXTURE_SHA256 = (
     "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f"
@@ -51,6 +71,17 @@ PUBLICATION_GATE_PURPOSES = (
     PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
     PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
 )
+MATCHED_CONTROL_CONDITION = "matched_policy_wrapper_without_generated_tools"
+LIFECYCLE_CONTRACT_FAILURE_THRESHOLD = 1
+LIFECYCLE_EXECUTION_FAILURE_THRESHOLD = 3
+LIFECYCLE_METADATA_VISIBLE_THRESHOLD = 8
+LIFECYCLE_ROUTE_HARMFUL_CALL_THRESHOLD = 2
+LIFECYCLE_ROUTE_HARM_DELTA = -0.25
+LIFECYCLE_ROUTE_HELP_DELTA = 0.10
+LIFECYCLE_CROSS_FAMILY_EXECUTION_FAILURE = "cross_family_execution_failure"
+LIFECYCLE_CANARY_ATTRIBUTABLE_OBSERVATION_MINIMUM = 3
+LIFECYCLE_CANARY_EXACT_OUTCOME_MINIMUM = 2
+LIFECYCLE_CANARY_FRESH_CONTROL_SUCCESS_FLIP_MINIMUM = 1
 PUBLICATION_EXECUTION_ENV = {
     "TZ": PUBLICATION_TIMEZONE,
     "SAGE_OPENAI_MAX_RETRIES": "5",
@@ -349,12 +380,999 @@ def _read_jsonl_objects(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _read_json_list(path: Path, *, label: str) -> list[Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read required {label} {path}: {exc}") from exc
+    if not isinstance(payload, list):
+        raise ValueError(f"Expected a JSON list for {label}: {path}")
+    return payload
+
+
+@contextlib.contextmanager
+def _publication_evaluation_environment() -> Iterator[None]:
+    """Recreate the clock, timezone, and random seed used to build scenarios."""
+
+    prior_timestamp = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
+    prior_timezone = os.environ.get("TZ")
+    prior_random_state = random.getstate()
+    os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(
+        PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP
+    )
+    os.environ["TZ"] = PUBLICATION_TIMEZONE
+    if hasattr(time, "tzset"):
+        time.tzset()
+    random.seed(42)
+    try:
+        yield
+    finally:
+        random.setstate(prior_random_state)
+        if prior_timestamp is None:
+            os.environ.pop("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP", None)
+        else:
+            os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = prior_timestamp
+        if prior_timezone is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = prior_timezone
+        if hasattr(time, "tzset"):
+            time.tzset()
+
+
+def _load_publication_scenarios(
+    scenario_names: list[str],
+) -> dict[str, Scenario]:
+    """Load only the declared scenarios under the publication runtime pins."""
+
+    with _publication_evaluation_environment():
+        return cast(
+            dict[str, Scenario],
+            resolve_scenarios(
+                desired_scenario_names=scenario_names,
+                preferred_tool_backend=DEFAULT_TOOL_BACKEND,
+            ),
+        )
+
+
+def _independently_recompute_trajectory(
+    scenario: Scenario,
+    execution_context: ExecutionContext,
+    *,
+    scenario_name: str,
+) -> dict[str, Any]:
+    """Re-evaluate one saved trajectory without using any summary artifact."""
+
+    evaluation_result = scenario.evaluation.evaluate(
+        execution_context=execution_context,
+        max_turn_count=scenario.max_messages,
+    )
+    canonical_milestone_scores = {
+        int(index): float(score)
+        for index, (_, score) in evaluation_result.milestone_mapping.items()
+    }
+    audited_outcome = compute_audited_outcome_score(
+        scenario,
+        execution_context,
+        scenario_name=scenario_name,
+    )
+    paper_outcome = compute_online_feedback_score(
+        scenario,
+        execution_context,
+        canonical_milestone_scores=canonical_milestone_scores,
+        minefield_similarity=evaluation_result.minefield_similarity,
+    )
+    conversation = serialize_to_conversation(
+        execution_context=execution_context,
+        evaluation_result=evaluation_result,
+        milestones=cast(
+            list[Milestone], scenario.evaluation.milestone_matcher.milestones
+        ),
+        minefields=cast(
+            list[Minefield], scenario.evaluation.minefield_matcher.milestones
+        ),
+    )
+    return {
+        "audited_outcome": audited_outcome,
+        "paper_outcome": paper_outcome,
+        "conversation": conversation,
+    }
+
+
+def _json_values_equal(left: Any, right: Any) -> bool:
+    """Compare JSON-compatible evaluator data without bool/number coercion."""
+
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left is right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return (
+            math.isfinite(float(left))
+            and math.isfinite(float(right))
+            and math.isclose(float(left), float(right), rel_tol=0.0, abs_tol=1e-12)
+        )
+    if isinstance(left, dict) and isinstance(right, dict):
+        return set(left) == set(right) and all(
+            _json_values_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(
+            _json_values_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right, strict=True)
+        )
+    return type(left) is type(right) and left == right
+
+
+def _append_unique(items: list[str], value: str) -> None:
+    if value not in items:
+        items.append(value)
+
+
+def _conversation_execution_projection(conversation: list[Any]) -> list[Any]:
+    """Remove only evaluator annotations from a serialized conversation.
+
+    ``tool_details`` and ``assistant_details`` are regenerated scorer reports;
+    their internal constraint ordering is not semantic. Every actor-visible and
+    tool-execution field remains exact and is independently regenerated from the
+    execution context.
+    """
+
+    projected: list[Any] = []
+    for message in conversation:
+        if not isinstance(message, dict):
+            projected.append(message)
+            continue
+        projected.append(
+            {
+                key: value
+                for key, value in message.items()
+                if not key.endswith("_details")
+            }
+        )
+    return projected
+
+
+def _tool_response_is_failure(content: Any) -> bool:
+    text = str(content or "")
+    return bool(
+        "Error:" in text
+        or text.startswith(("TypeError", "ValueError", "ValidationError"))
+        or "Traceback" in text
+    )
+
+
+def _trajectory_generated_tool_evidence(
+    serialized_context: dict[str, Any],
+    conversation: list[Any],
+    *,
+    generated_tool_names: set[str],
+    scenario_name: str,
+) -> dict[str, tuple[str, ...]]:
+    """Derive generated-tool visibility and execution only from a trajectory."""
+
+    allow_list = serialized_context.get("tool_allow_list")
+    deny_list = serialized_context.get("tool_deny_list")
+    if allow_list is not None and (
+        not isinstance(allow_list, list)
+        or any(not isinstance(item, str) or not item for item in allow_list)
+        or len(allow_list) != len(set(allow_list))
+    ):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} has a malformed tool allow list."
+        )
+    if deny_list is not None and (
+        not isinstance(deny_list, list)
+        or any(not isinstance(item, str) or not item for item in deny_list)
+        or len(deny_list) != len(set(deny_list))
+    ):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} has a malformed tool deny list."
+        )
+    denied = set(deny_list or [])
+    if allow_list is None and generated_tool_names:
+        raise ValueError(
+            f"Trajectory {scenario_name!r} cannot prove which generated tools "
+            "were visible because its allow list is null."
+        )
+    visible = [
+        tool_name
+        for tool_name in (allow_list or [])
+        if tool_name in generated_tool_names and tool_name not in denied
+    ]
+
+    databases = serialized_context.get("_dbs")
+    sandbox_rows = databases.get("SANDBOX") if isinstance(databases, dict) else None
+    if not isinstance(sandbox_rows, list) or any(
+        not isinstance(row, dict) for row in sandbox_rows
+    ):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} has no valid SANDBOX execution rows."
+        )
+
+    attempted: list[str] = []
+    responses: list[str] = []
+    failed: list[str] = []
+    for row in sandbox_rows:
+        tool_name = row.get("openai_function_name")
+        if not isinstance(tool_name, str) or tool_name not in generated_tool_names:
+            continue
+        if tool_name not in visible:
+            raise ValueError(
+                f"Trajectory {scenario_name!r} executed generated tool "
+                f"{tool_name!r} without recording it as visible."
+            )
+        sender = row.get("sender")
+        recipient = row.get("recipient")
+        if sender == "AGENT" and recipient == "EXECUTION_ENVIRONMENT":
+            _append_unique(attempted, tool_name)
+        elif sender == "EXECUTION_ENVIRONMENT" and recipient == "AGENT":
+            _append_unique(responses, tool_name)
+            if row.get("tool_call_exception") not in (
+                None,
+                "",
+            ) or _tool_response_is_failure(row.get("content")):
+                _append_unique(failed, tool_name)
+
+    conversation_attempted: list[str] = []
+    conversation_responses: list[str] = []
+    conversation_failed: list[str] = []
+    for message in conversation:
+        if not isinstance(message, dict):
+            raise ValueError(
+                f"Trajectory {scenario_name!r} conversation contains a non-object."
+            )
+        tool_calls = message.get("tool_calls")
+        if tool_calls is not None:
+            if not isinstance(tool_calls, list):
+                raise ValueError(
+                    f"Trajectory {scenario_name!r} has malformed conversation "
+                    "tool calls."
+                )
+            for tool_call in tool_calls:
+                function = (
+                    tool_call.get("function") if isinstance(tool_call, dict) else None
+                )
+                tool_name = function.get("name") if isinstance(function, dict) else None
+                if isinstance(tool_name, str) and tool_name in generated_tool_names:
+                    _append_unique(conversation_attempted, tool_name)
+        if message.get("role") != "tool":
+            continue
+        tool_name = message.get("name")
+        if not isinstance(tool_name, str) or tool_name not in generated_tool_names:
+            continue
+        _append_unique(conversation_attempted, tool_name)
+        _append_unique(conversation_responses, tool_name)
+        if _tool_response_is_failure(message.get("content")):
+            _append_unique(conversation_failed, tool_name)
+
+    if tuple(attempted) != tuple(conversation_attempted):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} execution rows and conversation disagree "
+            "about generated-tool attempts."
+        )
+    if tuple(responses) != tuple(conversation_responses):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} execution rows and conversation disagree "
+            "about generated-tool responses."
+        )
+    if tuple(failed) != tuple(conversation_failed):
+        raise ValueError(
+            f"Trajectory {scenario_name!r} execution rows and conversation disagree "
+            "about generated-tool failures."
+        )
+    called = [tool_name for tool_name in responses if tool_name not in set(failed)]
+    return {
+        "generated_tools_visible": tuple(visible),
+        "generated_tools_attempted": tuple(attempted),
+        "generated_tools_failed": tuple(failed),
+        "generated_tools_called": tuple(called),
+    }
+
+
+def _verify_trajectory_artifacts(
+    run_dir: Path,
+    *,
+    rows: dict[str, dict[str, Any]],
+    order: list[str],
+    arm: str,
+    generated_tool_names: set[str],
+) -> dict[str, dict[str, tuple[str, ...]]]:
+    """Require and independently audit one complete trajectory per result row."""
+
+    trajectory_root = run_dir / "trajectories"
+    if (
+        not trajectory_root.is_dir()
+        or trajectory_root.is_symlink()
+        or trajectory_root.resolve().parent != run_dir.resolve()
+    ):
+        raise ValueError(f"{arm} run has no valid trajectory directory.")
+    scenarios = _load_publication_scenarios(order)
+    if set(scenarios) != set(order):
+        raise ValueError(f"{arm} trajectory scenarios are incomplete.")
+
+    evidence: dict[str, dict[str, tuple[str, ...]]] = {}
+    with _publication_evaluation_environment():
+        for scenario_name in order:
+            if Path(scenario_name).name != scenario_name or scenario_name in {
+                ".",
+                "..",
+            }:
+                raise ValueError(f"{arm} result has an unsafe scenario name.")
+            scenario_dir = trajectory_root / scenario_name
+            execution_path = scenario_dir / "execution_context.json"
+            conversation_path = scenario_dir / "conversation.json"
+            if (
+                not scenario_dir.is_dir()
+                or scenario_dir.is_symlink()
+                or scenario_dir.resolve().parent != trajectory_root.resolve()
+                or not execution_path.is_file()
+                or execution_path.is_symlink()
+                or not conversation_path.is_file()
+                or conversation_path.is_symlink()
+            ):
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} is missing complete trajectory "
+                    "artifacts."
+                )
+            serialized_context = _read_json(execution_path)
+            conversation = _read_json_list(
+                conversation_path,
+                label=f"{arm} trajectory conversation",
+            )
+            try:
+                execution_context = ExecutionContext.from_dict(serialized_context)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} has an invalid execution context: "
+                    f"{exc}"
+                ) from exc
+            try:
+                recomputed = _independently_recompute_trajectory(
+                    scenarios[scenario_name],
+                    execution_context,
+                    scenario_name=scenario_name,
+                )
+            except Exception as exc:
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} cannot be independently "
+                    f"re-evaluated: {exc}"
+                ) from exc
+            audited = recomputed.get("audited_outcome")
+            paper = recomputed.get("paper_outcome")
+            canonical_conversation = recomputed.get("conversation")
+            if not isinstance(audited, dict) or not isinstance(paper, dict):
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} evaluator recomputation is invalid."
+                )
+            row = rows[scenario_name]
+            for field, expected in audited.items():
+                if field not in row or not _json_values_equal(row[field], expected):
+                    raise ValueError(
+                        f"{arm} task {scenario_name!r} summary {field!r} disagrees "
+                        "with its independently recomputed audited v9 outcome."
+                    )
+            if (
+                row.get("online_feedback_evaluator_version")
+                != ONLINE_FEEDBACK_EVALUATOR_VERSION
+                or "online_feedback_outcome_similarity" not in row
+                or not _json_values_equal(
+                    row["online_feedback_outcome_similarity"],
+                    paper.get("outcome_similarity"),
+                )
+            ):
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} summary disagrees with its "
+                    "independently recomputed paper-era v1 outcome."
+                )
+            if not isinstance(canonical_conversation, list) or not _json_values_equal(
+                _conversation_execution_projection(conversation),
+                _conversation_execution_projection(canonical_conversation),
+            ):
+                raise ValueError(
+                    f"{arm} task {scenario_name!r} stored conversation is not the "
+                    "canonical serialization of its execution context."
+                )
+            evidence[scenario_name] = _trajectory_generated_tool_evidence(
+                serialized_context,
+                conversation,
+                generated_tool_names=generated_tool_names,
+                scenario_name=scenario_name,
+            )
+    return evidence
+
+
+_LIFECYCLE_SELECTION_FIELDS = (
+    "generated_tools_visible",
+    "generated_tools_called",
+    "generated_tools_attempted",
+    "generated_tools_failed",
+    "generated_tool_contract_failures",
+)
+_SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def _verify_metadata_implementation_proof(
+    *,
+    request: dict[str, Any],
+    acknowledgement: dict[str, Any],
+) -> None:
+    """Require code-hash equality for every metadata-repair disposition."""
+
+    request_id = str(request.get("request_id") or "")
+    source_hash = request.get("source_code_hash")
+    proof = acknowledgement.get("implementation_proof")
+    if (
+        not isinstance(source_hash, str)
+        or _SHA256_HEX_PATTERN.fullmatch(source_hash) is None
+        or not isinstance(proof, dict)
+    ):
+        raise ValueError(
+            f"Metadata repair {request_id!r} has no valid source-hash proof."
+        )
+    proof_source_hash = proof.get("source_code_hash")
+    replacement_hash = proof.get("replacement_code_hash")
+    replacement_activated = proof.get("replacement_activated")
+    implementation_preserved = proof.get("implementation_preserved")
+    code_change_discarded = proof.get("model_authored_code_change_discarded")
+    status = str(acknowledgement.get("status") or "")
+    valid = bool(
+        proof.get("proof_schema_version") == 1
+        and proof.get("repair_kind") == "metadata"
+        and proof_source_hash == source_hash
+        and isinstance(replacement_activated, bool)
+        and implementation_preserved is True
+        and isinstance(code_change_discarded, bool)
+        and (
+            (
+                replacement_activated
+                and isinstance(replacement_hash, str)
+                and _SHA256_HEX_PATTERN.fullmatch(replacement_hash) is not None
+                and replacement_hash == source_hash
+            )
+            or (not replacement_activated and replacement_hash is None)
+        )
+        and (status not in {"canary_pending", "promoted"} or replacement_activated)
+    )
+    if not valid:
+        raise ValueError(
+            f"Metadata repair {request_id!r} did not preserve its source "
+            "implementation hash."
+        )
+
+
+def _lifecycle_tool_names(
+    row: dict[str, Any],
+    *,
+    field: str,
+    artifact: str,
+) -> tuple[str, ...]:
+    value = row.get(field)
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, str) or not item for item in value)
+        or len(value) != len(set(value))
+    ):
+        raise ValueError(f"Lifecycle {artifact} has malformed {field!r}.")
+    return tuple(value)
+
+
+def _lifecycle_tool_versions(
+    row: dict[str, Any],
+    *,
+    artifact: str,
+) -> dict[str, int]:
+    value = row.get("generated_tool_versions")
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"Lifecycle {artifact} has malformed 'generated_tool_versions'."
+        )
+    versions: dict[str, int] = {}
+    for tool_name, version in value.items():
+        if (
+            not isinstance(tool_name, str)
+            or not tool_name
+            or isinstance(version, bool)
+            or not isinstance(version, int)
+            or version < 1
+        ):
+            raise ValueError(
+                f"Lifecycle {artifact} has malformed generated-tool version data."
+            )
+        versions[tool_name] = version
+    return versions
+
+
+def _public_lifecycle_family(row: dict[str, Any]) -> str:
+    """Mirror the lifecycle's fail-closed public family-label boundary."""
+
+    if row.get("source_task_id_redacted") is not True:
+        return "unclassified"
+    family = str(row.get("task_family_key") or "").strip().lower()
+    if (
+        not family
+        or len(family) > 128
+        or re.fullmatch(r"[a-z0-9_.:-]+", family) is None
+    ):
+        return "unclassified"
+    return family
+
+
+def _paired_lifecycle_evidence_rows(
+    candidate_dir: Path,
+    *,
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Bind selection facts to the matching independently written feedback row."""
+
+    selection_rows = _read_jsonl_objects(
+        candidate_dir / "scenario_tool_selection.jsonl"
+    )
+    feedback_rows = [
+        row
+        for row in _read_jsonl_objects(
+            candidate_dir / "self_evolution_task_feedback.jsonl"
+        )
+        if row.get("event") == "self_evolution_task_assessed"
+    ]
+    if not selection_rows or len(selection_rows) != len(feedback_rows):
+        raise ValueError(
+            "Lifecycle selection and reflection evidence are missing or incomplete."
+        )
+    if trajectory_evidence is not None and len(trajectory_evidence) != len(
+        selection_rows
+    ):
+        raise ValueError(
+            "Lifecycle evidence is not backed by one trajectory for every task."
+        )
+
+    paired: list[dict[str, Any]] = []
+    for selection, feedback in zip(selection_rows, feedback_rows, strict=True):
+        scenario = str(selection.get("scenario") or "")
+        if not scenario or str(feedback.get("scenario") or "") != scenario:
+            raise ValueError(
+                "Reflection task order disagrees with lifecycle selection evidence."
+            )
+        selection_values = {
+            field: _lifecycle_tool_names(
+                selection,
+                field=field,
+                artifact=f"selection row for {scenario!r}",
+            )
+            for field in _LIFECYCLE_SELECTION_FIELDS
+        }
+        if trajectory_evidence is not None:
+            raw = trajectory_evidence.get(scenario)
+            if not isinstance(raw, dict):
+                raise ValueError(
+                    f"Lifecycle evidence for {scenario!r} has no raw trajectory."
+                )
+            for field in (
+                "generated_tools_visible",
+                "generated_tools_called",
+                "generated_tools_attempted",
+                "generated_tools_failed",
+            ):
+                raw_values = raw.get(field)
+                if not isinstance(raw_values, tuple) or set(
+                    selection_values[field]
+                ) != set(raw_values):
+                    raise ValueError(
+                        "Lifecycle selection evidence disagrees with raw trajectory "
+                        f"{field!r} for {scenario!r}."
+                    )
+        feedback_values = {
+            field: _lifecycle_tool_names(
+                feedback,
+                field=field,
+                artifact=f"feedback row for {scenario!r}",
+            )
+            for field in _LIFECYCLE_SELECTION_FIELDS
+        }
+        if selection_values != feedback_values:
+            raise ValueError(
+                "Lifecycle selection and reflection generated-tool evidence disagree "
+                f"for {scenario!r}."
+            )
+        selection_versions = _lifecycle_tool_versions(
+            selection,
+            artifact=f"selection row for {scenario!r}",
+        )
+        feedback_versions = _lifecycle_tool_versions(
+            feedback,
+            artifact=f"feedback row for {scenario!r}",
+        )
+        if selection_versions != feedback_versions:
+            raise ValueError(
+                "Lifecycle selection and reflection generated-tool versions disagree "
+                f"for {scenario!r}."
+            )
+        if selection.get("exception_type") != feedback.get("exception_type"):
+            raise ValueError(
+                "Lifecycle selection and reflection exception evidence disagree "
+                f"for {scenario!r}."
+            )
+        observed_tools = set().union(*map(set, selection_values.values()))
+        if set(selection_versions) != observed_tools:
+            raise ValueError(
+                "Lifecycle evidence cannot bind every observed generated tool to its "
+                f"version for {scenario!r}."
+            )
+        called = set(selection_values["generated_tools_called"])
+        attempted = set(selection_values["generated_tools_attempted"])
+        failed = set(selection_values["generated_tools_failed"])
+        contract_failed = set(selection_values["generated_tool_contract_failures"])
+        if not failed.issubset(attempted) or not contract_failed.issubset(called):
+            raise ValueError(
+                "Lifecycle evidence contains a failure not attributable to an actual "
+                f"generated-tool attempt/call for {scenario!r}."
+            )
+        paired.append(
+            {
+                "scenario": scenario,
+                "selection": selection,
+                "feedback": feedback,
+                "selection_values": selection_values,
+                "versions": selection_versions,
+                "observed_tools": observed_tools,
+            }
+        )
+    return tuple(paired)
+
+
+def _derive_lifecycle_repair_obligations(
+    candidate_dir: Path,
+    *,
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]] | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Derive repair duties independently from paired lifecycle evidence."""
+
+    paired_rows = _paired_lifecycle_evidence_rows(
+        candidate_dir,
+        trajectory_evidence=trajectory_evidence,
+    )
+
+    stats: dict[tuple[str, int], dict[str, dict[str, int]]] = {}
+    for paired in paired_rows:
+        feedback = paired["feedback"]
+        selection = paired["selection"]
+        selection_values = paired["selection_values"]
+        selection_versions = paired["versions"]
+        observed_tools = paired["observed_tools"]
+        called = set(selection_values["generated_tools_called"])
+        failed = set(selection_values["generated_tools_failed"])
+        contract_failed = set(selection_values["generated_tool_contract_failures"])
+        visible = set(selection_values["generated_tools_visible"])
+        family = _public_lifecycle_family(feedback)
+        for tool_name in observed_tools:
+            version_stats = stats.setdefault(
+                (tool_name, selection_versions[tool_name]), {}
+            )
+            family_stats = version_stats.setdefault(
+                family,
+                {
+                    "visible": 0,
+                    "called": 0,
+                    "failed": 0,
+                    "contract_failed": 0,
+                    "sole_harmful": 0,
+                    "sole_helpful": 0,
+                },
+            )
+            family_stats["visible"] += int(tool_name in visible)
+            family_stats["called"] += int(tool_name in called)
+            family_stats["failed"] += int(tool_name in failed)
+            family_stats["contract_failed"] += int(tool_name in contract_failed)
+            attempted = set(selection_values["generated_tools_attempted"])
+            all_attempted = called | attempted | failed
+            control_outcome = feedback.get("control_outcome")
+            candidate_outcome = feedback.get("candidate_outcome")
+            outcome_delta = feedback.get("outcome_delta")
+            attributable_route_observation = bool(
+                tool_name in called
+                and all_attempted == {tool_name}
+                and feedback.get("source_task_id_redacted") is True
+                and feedback.get("control_source") == "same_run_fresh"
+                and feedback.get("control_outcome_source") == "audited_outcome"
+                and feedback.get("candidate_outcome_source") == "audited_outcome"
+                and selection.get("exception_type") is None
+                and isinstance(control_outcome, (int, float))
+                and not isinstance(control_outcome, bool)
+                and isinstance(candidate_outcome, (int, float))
+                and not isinstance(candidate_outcome, bool)
+                and isinstance(outcome_delta, (int, float))
+                and not isinstance(outcome_delta, bool)
+                and math.isfinite(float(control_outcome))
+                and math.isfinite(float(candidate_outcome))
+                and math.isfinite(float(outcome_delta))
+                and float(outcome_delta)
+                == float(candidate_outcome) - float(control_outcome)
+            )
+            if attributable_route_observation:
+                family_stats["sole_harmful"] += int(
+                    float(outcome_delta) <= LIFECYCLE_ROUTE_HARM_DELTA
+                )
+                family_stats["sole_helpful"] += int(
+                    float(outcome_delta) >= LIFECYCLE_ROUTE_HELP_DELTA
+                )
+
+    obligations: list[dict[str, Any]] = []
+    for (tool_name, version), family_stats_by_name in sorted(stats.items()):
+        implementation_targets: dict[str, set[str]] = {}
+        for family, family_stats in sorted(family_stats_by_name.items()):
+            reasons: set[str] = set()
+            if family_stats["contract_failed"] >= LIFECYCLE_CONTRACT_FAILURE_THRESHOLD:
+                reasons.add("deterministic_public_contract_failure")
+            if family_stats["failed"] >= LIFECYCLE_EXECUTION_FAILURE_THRESHOLD:
+                reasons.add("repeated_generated_tool_execution_failure")
+            if reasons:
+                implementation_targets[family] = reasons
+        if not implementation_targets:
+            failed_families = sorted(
+                family
+                for family, family_stats in family_stats_by_name.items()
+                if family_stats["failed"] > 0
+            )
+            if failed_families:
+                target_family = (
+                    failed_families[0]
+                    if len(failed_families) == 1
+                    else LIFECYCLE_CROSS_FAMILY_EXECUTION_FAILURE
+                )
+                implementation_targets[target_family] = {
+                    "unresolved_generated_tool_execution_failure"
+                }
+        for family, reasons in sorted(implementation_targets.items()):
+            obligations.append(
+                {
+                    "tool_name": tool_name,
+                    "source_tool_version": version,
+                    "repair_kind": "implementation",
+                    "target_task_family": family,
+                    "required_reason_codes": sorted(reasons),
+                }
+            )
+        for family, family_stats in sorted(family_stats_by_name.items()):
+            if (
+                family_stats["visible"] >= LIFECYCLE_METADATA_VISIBLE_THRESHOLD
+                and family_stats["called"] == 0
+            ):
+                obligations.append(
+                    {
+                        "tool_name": tool_name,
+                        "source_tool_version": version,
+                        "repair_kind": "metadata",
+                        "target_task_family": family,
+                        "required_reason_codes": [
+                            "visible_repeatedly_without_adoption"
+                        ],
+                    }
+                )
+            if (
+                family_stats["sole_harmful"] >= LIFECYCLE_ROUTE_HARMFUL_CALL_THRESHOLD
+                and family_stats["sole_harmful"] > family_stats["sole_helpful"]
+            ):
+                obligations.append(
+                    {
+                        "tool_name": tool_name,
+                        "source_tool_version": version,
+                        "repair_kind": "routing",
+                        "target_task_family": family,
+                        "required_reason_codes": [
+                            "repeated_sole_tool_family_regression"
+                        ],
+                    }
+                )
+    return tuple(obligations)
+
+
+def _optional_lifecycle_metric(value: Any, *, label: str) -> float | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+    ):
+        raise ValueError(f"Promoted canary has malformed {label} evidence.")
+    return float(value)
+
+
+def _positive_lifecycle_count(value: Any, *, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"Promoted canary has malformed {label} boundary.")
+    return cast(int, value)
+
+
+def _verify_promoted_canary_evidence(
+    paired_rows: tuple[dict[str, Any], ...],
+    *,
+    request: dict[str, Any],
+    canary_pending: dict[str, Any],
+    promoted: dict[str, Any],
+) -> dict[str, int]:
+    """Recompute the prospective promotion gate from per-task evidence."""
+
+    request_id = str(request.get("request_id") or "")
+    tool_name = str(request.get("tool_name") or "")
+    version = promoted.get("new_version")
+    target_family = str(request.get("target_task_family") or "").strip().lower()
+    if (
+        not target_family
+        or len(target_family) > 128
+        or re.fullmatch(r"[a-z0-9_.:-]+", target_family) is None
+    ):
+        raise ValueError(
+            f"Promoted canary {request_id!r} has no valid public target family."
+        )
+    if (
+        canary_pending.get("new_version") != version
+        or canary_pending.get("tool_name") != tool_name
+        or promoted.get("tool_name") != tool_name
+        or isinstance(request.get("source_tool_version"), bool)
+        or not isinstance(request.get("source_tool_version"), int)
+        or version != request["source_tool_version"] + 1
+    ):
+        raise ValueError(
+            f"Promoted canary {request_id!r} changes tool or version during canary."
+        )
+    pending_after = _positive_lifecycle_count(
+        canary_pending.get("acknowledged_after_completed_count"),
+        label="canary-pending acknowledgement",
+    )
+    eligible_from = _positive_lifecycle_count(
+        canary_pending.get("eligible_from_completed_count"),
+        label="prospective eligibility",
+    )
+    promoted_after = _positive_lifecycle_count(
+        promoted.get("acknowledged_after_completed_count"),
+        label="promotion acknowledgement",
+    )
+    if (
+        eligible_from != pending_after + 1
+        or promoted_after < eligible_from
+        or pending_after > len(paired_rows)
+        or promoted_after > len(paired_rows)
+    ):
+        raise ValueError(
+            f"Promoted canary {request_id!r} has an invalid prospective window."
+        )
+
+    eligible_call_count = 0
+    attributable_observation_count = 0
+    exact_outcome_count = 0
+    regression_count = 0
+    fresh_control_success_flip_count = 0
+    previous_completed_count = 0
+    for paired in paired_rows:
+        feedback = paired["feedback"]
+        selection = paired["selection"]
+        scenario = paired["scenario"]
+        completed_count = feedback.get("completed_count")
+        if (
+            isinstance(completed_count, bool)
+            or not isinstance(completed_count, int)
+            or completed_count != previous_completed_count + 1
+        ):
+            raise ValueError(
+                "Promoted canary evidence has malformed reflection task ordering."
+            )
+        previous_completed_count = completed_count
+        if not eligible_from <= completed_count <= promoted_after:
+            continue
+
+        selection_values = paired["selection_values"]
+        versions = paired["versions"]
+        failed = set(selection_values["generated_tools_failed"])
+        contract_failed = set(selection_values["generated_tool_contract_failures"])
+        if versions.get(tool_name) == version and (
+            tool_name in failed or tool_name in contract_failed
+        ):
+            raise ValueError(
+                f"Promoted canary {request_id!r} has a generated-tool hard failure."
+            )
+
+        all_called = set(selection_values["generated_tools_called"]) | failed
+        if (
+            _public_lifecycle_family(feedback) != target_family
+            or all_called != {tool_name}
+            or versions.get(tool_name) != version
+        ):
+            continue
+        eligible_call_count += 1
+
+        if "exception_type" not in selection or not (
+            selection["exception_type"] is None
+            or isinstance(selection["exception_type"], str)
+        ):
+            raise ValueError(
+                f"Promoted canary evidence for {scenario!r} has no valid exception "
+                "provenance."
+            )
+        if selection["exception_type"] is not None:
+            continue
+        if (
+            feedback.get("control_source") != "same_run_fresh"
+            or feedback.get("control_outcome_source") != "audited_outcome"
+            or feedback.get("candidate_outcome_source") != "audited_outcome"
+        ):
+            continue
+        control_outcome = _optional_lifecycle_metric(
+            feedback.get("control_outcome"),
+            label=f"control outcome for {scenario!r}",
+        )
+        candidate_outcome = _optional_lifecycle_metric(
+            feedback.get("candidate_outcome"),
+            label=f"candidate outcome for {scenario!r}",
+        )
+        outcome_delta = _optional_lifecycle_metric(
+            feedback.get("outcome_delta"),
+            label=f"outcome delta for {scenario!r}",
+        )
+        selection_outcome = _optional_lifecycle_metric(
+            selection.get("outcome_similarity"),
+            label=f"selection outcome for {scenario!r}",
+        )
+        if (
+            control_outcome is None
+            or candidate_outcome is None
+            or outcome_delta is None
+            or selection_outcome != candidate_outcome
+            or outcome_delta != candidate_outcome - control_outcome
+        ):
+            continue
+        attributable_observation_count += 1
+        exact_success = candidate_outcome == 1.0
+        success_flip = bool(
+            exact_success and control_outcome < 1.0 and outcome_delta > 0.0
+        )
+        if not isinstance(feedback.get("candidate_success_flip"), bool) or (
+            feedback["candidate_success_flip"] is not success_flip
+        ):
+            raise ValueError(
+                f"Promoted canary success-flip evidence disagrees for {scenario!r}."
+            )
+        exact_outcome_count += int(exact_success)
+        regression_count += int(outcome_delta < 0.0)
+        fresh_control_success_flip_count += int(success_flip)
+
+    counts = {
+        "eligible_call_count": eligible_call_count,
+        "attributable_observation_count": attributable_observation_count,
+        "exact_outcome_count": exact_outcome_count,
+        "regression_count": regression_count,
+        "fresh_control_success_flip_count": fresh_control_success_flip_count,
+    }
+    if (
+        eligible_call_count < LIFECYCLE_CANARY_ATTRIBUTABLE_OBSERVATION_MINIMUM
+        or attributable_observation_count
+        < LIFECYCLE_CANARY_ATTRIBUTABLE_OBSERVATION_MINIMUM
+        or exact_outcome_count < LIFECYCLE_CANARY_EXACT_OUTCOME_MINIMUM
+        or regression_count != 0
+        or fresh_control_success_flip_count
+        < LIFECYCLE_CANARY_FRESH_CONTROL_SUCCESS_FLIP_MINIMUM
+    ):
+        raise ValueError(
+            f"Promoted canary {request_id!r} lacks independently verified evidence: "
+            f"{counts!r}."
+        )
+    return counts
+
+
 def _verify_lifecycle_closed(
     candidate_dir: Path,
     registry_dir: Path,
+    *,
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]] | None = None,
 ) -> dict[str, Any]:
     """Require every repair request to have a safe terminal run disposition."""
 
+    paired_rows = _paired_lifecycle_evidence_rows(
+        candidate_dir,
+        trajectory_evidence=trajectory_evidence,
+    )
+    obligations = _derive_lifecycle_repair_obligations(
+        candidate_dir,
+        trajectory_evidence=trajectory_evidence,
+    )
     requests = _read_jsonl_objects(
         candidate_dir / "self_evolution_tool_repair_requests.jsonl"
     )
@@ -387,6 +1405,12 @@ def _verify_lifecycle_closed(
         request_id = str(row.get("request_id") or "")
         tool_name = str(row.get("tool_name") or "")
         source_version = row.get("source_tool_version")
+        prohibited_paths = prohibited_repair_payload_paths(row)
+        if prohibited_paths:
+            raise ValueError(
+                "Completed SAGE run has evaluator-private evidence in lifecycle "
+                f"request {request_id!r}: {list(prohibited_paths)!r}."
+            )
         if (
             not request_id
             or request_id in request_by_id
@@ -399,7 +1423,16 @@ def _verify_lifecycle_closed(
             or row.get("triggering_task_replay_allowed") is not False
         ):
             raise ValueError("Completed SAGE run has a malformed lifecycle request.")
+        if row.get("repair_kind") == "metadata" and (
+            not isinstance(row.get("source_code_hash"), str)
+            or _SHA256_HEX_PATTERN.fullmatch(row["source_code_hash"]) is None
+        ):
+            raise ValueError(
+                "Completed SAGE run has a metadata repair without a valid source "
+                "implementation hash."
+            )
         request_by_id[request_id] = row
+    acknowledgements_by_request: dict[str, list[dict[str, Any]]] = {}
     final_ack_by_request: dict[str, dict[str, Any]] = {}
     allowed_acknowledgement_statuses = {
         "validation_failed",
@@ -426,6 +1459,13 @@ def _verify_lifecycle_closed(
             raise ValueError(
                 "Completed SAGE run has a malformed lifecycle acknowledgement."
             )
+        request = request_by_id.get(request_id)
+        if isinstance(request, dict) and request.get("repair_kind") == "metadata":
+            _verify_metadata_implementation_proof(
+                request=request,
+                acknowledgement=row,
+            )
+        acknowledgements_by_request.setdefault(request_id, []).append(row)
         final_ack_by_request[request_id] = row
     request_ids = set(request_by_id)
     unacknowledged = sorted(request_ids - set(final_ack_by_request))
@@ -443,9 +1483,13 @@ def _verify_lifecycle_closed(
         )
     mismatched_tools = sorted(
         request_id
-        for request_id, acknowledgement in final_ack_by_request.items()
-        if acknowledgement.get("tool_name")
-        != request_by_id[request_id].get("tool_name")
+        for request_id, request_acknowledgements in acknowledgements_by_request.items()
+        if request_id in request_by_id
+        and any(
+            acknowledgement.get("tool_name")
+            != request_by_id[request_id].get("tool_name")
+            for acknowledgement in request_acknowledgements
+        )
     )
     if mismatched_tools:
         raise ValueError(
@@ -463,11 +1507,127 @@ def _verify_lifecycle_closed(
             "Completed SAGE run has nonterminal lifecycle acknowledgements: "
             f"{nonterminal!r}."
         )
+
+    verified_promoted_canaries: dict[str, dict[str, int]] = {}
+    for request_id, request_acknowledgements in acknowledgements_by_request.items():
+        acknowledgement_statuses = [
+            str(row.get("status") or "") for row in request_acknowledgements
+        ]
+        if "promoted" not in acknowledgement_statuses:
+            continue
+        if acknowledgement_statuses != ["canary_pending", "promoted"]:
+            raise ValueError(
+                "Completed SAGE run has a promoted lifecycle repair without the "
+                "ordered canary_pending -> promoted transition: "
+                f"{request_id!r}:{acknowledgement_statuses!r}."
+            )
+        verified_promoted_canaries[request_id] = _verify_promoted_canary_evidence(
+            paired_rows,
+            request=request_by_id[request_id],
+            canary_pending=request_acknowledgements[0],
+            promoted=request_acknowledgements[1],
+        )
     unhandled = sorted(request_ids - set(handled))
     if unhandled:
         raise ValueError(
             "Completed SAGE run has terminal lifecycle requests missing from state: "
             f"{unhandled!r}."
+        )
+
+    missing_obligations: list[str] = []
+    lifecycle_routing_path = registry_dir / "tool_lifecycle.json"
+    lifecycle_routing_rows: dict[str, Any] = {}
+    if any(item["repair_kind"] == "routing" for item in obligations):
+        if not lifecycle_routing_path.is_file():
+            raise ValueError(
+                "Completed SAGE run has routing-repair obligations but no durable "
+                "lifecycle routing state."
+            )
+        lifecycle_routing_payload = _read_json(lifecycle_routing_path)
+        raw_lifecycle_rows = lifecycle_routing_payload.get("tool_lifecycle")
+        if not isinstance(raw_lifecycle_rows, dict):
+            raise ValueError(
+                "Completed SAGE run has malformed durable lifecycle routing state."
+            )
+        lifecycle_routing_rows = raw_lifecycle_rows
+    verified_route_repair_count = 0
+    for obligation in obligations:
+        if obligation["repair_kind"] == "routing":
+            lifecycle_row = lifecycle_routing_rows.get(obligation["tool_name"])
+            route_applied = bool(
+                isinstance(lifecycle_row, dict)
+                and lifecycle_row.get("tool_version")
+                == obligation["source_tool_version"]
+                and lifecycle_row.get("repair_kind") == "routing"
+                and lifecycle_row.get("routing_disposition")
+                == "family_suppression_active"
+                and lifecycle_row.get("decision")
+                in {"needs_route_repair", "retain_with_route_repair"}
+                and obligation["target_task_family"]
+                in {
+                    str(item)
+                    for item in (lifecycle_row.get("route_repair_families") or [])
+                    if isinstance(item, str)
+                }
+            )
+            superseded_by_terminal_repair = any(
+                request.get("tool_name") == obligation["tool_name"]
+                and request.get("source_tool_version")
+                == obligation["source_tool_version"]
+                and request.get("repair_kind") == "implementation"
+                and str(request.get("request_id") or "") in final_ack_by_request
+                and str(
+                    final_ack_by_request[str(request.get("request_id") or "")].get(
+                        "status"
+                    )
+                    or ""
+                )
+                in terminal_statuses
+                for request in requests
+            )
+            if route_applied or superseded_by_terminal_repair:
+                verified_route_repair_count += 1
+                continue
+            missing_obligations.append(
+                f"routing:{obligation['tool_name']}:"
+                f"v{obligation['source_tool_version']}:"
+                f"{obligation['target_task_family']}"
+            )
+            continue
+        required_reasons = set(obligation["required_reason_codes"])
+        matching_requests = [
+            row
+            for row in requests
+            if row.get("tool_name") == obligation["tool_name"]
+            and row.get("source_tool_version") == obligation["source_tool_version"]
+            and row.get("repair_kind") == obligation["repair_kind"]
+            and row.get("target_task_family") == obligation["target_task_family"]
+            and required_reasons.issubset(
+                {
+                    str(reason)
+                    for reason in (row.get("trigger_reason_codes") or [])
+                    if isinstance(reason, str)
+                }
+            )
+        ]
+        if not matching_requests or not any(
+            str(row.get("request_id") or "") in final_ack_by_request
+            and str(
+                final_ack_by_request[str(row.get("request_id") or "")].get("status")
+                or ""
+            )
+            in terminal_statuses
+            for row in matching_requests
+        ):
+            missing_obligations.append(
+                f"{obligation['repair_kind']}:{obligation['tool_name']}:"
+                f"v{obligation['source_tool_version']}:"
+                f"{obligation['target_task_family']}"
+            )
+    if missing_obligations:
+        raise ValueError(
+            "Completed SAGE run did not terminally repair or retire all derived "
+            f"lifecycle obligations: {sorted(missing_obligations)!r}."
         )
 
     registry = _read_json(registry_dir / "registry_manifest.json")
@@ -486,6 +1646,20 @@ def _verify_lifecycle_closed(
                 "Completed SAGE run has a malformed lifecycle acknowledgement version."
             )
         entry = registry_tools.get(tool_name)
+        request = request_by_id[request_id]
+        proof = acknowledgement.get("implementation_proof")
+        if (
+            request.get("repair_kind") == "metadata"
+            and isinstance(proof, dict)
+            and proof.get("replacement_activated") is True
+            and isinstance(entry, dict)
+            and entry.get("version") == version
+            and entry.get("code_hash") != proof.get("replacement_code_hash")
+        ):
+            raise ValueError(
+                "Completed SAGE run registry code hash disagrees with metadata "
+                f"repair proof: {tool_name}:v{version}:{request_id}."
+            )
         if status == "promoted" and (
             not isinstance(entry, dict)
             or isinstance(entry.get("version"), bool)
@@ -542,6 +1716,9 @@ def _verify_lifecycle_closed(
     return {
         "repair_request_count": len(requests),
         "repair_acknowledgement_count": len(acknowledgements),
+        "derived_repair_obligation_count": len(obligations),
+        "verified_promoted_canary_count": len(verified_promoted_canaries),
+        "verified_route_repair_count": verified_route_repair_count,
         "pending_repair_request_count": 0,
         "open_canary_count": 0,
         "open_repair_transaction_count": 0,
@@ -590,6 +1767,37 @@ def _verify_no_scenario_transform_failures(candidate_dir: Path) -> None:
             "Candidate run contains scenario transformation failures; strict runs "
             "must abort instead of falling back to the base scenario."
         )
+
+
+def _verify_matched_policy_runtimes(
+    control_dir: Path,
+    candidate_dir: Path,
+) -> dict[str, Any]:
+    """Bind both arms to the same policy actor implementation.
+
+    The control is intentionally not ToolSandbox's upstream actor. It is the
+    same SAGE policy wrapper used by the candidate, with generated tools absent.
+    That matched actor runtime isolates the generated-tool lifecycle treatment.
+    """
+
+    manifests: dict[str, dict[str, Any]] = {}
+    for arm, run_dir in (("control", control_dir), ("candidate", candidate_dir)):
+        manifest = _read_json(run_dir / "sage_ts_run_manifest.json")
+        if manifest.get("agent_runtime") != SAGE_WRAPPED_AGENT_RUNTIME:
+            raise ValueError(
+                f"Publication {arm} arm did not use the matched SAGE policy wrapper."
+            )
+        if manifest.get("actor_selection_mode") != "policy":
+            raise ValueError(
+                f"Publication {arm} arm did not record policy actor selection."
+            )
+        manifests[arm] = manifest
+    return {
+        "control_condition": MATCHED_CONTROL_CONDITION,
+        "control_agent_runtime": manifests["control"]["agent_runtime"],
+        "candidate_agent_runtime": manifests["candidate"]["agent_runtime"],
+        "actor_selection_mode": "policy",
+    }
 
 
 def _verify_parallel_arm_execution(
@@ -1371,6 +2579,13 @@ def verify_run(
         "scenario_transform_failure_policy": "abort",
         "publication_performance_endpoint": "outcome_task_completion_similarity",
         "actor_selection_mode": "policy",
+        "control_condition": MATCHED_CONTROL_CONDITION,
+        "control_agent_runtime": SAGE_WRAPPED_AGENT_RUNTIME,
+        "control_actor_selection_mode": "policy",
+        "control_generated_tools_enabled": False,
+        "candidate_agent_runtime": SAGE_WRAPPED_AGENT_RUNTIME,
+        "candidate_actor_selection_mode": "policy",
+        "candidate_generated_tools_enabled": expected_generation,
         "reporting_outcome_evaluator": current_outcome_evaluator,
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "timezone": PUBLICATION_TIMEZONE,
@@ -1562,8 +2777,14 @@ def verify_run(
         "candidate_dir",
         required_parent=run_root / "candidate",
     )
+    matched_policy_runtimes = _verify_matched_policy_runtimes(
+        control_dir,
+        candidate_dir,
+    )
     _verify_no_scenario_transform_failures(candidate_dir)
     lifecycle_integrity: dict[str, Any] | None = None
+    registry_dir: Path | None = None
+    generated_tool_names: set[str] = set()
     if expected_generation:
         _verify_empty_online_registry_start(run_root, protocol)
         registry_dir = _resolve_declared_path(
@@ -1591,7 +2812,14 @@ def verify_run(
             raise ValueError(
                 "Final registry manifest does not match the protocol digest."
             )
-        lifecycle_integrity = _verify_lifecycle_closed(candidate_dir, registry_dir)
+        registry_payload = _read_json(registry_manifest)
+        registry_tools = registry_payload.get("tools")
+        if not isinstance(registry_tools, dict) or any(
+            not isinstance(tool_name, str) or not tool_name
+            for tool_name in registry_tools
+        ):
+            raise ValueError("Final registry manifest has an invalid tool mapping.")
+        generated_tool_names = set(registry_tools)
     control_rows, control_order, control_llm_usage = _uncached_rows(
         control_dir,
         expected_tasks=expected_tasks,
@@ -1629,6 +2857,35 @@ def verify_run(
         raise ValueError(
             "Result rows do not preserve the pinned publication task order."
         )
+    control_trajectory_evidence = _verify_trajectory_artifacts(
+        control_dir,
+        rows=control_rows,
+        order=control_order,
+        arm="control",
+        generated_tool_names=generated_tool_names,
+    )
+    if any(
+        any(values for values in task_evidence.values())
+        for task_evidence in control_trajectory_evidence.values()
+    ):
+        raise ValueError(
+            "Control trajectories expose or execute a generated registry tool."
+        )
+    candidate_trajectory_evidence = _verify_trajectory_artifacts(
+        candidate_dir,
+        rows=candidate_rows,
+        order=candidate_order,
+        arm="candidate",
+        generated_tool_names=generated_tool_names,
+    )
+    if expected_generation:
+        if registry_dir is None:
+            raise AssertionError("online publication run has no registry directory")
+        lifecycle_integrity = _verify_lifecycle_closed(
+            candidate_dir,
+            registry_dir,
+            trajectory_evidence=candidate_trajectory_evidence,
+        )
     _verify_paired_outcome_aggregates(
         comparison,
         control_rows=control_rows,
@@ -1647,9 +2904,14 @@ def verify_run(
         "performance_gate_passed": performance_gate_passed,
         "performance_gate_reasons": performance_gate_reasons,
         "scenario_count": expected_tasks,
+        "matched_policy_runtimes": matched_policy_runtimes,
         "audited_outcome_count": {
             "control": len(control_rows),
             "candidate": len(candidate_rows),
+        },
+        "trajectory_audit_count": {
+            "control": len(control_trajectory_evidence),
+            "candidate": len(candidate_trajectory_evidence),
         },
         "cached_control_tasks": 0,
         # Backward-compatible name: this counts repository response replays,

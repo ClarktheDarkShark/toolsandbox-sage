@@ -4,13 +4,92 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
 from scripts import verify_lifecycle_repair_run
+from tool_sandbox.common.execution_context import (
+    DatabaseNamespace,
+    ExecutionContext,
+    RoleType,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+_TEST_OUTCOME_MARKER = "__lifecycle_test_outcome__"
+
+
+def _synthetic_conversation(helper_called: bool) -> list[dict[str, object]]:
+    if not helper_called:
+        return []
+    return [
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "synthetic-call",
+                    "type": "function",
+                    "function": {
+                        "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+                        "arguments": "{}",
+                    },
+                }
+            ],
+        },
+        {
+            "tool_call_id": "synthetic-call",
+            "role": "tool",
+            "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+            "content": "{'should_abstain': True}",
+        },
+    ]
+
+
+def _fake_trajectory_recomputation(
+    _scenario: object,
+    execution_context: ExecutionContext,
+    *,
+    scenario_name: str,
+) -> dict[str, object]:
+    marker = next(
+        (
+            item
+            for item in (execution_context.tool_allow_list or [])
+            if item.startswith(_TEST_OUTCOME_MARKER)
+        ),
+        None,
+    )
+    if marker is None:
+        raise ValueError("synthetic lifecycle trajectory has no outcome marker")
+    outcome = float(marker.removeprefix(_TEST_OUTCOME_MARKER))
+    result = _result_row(scenario_name, outcome)
+    return {
+        "audited_outcome": {
+            key: value for key, value in result.items() if key.startswith("outcome_")
+        },
+        "paper_outcome": {"outcome_similarity": None},
+        "conversation": _synthetic_conversation(
+            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+            in (execution_context.tool_allow_list or [])
+        ),
+    }
+
+
+@pytest.fixture(autouse=True)
+def _synthetic_trajectory_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
+    strict = verify_lifecycle_repair_run._strict_run_verifier
+    monkeypatch.setattr(
+        strict,
+        "_load_publication_scenarios",
+        lambda scenario_names: {name: object() for name in scenario_names},
+    )
+    monkeypatch.setattr(
+        strict,
+        "_independently_recompute_trajectory",
+        _fake_trajectory_recomputation,
+    )
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -21,6 +100,129 @@ def _write_json(path: Path, payload: object) -> None:
 def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+
+def _write_synthetic_trajectory(
+    run_dir: Path,
+    *,
+    scenario_name: str,
+    outcome: float,
+    helper_called: bool,
+) -> None:
+    trajectory_dir = run_dir / "trajectories" / scenario_name
+    trajectory_dir.mkdir(parents=True, exist_ok=True)
+    context = ExecutionContext()
+    context.tool_allow_list = [f"{_TEST_OUTCOME_MARKER}{outcome!r}"]
+    if helper_called:
+        context.tool_allow_list.append(
+            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+        )
+        context.add_to_database(
+            DatabaseNamespace.SANDBOX,
+            rows=[
+                {
+                    "sender": RoleType.AGENT,
+                    "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                    "content": "synthetic generated-tool request",
+                    "openai_tool_call_id": "synthetic-call",
+                    "openai_function_name": (
+                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                    ),
+                },
+                {
+                    "sender": RoleType.EXECUTION_ENVIRONMENT,
+                    "recipient": RoleType.AGENT,
+                    "content": "{'should_abstain': True}",
+                    "openai_tool_call_id": "synthetic-call",
+                    "openai_function_name": (
+                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                    ),
+                },
+            ],
+        )
+    _write_json(
+        trajectory_dir / "execution_context.json",
+        context.to_dict(serialize_console=False),
+    )
+    _write_json(
+        trajectory_dir / "conversation.json",
+        _synthetic_conversation(helper_called),
+    )
+
+
+def _write_registry_checkpoints(
+    candidate_dir: Path,
+    registry_dir: Path,
+    *,
+    scenario_order: tuple[str, ...],
+    versions: dict[str, int | None],
+) -> None:
+    promoted_manifest = _promoted_registry_manifest()
+    fault_manifest = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "docs"
+            / "sage_protocol"
+            / "fixtures"
+            / "historical_faulty_safe_action_registry.json"
+        ).read_text(encoding="utf-8")
+    )
+    for completed_count, scenario_name in enumerate(scenario_order, start=1):
+        checkpoint_dir = (
+            candidate_dir
+            / "registry_checkpoints"
+            / (
+                f"after_{completed_count:04d}_"
+                f"{verify_lifecycle_repair_run._safe_checkpoint_name(scenario_name)}"
+            )
+        )
+        version = versions.get(scenario_name)
+        manifest = fault_manifest if version == 1 else promoted_manifest
+        _write_json(checkpoint_dir / "registry_manifest.json", manifest)
+        _write_json(
+            checkpoint_dir / "checkpoint.json",
+            {
+                "scenario": scenario_name,
+                "completed_count": completed_count,
+                "registry_dir": str(registry_dir),
+                "copied_files": ["registry_manifest.json"],
+            },
+        )
+
+
+def _promoted_registry_manifest() -> dict[str, object]:
+    code = (
+        "def prepare_safe_action_or_abstain(user_request: str, "
+        "requested_action: str):\n"
+        "    return {'should_abstain': True, 'missing_information': "
+        "['contact_lookup'], 'required_original_tools': ['search_contacts'], "
+        "'safe_next_action': 'ask_user_or_abstain', "
+        "'final_answer_recommendation': 'I do not have enough information.', "
+        "'abstain_reason': 'missing_required_original_tool'}\n"
+    )
+    return {
+        "tools": {
+            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: {
+                "version": 2,
+                "retired": False,
+                "birth_scenario": "post_deployment_repair:contact",
+                "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+                "tool": {
+                    "spec": {
+                        "schema_version": 2,
+                        "tool_name": (
+                            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                        ),
+                        "family": "validation_abstention_helper",
+                        "description": "Safely abstain when a required lookup is absent.",
+                        "inputs": [],
+                        "output_annotation": "dict",
+                    },
+                    "code": code,
+                },
+            }
+        }
+    }
 
 
 def _zero_usage() -> dict[str, object]:
@@ -87,6 +289,10 @@ def _result_row(name: str, outcome: float) -> dict[str, object]:
         "outcome_evaluator_version": evaluator["version"],
         "outcome_evaluator_contract_sha256": evaluator["contract_sha256"],
         "outcome_evaluator_source_sha256": evaluator["source_sha256"],
+        "online_feedback_outcome_similarity": None,
+        "online_feedback_evaluator_version": (
+            verify_lifecycle_repair_run._strict_run_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION
+        ),
         "exception_type": None,
         "traceback": None,
         **_zero_usage(),
@@ -145,15 +351,35 @@ def _development_artifacts(
                 "scenario": name,
                 "generated_tools_visible": visible,
                 "generated_tools_called": visible,
+                "generated_tools_attempted": visible,
+                "generated_tools_failed": [],
+                "generated_tool_contract_failures": (
+                    [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
+                    if name == trigger_name
+                    else []
+                ),
+                "generated_tool_versions": (
+                    {
+                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: (
+                            1 if name == trigger_name else 2
+                        )
+                    }
+                    if safe
+                    else {}
+                ),
+                "exception_type": None,
             }
         )
         feedback_rows.append(
             {
+                "event": "self_evolution_task_assessed",
                 "scenario": name,
                 "completed_count": completed_count,
                 "candidate_outcome": 0.0 if name == trigger_name else 1.0,
                 "generated_tools_visible": visible,
                 "generated_tools_called": visible,
+                "generated_tools_attempted": visible,
+                "generated_tools_failed": [],
                 "generated_tool_versions": (
                     {
                         verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: (
@@ -171,10 +397,30 @@ def _development_artifacts(
                 "post_deployment_repair_request_ids": (
                     [request_id] if name == trigger_name else []
                 ),
+                "exception_type": None,
             }
         )
     _write_jsonl(candidate_dir / "scenario_tool_selection.jsonl", selection_rows)
     _write_jsonl(candidate_dir / "self_evolution_task_feedback.jsonl", feedback_rows)
+    candidate_outcome_by_name = {
+        str(row["name"]): float(row["outcome_similarity"]) for row in candidate_rows
+    }
+    control_outcome_by_name = {
+        str(row["name"]): float(row["outcome_similarity"]) for row in control_rows
+    }
+    for name in order:
+        _write_synthetic_trajectory(
+            control_dir,
+            scenario_name=name,
+            outcome=control_outcome_by_name[name],
+            helper_called=False,
+        )
+        _write_synthetic_trajectory(
+            candidate_dir,
+            scenario_name=name,
+            outcome=candidate_outcome_by_name[name],
+            helper_called=name in safe_names,
+        )
     _write_jsonl(
         candidate_dir / "self_evolution_tool_repair_requests.jsonl",
         [
@@ -237,16 +483,29 @@ def _development_artifacts(
         ],
     )
     registry_manifest_path = registry_dir / "registry_manifest.json"
+    _write_json(registry_manifest_path, _promoted_registry_manifest())
     _write_json(
-        registry_manifest_path,
+        registry_dir / "tool_lifecycle.json",
         {
+            "schema_version": 1,
             "tools": {
                 verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: {
-                    "version": 2,
-                    "retired": False,
-                    "birth_scenario": "post_deployment_repair:contact",
+                    "status": "promoted"
                 }
-            }
+            },
+        },
+    )
+    _write_jsonl(
+        registry_dir / "success_flip_events.jsonl",
+        [{"tool_name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL}],
+    )
+    _write_registry_checkpoints(
+        candidate_dir,
+        registry_dir,
+        scenario_order=order,
+        versions={
+            name: 1 if name == trigger_name else 2 if name in safe_names else None
+            for name in order
         },
     )
     registry_sha256 = hashlib.sha256(registry_manifest_path.read_bytes()).hexdigest()
@@ -376,6 +635,204 @@ def _development_artifacts(
     )
     assert set(preservation_names).isdisjoint(safe_names)
     return search_root, run_root, candidate_dir, manifest_path
+
+
+def _transfer_artifacts(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, Path, Path]:
+    source_search, source_run, _, _ = _development_artifacts(
+        tmp_path / "source", "dev10"
+    )
+    source_report = verify_lifecycle_repair_run.verify(source_search, 10)
+    assert source_report["status"] == "pass"
+    source_protocol_path = source_run / "protocol_manifest.json"
+    source_protocol = json.loads(source_protocol_path.read_text(encoding="utf-8"))
+    source_report_path = source_run / "lifecycle_repair_validation_report.json"
+    source_registry_dir = Path(source_protocol["registry_dir"])
+
+    search_root, run_root, candidate_dir, _ = _development_artifacts(
+        tmp_path / "destination", "dev30"
+    )
+    control_dir = run_root / "control"
+    registry_dir = run_root / "registry"
+    shutil.rmtree(registry_dir)
+    shutil.copytree(source_registry_dir, registry_dir)
+
+    manifest_path = (
+        REPOSITORY_ROOT
+        / "docs"
+        / "sage_protocol"
+        / "manifests"
+        / "lifecycle_repair_transfer_dev30.json"
+    )
+    benchmark = json.loads(manifest_path.read_text(encoding="utf-8"))
+    spec = verify_lifecycle_repair_run.COHORT_SPECS[benchmark["manifest_type"]]
+    order = tuple(spec["order"])
+    safe_names = tuple(spec["roles"][spec["safe_role"]])
+    preservation_names = tuple(spec["roles"]["preservation"])
+
+    _write_json(
+        candidate_dir / "result_summary.json",
+        {"per_scenario_results": [_result_row(name, 1.0) for name in order]},
+    )
+    _write_json(
+        control_dir / "result_summary.json",
+        {
+            "per_scenario_results": [
+                _result_row(name, 0.0 if name in safe_names else 1.0) for name in order
+            ]
+        },
+    )
+    selection_rows = []
+    for name in order:
+        visible = (
+            [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
+            if name in safe_names
+            else []
+        )
+        selection_rows.append(
+            {
+                "scenario": name,
+                "generated_tools_visible": visible,
+                "generated_tools_called": visible,
+                "generated_tools_attempted": visible,
+                "generated_tools_failed": [],
+                "generated_tool_versions": (
+                    {verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: 2}
+                    if visible
+                    else {}
+                ),
+            }
+        )
+    _write_jsonl(candidate_dir / "scenario_tool_selection.jsonl", selection_rows)
+    for name in order:
+        _write_synthetic_trajectory(
+            control_dir,
+            scenario_name=name,
+            outcome=0.0 if name in safe_names else 1.0,
+            helper_called=False,
+        )
+        _write_synthetic_trajectory(
+            candidate_dir,
+            scenario_name=name,
+            outcome=1.0,
+            helper_called=name in safe_names,
+        )
+    _write_registry_checkpoints(
+        candidate_dir,
+        registry_dir,
+        scenario_order=order,
+        versions={name: 2 if name in safe_names else None for name in order},
+    )
+    for filename in (
+        "capability_observations.jsonl",
+        "tool_birth_events.jsonl",
+        "self_evolution_reflections.jsonl",
+        "self_evolution_task_feedback.jsonl",
+        "self_evolution_tool_lifecycle.jsonl",
+        "self_evolution_tool_repair_requests.jsonl",
+        "self_evolution_tool_repair_acknowledgements.jsonl",
+        "post_deployment_repair_state.json",
+        "self_evolution_reflection_state.json",
+        "tool_generation_status.json",
+    ):
+        path = candidate_dir / filename
+        if path.exists():
+            path.unlink()
+    _write_jsonl(
+        candidate_dir / "sage_run_events.jsonl",
+        [
+            {
+                "event": "registry_load",
+                "generation_enabled": False,
+                "registry_tools": [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL],
+            },
+            {
+                "event": "run_finished",
+                "lifecycle_finalization_count": 0,
+                "final_registry_tools": [
+                    verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                ],
+            },
+        ],
+    )
+    for arm, run_dir in (("control", control_dir), ("candidate", candidate_dir)):
+        _write_json(
+            run_dir / "sage_ts_run_manifest.json",
+            {
+                "agent_runtime": "sage_wrapped",
+                "actor_selection_mode": "policy",
+                "scenario_names": list(order),
+                "run_type": f"transfer_30_{arm}",
+            },
+        )
+
+    inventory = verify_lifecycle_repair_run._registry_inventory(registry_dir)
+    inventory_sha256 = verify_lifecycle_repair_run._inventory_sha256(inventory)
+    target_identity = verify_lifecycle_repair_run._target_tool_identity(registry_dir)
+    assert target_identity is not None
+    snapshot_path = run_root / "registry_gate" / "registry_manifest_before_run.json"
+    snapshot_path.write_bytes((registry_dir / "registry_manifest.json").read_bytes())
+    snapshot = {
+        "registry_dir": str(registry_dir),
+        "manifest_existed_before_run": True,
+        "snapshot_path": str(snapshot_path),
+        "manifest_digest_before_run": hashlib.sha256(
+            snapshot_path.read_bytes()
+        ).hexdigest(),
+        "registry_directory_existed_before_run": True,
+        "registry_inventory_before_run": inventory,
+        "registry_inventory_count_before_run": len(inventory),
+        "registry_inventory_sha256": inventory_sha256,
+    }
+    _write_json(run_root / "registry_gate" / "registry_gate_snapshot.json", snapshot)
+    provenance = {
+        "mode": "frozen_promoted_registry_transfer",
+        "source_run_root": str(source_run.resolve()),
+        "source_protocol_path": str(source_protocol_path),
+        "source_protocol_sha256": hashlib.sha256(
+            source_protocol_path.read_bytes()
+        ).hexdigest(),
+        "source_validation_report_path": str(source_report_path),
+        "source_validation_report_sha256": hashlib.sha256(
+            source_report_path.read_bytes()
+        ).hexdigest(),
+        "source_registry_dir": str(source_registry_dir.resolve()),
+        "source_registry_inventory_count": len(inventory),
+        "source_registry_inventory_sha256": inventory_sha256,
+        "installed_registry_dir": str(registry_dir.resolve()),
+        "installed_registry_inventory_sha256": inventory_sha256,
+        "target_tool": target_identity,
+    }
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol.update(
+        {
+            "mode": "transfer_30",
+            "manifest_type": benchmark["manifest_type"],
+            "benchmark_manifest_path": str(manifest_path),
+            "benchmark_manifest_sha256": hashlib.sha256(
+                manifest_path.read_bytes()
+            ).hexdigest(),
+            "scenario_order_sha256": spec["order_sha256"],
+            "generation_enabled": False,
+            "candidate_generated_tools_enabled": False,
+            "lifecycle_mutation_enabled": False,
+            "sage_policy": "none",
+            "actor_selection_mode": "policy",
+            "control_condition": "matched_policy_wrapper_without_generated_tools",
+            "control_agent_runtime": "sage_wrapped",
+            "candidate_agent_runtime": "sage_wrapped",
+            "registry_manifest_digest_after_run": hashlib.sha256(
+                (registry_dir / "registry_manifest.json").read_bytes()
+            ).hexdigest(),
+            "registry_gate_snapshot": snapshot,
+            "registry_transfer_provenance": provenance,
+        }
+    )
+    _write_json(protocol_path, protocol)
+    assert set(preservation_names).isdisjoint(safe_names)
+    return search_root, run_root, candidate_dir, registry_dir, source_run
 
 
 def test_development_outcome_ignores_legacy_feedback() -> None:
@@ -544,6 +1001,261 @@ def test_predeclared_development_cohort_passes_with_real_artifact_fields(
     assert report["status"] == "pass"
     assert report["historical_v1_observed_failure_proved"] is True
     assert report["repaired_version_future_success_flip_count"] >= 1
+
+
+def test_frozen_dev30_transfer_passes_with_exact_promoted_registry(
+    tmp_path: Path,
+) -> None:
+    search_root, _, _, _, _ = _transfer_artifacts(tmp_path)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "pass"
+    assert report["registry_unchanged"] is True
+    assert report["source_and_confirmation_cohorts_disjoint"] is True
+    assert report["safe_abstain_visible_and_called_count"] == 26
+    assert report["safe_abstain_exact_outcome_count"] >= 21
+    assert report["fresh_control_success_flip_count"] >= 1
+    assert report["preservation_exact_hidden_nonregression_count"] == 4
+
+
+def test_development_cohort_requires_complete_trajectory_artifacts(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    missing_path = (
+        run_root
+        / "candidate"
+        / "trajectories"
+        / verify_lifecycle_repair_run.DEV10_ORDER[0]
+        / "conversation.json"
+    )
+    missing_path.unlink()
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "trajectory_integrity_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_summary_not_backed_by_trajectory(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    summary_path = candidate_dir / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["outcome_checks"] = []
+    _write_json(summary_path, summary)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "trajectory_integrity_failed" in report["reasons"]
+
+
+def test_development_control_rejects_generated_tool_leakage(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[0]
+    _write_synthetic_trajectory(
+        run_root / "control",
+        scenario_name=scenario_name,
+        outcome=0.0,
+        helper_called=True,
+    )
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "trajectory_integrity_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_checkpoint_version_corruption(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[0]
+    checkpoint_path = (
+        run_root
+        / "candidate"
+        / "registry_checkpoints"
+        / (
+            "after_0001_"
+            f"{verify_lifecycle_repair_run._safe_checkpoint_name(scenario_name)}"
+        )
+        / "registry_manifest.json"
+    )
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["tools"][verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL][
+        "version"
+    ] = 99
+    _write_json(checkpoint_path, checkpoint)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "registry_checkpoint_version_mismatch" in report["reasons"]
+
+
+def test_frozen_transfer_requires_complete_trajectory_artifacts(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _, _ = _transfer_artifacts(tmp_path)
+    missing_path = (
+        candidate_dir
+        / "trajectories"
+        / verify_lifecycle_repair_run.DEV30_ORDER[0]
+        / "execution_context.json"
+    )
+    missing_path.unlink()
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert "transfer_trajectory_integrity_failed" in report["reasons"]
+
+
+def test_frozen_transfer_rejects_nonpassing_source_report(tmp_path: Path) -> None:
+    search_root, _, _, _, source_run = _transfer_artifacts(tmp_path)
+    source_protocol = json.loads(
+        (source_run / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    source_candidate = Path(source_protocol["candidate_dir"])
+    result_path = source_candidate / "result_summary.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["per_scenario_results"] = [
+        _result_row(str(row["name"]), 0.0) for row in result["per_scenario_results"]
+    ]
+    _write_json(result_path, result)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert "transfer_source_dev10_not_passing" in report["reasons"]
+
+
+def test_frozen_transfer_rejects_registry_sidecar_mutation(tmp_path: Path) -> None:
+    search_root, _, _, registry_dir, _ = _transfer_artifacts(tmp_path)
+    lifecycle_path = registry_dir / "tool_lifecycle.json"
+    lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+    lifecycle["tampered"] = True
+    _write_json(lifecycle_path, lifecycle)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert "transfer_registry_mutated_during_confirmation" in report["reasons"]
+
+
+def test_frozen_transfer_rejects_generation_or_lifecycle_activity(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, candidate_dir, _, _ = _transfer_artifacts(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["generation_enabled"] = True
+    protocol["lifecycle_mutation_enabled"] = True
+    _write_json(protocol_path, protocol)
+    _write_jsonl(
+        candidate_dir / "tool_birth_events.jsonl",
+        [{"event": "tool_birth_accepted"}],
+    )
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert "transfer_protocol_generation_enabled_mismatch" in report["reasons"]
+    assert "transfer_lifecycle_activity_present" in report["reasons"]
+
+
+def test_frozen_transfer_rejects_missing_exact_version_call(tmp_path: Path) -> None:
+    search_root, _, candidate_dir, _, _ = _transfer_artifacts(tmp_path)
+    selection_path = candidate_dir / "scenario_tool_selection.jsonl"
+    rows = [json.loads(line) for line in selection_path.read_text().splitlines()]
+    rows[0]["generated_tool_versions"][
+        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    ] = 3
+    _write_jsonl(selection_path, rows)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert (
+        "transfer_helper_not_visible_called_at_exact_version_26_of_26"
+        in report["reasons"]
+    )
+
+
+def test_frozen_transfer_rejects_absent_fresh_control_flip(tmp_path: Path) -> None:
+    search_root, run_root, _, _, _ = _transfer_artifacts(tmp_path)
+    control_path = run_root / "control" / "result_summary.json"
+    control = json.loads(control_path.read_text(encoding="utf-8"))
+    control["per_scenario_results"] = [
+        _result_row(str(row["name"]), 1.0) for row in control["per_scenario_results"]
+    ]
+    _write_json(control_path, control)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert "transfer_fresh_control_success_flip_missing" in report["reasons"]
+
+
+def test_frozen_transfer_rejects_preservation_regression_or_helper_leak(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _, _ = _transfer_artifacts(tmp_path)
+    summary_path = candidate_dir / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][-1] = _result_row(
+        str(summary["per_scenario_results"][-1]["name"]), 0.0
+    )
+    _write_json(summary_path, summary)
+    selection_path = candidate_dir / "scenario_tool_selection.jsonl"
+    selections = [json.loads(line) for line in selection_path.read_text().splitlines()]
+    selections[-1]["generated_tools_visible"] = [
+        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    ]
+    _write_jsonl(selection_path, selections)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 30)
+
+    assert report["status"] == "fail"
+    assert (
+        "transfer_preservation_exact_hidden_nonregression_gate_failed"
+        in report["reasons"]
+    )
+
+
+def test_development_cohort_recursively_rejects_private_repair_evidence(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8").splitlines()[0])
+    request["nested_diagnostics"] = {
+        "history": [
+            {"evaluator_trace": {"expected_answer": "private"}},
+            {"candidate_outcome_similarity": 1.0},
+            {"fresh_control_success_flip": True},
+        ]
+    }
+    _write_jsonl(request_path, [request])
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "repair_request_contains_prohibited_evidence" in report["reasons"]
+    prohibited_paths = report["repair_request_prohibited_paths"][
+        "prepare-safe-v1-after-1"
+    ]
+    assert any(path.endswith("evaluator_trace") for path in prohibited_paths)
+    assert any(path.endswith("expected_answer") for path in prohibited_paths)
+    assert any(
+        path.endswith("candidate_outcome_similarity") for path in prohibited_paths
+    )
+    assert any(path.endswith("fresh_control_success_flip") for path in prohibited_paths)
 
 
 def test_development_cohort_rejects_nonoverlapping_arm_processes(

@@ -385,6 +385,20 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert "git status --porcelain --untracked-files=all" in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_protocol.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py' in launcher
+    assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py' in launcher
+    assert "docs/sage_protocol/publication_validation_thresholds_v4.json" in launcher
+    assert launcher.index("scripts/verify_publication_run.py") < launcher.index(
+        "scripts/verify_publication_sample.py"
+    )
+    assert (
+        '"$EXECUTION_MODE" == "native-only"'
+        ' && "$PUBLICATION_GATE_PURPOSE" == "release-sample"' in launcher
+    )
+    assert (
+        "control_condition=matched_policy_wrapper_without_generated_tools" in launcher
+    )
+    assert "control_agent_runtime=sage_wrapped" in launcher
+    assert "control_generated_tools_enabled=false" in launcher
     for provenance_field in (
         "python_executable=",
         "python_version=",

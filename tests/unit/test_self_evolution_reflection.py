@@ -8,13 +8,16 @@ from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     compatibility_context,
 )
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolSpec
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
     _online_feedback_outcome,
     _online_feedback_outcome_with_source,
 )
+from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
+from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
 
@@ -26,6 +29,31 @@ def _single_record_legacy_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _scenario() -> Scenario:
     return Scenario(starting_context=ExecutionContext())
+
+
+def _accepted_registry_tool(tool_name: str) -> RegistryEntry:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name=tool_name,
+            family=ToolFamily.CANONICALIZER,
+            description="Normalize a public record selector.",
+            inputs=(),
+            output_annotation="str",
+            generalization_rationale="Applies to repeated record-selection tasks.",
+        ),
+        code=f"def {tool_name}() -> str:\n    return 'normalized'\n",
+    )
+    return RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            True,
+            (),
+            source_example_count=1,
+            held_out_check_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="public_metadata_test",
+    )
 
 
 @pytest.mark.parametrize(
@@ -226,7 +254,7 @@ def test_reflection_flags_sparse_positive_tool(tmp_path: Path) -> None:
     assert decision["called_count"] == 1
 
 
-def test_reflection_routes_repairs_harmful_calls_without_global_retirement(
+def test_reflection_does_not_attribute_one_legacy_outcome_to_generated_tool(
     tmp_path: Path,
 ) -> None:
     scenario = _scenario()
@@ -268,7 +296,9 @@ def test_reflection_routes_repairs_harmful_calls_without_global_retirement(
         (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
     )
     decision = lifecycle["tool_lifecycle"]["relative_day_time_to_timestamp"]
-    assert decision["decision"] == "needs_route_repair"
+    assert decision["decision"] == "diagnostic"
+    assert decision["repair_kind"] is None
+    assert decision["routing_disposition"] == "unchanged"
     assert decision["harmful_called_count"] == 1
 
 
@@ -402,9 +432,58 @@ def test_reflection_keeps_relative_regression_as_route_repair(
     )["tool_lifecycle"]["generic_routed_helper"]
     assert lifecycle["decision"] == "needs_route_repair"
     assert lifecycle["repair_kind"] == "routing"
+    assert lifecycle["routing_disposition"] == "family_suppression_active"
+    assert lifecycle["route_repair_families"] == ["lookup"]
+    assert (
+        lifecycle["family_evidence"]["lookup"]["attributable_harmful_call_count"] == 2
+    )
     assert lifecycle["implementation_repair_families"] == []
     assert controller.drain_pending_repair_requests() == ()
     assert not controller.repair_request_path.exists()
+
+
+def test_reflection_does_not_route_repair_co_called_outcome_regressions(
+    tmp_path: Path,
+) -> None:
+    scenario_names = ("private_case_one", "private_case_two")
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {"name": name, "similarity": 1.0, "outcome_similarity": 1.0}
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    for scenario_name in scenario_names:
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.0, "outcome_similarity": 0.0},
+            selection_record={
+                "generated_tools_visible": ["helper_a", "helper_b"],
+                "generated_tools_called": ["helper_a", "helper_b"],
+                "generated_tools_attempted": ["helper_a", "helper_b"],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label="visible_task_context(family=lookup)",
+            task_family_key="lookup",
+        )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]
+    for tool_name in ("helper_a", "helper_b"):
+        assert lifecycle[tool_name]["route_repair_families"] == []
+        assert lifecycle[tool_name]["routing_disposition"] == "unchanged"
 
 
 def test_reflection_single_contract_failure_triggers_attributable_repair(
@@ -470,6 +549,8 @@ def test_reflection_single_contract_failure_triggers_attributable_repair(
         "failed_count": 0,
     }
     assert "post_task_scalar_outcome" not in requests[0]["evidence_policy"]["allowed"]
+    assert "outcome_values" in requests[0]["evidence_policy"]["prohibited"]
+    assert "success_flips" in requests[0]["evidence_policy"]["prohibited"]
 
 
 def test_reflection_requires_repeated_generated_tool_execution_failures(
@@ -590,6 +671,94 @@ def test_generic_task_exception_does_not_retire_called_generated_tool(
     )["tool_lifecycle"]["successful_helper"]
     assert lifecycle["decision"] == "diagnostic"
     assert lifecycle["implementation_repair_families"] == []
+
+
+def test_missing_public_lifecycle_context_never_uses_private_scenario_id(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "private_benchmark_scenario_identifier"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            }
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+        min_route_repair_harmful_calls=1,
+    )
+
+    feedback = controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 0.0, "outcome_similarity": 0.0},
+        selection_record={
+            "generated_tools_visible": ["generic_helper"],
+            "generated_tools_called": ["generic_helper"],
+            "generated_tools_attempted": ["generic_helper"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=[],
+    )
+
+    assert feedback["task_context_label"] == "visible_task_context(family=unclassified)"
+    assert feedback["task_family_key"] == "unclassified"
+    assert feedback["source_task_id_redacted"] is False
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["generic_helper"]
+    assert lifecycle["task_families"] == ["unclassified"]
+    assert lifecycle["task_contexts"] == ["visible_task_context(family=unclassified)"]
+    assert lifecycle["route_repair_families"] == []
+    assert scenario_name not in json.dumps(lifecycle, sort_keys=True)
+
+
+def test_hydrated_row_without_public_context_uses_unclassified_bucket(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "private_historical_scenario_identifier"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=ControlBaselineCache(tmp_path / "control_cache"),
+        min_route_repair_harmful_calls=1,
+    )
+
+    controller._record_feedback_row(  # noqa: SLF001
+        {
+            "scenario": scenario_name,
+            "source_task_id_redacted": False,
+            "control_source": "same_run_fresh",
+            "control_outcome_source": "audited_outcome",
+            "candidate_outcome_source": "audited_outcome",
+            "control_outcome": 1.0,
+            "candidate_outcome": 0.0,
+            "outcome_delta": -1.0,
+            "generated_tools_visible": ["generic_helper"],
+            "generated_tools_called": ["generic_helper"],
+            "generated_tools_attempted": ["generic_helper"],
+            "generated_tools_failed": [],
+        }
+    )
+
+    lifecycle = controller._tool_lifecycle_snapshot()["generic_helper"]  # noqa: SLF001
+    assert lifecycle["task_families"] == ["unclassified"]
+    assert lifecycle["task_contexts"] == ["visible_task_context(family=unclassified)"]
+    assert lifecycle["route_repair_families"] == []
+    assert scenario_name not in json.dumps(lifecycle, sort_keys=True)
 
 
 def test_three_execution_failures_across_families_trigger_one_global_repair(
@@ -719,12 +888,73 @@ def test_repaired_version_does_not_inherit_prior_version_retirement(
     assert lifecycle["decision"] != "parked"
 
 
+def test_metadata_acknowledgement_requires_consistent_implementation_proof(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("metadata_helper"))
+    source = store.get("metadata_helper")
+    assert source is not None
+    controller = SelfEvolutionReflectionController(
+        store=store,
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+    )
+    request = {
+        "request_id": "metadata-proof-request",
+        "repair_kind": "metadata",
+        "source_code_hash": source.stored_code_hash,
+    }
+    controller.repair_request_path.parent.mkdir(parents=True, exist_ok=True)
+    controller.repair_request_path.write_text(
+        json.dumps(request) + "\n",
+        encoding="utf-8",
+    )
+    invalid_proof = {
+        "proof_schema_version": 1,
+        "repair_kind": "metadata",
+        "source_code_hash": source.stored_code_hash,
+        "replacement_code_hash": "0" * 64,
+        "replacement_activated": True,
+        "implementation_preserved": True,
+        "model_authored_code_change_discarded": True,
+    }
+
+    with pytest.raises(ValueError, match="invalid implementation proof"):
+        controller.acknowledge_repair(
+            "metadata_helper",
+            2,
+            "metadata-proof-request",
+            "canary_pending",
+            invalid_proof,
+        )
+
+    valid_proof = {
+        **invalid_proof,
+        "replacement_code_hash": source.stored_code_hash,
+    }
+    acknowledgement = controller.acknowledge_repair(
+        "metadata_helper",
+        2,
+        "metadata-proof-request",
+        "canary_pending",
+        valid_proof,
+    )
+    assert acknowledgement["implementation_proof"] == valid_proof
+
+
 def test_reflection_emits_metadata_repair_for_repeated_non_adoption(
     tmp_path: Path,
 ) -> None:
     scenario_names = tuple(f"private_adoption_case_{index}" for index in range(8))
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("generic_unadopted_helper"))
     controller = SelfEvolutionReflectionController(
-        store=RegistryStore(tmp_path / "registry"),
+        store=store,
         output_dir=tmp_path / "run",
         agent="gpt-4o-mini",
         user="gpt-4o-mini",
@@ -773,6 +1003,9 @@ def test_reflection_emits_metadata_repair_for_repeated_non_adoption(
     assert len(requests) == 1
     request = requests[0]
     assert request["repair_kind"] == "metadata"
+    source_entry = store.get("generic_unadopted_helper")
+    assert source_entry is not None
+    assert request["source_code_hash"] == source_entry.stored_code_hash
     assert request["requested_action"] == (
         "repair_public_metadata_and_revalidate_or_retire"
     )
@@ -782,6 +1015,81 @@ def test_reflection_emits_metadata_repair_for_repeated_non_adoption(
     assert request["public_evidence"]["called_count"] == 0
     serialized_request = json.dumps(request)
     assert all(name not in serialized_request for name in scenario_names)
+
+
+def test_metadata_non_adoption_does_not_replace_tool_working_in_another_family(
+    tmp_path: Path,
+) -> None:
+    working_scenario = "working_family_case"
+    nonadoption_scenarios = tuple(
+        f"nonadoption_family_case_{index}" for index in range(8)
+    )
+    scenario_names = (working_scenario, *nonadoption_scenarios)
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("mixed_family_helper"))
+    source = store.get("mixed_family_helper")
+    assert source is not None
+    controller = SelfEvolutionReflectionController(
+        store=store,
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    controller.assess_scenario(
+        scenario_name=working_scenario,
+        baseline_scenario=_scenario(),
+        result={"similarity": 1.0, "outcome_similarity": 1.0},
+        selection_record={
+            "generated_tools_visible": ["mixed_family_helper"],
+            "generated_tools_called": ["mixed_family_helper"],
+            "generated_tools_attempted": ["mixed_family_helper"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=[],
+        task_context_label="visible_task_context(family=working_family)",
+        task_family_key="working_family",
+    )
+    for scenario_name in nonadoption_scenarios:
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.0, "outcome_similarity": 0.0},
+            selection_record={
+                "generated_tools_visible": ["mixed_family_helper"],
+                "generated_tools_called": [],
+                "generated_tools_attempted": [],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label=("visible_task_context(family=nonadoption_family)"),
+            task_family_key="nonadoption_family",
+        )
+
+    assert controller.drain_pending_repair_requests() == ()
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["mixed_family_helper"]
+    assert lifecycle["metadata_repair_families"] == []
+    assert lifecycle["decision"] in {"keep_sparse_positive", "retain"}
+    current = store.get("mixed_family_helper")
+    assert current is not None
+    assert current.version == source.version
+    assert current.stored_code_hash == source.stored_code_hash
+    assert current.retired is False
 
 
 def test_reflection_keeps_positive_tool_with_side_effect_audit(
@@ -840,7 +1148,7 @@ def test_reflection_keeps_positive_tool_with_side_effect_audit(
             "tool_name": "prepare_reminder_creation_args",
             "decision": "needs_safety_audit",
             "reason": "side_effect_preservation_audit",
-            "scenario": "add_reminder_content_and_week_delta_and_time",
+            "scenario": "visible_task_context(family=unclassified)",
         }
     ]
 

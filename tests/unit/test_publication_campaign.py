@@ -70,6 +70,12 @@ def _valid_campaign(
 
     sample_run_root = tmp_path / "sample_run"
     sample_run_root.mkdir()
+    sample_registry = tmp_path / "sample_registry"
+    _write_json(sample_registry / "registry_manifest.json", {"tools": {}})
+    _write_json(
+        sample_run_root / "protocol_manifest.json",
+        {"registry_dir": sample_registry.relative_to(tmp_path).as_posix()},
+    )
     sample_payload = {
         "schema_version": 1,
         "status": "pass",
@@ -222,6 +228,40 @@ def _valid_campaign(
     return manifest, sample_report, sample_calls
 
 
+def _enable_sample_as_rep01(
+    tmp_path: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    binding = campaign._sample_artifact_binding(
+        tmp_path,
+        manifest["sample_validation"],
+    )
+    endpoint_measurements = {"status": "pass", "binding": "sample-rep01"}
+    manifest["replication_accounting"] = campaign._adaptive_replication_accounting(
+        binding
+    )
+    manifest["execution_waves"] = campaign._expected_execution_waves(
+        campaign.MAX_CONCURRENCY,
+        str(manifest["campaign_scope"]),
+        sample_as_rep01=True,
+    )
+    manifest["run_pairs"][0]["online"] = {
+        "source": "bound_passing_release_sample",
+        "publication_gate_purpose": (campaign.PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE),
+        "run_root": binding["sample_run_root"],
+        "search_root": binding["sample_run_root"],
+        "registry_dir": binding["sample_registry_dir"],
+        "execution_status": "completed",
+        "return_code": 0,
+        "verification_status": "pass",
+        "completed_at": "2026-09-13T00:00:00Z",
+        "imported_at": "2026-09-13T00:00:00Z",
+        "sample_artifact_binding": copy.deepcopy(binding),
+        "endpoint_measurements": endpoint_measurements,
+    }
+    return endpoint_measurements
+
+
 def _set_nested(
     payload: dict[str, Any],
     path: tuple[str | int, ...],
@@ -291,6 +331,196 @@ def test_campaign_prerequisites_accept_default_online_only_plan(
             "write_report": False,
         }
     ]
+
+
+def test_sample_as_rep01_prerequisites_bind_sample_and_plan_only_rep02_to_rep10(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    endpoint_measurements = _enable_sample_as_rep01(tmp_path, manifest)
+    monkeypatch.setattr(
+        campaign,
+        "_verify_publication_entry",
+        lambda repo_root, observed, entry, arm: {
+            "run_root": str(tmp_path / entry["run_root"]),
+            "endpoint_measurements": endpoint_measurements,
+        },
+    )
+
+    assert campaign._campaign_prerequisite_errors(tmp_path, manifest) == []
+    assert campaign._expected_wave_jobs(manifest, 1) == [
+        (replication, "online") for replication in range(2, 11)
+    ]
+    monkeypatch.setattr(
+        campaign,
+        "_entry_is_valid",
+        lambda repo_root, observed, entry, arm: (
+            entry.get("source") == "bound_passing_release_sample"
+        ),
+    )
+    assert campaign._wave_jobs(repo_root=tmp_path, manifest=manifest, wave=1) == [
+        (replication, "online") for replication in range(2, 11)
+    ]
+    assert manifest["run_pairs"][0]["online"]["execution_status"] == "completed"
+    assert all(
+        pair["online"]["execution_status"] == "queued"
+        for pair in manifest["run_pairs"][1:]
+    )
+
+
+def test_sample_as_rep01_rejects_any_imported_run_tree_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    endpoint_measurements = _enable_sample_as_rep01(tmp_path, manifest)
+    monkeypatch.setattr(
+        campaign,
+        "_verify_publication_entry",
+        lambda *args, **kwargs: {
+            "run_root": str(tmp_path / "sample_run"),
+            "endpoint_measurements": endpoint_measurements,
+        },
+    )
+    (tmp_path / "sample_run" / "post_binding_mutation.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    errors = campaign._campaign_prerequisite_errors(tmp_path, manifest)
+
+    assert any("sample_run_artifact" in error for error in errors)
+
+
+def test_sample_as_rep01_wave_attests_nine_parallel_children(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    _enable_sample_as_rep01(tmp_path, manifest)
+    expected_jobs = campaign._expected_wave_jobs(manifest, 1)
+    results: list[dict[str, Any]] = []
+    for replication, arm in expected_jobs:
+        result = {
+            "replication": replication,
+            "arm": arm,
+            "port": 64200 + replication,
+            "return_code": 0,
+            "process_pid": 10_000 + replication,
+            "process_started_monotonic_ns": 100 + replication,
+            "process_completed_monotonic_ns": 1_000 + replication,
+        }
+        results.append(result)
+        manifest["run_pairs"][replication - 1][arm].update(
+            {
+                "dashboard_port": result["port"],
+                "process_pid": result["process_pid"],
+                "process_started_monotonic_ns": result["process_started_monotonic_ns"],
+                "process_completed_monotonic_ns": result[
+                    "process_completed_monotonic_ns"
+                ],
+                "process_return_code": 0,
+            }
+        )
+    record = campaign._parallel_wave_execution_record(
+        wave=1,
+        jobs=expected_jobs,
+        results=results,
+        expected_jobs=expected_jobs,
+    )
+    manifest["parallel_wave_execution"]["1"] = record
+
+    assert record["verified"] is True
+    assert record["job_count"] == 9
+    assert [job["replication"] for job in record["jobs"]] == list(range(2, 11))
+    assert campaign._parallel_wave_record_errors(manifest, 1) == []
+
+
+def test_sample_as_rep01_job_can_never_be_launched(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    _enable_sample_as_rep01(tmp_path, manifest)
+    publication_python = tmp_path / ".venv-publication" / "bin" / "python"
+    publication_python.parent.mkdir(parents=True)
+    publication_python.write_text("#!/bin/sh\n", encoding="utf-8")
+    publication_python.chmod(0o755)
+
+    with pytest.raises(ValueError, match="must never be launched again"):
+        campaign._job_command(
+            repo_root=tmp_path,
+            manifest=manifest,
+            pair=manifest["run_pairs"][0],
+            arm="online",
+            port=64200,
+        )
+
+
+def test_prepare_sample_as_rep01_binds_one_and_queues_only_nine(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_manifest, sample_report, _ = _valid_campaign(tmp_path, monkeypatch)
+    benchmark = tmp_path / seed_manifest["benchmark_manifest"]
+    _write_json(
+        benchmark,
+        {
+            "splits": {
+                "full_benchmark": [
+                    {"name": f"task_{index}"}
+                    for index in range(campaign.EXPECTED_TASKS_PER_RUN)
+                ]
+            }
+        },
+    )
+    monkeypatch.setattr(campaign, "PINNED_BENCHMARK_SHA256", _sha256(benchmark))
+    monkeypatch.setattr(
+        campaign,
+        "_verify_publication_entry",
+        lambda repo_root, manifest, entry, arm: {
+            "run_root": str(tmp_path / entry["run_root"]),
+            "endpoint_measurements": {"status": "pass"},
+        },
+    )
+    monkeypatch.setattr(campaign, "write_evidence_dashboard", lambda **kwargs: {})
+    args = argparse.Namespace(
+        repo_root=tmp_path,
+        campaign_id="adaptive_sample_campaign",
+        scope=campaign.DEFAULT_CAMPAIGN_SCOPE,
+        expected_online_runs=campaign.EXPECTED_REPLICATIONS,
+        sample_validation_report=sample_report.relative_to(tmp_path),
+        researcher_waived_sample_validation=False,
+        sample_validation_waiver_reason=None,
+        sample_as_rep01=True,
+        benchmark_manifest=benchmark.relative_to(tmp_path),
+        external_fixture=Path("fixture.json"),
+        fixed_now=campaign.DEFAULT_FIXED_NOW,
+        max_parallel=campaign.MAX_CONCURRENCY,
+        bootstrap_iterations=campaign.DEFAULT_BOOTSTRAP_ITERATIONS,
+        randomization_iterations=campaign.DEFAULT_RANDOMIZATION_ITERATIONS,
+        seed=campaign.DEFAULT_ANALYSIS_SEED,
+        force=False,
+    )
+
+    manifest_path = campaign.prepare_campaign(args)
+    prepared = campaign._load_manifest(manifest_path)
+
+    assert prepared["replication_accounting"]["mode"] == (
+        campaign.SAMPLE_AS_REP01_ACCOUNTING_MODE
+    )
+    assert prepared["run_pairs"][0]["online"]["source"] == (
+        "bound_passing_release_sample"
+    )
+    assert prepared["run_pairs"][0]["online"]["execution_status"] == "completed"
+    assert [
+        pair["replication"]
+        for pair in prepared["run_pairs"]
+        if pair["online"]["execution_status"] == "queued"
+    ] == list(range(2, 11))
+    assert prepared["execution_waves"][0]["job_count"] == 9
+    assert prepared["execution_waves"][0]["replications_launched"] == list(range(2, 11))
 
 
 def test_sample_validation_declaration_requires_exactly_one_gate_disposition(

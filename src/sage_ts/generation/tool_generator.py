@@ -30,6 +30,63 @@ class ChatCompleter(Protocol):
     def complete(self, request: ChatRequest) -> str: ...
 
 
+_POST_DEPLOYMENT_REPAIR_SCENARIO_PATTERN = re.compile(
+    r"post_deployment_repair\(kind=(?:implementation|metadata);"
+    r"family=[a-z0-9_.:-]+\)"
+)
+_PROHIBITED_REPAIR_CHAT_TOKENS = (
+    "candidate_outcome",
+    "control_outcome",
+    "outcome_similarity",
+    "success_flip",
+    "task_id",
+    "scenario_name",
+    "scenario_id",
+    "expected_answer",
+    "gold_answer",
+    "reference_answer",
+    "target_state",
+    "expected_target_state",
+    "evaluator_trace",
+    "evaluator_result",
+)
+
+
+def _assert_post_deployment_repair_chat_request_safe(
+    generation_request: ToolGenerationRequest,
+    chat_request: ChatRequest,
+) -> None:
+    """Audit the exact post-deployment prompt immediately before inference."""
+
+    if not _POST_DEPLOYMENT_REPAIR_SCENARIO_PATTERN.fullmatch(
+        generation_request.scenario_name
+    ):
+        return
+    exact_model_input = f"{chat_request.system}\n{chat_request.user}".lower()
+    violations = sorted(
+        {
+            token
+            for token in _PROHIBITED_REPAIR_CHAT_TOKENS
+            if any(
+                re.search(
+                    rf"(?<![a-z0-9]){re.escape(variant)}(?![a-z0-9])",
+                    exact_model_input,
+                )
+                for variant in {
+                    token,
+                    token.replace("_", "-"),
+                    token.replace("_", ""),
+                }
+            )
+        }
+    )
+    if violations:
+        raise ValueError(
+            "post-deployment repair ChatRequest contains prohibited "
+            "evaluator-private field tokens: " + ", ".join(violations)
+        )
+
+
 @dataclass(frozen=True)
 class ToolGenerationRequest:
     scenario_name: str
@@ -304,10 +361,25 @@ class ToolGenerator:
         # or written to a prior run.
         self._contract_analyses: dict[str, str] = {}
 
+    def _complete(
+        self,
+        generation_request: ToolGenerationRequest,
+        chat_request: ChatRequest,
+    ) -> str:
+        # This is the last local boundary before model inference. In particular,
+        # repair prompts have already incorporated any rejected spec/code,
+        # validator-error labels, and model-authored analysis at this point.
+        _assert_post_deployment_repair_chat_request_safe(
+            generation_request,
+            chat_request,
+        )
+        return self.completer.complete(chat_request)
+
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         prompt = _model_authored_generation_prompt(request)
         prompt += self._contract_analysis_suffix(request)
-        response = self.completer.complete(
+        response = self._complete(
+            request,
             ChatRequest(
                 system=(
                     "You generate safe deterministic Python helper tools. "
@@ -316,7 +388,7 @@ class ToolGenerator:
                 user=prompt,
                 model=self.completer.model,
                 response_format_json=True,
-            )
+            ),
         )
         tools = parse_generated_tool_candidates_json(
             response, default_tool_name=request.suggested_tool_name
@@ -340,13 +412,14 @@ class ToolGenerator:
         rejected_tool: GeneratedTool,
         errors: tuple[str, ...],
     ) -> tuple[GeneratedTool, ...]:
-        """Return every independently authored repair for contract validation."""
+        """Return independently authored repairs for contract validation."""
 
         prompt = _model_authored_repair_prompt(request, rejected_tool, errors)
         prompt += self._contract_analysis_suffix(request)
         prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
         prompt += _model_authored_final_repair_directive(request, errors)
-        response = self.completer.complete(
+        response = self._complete(
+            request,
             ChatRequest(
                 system=(
                     "You repair rejected deterministic Python helper tools. "
@@ -355,12 +428,20 @@ class ToolGenerator:
                 user=prompt,
                 model=self.completer.model,
                 response_format_json=True,
-            )
+            ),
         )
         tools = parse_generated_tool_candidates_json(
             response, default_tool_name=request.suggested_tool_name
         )
-        return tuple(_normalize_model_authored_tool(request, tool) for tool in tools)
+        normalized = tuple(
+            _normalize_model_authored_tool(request, tool) for tool in tools
+        )
+        if _request_is_validation_abstention_helper(request):
+            # A validation helper is one ordered safety decision, not a portfolio of
+            # unrelated strategies.  Give each iterative validation round one complete
+            # candidate so the next feedback describes exactly the code being repaired.
+            return normalized[:1]
+        return normalized
 
     def _contract_analysis_suffix(self, request: ToolGenerationRequest) -> str:
         if not _request_complete_tools_enabled(request):
@@ -368,7 +449,8 @@ class ToolGenerator:
         analysis_prompt = _model_authored_contract_analysis_prompt(request)
         analysis = self._contract_analyses.get(analysis_prompt)
         if analysis is None:
-            analysis = self.completer.complete(
+            analysis = self._complete(
+                request,
                 ChatRequest(
                     system=(
                         "You analyze public generated-tool validation contracts. "
@@ -377,7 +459,7 @@ class ToolGenerator:
                     user=analysis_prompt,
                     model=self.completer.model,
                     response_format_json=True,
-                )
+                ),
             )
             self._contract_analyses[analysis_prompt] = analysis
         return (
@@ -400,7 +482,8 @@ class ToolGenerator:
         )
         analysis = self._contract_analyses.get(analysis_prompt)
         if analysis is None:
-            analysis = self.completer.complete(
+            analysis = self._complete(
+                request,
                 ChatRequest(
                     system=(
                         "You trace rejected generated Python tools against public "
@@ -410,7 +493,7 @@ class ToolGenerator:
                     user=analysis_prompt,
                     model=self.completer.model,
                     response_format_json=True,
-                )
+                ),
             )
             self._contract_analyses[analysis_prompt] = analysis
         return (
@@ -424,7 +507,17 @@ def _model_authored_candidate_count() -> int:
     return 3
 
 
-def _model_authored_repair_candidate_count() -> int:
+def _request_is_validation_abstention_helper(
+    request: ToolGenerationRequest,
+) -> bool:
+    return str(ToolFamily.VALIDATION_ABSTENTION_HELPER) in {
+        str(family) for family in request.allowed_families
+    }
+
+
+def _model_authored_repair_candidate_count(request: ToolGenerationRequest) -> int:
+    if _request_is_validation_abstention_helper(request):
+        return 1
     return 3
 
 
@@ -1405,6 +1498,55 @@ def _model_authored_final_repair_directive(
 ) -> str:
     """Restate structural invariants after verbose model-authored analysis."""
 
+    if _request_is_validation_abstention_helper(request):
+        return (
+            " FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE. This directive "
+            "is authoritative and must be followed after every earlier instruction. "
+            "Return exactly one complete JSON repair object with top-level spec and "
+            "code_lines, never a candidates array. Keep the public function name and "
+            "signature. The function must be pure and must return exactly these six "
+            "keys on every branch, with no extra or missing keys: should_abstain, "
+            "missing_information, required_original_tools, safe_next_action, "
+            "final_answer_recommendation, and abstain_reason. Implement this decision "
+            "algorithm in the following exact order. STEP 1: normalize "
+            "required_original_tools and available_original_tools. Treat a nonblank "
+            "string as one capability rather than characters, treat a list as the "
+            "capability sequence, safely treat missing or malformed containers as "
+            "empty, apply only capability aliases explicitly stated in the public "
+            "contract, preserve first-seen order, and remove duplicates. STEP 2: add "
+            "only semantic prerequisites that the public contract explicitly states "
+            "can be inferred from user_request, requested_action, or target_identifier. "
+            "Treat those public inference rules as exhaustive. Never invent an "
+            "unstated prerequisite or infer one from a task id, scenario name, "
+            "benchmark label, expected answer, or example-specific literal. STEP 3: "
+            "compute missing capabilities from the complete normalized required list "
+            "against the normalized available list. If any are missing, abstain "
+            "immediately with all missing capabilities in missing_information, the "
+            "complete normalized requirements in required_original_tools, "
+            "safe_next_action ask_user_or_abstain, abstain_reason "
+            "missing_required_original_tool, and a dynamically constructed "
+            "final_answer_recommendation that names every missing capability. A fixed "
+            "generic sentence such as 'not enough information' is invalid. STEP 4: "
+            "only when no capability is missing, apply the public contract's "
+            "mutating-action target rule. If that rule requires a target and the "
+            "visible target_identifier is blank, abstain with target_identifier in "
+            "missing_information, abstain_reason missing_target_identifier, and a "
+            "dynamic recommendation that explicitly says target identifier. Do not "
+            "apply this rule to read-only search, lookup, find, list, read, or check "
+            "actions when the public contract allows a blank target. STEP 5: only "
+            "after capability and missing-target checks, apply the public ambiguity "
+            "rule. If the visible evidence is not unique under that rule, abstain with "
+            "ambiguous_target in missing_information, abstain_reason ambiguous_target, "
+            "and a dynamic recommendation that explicitly names ambiguity or multiple "
+            "matches. STEP 6: otherwise continue safely with should_abstain false, "
+            "missing_information empty, the complete normalized requirements, "
+            "safe_next_action continue_with_original_tool, and empty "
+            "final_answer_recommendation and abstain_reason. Before returning JSON, "
+            "mentally execute every model-visible public example and every invariant "
+            "named by a held-out or blind-property error. Generalize the algorithm; "
+            "do not embed task ids, scenario names, benchmark answers, contact names, "
+            "phone numbers, dates, or other example-specific constants in code."
+        )
     if not _request_complete_tools_enabled(request):
         return ""
     cases = _native_action_validator_labeled_examples(request)
@@ -1706,10 +1848,8 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Build search_contacts_kwargs from contact_name, phone_number, and relationship before branching on selected_record; return those kwargs in both pre-search and selected-record outputs.",
             "If selected_record is a non-empty dict and requested_field is present, should_call_search_contacts is false, abstain_reason is empty, selected_record is copied exactly, answer_field equals requested_field, and answer_value is selected_record[requested_field].",
             "Use an early return for selected_record cases so should_call_search_contacts cannot remain true from pre-search kwargs.",
-            "For selected_record relationship answers with a nonblank phone_number lookup, final_answer_recommendation equals phone_number + ' is your ' + answer_value.",
-            "This relationship-answer rule applies even when contact_name is blank: if requested_field == 'relationship', phone_number is nonblank, and selected_record has relationship, final_answer_recommendation must be the phone number plus ' is your ' plus selected_record['relationship'].",
-            'For selected_record phone_number answers with a nonblank contact_name lookup, final_answer_recommendation equals contact_name + "\'s phone number is " + answer_value.',
-            "For selected_record name answers with a nonblank relationship lookup, final_answer_recommendation equals 'Your ' + relationship + ' is ' + answer_value.",
+            "For a selected-record answer, construct final_answer_recommendation as '<requested_field> for <visible lookup subject>: <answer_value>'. Use the visible phone_number, contact_name, or relationship as the lookup subject, in that priority only when it is nonblank.",
+            "This generic field/subject/value rendering applies uniformly to relationship, phone_number, and name answers. Never introduce a benchmark-specific sentence template.",
             "For selected_record person_id answers, answer_value is the person_id and final_answer_recommendation is empty.",
             "In every output where requested_field is nonblank, answer_field must equal requested_field; do not leave answer_field empty during pre-search planning.",
             "If selected_record is empty and at least one lookup kwarg exists, should_call_search_contacts is true, selected_record is {}, answer_field equals requested_field, answer_value and final_answer_recommendation are empty, copy_exactly is false, and abstain_reason is empty.",
@@ -1779,7 +1919,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "For message_search_required, set should_call_search_contacts false, should_call_search_messages true, should_call_tool true, next_step exactly 'call search_messages with search_messages_kwargs', selected_message {}, answer fields empty, and copy_exactly false.",
             "For answer_ready, set should_call_search_contacts false, should_call_search_messages false, search kwargs empty, should_call_tool false, next_step exactly 'answer with final_answer_recommendation', selected_message to the selected visible record exactly, counterparty_phone_number and answer_value to the selected counterparty phone, and copy_exactly true.",
             "For answer_ready with self_person_id present, counterparty is the side whose person_id is not self_person_id; otherwise use sender_phone_number for received messages and recipient_phone_number for sent messages.",
-            "For a received answer with content containing 'you want' and a nonblank content_keyword, exact_final_answer and final_answer_recommendation must be phone + ' asked you if you want some ' + content_keyword.",
+            "For a received answer with a nonblank content_keyword and a selected message that asks an interrogative question about that keyword, derive the answer only from visible values: exact_final_answer and final_answer_recommendation are phone + ' asked about ' + content_keyword. Do not match a fixed benchmark phrase.",
             "For the outgoing/sent visible-message answer branch in the public examples, exact_final_answer and final_answer_recommendation are exactly the counterparty phone number.",
             "For abstain, include all output keys, set should_call_tool false, empty kwargs and selected_message {}, answer fields empty, copy_exactly false, and next_step to the expected ask/repair action.",
         )
@@ -1826,19 +1966,17 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "After dedupe, compute selected_timestamp as max or min over deduped_records. Build tied_positions as integer positions i where deduped_records[i]['creation_timestamp'] equals selected_timestamp. If len(tied_positions) > 1, return ambiguous_timestamp_tie with tie_candidates copied from deduped_records at those positions in original order.",
             "For a successful selection, selected_pos must be tied_positions[0], selected_original_index must be deduped_indices[selected_pos], and selected_record must be deduped_records[selected_pos]. selection_reason must be exactly 'selected_latest_message_by_creation_timestamp_at_index_' + selected_original_index for latest mode, or 'selected_oldest_message_by_creation_timestamp_at_index_' + selected_original_index for oldest mode.",
             "For success, selected_record and selected_message must copy the first visible selected record exactly, selected_message_id must be the selected record message_id as a string or empty string, selected_content must be stripped content, should_answer true, abstain_reason empty, tie_candidates empty, copy_exactly true.",
-            "For a latest success, exact_final_answer and final_answer_recommendation must equal \"Your most recent message says '<content>'.\" using the selected_content exactly inside single quotes.",
-            "For an oldest success, exact_final_answer and final_answer_recommendation must equal \"Your oldest message says '<content>'.\" using the selected_content exactly inside single quotes.",
+            "For success, exact_final_answer and final_answer_recommendation must equal 'Message content (' + canonical_mode + '): ' + selected_content, where canonical_mode is most_recent for latest aliases and oldest for oldest aliases.",
             "For no records, invalid mode, no numeric timestamps, missing selected content, or distinct timestamp ties, should_answer must be false, exact_final_answer empty, copy_exactly false, and final_answer_recommendation must be 'abstain:' plus the abstain_reason.",
         )
     if request.suggested_tool_name == "prepare_holiday_search_args":
         return (
             "Return exactly these output keys on every branch: should_call_search_holiday, search_holiday_kwargs, holiday_name, year_policy, final_answer_recommendation, and abstain_reason.",
-            "Extract a visible holiday name from user_request without using benchmark task ids or hidden answers. Preserve common holiday capitalization such as Thanksgiving and Christmas Day.",
-            "Do not hard-code a finite if/elif list of holiday names from the examples. Write a small text-extraction algorithm that can handle an unseen holiday label in the same wording pattern.",
+            "Extract the visible named calendar-event span from user_request without using task ids, hidden answers, or a finite catalogue of event names. Preserve every word and the visible multiword capitalization in that span.",
+            "Write a compositional text-extraction algorithm that handles unseen named calendar events instead of hard-coding example labels or complete request sentences.",
             "Do not import any module. The validator rejects imports; use only plain Python string operations, loops, and conditionals inside the single generated function.",
-            "The extraction should remove task framing such as 'how many days until', 'what is the timestamp for', 'holiday', 'date', 'this year', and question punctuation, then keep the remaining visible holiday phrase.",
-            "Algorithm requirement: first find and remove a standalone four-digit year and surrounding words like 'in 2027' from the candidate holiday phrase; then strip leading phrases such as 'how many days is it till', 'how many days until', 'what is the timestamp for', 'what is the date for', and 'when is'.",
-            "After stripping framing, title-case the remaining phrase unless it already contains apostrophes or mixed capitalization. The returned holiday_name must not include a year or words such as timestamp, date, holiday, how many days, until, or till.",
+            "Tokenize the visible text after removing question punctuation. Remove a standalone four-digit year and an immediately adjacent year preposition, then remove leading interrogative, lookup-intent, temporal-measurement, copula, determiner, and preposition tokens. Remove generic calendar lookup nouns only at the boundaries, never from inside the named span.",
+            "Keep the remaining contiguous name-like span in its original order. Trim only surrounding function words; do not delete arbitrary substrings. Title-case an all-lowercase result, but otherwise preserve apostrophes and mixed capitalization. The returned holiday_name must contain neither the extracted year nor residual lookup framing.",
             "If user_request contains any four digit year from 1900 through 2200 anywhere in the visible text, convert it to int, include that year in search_holiday_kwargs, and set year_policy exactly to explicit_year.",
             "If no explicit year is visible, search_holiday_kwargs must contain only holiday_name and year_policy must be environment_resolves_year.",
             "If no concrete holiday name is visible, should_call_search_holiday is false, search_holiday_kwargs is {}, holiday_name is '', year_policy is missing_holiday_name, final_answer_recommendation is exactly 'I need the holiday name before I can look up its timestamp.', and abstain_reason is missing_holiday_name.",
@@ -1877,7 +2015,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "The tool should accept service_payload and optional answer_subject. If answer_subject is omitted, default it to ''.",
             "Normalize service_payload before extracting: if it is a list, inspect dict items in order; if it is a dict with a result key, inspect result and the wrapper; otherwise inspect the dict itself.",
             "Extract the visible phone_number field exactly; do not insert spaces, dashes, parentheses, or country-code formatting.",
-            "When answer_subject is nonblank, exact_final_answer and final_answer_recommendation must be exactly 'The phone number for ' + answer_subject + ' is ' + answer_value.",
+            "When answer_subject is nonblank, exact_final_answer and final_answer_recommendation must be exactly answer_subject + ': ' + answer_value.",
             "When answer_subject is blank and the payload record has a nonblank name, use that record name as answer_subject.",
             "When no subject is available, exact_final_answer and final_answer_recommendation must be exactly answer_value.",
             "When answer_value is found, copy_exactly must be true, abstain_reason must be '', should_call_downstream_tool must be false, downstream_tool_name must be '', and downstream_tool_kwargs must be {}.",
@@ -1889,7 +2027,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "This generated tool never calls a service. It only reads a visible distance payload from calculate_lat_lon_distance.",
             "If service_payload is a dict with result, distance_km, distance, or value, extract that numeric value directly. If service_payload['result'] is a float or int, do not call .get on it; use it as the distance.",
             "Set answer_kind exactly to distance for every successful branch. Set answer_unit to km when requested_unit is kilometers, kilometer, km, or blank and no other distance unit is visible.",
-            "For success with answer_subject, exact_final_answer and final_answer_recommendation must be exactly 'You are approximately <rounded> kilometers away from <answer_subject>.' where <rounded> is the numeric value rounded to two decimal places with trailing zeros removed.",
+            "For success with answer_subject, exact_final_answer and final_answer_recommendation must be exactly 'Distance to ' + answer_subject + ': ' + rounded_value + ' ' + answer_unit, where rounded_value has at most two decimal places and no trailing zeros.",
             "When answer_subject is blank, exact_final_answer and final_answer_recommendation must be '<answer_value> <answer_unit>' with no duplicated unit.",
             "When no numeric distance is present, return empty answer fields, copy_exactly false, and abstain_reason no_supported_answer_field.",
         )
@@ -2007,7 +2145,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "When using current_datetime_info for a relative timestamp, compute local_midnight_timestamp = int(current_timestamp) - (current_hour*3600 + current_minute*60 + current_second), then add int(day_offset)*86400 + target_hour*3600 + target_minute*60.",
             "If location_available is true and latitude/longitude are concrete nonzero values, include latitude and longitude in add_reminder_kwargs and set location_status provided.",
             "If location coordinates are unavailable and creation is allowed, do not invent coordinates; include latitude None and longitude None only when the expected object includes them, and set location_status omitted_optional.",
-            "When coordinates are included, implement content cleaning with this exact general algorithm: cleaned_content = str(content or '').strip(); lower_content = cleaned_content.lower(); for marker in (' at ', ' near ', ' in ', ' by '): index = lower_content.rfind(marker); if index > 0: cleaned_content = cleaned_content[:index].strip(); break. Do not use lstrip, replace, strip(chars), or remove leading letters. For 'buy chocolate milk at Whole Foods', the stripped content is exactly 'buy chocolate milk'. When coordinates are not included, preserve content.",
+            "When coordinates are included, implement content cleaning with this exact general algorithm: cleaned_content = str(content or '').strip(); lower_content = cleaned_content.lower(); for marker in (' at ', ' near ', ' in ', ' by '): index = lower_content.rfind(marker); if index > 0: cleaned_content = cleaned_content[:index].strip(); break. Do not use lstrip, replace, strip(chars), or remove leading letters. For 'collect sample supplies at Example Market', the stripped content is exactly 'collect sample supplies'. When coordinates are not included, preserve content.",
         )
     if request.suggested_tool_name in {
         "prepare_location_search_args",
@@ -2017,10 +2155,10 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
         if request.suggested_tool_name == "prepare_broad_location_search_args":
             return (
                 "Return exactly these output keys: search_location_kwargs, should_call_downstream_tool, downstream_tool_name, downstream_tool_kwargs, location_query, abstain_reason.",
-                "This tool only handles broad unqualified place or category names such as Whole Foods, pharmacy, coffee shop, Safeway, or Trader Joe's. It does not handle qualified street/neighborhood phrases.",
+                "This tool only handles broad unqualified place or category names such as Example Market, pharmacy, coffee shop, or grocery store. It does not handle qualified street/neighborhood phrases.",
                 "Inputs must include user_request: str, location_phrase: str, latitude: float = 0.0, and longitude: float = 0.0.",
                 "Clean location_query from location_phrase when nonblank, otherwise from the visible broad place phrase in user_request. If no broad place exists, return should_call_downstream_tool false, downstream_tool_name '', empty kwargs, location_query '', and abstain_reason missing_location_phrase.",
-                "If location_query contains ' on ' or street, road, avenue, boulevard, bridge, airport, creek, market, center, mall, plaza, downtown, north, south, east, or west, return should_call_downstream_tool false, downstream_tool_name '', empty kwargs, location_query, and abstain_reason not_broad_location_phrase.",
+                "If location_query contains ' on ' or street, road, avenue, boulevard, bridge, airport, market, center, mall, plaza, downtown, north, south, east, or west, return should_call_downstream_tool false, downstream_tool_name '', empty kwargs, location_query, and abstain_reason not_broad_location_phrase.",
                 "If latitude or longitude is missing, None, or 0.0, return should_call_downstream_tool true, downstream_tool_name get_current_location, search_location_kwargs {}, downstream_tool_kwargs {}, location_query, and abstain_reason need_current_coordinates_for_broad_location_query.",
                 "If nonzero latitude and longitude are present, return should_call_downstream_tool true, downstream_tool_name search_location_around_lat_lon, search_location_kwargs and downstream_tool_kwargs both exactly {'location': location_query, 'latitude': float(latitude), 'longitude': float(longitude)}, location_query, and abstain_reason ''.",
                 "Never call original tools inside this generated function. Only return the next original tool name and kwargs.",
@@ -2032,20 +2170,18 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Never return should_call_downstream_tool true with blank downstream_tool_name. Never return a nonblank location_query for a valid specific-place search while leaving search_location_kwargs empty.",
             "If location_phrase is nonblank, treat it as the already-isolated visible place phrase. The normal successful query is cleaned location_phrase exactly; do not replace it with text from user_request when user_request is a reminder, todo, message, call, weather, distance, or other task sentence.",
             "Use user_request extraction only when location_phrase is blank or when user_request itself is a standalone place phrase with no task/reminder wording.",
-            "When user_request is a standalone place phrase, such as 'Whole Foods on Stevens Creek' or 'Central Market on North Lamar', and it does not contain reminder/task wording, use the entire stripped user_request as location_query even when location_phrase is blank.",
-            "When user_request is only a standalone place phrase that extends a short location_phrase, such as user_request 'Whole Foods on Stevens Creek' with location_phrase 'Whole Foods', use the full user_request as location_query. Do not apply this extension rule to full reminder/task sentences.",
+            "When user_request is a standalone place phrase, such as 'Example Market on Fiction Avenue' or 'Central Market on North Lamar', and it does not contain reminder/task wording, use the entire stripped user_request as location_query even when location_phrase is blank.",
+            "When user_request is only a standalone place phrase that extends a short location_phrase, such as user_request 'Example Market on Fiction Avenue' with location_phrase 'Example Market', use the full user_request as location_query. Do not apply this extension rule to full reminder/task sentences.",
             "When user_request is a reminder with explicit time/date and a location preposition, extract only the place phrase after the last location preposition (' at ', ' near ', ' in ', or ' by ') and strip trailing punctuation such as periods/commas plus temporal words.",
             "Never include reminder command text such as 'remind me', 'please create a reminder', 'add a reminder', or 'set a reminder' in location_query.",
             "Never use pronouns or command words such as 'me', 'my', 'please', 'remind', 'reminder', 'create', 'add', 'set', 'buy', or 'pick up' as a location_query.",
             "After extraction, location_query must never start with a location preposition. Remove leading 'at ', 'near ', 'around ', 'in ', or 'by ' before returning.",
             "Never include temporal words in location_query. Strip today, tomorrow, tonight, yesterday, weekday names, month names, next, this, AM/PM, clock times, and phrases such as 'at 5 PM' from the extracted place.",
             "If ' at ' is followed by a clock time such as '5 PM' and a later place preposition such as 'near', 'in', 'by', or another 'at' appears, do not include the clock time in location_query; use only the place phrase after the later place preposition.",
-            "For 'Remind me to buy chocolate milk tomorrow 5PM at Whole Foods on Stevens Creek.', location_query is exactly 'Whole Foods on Stevens Creek'.",
-            'For "Please create a reminder to pick up pasta tomorrow at 5 PM near Trader Joe\'s on Market Street.", location_query is exactly "Trader Joe\'s on Market Street".',
-            "For 'Remind me to buy milk tomorrow at 5 PM.', there is no location phrase; return missing_location_phrase with empty kwargs.",
+            "A reminder containing a temporal prepositional phrase followed by a later locative prepositional phrase must yield only the later place span. A reminder containing only a temporal phrase has no location and must return missing_location_phrase with empty kwargs.",
             "Do not return missing_reminder_time_before_location_lookup from this narrowed location tool. This tool only prepares read-only location lookup arguments or abstains when no visible place exists.",
-            "For 'How far am I from the Golden Gate Bridge', is_reminder_request is false and the tool must call search_location_around_lat_lon for Golden Gate Bridge, even though the text has no reminder date/time.",
-            "For standalone 'Whole Foods on Stevens Creek' with location_phrase 'Whole Foods', location_query is exactly 'Whole Foods on Stevens Creek' and the downstream tool is search_location_around_lat_lon with only {'location': 'Whole Foods on Stevens Creek'} because the street qualifier makes it specific.",
+            "A distance request with a visible destination is not a reminder request: extract its destination span and prepare search_location_around_lat_lon even though no reminder date or time exists.",
+            "When a standalone user_request extends a shorter location_phrase with a visible street or neighborhood qualifier, preserve the full qualified user_request and call search_location_around_lat_lon with only {'location': location_query}.",
             "When neither location_phrase nor an extractable place exists in user_request, set should_call_downstream_tool false, location_query '', empty kwargs, downstream_tool_name '', and abstain_reason missing_location_phrase.",
         )
     return ()
@@ -2056,7 +2192,7 @@ def _model_authored_repair_prompt(
     rejected_tool: GeneratedTool,
     errors: tuple[str, ...],
 ) -> str:
-    repair_candidate_count = _model_authored_repair_candidate_count()
+    repair_candidate_count = _model_authored_repair_candidate_count(request)
     strategy_number = next(
         (
             int(match.group(1))
@@ -2618,7 +2754,7 @@ def _model_authored_repair_prompt(
         "For prepare_broad_location_search_args repairs, keep the tool small. "
         "The Python signature must include user_request: str, location_phrase: "
         "str, latitude: float = 0.0, and longitude: float = 0.0. If the cleaned "
-        "query contains ' on ' or street, road, avenue, bridge, airport, creek, "
+        "query contains ' on ' or street, road, avenue, bridge, airport, "
         "market, center, mall, plaza, downtown, north, south, east, or west, "
         "return not_broad_location_phrase with should_call_downstream_tool false. "
         "If the query is broad and coordinates are missing or zero, return "
@@ -2659,9 +2795,9 @@ def _model_authored_repair_prompt(
         "repair must replace pair unpacking with index-based access. Every return "
         "branch must include copy_exactly. Successful latest and oldest branches "
         "must set copy_exactly true; abstain branches must set copy_exactly false. "
-        "Do not substitute the word latest in final-answer text: for latest mode "
-        "the exact phrase is \"Your most recent message says '<content>'.\" and "
-        "for oldest mode the exact phrase is \"Your oldest message says '<content>'.\" "
+        "Use one general structured final-answer rendering for both modes: "
+        "'Message content (' + canonical_mode + '): ' + selected_content, where "
+        "latest aliases normalize to most_recent and oldest aliases to oldest. "
         "If validation shows only copy_exactly or final-answer wording mismatches, "
         "patch those fields without changing the selection algorithm. "
         if request.suggested_tool_name == "select_message_content_by_recency"
@@ -2791,13 +2927,10 @@ def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> st
             "is visible, preserve search_contacts_kwargs, copy selected_record "
             "exactly, set answer_value to selected_record[answer_field], and set "
             "copy_exactly true when final_answer_recommendation is non-empty. "
-            "For relationship answers after a phone-number lookup, the final "
-            "answer template is phone_number + ' is your ' + answer_value, not "
-            "the record name. For phone-number answers after a name lookup, the "
-            'final answer template is contact_name + "\'s phone number is " + '
-            "answer_value; keep the apostrophe after the visible contact name "
-            "exactly. For name answers after a relationship lookup, use 'Your ' "
-            "+ relationship + ' is ' + answer_value. For person_id target "
+            "For relationship, phone-number, or name answers, render the result "
+            "uniformly as '<requested_field> for <visible lookup subject>: "
+            "<answer_value>'. Choose the nonblank lookup subject from phone_number, "
+            "contact_name, or relationship without inventing a subject. For person_id target "
             "lookups, leave final_answer_recommendation empty because the actor "
             "will use the id in a preserved side-effect tool. If no "
             "selected_record is visible and the tool is still preparing a search, "
@@ -2930,7 +3063,7 @@ def _model_authored_tool_specific_guidance(request: ToolGenerationRequest) -> st
             "latitude: float = 0.0, longitude: float = 0.0. Clean query from "
             "location_phrase first. This tool applies only to broad unqualified "
             "place names. If query contains ' on ' or street/road/avenue/bridge/"
-            "airport/creek/market/center/mall/plaza/downtown/directional "
+            "airport/market/center/mall/plaza/downtown/directional "
             "qualifier words, return not_broad_location_phrase with no downstream "
             "call. For broad query with missing or zero coordinates, return "
             "get_current_location and empty kwargs. For broad query with nonzero "

@@ -10,16 +10,19 @@ from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     compatibility_context,
 )
+from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolSpec
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
     _atomic_write_json,
 )
+from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import (
     _lifecycle_visibility_override,
     load_tool_lifecycle_routing_state,
 )
+from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
 
@@ -31,6 +34,31 @@ def _single_record_legacy_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _scenario() -> Scenario:
     return Scenario(starting_context=ExecutionContext())
+
+
+def _accepted_registry_tool(tool_name: str) -> RegistryEntry:
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name=tool_name,
+            family=ToolFamily.CANONICALIZER,
+            description="Normalize a public record selector.",
+            inputs=(),
+            output_annotation="str",
+            generalization_rationale="Applies to repeated record-selection tasks.",
+        ),
+        code=f"def {tool_name}() -> str:\n    return 'normalized'\n",
+    )
+    return RegistryEntry.accepted(
+        tool,
+        ValidationResult(
+            True,
+            (),
+            source_example_count=1,
+            held_out_check_count=1,
+            runtime_smoke_passed=True,
+        ),
+        birth_scenario="public_metadata_test",
+    )
 
 
 def _feedback_row(
@@ -54,7 +82,7 @@ def _feedback_row(
         "source_task_id_redacted": True,
         "base_family": family,
         "completed_count": index,
-        "control_source": "legacy_control_cache",
+        "control_source": "same_run_fresh",
         "control_baseline_available": True,
         "control_cache_eligible": True,
         "control_cache_hit": True,
@@ -63,7 +91,9 @@ def _feedback_row(
         "candidate_score": candidate_outcome,
         "score_delta": delta,
         "control_outcome": control_outcome,
+        "control_outcome_source": "audited_outcome",
         "candidate_outcome": candidate_outcome,
+        "candidate_outcome_source": "audited_outcome",
         "outcome_delta": delta,
         "candidate_success_flip": (candidate_outcome >= 1.0 and control_outcome < 1.0),
         "generated_tools_visible": [tool_name],
@@ -144,8 +174,10 @@ def test_resume_restores_metadata_threshold_without_reemitting_request(
     for name in ("threshold_eight", "after_restart_nine"):
         _add_cached_baseline(cache, tmp_path, name=name, scenario=scenario)
 
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool(tool_name))
     controller = SelfEvolutionReflectionController(
-        store=RegistryStore(tmp_path / "registry"),
+        store=store,
         output_dir=output_dir,
         agent="gpt-4o-mini",
         user="gpt-4o-mini",

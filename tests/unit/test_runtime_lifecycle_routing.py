@@ -87,6 +87,25 @@ def test_mixed_tool_is_hidden_only_in_its_harmful_family() -> None:
     )
 
 
+def test_private_exact_scenario_history_cannot_suppress_a_route() -> None:
+    state = {
+        "generated_helper": {
+            "decision": "retain_with_route_repair",
+            "harmful_called_scenarios": ["private_exact_scenario"],
+            "route_repair_families": [],
+        }
+    }
+
+    assert (
+        _lifecycle_visibility_override(
+            tool_name="generated_helper",
+            scenario_name="private_exact_scenario",
+            lifecycle_state=state,
+        )
+        is None
+    )
+
+
 @pytest.mark.parametrize(
     "content",
     (

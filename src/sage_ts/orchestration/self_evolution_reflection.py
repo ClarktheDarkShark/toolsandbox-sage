@@ -24,7 +24,6 @@ from sage_ts.evaluation.control_baseline_cache import (
     ControlBaselineCache,
     compatibility_context,
 )
-from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.scenario import Scenario
@@ -51,6 +50,16 @@ POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_STATUSES = frozenset(
 )
 CROSS_FAMILY_EXECUTION_FAILURE = "cross_family_execution_failure"
 RUN_END_EXECUTION_FAILURE_REASON = "unresolved_generated_tool_execution_failure"
+UNCLASSIFIED_PUBLIC_TASK_CONTEXT = "visible_task_context(family=unclassified)"
+_SHA256_HEX_CHARACTERS = frozenset("0123456789abcdef")
+
+
+def _is_sha256_hex(value: Any) -> bool:
+    return bool(
+        isinstance(value, str)
+        and len(value) == 64
+        and set(value).issubset(_SHA256_HEX_CHARACTERS)
+    )
 
 
 def _optional_float(value: Any) -> float | None:
@@ -144,6 +153,9 @@ class ToolFamilyLifecycleStats:
     contract_failure_count: int = 0
     success_flip_count: int = 0
     public_visible_context_count: int = 0
+    sole_generated_call_count: int = 0
+    attributable_harmful_call_count: int = 0
+    attributable_helpful_call_count: int = 0
     candidate_outcomes: list[float] = field(default_factory=list)
     called_score_deltas: list[float] = field(default_factory=list)
     called_outcome_deltas: list[float] = field(default_factory=list)
@@ -160,6 +172,9 @@ class ToolFamilyLifecycleStats:
             "contract_failure_count": self.contract_failure_count,
             "success_flip_count": self.success_flip_count,
             "public_visible_context_count": self.public_visible_context_count,
+            "sole_generated_call_count": self.sole_generated_call_count,
+            "attributable_harmful_call_count": (self.attributable_harmful_call_count),
+            "attributable_helpful_call_count": (self.attributable_helpful_call_count),
             "candidate_outcome_observation_count": outcome_observation_count,
             "candidate_outcome_mean": _mean(self.candidate_outcomes),
             "candidate_outcome_success_count": outcome_success_count,
@@ -283,6 +298,7 @@ class SelfEvolutionReflectionController:
     min_implementation_repair_contract_failures: int = 1
     min_implementation_repair_execution_failures: int = 3
     min_metadata_repair_visible_count: int = 8
+    min_route_repair_harmful_calls: int = 2
     min_acceptable_called_outcome_mean: float = 0.50
     outcome_success_threshold: float = 1.0
     completed_count: int = 0
@@ -346,6 +362,8 @@ class SelfEvolutionReflectionController:
             )
         if self.min_metadata_repair_visible_count < 1:
             raise ValueError("Metadata-repair visibility threshold must be positive.")
+        if self.min_route_repair_harmful_calls < 1:
+            raise ValueError("Route-repair harm threshold must be positive.")
         if not 0.0 <= self.min_acceptable_called_outcome_mean <= 1.0:
             raise ValueError("Acceptable called-outcome mean must be in [0, 1].")
         if not 0.0 <= self.outcome_success_threshold <= 1.0:
@@ -410,6 +428,7 @@ class SelfEvolutionReflectionController:
         new_version: int,
         request_id: str,
         status: str,
+        implementation_proof: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Record orchestration's disposition and isolate new-version evidence.
 
@@ -426,6 +445,63 @@ class SelfEvolutionReflectionController:
             raise ValueError("Repair acknowledgement requires a request id.")
         if status not in POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_STATUSES:
             raise ValueError(f"Unknown repair acknowledgement status: {status!r}.")
+        request: dict[str, Any] | None = None
+        if self.repair_request_path.exists():
+            matching_requests = [
+                row
+                for row in _read_jsonl_objects_strict(
+                    self.repair_request_path,
+                    label="self-evolution repair request",
+                )
+                if row.get("request_id") == request_id
+            ]
+            if len(matching_requests) > 1:
+                raise ValueError(
+                    "Repair acknowledgement matches duplicate request ids."
+                )
+            if matching_requests:
+                request = matching_requests[0]
+        request_kind = str((request or {}).get("repair_kind") or "")
+        if request_kind == "metadata":
+            if not isinstance(implementation_proof, dict):
+                raise ValueError(
+                    "Metadata repair acknowledgement requires implementation proof."
+                )
+            source_hash = str((request or {}).get("source_code_hash") or "")
+            proof_source_hash = implementation_proof.get("source_code_hash")
+            replacement_hash = implementation_proof.get("replacement_code_hash")
+            replacement_activated = implementation_proof.get("replacement_activated")
+            implementation_preserved = implementation_proof.get(
+                "implementation_preserved"
+            )
+            code_change_discarded = implementation_proof.get(
+                "model_authored_code_change_discarded"
+            )
+            if (
+                implementation_proof.get("proof_schema_version") != 1
+                or implementation_proof.get("repair_kind") != "metadata"
+                or not _is_sha256_hex(source_hash)
+                or proof_source_hash != source_hash
+                or not _is_sha256_hex(proof_source_hash)
+                or not isinstance(replacement_activated, bool)
+                or not isinstance(implementation_preserved, bool)
+                or not isinstance(code_change_discarded, bool)
+                or (replacement_activated and not _is_sha256_hex(replacement_hash))
+                or (not replacement_activated and replacement_hash is not None)
+                or implementation_preserved
+                != (not replacement_activated or replacement_hash == proof_source_hash)
+                or (
+                    status in {"canary_pending", "promoted"}
+                    and not replacement_activated
+                )
+            ):
+                raise ValueError(
+                    "Metadata repair acknowledgement has invalid implementation proof."
+                )
+        elif implementation_proof is not None:
+            raise ValueError(
+                "Implementation proof is permitted only for a metadata repair request."
+            )
         current_stats = self.tool_stats.get(tool_name)
         if status in {"canary_pending", "promoted"} and (
             current_stats is None or current_stats.tool_version != new_version
@@ -447,6 +523,8 @@ class SelfEvolutionReflectionController:
             "future_tasks_only": True,
             "triggering_task_replay_allowed": False,
         }
+        if implementation_proof is not None:
+            event["implementation_proof"] = dict(implementation_proof)
         append_jsonl(self.repair_acknowledgement_path, event)
         self._write_current_state()
         return event
@@ -875,9 +953,24 @@ class SelfEvolutionReflectionController:
         scenario_name = str(row.get("scenario") or "")
         if not scenario_name:
             return
-        task_context_label = str(row.get("task_context_label") or scenario_name)
-        task_family_key = str(
-            row.get("task_family_key") or base_task_family(scenario_name)
+        raw_task_context_label = row.get("task_context_label")
+        raw_task_family_key = row.get("task_family_key")
+        has_public_lifecycle_context = bool(
+            row.get("source_task_id_redacted") is True
+            and isinstance(raw_task_context_label, str)
+            and raw_task_context_label.strip()
+            and isinstance(raw_task_family_key, str)
+            and raw_task_family_key.strip()
+        )
+        task_context_label = (
+            raw_task_context_label.strip()
+            if has_public_lifecycle_context
+            else UNCLASSIFIED_PUBLIC_TASK_CONTEXT
+        )
+        task_family_key = (
+            raw_task_family_key.strip()
+            if has_public_lifecycle_context
+            else "unclassified"
         )
 
         self.completed_count += 1
@@ -974,6 +1067,18 @@ class SelfEvolutionReflectionController:
         if not called:
             bucket["no_called_helper"] += 1
 
+        generated_attempt_set = set(called) | set(attempted) | set(failed)
+        route_attribution_available = bool(
+            row.get("control_source") == "same_run_fresh"
+            and row.get("control_outcome_source") == "audited_outcome"
+            and row.get("candidate_outcome_source") == "audited_outcome"
+            and control_outcome is not None
+            and candidate_outcome is not None
+            and outcome_delta is not None
+            and not row.get("exception_type")
+            and row.get("source_task_id_redacted") is True
+        )
+
         for tool_name in sorted(
             set(visible)
             | set(called)
@@ -1023,6 +1128,12 @@ class SelfEvolutionReflectionController:
                 elif self._is_helpful_call(score_delta, outcome_delta):
                     stats.helpful_called_scenarios.append(task_context_label)
                     stats.helpful_called_families.append(family)
+                if route_attribution_available and generated_attempt_set == {tool_name}:
+                    family_stats.sole_generated_call_count += 1
+                    if self._is_harmful_call(score_delta, outcome_delta):
+                        family_stats.attributable_harmful_call_count += 1
+                    elif self._is_helpful_call(score_delta, outcome_delta):
+                        family_stats.attributable_helpful_call_count += 1
             if tool_name in attempted:
                 stats.attempted_count += 1
             if tool_name in failed:
@@ -1112,8 +1223,20 @@ class SelfEvolutionReflectionController:
             for tool_name in sorted(observed_tool_names)
             if tool_name in registry_entries
         }
-        lifecycle_context = task_context_label or scenario_name
-        family = task_family_key or base_task_family(scenario_name)
+        has_public_lifecycle_context = bool(
+            isinstance(task_context_label, str)
+            and task_context_label.strip()
+            and isinstance(task_family_key, str)
+            and task_family_key.strip()
+        )
+        lifecycle_context = (
+            task_context_label.strip()
+            if has_public_lifecycle_context
+            else UNCLASSIFIED_PUBLIC_TASK_CONTEXT
+        )
+        family = (
+            task_family_key.strip() if has_public_lifecycle_context else "unclassified"
+        )
 
         immediate_actions = self._immediate_lifecycle_actions(
             scenario_name=lifecycle_context,
@@ -1127,7 +1250,7 @@ class SelfEvolutionReflectionController:
             "scenario": scenario_name,
             "task_context_label": lifecycle_context,
             "task_family_key": family,
-            "source_task_id_redacted": bool(task_context_label),
+            "source_task_id_redacted": has_public_lifecycle_context,
             "base_family": family,
             "completed_count": self.completed_count + 1,
             "control_source": control_source,
@@ -1148,6 +1271,7 @@ class SelfEvolutionReflectionController:
             "candidate_outcome_source": candidate_outcome_source,
             "outcome_delta": outcome_delta,
             "candidate_success_flip": candidate_success_flip,
+            "exception_type": result.get("exception_type"),
             "generated_tools_visible": visible,
             "generated_tools_called": called,
             "generated_tools_attempted": attempted,
@@ -1370,13 +1494,38 @@ class SelfEvolutionReflectionController:
         self,
         stats: ToolLifecycleStats,
     ) -> list[str]:
-        """Return families where public metadata repeatedly failed adoption."""
+        """Return families where a never-selected tool failed adoption.
+
+        Metadata replacement and its canary operate on the registry entry as a
+        whole. Do not expose a tool that has already been selected successfully
+        in another family to global replacement or retirement merely because it
+        was not adopted in one additional family.
+        """
+
+        if stats.called_count:
+            return []
 
         return sorted(
             family
             for family, family_stats in stats.family_stats.items()
             if family_stats.visible_count >= self.min_metadata_repair_visible_count
             and family_stats.called_count == 0
+        )
+
+    def _active_route_repair_families(
+        self,
+        stats: ToolLifecycleStats,
+    ) -> list[str]:
+        """Return families with repeated, sole-tool, fresh-control regressions."""
+
+        return sorted(
+            family
+            for family, family_stats in stats.family_stats.items()
+            if family_stats.public_visible_context_count > 0
+            and family_stats.attributable_harmful_call_count
+            >= self.min_route_repair_harmful_calls
+            and family_stats.attributable_harmful_call_count
+            > family_stats.attributable_helpful_call_count
         )
 
     def _emit_post_deployment_repair_requests(
@@ -1456,6 +1605,8 @@ class SelfEvolutionReflectionController:
                             "expected_answer",
                             "target_state",
                             "evaluator_trace",
+                            "outcome_values",
+                            "success_flips",
                         ],
                     },
                 }
@@ -1466,6 +1617,19 @@ class SelfEvolutionReflectionController:
             for family in self._metadata_repair_families(stats):
                 family_stats = stats.family_stats[family]
                 public_family = self._public_family_label(family, family_stats)
+                source_entry = self.store.get(tool_name)
+                if (
+                    source_entry is None
+                    or stats.tool_version is None
+                    or source_entry.version != stats.tool_version
+                    or not source_entry.code_hash_verified
+                    or not _is_sha256_hex(source_entry.stored_code_hash)
+                ):
+                    raise ValueError(
+                        "Metadata repair cannot bind the observed tool version to a "
+                        "verified source implementation."
+                    )
+                source_code_hash = str(source_entry.stored_code_hash)
                 version_label = (
                     str(stats.tool_version)
                     if stats.tool_version is not None
@@ -1487,6 +1651,7 @@ class SelfEvolutionReflectionController:
                     "repair_kind": "metadata",
                     "tool_name": tool_name,
                     "source_tool_version": stats.tool_version,
+                    "source_code_hash": source_code_hash,
                     "target_task_family": public_family,
                     "trigger_reason_codes": ["visible_repeatedly_without_adoption"],
                     "trigger_completed_count": self.completed_count,
@@ -1517,6 +1682,8 @@ class SelfEvolutionReflectionController:
                             "expected_answer",
                             "target_state",
                             "evaluator_trace",
+                            "outcome_values",
+                            "success_flips",
                         ],
                     },
                 }
@@ -1563,6 +1730,7 @@ class SelfEvolutionReflectionController:
                 self._outcome_shortfall_diagnostic_families(stats)
             )
             metadata_repair_families = self._metadata_repair_families(stats)
+            route_repair_families = self._active_route_repair_families(stats)
             row["implementation_repair_families"] = implementation_repair_families
             row["implementation_repair_reason_codes"] = {
                 family: list(reason_codes)
@@ -1575,6 +1743,7 @@ class SelfEvolutionReflectionController:
                 else None
             )
             row["metadata_repair_families"] = metadata_repair_families
+            row["route_repair_families"] = route_repair_families
             if called_outcome is not None:
                 negative_called_subset = called_outcome < -0.05
             else:
@@ -1601,23 +1770,24 @@ class SelfEvolutionReflectionController:
                     reason = "repeated_generated_tool_execution_failure"
                 repair_kind = "implementation"
                 routing_disposition = "quarantine_pending_repair"
-            elif stats.harmful_called_scenarios and stats.helpful_called_scenarios:
-                decision = "retain_with_route_repair"
+            elif route_repair_families:
+                has_attributable_helpful_route = any(
+                    family_stats.attributable_helpful_call_count > 0
+                    for family, family_stats in stats.family_stats.items()
+                    if family not in route_repair_families
+                )
+                decision = (
+                    "retain_with_route_repair"
+                    if has_attributable_helpful_route
+                    else "needs_route_repair"
+                )
                 repair_kind = "routing"
-                if stats.side_effect_incident_count:
-                    reason = (
-                        "mixed_called_subset_family_specific_repair_with_safety_audit"
-                    )
-                else:
-                    reason = "mixed_called_subset_family_specific_repair"
+                reason = "repeated_sole_tool_family_regression"
+                routing_disposition = "family_suppression_active"
             elif stats.side_effect_incident_count:
                 decision = "retain_with_safety_audit"
                 reason = "positive_called_subset_with_side_effect_audit"
                 repair_kind = "safety"
-            elif stats.harmful_called_scenarios:
-                decision = "needs_route_repair"
-                reason = "harmful_called_subset_without_global_retirement"
-                repair_kind = "routing"
             elif outcome_shortfall_alarm_families:
                 decision = "diagnostic_alarm"
                 reason = "low_task_outcome_not_tool_attributable"
@@ -1627,13 +1797,6 @@ class SelfEvolutionReflectionController:
             ):
                 decision = "retain"
                 reason = "positive_called_subset"
-            elif stats.called_count >= 2 and (
-                (called_outcome is not None and called_outcome < 0)
-                and (called_score is None or called_score < 0)
-            ):
-                decision = "needs_repair"
-                reason = "negative_called_subset"
-                repair_kind = "routing"
             elif metadata_repair_families:
                 decision = "adoption_repair"
                 reason = "visible_not_called_repeatedly"

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Iterator, cast
 
 from scripts.research.chapter4_evidence import (
+    ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE,
     EVIDENCE_DATA_NAME,
     EVIDENCE_HTML_NAME,
     load_run_evidence,
@@ -33,6 +34,9 @@ from scripts.research.chapter4_evidence import (
 )
 from scripts.research.chapter4_evidence import (
     RESEARCHER_SAMPLE_WAIVER_STATUS as RESEARCHER_SAMPLE_WAIVER_STATUS,
+)
+from scripts.research.chapter4_evidence import (
+    SAMPLE_AS_REP01_ACCOUNTING_MODE as SAMPLE_AS_REP01_ACCOUNTING_MODE,
 )
 
 try:
@@ -78,6 +82,14 @@ MAX_CONCURRENCY = 10
 EXPECTED_REPLICATIONS = 10
 EXPECTED_TASKS_PER_RUN = 1032
 EXPECTED_PAPER_COMPARABLE_TASKS_PER_RUN = 800
+BOUND_SAMPLE_REPLICATION = 1
+ADDITIONAL_ONLINE_REPLICATIONS = tuple(range(2, EXPECTED_REPLICATIONS + 1))
+ADAPTIVE_SELECTION_NOTICE = (
+    "Adaptive, selection-conditioned distribution: online rep01 is the release "
+    "sample selected after it passed the strict technical-readiness gate. Aggregate "
+    "all ten runs descriptively; do not present this distribution as preregistered "
+    "confirmatory inference."
+)
 DEFAULT_CAMPAIGN_SCOPE = "online-only"
 CAMPAIGN_SCOPES = (DEFAULT_CAMPAIGN_SCOPE, "online-and-frozen")
 PUBLICATION_MODEL = "gpt-4o-mini"
@@ -113,7 +125,7 @@ GENERATION_SETTINGS_FILES = (
     Path("src/sage_ts/generation/tool_generator.py"),
     Path("src/sage_ts/orchestration/online_birth.py"),
     Path("src/sage_ts/orchestration/self_evolution_reflection.py"),
-    Path("docs/sage_protocol/publication_validation_thresholds_v3.json"),
+    Path("docs/sage_protocol/publication_validation_thresholds_v4.json"),
 )
 SAMPLE_RELEASE_IDENTITY_FIELDS = (
     "git_commit",
@@ -237,17 +249,64 @@ def _planned_arms(campaign_scope: str) -> tuple[str, ...]:
     raise ValueError(f"Unsupported campaign scope: {campaign_scope!r}")
 
 
+def _sample_as_rep01_enabled(manifest: dict[str, Any]) -> bool:
+    accounting = manifest.get("replication_accounting")
+    return (
+        isinstance(accounting, dict)
+        and accounting.get("mode") == SAMPLE_AS_REP01_ACCOUNTING_MODE
+    )
+
+
+def _expected_wave_jobs(
+    manifest: dict[str, Any],
+    wave: int,
+) -> list[tuple[int, str]]:
+    if wave == 1:
+        replications = (
+            ADDITIONAL_ONLINE_REPLICATIONS
+            if _sample_as_rep01_enabled(manifest)
+            else tuple(range(1, EXPECTED_REPLICATIONS + 1))
+        )
+        return [(replication, "online") for replication in replications]
+    if wave == 2:
+        return [
+            (replication, "frozen")
+            for replication in range(1, EXPECTED_REPLICATIONS + 1)
+        ]
+    raise ValueError("Wave must be 1 or 2.")
+
+
 def _expected_execution_waves(
     maximum_parallel: int,
     campaign_scope: str = DEFAULT_CAMPAIGN_SCOPE,
+    *,
+    sample_as_rep01: bool = False,
 ) -> list[dict[str, Any]]:
+    online_replications = (
+        list(ADDITIONAL_ONLINE_REPLICATIONS)
+        if sample_as_rep01
+        else list(range(1, EXPECTED_REPLICATIONS + 1))
+    )
     waves = [
         {
             "wave": 1,
             "description": (
-                "Ten new online-build replications, each with a same-run fresh control."
+                "Nine new online-build replications (rep02-rep10), each with a "
+                "same-run fresh control; the immutable passing release sample is "
+                "bound as online rep01."
+                if sample_as_rep01
+                else "Ten new online-build replications, each with a same-run fresh "
+                "control."
             ),
             "maximum_parallel": maximum_parallel,
+            **(
+                {
+                    "job_count": len(online_replications),
+                    "replications_launched": online_replications,
+                }
+                if sample_as_rep01
+                else {}
+            ),
         },
     ]
     if campaign_scope == "online-and-frozen":
@@ -255,8 +314,11 @@ def _expected_execution_waves(
             {
                 "wave": 2,
                 "description": (
-                    "Ten paired frozen-reuse replications using registries produced "
-                    "by wave 1."
+                    "Ten paired frozen-reuse replications using the imported rep01 "
+                    "registry and the nine registries produced by wave 1."
+                    if sample_as_rep01
+                    else "Ten paired frozen-reuse replications using registries "
+                    "produced by wave 1."
                 ),
                 "maximum_parallel": maximum_parallel,
             }
@@ -278,14 +340,21 @@ def _parallel_wave_record_errors(
         return [f"wave {wave} lacks parallel execution evidence"]
 
     errors: list[str] = []
+    expected_jobs = _expected_wave_jobs(manifest, wave)
+    expected_replications = sorted(replication for replication, _ in expected_jobs)
+    expected_job_count = len(expected_jobs)
     if not _exact_value(record.get("wave"), wave):
         errors.append(f"wave {wave} parallel execution evidence has the wrong wave")
-    if not _exact_value(record.get("job_count"), EXPECTED_REPLICATIONS):
-        errors.append(f"wave {wave} did not execute exactly 10 jobs")
+    if not _exact_value(record.get("job_count"), expected_job_count):
+        errors.append(
+            f"wave {wave} did not execute exactly {expected_job_count} planned jobs"
+        )
 
     jobs = record.get("jobs")
-    if not isinstance(jobs, list) or len(jobs) != EXPECTED_REPLICATIONS:
-        errors.append(f"wave {wave} lacks exactly 10 child-process intervals")
+    if not isinstance(jobs, list) or len(jobs) != expected_job_count:
+        errors.append(
+            f"wave {wave} lacks exactly {expected_job_count} child-process intervals"
+        )
         jobs = []
 
     expected_arm = "online" if wave == 1 else "frozen" if wave == 2 else None
@@ -393,31 +462,35 @@ def _parallel_wave_record_errors(
                             f"entry field {field}"
                         )
 
-    if jobs and sorted(replications) != list(range(1, EXPECTED_REPLICATIONS + 1)):
-        errors.append(f"wave {wave} child intervals are not replications 1 through 10")
+    if jobs and sorted(replications) != expected_replications:
+        errors.append(
+            f"wave {wave} child intervals do not match planned replications "
+            f"{expected_replications}"
+        )
     distinct_process_ids = (
-        len(process_ids) == EXPECTED_REPLICATIONS
-        and len(set(process_ids)) == EXPECTED_REPLICATIONS
+        len(process_ids) == expected_job_count
+        and len(set(process_ids)) == expected_job_count
     )
     distinct_ports = (
-        len(ports) == EXPECTED_REPLICATIONS and len(set(ports)) == EXPECTED_REPLICATIONS
+        len(ports) == expected_job_count and len(set(ports)) == expected_job_count
     )
     if record.get("distinct_process_ids") is not distinct_process_ids:
         errors.append(f"wave {wave} PID-distinctness attestation is inconsistent")
     if not distinct_process_ids:
-        errors.append(f"wave {wave} did not use 10 distinct child processes")
+        errors.append(
+            f"wave {wave} did not use {expected_job_count} distinct child processes"
+        )
     if record.get("distinct_ports") is not distinct_ports:
         errors.append(f"wave {wave} port-distinctness attestation is inconsistent")
     if not distinct_ports:
-        errors.append(f"wave {wave} did not use 10 distinct dashboard ports")
+        errors.append(
+            f"wave {wave} did not use {expected_job_count} distinct dashboard ports"
+        )
 
     global_overlap_ns: int | None = None
     latest_start: int | None = None
     earliest_completion: int | None = None
-    if (
-        len(starts) == EXPECTED_REPLICATIONS
-        and len(completions) == EXPECTED_REPLICATIONS
-    ):
+    if len(starts) == expected_job_count and len(completions) == expected_job_count:
         latest_start = max(starts)
         earliest_completion = min(completions)
         global_overlap_ns = earliest_completion - latest_start
@@ -500,6 +573,111 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _resolve_within_repo(repo_root: Path, raw: Any, label: str) -> Path:
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(f"{label} is missing.")
+    path = Path(raw)
+    resolved = (path if path.is_absolute() else repo_root / path).resolve()
+    try:
+        resolved.relative_to(repo_root.resolve())
+    except ValueError as exc:
+        raise ValueError(f"{label} escapes the repository root.") from exc
+    return resolved
+
+
+def _directory_tree_identity(root: Path, label: str) -> dict[str, Any]:
+    """Content-address every immutable file under one imported artifact root."""
+
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError(f"{label} is not a real directory: {root}")
+    digest = hashlib.sha256()
+    file_count = 0
+    for path in sorted(
+        root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()
+    ):
+        if path.is_symlink():
+            raise ValueError(f"{label} contains a symlink: {path}")
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
+        file_count += 1
+    return {
+        "file_count": file_count,
+        "tree_sha256": digest.hexdigest(),
+    }
+
+
+def _sample_artifact_binding(
+    repo_root: Path,
+    sample_validation: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind the passing report, exact run tree, and evolved registry tree."""
+
+    if sample_validation.get("status") != "pass":
+        raise ValueError("Sample-as-rep01 requires a passing release sample report.")
+    report_path = _resolve_within_repo(
+        repo_root,
+        sample_validation.get("path"),
+        "sample validation report path",
+    )
+    report_sha256 = sample_validation.get("sha256")
+    if not report_path.is_file() or _sha256(report_path) != report_sha256:
+        raise ValueError("Sample validation report bytes changed before binding.")
+    run_root = _resolve_within_repo(
+        repo_root,
+        sample_validation.get("run_root"),
+        "sample run root",
+    )
+    protocol_path = run_root / "protocol_manifest.json"
+    if not protocol_path.is_file():
+        raise ValueError("Sample run lacks protocol_manifest.json.")
+    protocol = _load_manifest(protocol_path)
+    registry_dir = _resolve_within_repo(
+        repo_root,
+        protocol.get("registry_dir"),
+        "sample registry_dir",
+    )
+    if not (registry_dir / "registry_manifest.json").is_file():
+        raise ValueError("Sample run registry lacks registry_manifest.json.")
+    run_identity = _directory_tree_identity(run_root, "sample run artifact tree")
+    registry_identity = _directory_tree_identity(
+        registry_dir,
+        "sample registry artifact tree",
+    )
+    return {
+        "sample_report_path": _relative(repo_root, report_path),
+        "sample_report_sha256": report_sha256,
+        "sample_run_root": _relative(repo_root, run_root),
+        "sample_run_artifact_file_count": run_identity["file_count"],
+        "sample_run_artifact_tree_sha256": run_identity["tree_sha256"],
+        "sample_registry_dir": _relative(repo_root, registry_dir),
+        "sample_registry_artifact_file_count": registry_identity["file_count"],
+        "sample_registry_artifact_tree_sha256": registry_identity["tree_sha256"],
+    }
+
+
+def _adaptive_replication_accounting(
+    artifact_binding: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "mode": SAMPLE_AS_REP01_ACCOUNTING_MODE,
+        "analysis_role": ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE,
+        "preregistered_inference_eligible": False,
+        "selection_conditioned": True,
+        "selection_conditioning_notice": ADAPTIVE_SELECTION_NOTICE,
+        "aggregate_online_replications": EXPECTED_REPLICATIONS,
+        "bound_release_sample_replication": BOUND_SAMPLE_REPLICATION,
+        "new_online_replications_launched": list(ADDITIONAL_ONLINE_REPLICATIONS),
+        "sample_artifact_binding": copy.deepcopy(artifact_binding),
+    }
 
 
 def _digest_paths(repo_root: Path, paths: tuple[Path, ...]) -> str:
@@ -840,6 +1018,7 @@ def _force_replacement_errors(
     output_root: Path,
 ) -> list[str]:
     errors: list[str] = []
+    sample_as_rep01 = _sample_as_rep01_enabled(existing)
     try:
         planned_arms = _planned_arms(str(existing.get("campaign_scope")))
     except ValueError:
@@ -875,6 +1054,30 @@ def _force_replacement_errors(
                 errors.append(
                     f"existing replication {expected_replication} lacks {arm}"
                 )
+                continue
+            if sample_as_rep01 and expected_replication == 1 and arm == "online":
+                if (
+                    entry.get("source") != "bound_passing_release_sample"
+                    or entry.get("execution_status") != "completed"
+                    or not _exact_value(entry.get("return_code"), 0)
+                    or entry.get("verification_status") != "pass"
+                ):
+                    errors.append(
+                        "existing replication 1 imported sample is not intact"
+                    )
+                for field in (
+                    "process_pid",
+                    "process_started_monotonic_ns",
+                    "process_completed_monotonic_ns",
+                    "process_return_code",
+                    "dashboard_port",
+                    "log_path",
+                ):
+                    if field in entry:
+                        errors.append(
+                            "existing replication 1 imported sample falsely claims "
+                            f"launch field {field}"
+                        )
                 continue
             if entry.get("execution_status") != "queued":
                 errors.append(
@@ -912,6 +1115,7 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
     repo_root = args.repo_root.resolve()
     campaign_scope = getattr(args, "scope", DEFAULT_CAMPAIGN_SCOPE)
     planned_arms = _planned_arms(campaign_scope)
+    sample_as_rep01 = bool(getattr(args, "sample_as_rep01", False))
     try:
         configuration_identity = _require_clean_git(repo_root)
         sample_validation = _sample_validation_declaration(
@@ -922,6 +1126,16 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
                 getattr(args, "researcher_waived_sample_validation", False)
             ),
             waiver_reason=getattr(args, "sample_validation_waiver_reason", None),
+        )
+        if sample_as_rep01 and sample_validation.get("status") != "pass":
+            raise ValueError(
+                "--sample-as-rep01 requires --sample-validation-report; a waived "
+                "sample cannot become a replication."
+            )
+        sample_binding = (
+            _sample_artifact_binding(repo_root, sample_validation)
+            if sample_as_rep01
+            else None
         )
     except (ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
@@ -991,22 +1205,42 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
     artifact_root.mkdir(parents=True, exist_ok=True)
     output_root.mkdir(parents=True, exist_ok=True)
 
+    prepared_at = _now()
     run_pairs: list[dict[str, Any]] = []
     for replicate in range(1, args.expected_online_runs + 1):
         rep_label = f"rep{replicate:02d}"
         online_output = output_root / "online" / rep_label / "native_action"
         online_artifacts = artifact_root / "online" / rep_label
-        online = {
-            "source": "campaign_online_build_fresh_control",
-            "publication_gate_purpose": (PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION),
-            "run_root": "",
-            "search_root": _relative(repo_root, online_output),
-            "registry_dir": _relative(
-                repo_root,
-                online_artifacts / "native_action_registry",
-            ),
-            "execution_status": "queued",
-        }
+        if sample_as_rep01 and replicate == BOUND_SAMPLE_REPLICATION:
+            if sample_binding is None:  # pragma: no cover - guarded above.
+                raise AssertionError("sample-as-rep01 binding is missing")
+            online = {
+                "source": "bound_passing_release_sample",
+                "publication_gate_purpose": PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+                "run_root": sample_binding["sample_run_root"],
+                "search_root": sample_binding["sample_run_root"],
+                "registry_dir": sample_binding["sample_registry_dir"],
+                "execution_status": "completed",
+                "return_code": 0,
+                "verification_status": "pass",
+                "completed_at": prepared_at,
+                "imported_at": prepared_at,
+                "sample_artifact_binding": copy.deepcopy(sample_binding),
+            }
+        else:
+            online = {
+                "source": "campaign_online_build_fresh_control",
+                "publication_gate_purpose": (
+                    PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+                ),
+                "run_root": "",
+                "search_root": _relative(repo_root, online_output),
+                "registry_dir": _relative(
+                    repo_root,
+                    online_artifacts / "native_action_registry",
+                ),
+                "execution_status": "queued",
+            }
 
         pair = {
             "replication": replicate,
@@ -1034,8 +1268,8 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
     manifest = {
         "schema_version": 2,
         "campaign_id": campaign_id,
-        "created_at": _now(),
-        "updated_at": _now(),
+        "created_at": prepared_at,
+        "updated_at": prepared_at,
         "status": "prepared",
         "campaign_scope": campaign_scope,
         "model": PUBLICATION_MODEL,
@@ -1059,10 +1293,20 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
         ),
         "expected_tasks_per_run": scenario_count,
         "sample_validation": sample_validation,
+        **(
+            {
+                "replication_accounting": _adaptive_replication_accounting(
+                    cast(dict[str, Any], sample_binding)
+                )
+            }
+            if sample_as_rep01
+            else {}
+        ),
         "maximum_parallel_runs": args.max_parallel,
         "execution_waves": _expected_execution_waves(
             args.max_parallel,
             campaign_scope,
+            sample_as_rep01=sample_as_rep01,
         ),
         "statistical_plan": _expected_statistical_plan(),
         "claim_safeguards": _expected_claim_safeguards(),
@@ -1082,14 +1326,38 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
                 "at": _now(),
                 "event": "campaign_prepared",
                 "detail": (
-                    f"{args.expected_online_runs} new online runs and "
+                    (
+                        "Passing release sample bound immutably as online rep01; "
+                        "9 new online runs (rep02-rep10)"
+                        if sample_as_rep01
+                        else f"{args.expected_online_runs} new online runs"
+                    )
+                    + " and "
                     f"{args.expected_online_runs if 'frozen' in planned_arms else 0} "
                     "frozen runs "
-                    "queued; all controls must execute live and uncached."
+                    "queued; every newly executed control must run live and uncached."
                 ),
             }
         ],
     }
+    if sample_as_rep01:
+        imported_entry = run_pairs[BOUND_SAMPLE_REPLICATION - 1]["online"]
+        try:
+            verified_import = _verify_publication_entry(
+                repo_root,
+                manifest,
+                imported_entry,
+                "online",
+            )
+        except ValueError as exc:
+            raise SystemExit(f"Cannot bind release sample as rep01: {exc}") from exc
+        imported_entry["run_root"] = _relative(
+            repo_root,
+            Path(str(verified_import["run_root"])),
+        )
+        imported_entry["endpoint_measurements"] = verified_import[
+            "endpoint_measurements"
+        ]
     _atomic_json(manifest_path, manifest)
     write_evidence_dashboard(
         repo_root=repo_root,
@@ -1153,6 +1421,23 @@ def _campaign_prerequisite_errors(
         errors.append("baseline_cache_policy must prohibit baseline-cache use")
     if manifest.get("failure_recovery_policy") != CAMPAIGN_FAILURE_RECOVERY_POLICY:
         errors.append("failure_recovery_policy must prohibit partial-run reuse")
+    replication_accounting = manifest.get("replication_accounting")
+    sample_as_rep01 = _sample_as_rep01_enabled(manifest)
+    if replication_accounting is not None:
+        if not sample_as_rep01:
+            errors.append("replication_accounting mode is unsupported")
+        else:
+            artifact_binding = replication_accounting.get("sample_artifact_binding")
+            if not isinstance(artifact_binding, dict):
+                errors.append("replication_accounting sample binding is missing")
+            else:
+                errors.extend(
+                    _exact_mapping_errors(
+                        "replication accounting",
+                        replication_accounting,
+                        _adaptive_replication_accounting(artifact_binding),
+                    )
+                )
 
     campaign_id = manifest.get("campaign_id")
     expected_artifact_root: Path | None = None
@@ -1237,7 +1522,13 @@ def _campaign_prerequisite_errors(
             errors.append(
                 f"replication {pair.get('replication')} has an undeclared frozen arm"
             )
-        if online.get("source") != "campaign_online_build_fresh_control":
+        imported_sample = sample_as_rep01 and expected_replication == 1
+        expected_online_source = (
+            "bound_passing_release_sample"
+            if imported_sample
+            else "campaign_online_build_fresh_control"
+        )
+        if online.get("source") != expected_online_source:
             errors.append(
                 f"replication {pair.get('replication')} online source is invalid"
             )
@@ -1251,14 +1542,26 @@ def _campaign_prerequisite_errors(
         if expected_artifact_root is None or expected_output_root is None:
             continue
         rep_label = f"rep{expected_replication:02d}"
-        expected_online_search_root = _relative(
-            repo_root,
-            expected_output_root / "online" / rep_label / "native_action",
-        )
-        expected_online_registry = _relative(
-            repo_root,
-            expected_artifact_root / "online" / rep_label / "native_action_registry",
-        )
+        if imported_sample and isinstance(replication_accounting, dict):
+            sample_binding = replication_accounting.get("sample_artifact_binding")
+            if isinstance(sample_binding, dict):
+                expected_online_search_root = sample_binding.get("sample_run_root")
+                expected_online_registry = sample_binding.get("sample_registry_dir")
+            else:
+                expected_online_search_root = None
+                expected_online_registry = None
+        else:
+            expected_online_search_root = _relative(
+                repo_root,
+                expected_output_root / "online" / rep_label / "native_action",
+            )
+            expected_online_registry = _relative(
+                repo_root,
+                expected_artifact_root
+                / "online"
+                / rep_label
+                / "native_action_registry",
+            )
         expected_frozen_search_root = _relative(
             repo_root,
             expected_output_root / "frozen" / rep_label / "frozen_registry",
@@ -1290,13 +1593,15 @@ def _campaign_prerequisite_errors(
             expected_search_root,
             expected_registry,
         ) in expected_arm_paths:
-            if (
-                entry.get("publication_gate_purpose")
-                != PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
-            ):
+            expected_gate_purpose = (
+                PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+                if imported_sample and arm_name == "online"
+                else PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+            )
+            if entry.get("publication_gate_purpose") != expected_gate_purpose:
                 errors.append(
                     f"replication {expected_replication} {arm_name} gate purpose "
-                    "is not campaign-inclusion"
+                    f"is not {expected_gate_purpose}"
                 )
             if entry.get("search_root") != expected_search_root:
                 errors.append(
@@ -1317,7 +1622,67 @@ def _campaign_prerequisite_errors(
                 )
             except ValueError as exc:
                 errors.append(f"replication {expected_replication} {arm_name}: {exc}")
-            if campaign_status == "prepared":
+            if imported_sample and arm_name == "online":
+                for field in (
+                    "process_pid",
+                    "process_started_monotonic_ns",
+                    "process_completed_monotonic_ns",
+                    "process_return_code",
+                    "dashboard_port",
+                    "log_path",
+                ):
+                    if field in entry:
+                        errors.append(
+                            "replication 1 imported sample falsely claims launch "
+                            f"field {field}"
+                        )
+            if (
+                campaign_status == "prepared"
+                and imported_sample
+                and arm_name == "online"
+            ):
+                if entry.get("execution_status") != "completed":
+                    errors.append("replication 1 imported sample is not completed")
+                if not _exact_value(entry.get("return_code"), 0):
+                    errors.append("replication 1 imported sample did not succeed")
+                if entry.get("verification_status") != "pass":
+                    errors.append("replication 1 imported sample is not verified")
+                if not isinstance(entry.get("imported_at"), str) or not entry.get(
+                    "imported_at"
+                ):
+                    errors.append("replication 1 imported sample lacks imported_at")
+                if entry.get("sample_artifact_binding") != (
+                    replication_accounting or {}
+                ).get("sample_artifact_binding"):
+                    errors.append("replication 1 sample artifact binding changed")
+                endpoint_measurements = entry.get("endpoint_measurements")
+                if (
+                    not isinstance(endpoint_measurements, dict)
+                    or endpoint_measurements.get("status") != "pass"
+                ):
+                    errors.append(
+                        "replication 1 imported sample lacks passing dual-endpoint "
+                        "measurements"
+                    )
+                else:
+                    try:
+                        verified_import = _verify_publication_entry(
+                            repo_root,
+                            manifest,
+                            entry,
+                            "online",
+                        )
+                    except ValueError as exc:
+                        errors.append(f"replication 1 imported sample: {exc}")
+                    else:
+                        if endpoint_measurements != verified_import.get(
+                            "endpoint_measurements"
+                        ):
+                            errors.append(
+                                "replication 1 imported sample endpoint measurements "
+                                "changed"
+                            )
+            elif campaign_status == "prepared":
                 if entry.get("execution_status") != "queued":
                     errors.append(
                         f"replication {expected_replication} {arm_name} must be queued"
@@ -1422,7 +1787,11 @@ def _campaign_prerequisite_errors(
         errors.append("maximum_parallel_runs must be between 1 and 10")
     elif planned_arms and not _exact_value(
         manifest.get("execution_waves"),
-        _expected_execution_waves(maximum_parallel, str(campaign_scope)),
+        _expected_execution_waves(
+            maximum_parallel,
+            str(campaign_scope),
+            sample_as_rep01=sample_as_rep01,
+        ),
     ):
         errors.append(
             "execution_waves must exactly match the declared campaign parallelism"
@@ -1512,6 +1881,8 @@ def _campaign_prerequisite_errors(
             except ValueError as exc:
                 errors.append(f"publication sample verification failed: {exc}")
     elif sample.get("status") == RESEARCHER_SAMPLE_WAIVER_STATUS:
+        if sample_as_rep01:
+            errors.append("sample-as-rep01 cannot use a sample-validation waiver")
         if sample.get("authorization") != RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION:
             errors.append("publication sample waiver authorization is invalid")
         if sample.get("required_gate") != PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE:
@@ -1551,6 +1922,30 @@ def _campaign_prerequisite_errors(
         errors.append(
             "publication sample validation is neither passing nor explicitly waived"
         )
+
+    if sample_as_rep01:
+        stored_binding = (
+            replication_accounting.get("sample_artifact_binding")
+            if isinstance(replication_accounting, dict)
+            else None
+        )
+        if not isinstance(sample, dict) or sample.get("status") != "pass":
+            errors.append("sample-as-rep01 requires a passing release sample")
+        elif not isinstance(stored_binding, dict):
+            errors.append("sample-as-rep01 artifact binding is missing")
+        else:
+            try:
+                observed_binding = _sample_artifact_binding(repo_root, sample)
+            except ValueError as exc:
+                errors.append(f"sample-as-rep01 artifact verification failed: {exc}")
+            else:
+                errors.extend(
+                    _exact_mapping_errors(
+                        "sample-as-rep01 artifact binding",
+                        stored_binding,
+                        observed_binding,
+                    )
+                )
 
     identity = manifest.get("configuration_identity")
     if not isinstance(identity, dict):
@@ -1646,6 +2041,22 @@ def _verify_publication_entry(
 ) -> dict[str, Any]:
     search_root, declared_run_root = _entry_roots(repo_root, entry, arm)
     verification_root = declared_run_root or search_root
+    gate_purpose = entry.get("publication_gate_purpose")
+    if gate_purpose is None:
+        gate_purpose = PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
+    if gate_purpose not in {
+        PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    }:
+        raise ValueError(f"{arm} entry declares an unsupported publication gate.")
+    if (
+        gate_purpose == PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE
+        and entry.get("source") != "bound_passing_release_sample"
+    ):
+        raise ValueError(
+            "Only the explicitly bound passing release sample may use the "
+            "release-sample gate in a campaign."
+        )
     result = verify_run(
         verification_root,
         expected_tasks=int(manifest["expected_tasks_per_run"]),
@@ -1653,7 +2064,7 @@ def _verify_publication_entry(
         expected_fixture_sha256=PINNED_EXTERNAL_FIXTURE_SHA256,
         expected_benchmark_sha256=PINNED_BENCHMARK_SHA256,
         expected_scenario_order_sha256=PINNED_SCENARIO_ORDER_SHA256,
-        gate_purpose=PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+        gate_purpose=gate_purpose,
     )
     if not isinstance(result, dict):
         raise ValueError(f"{arm} publication verifier returned a non-object result.")
@@ -1864,6 +2275,11 @@ def _job_command(
     ):
         env.pop(stale_name, None)
     if arm == "online":
+        if pair.get("online", {}).get("source") == "bound_passing_release_sample":
+            raise ValueError(
+                "The immutable release sample is already bound as rep01 and must "
+                "never be launched again."
+            )
         env["SAGE_OUTPUT_ROOT"] = str(output_root / "online" / rep_label)
         env["SAGE_ARTIFACT_ROOT"] = str(artifact_root / "online" / rep_label)
         mode = "native-only"
@@ -2180,6 +2596,7 @@ def _parallel_wave_execution_record(
     wave: int,
     jobs: list[tuple[int, str]],
     results: list[dict[str, Any]],
+    expected_jobs: list[tuple[int, str]] | None = None,
 ) -> dict[str, Any]:
     def strict_int(record: dict[str, Any], key: str) -> int | None:
         value = record.get(key)
@@ -2187,6 +2604,17 @@ def _parallel_wave_execution_record(
             return None
         return value
 
+    planned_jobs = (
+        expected_jobs
+        if expected_jobs is not None
+        else [
+            (
+                replication,
+                "online" if wave == 1 else "frozen",
+            )
+            for replication in range(1, EXPECTED_REPLICATIONS + 1)
+        ]
+    )
     interval_records = sorted(
         [
             {
@@ -2255,9 +2683,9 @@ def _parallel_wave_execution_record(
         and isinstance(result.get("arm"), str)
     )
     verified = (
-        len(jobs) == EXPECTED_REPLICATIONS
-        and len(results) == EXPECTED_REPLICATIONS
-        and observed_jobs == sorted(jobs)
+        jobs == planned_jobs
+        and len(results) == len(planned_jobs)
+        and observed_jobs == sorted(planned_jobs)
         and all(_exact_value(result.get("return_code"), 0) for result in results)
         and distinct_process_ids
         and distinct_ports
@@ -2504,6 +2932,7 @@ def _run_wave(
         wave=wave,
         jobs=jobs,
         results=recorded_results,
+        expected_jobs=_expected_wave_jobs(manifest, wave),
     )
     manifest.setdefault("parallel_wave_execution", {})[str(wave)] = parallel_execution
     manifest.setdefault("execution_events", []).append(
@@ -2519,8 +2948,9 @@ def _run_wave(
     )
     if parallel_execution["verified"] is not True and not failures:
         attestation_error = (
-            "parallel wave execution attestation failed: all 10 successful child "
-            "processes must have distinct PIDs and ports with positive global overlap"
+            "parallel wave execution attestation failed: every planned successful "
+            "child process must have a distinct PID and port with positive global "
+            "overlap"
         )
         for result in recorded_results:
             result["return_code"] = 96
@@ -2577,6 +3007,18 @@ def _wave_jobs(
     if wave == 1:
         for pair in pairs:
             replicate = int(pair["replication"])
+            if _sample_as_rep01_enabled(manifest) and replicate == 1:
+                if not _entry_is_valid(
+                    repo_root,
+                    manifest,
+                    pair["online"],
+                    "online",
+                ):
+                    raise ValueError(
+                        "Bound release sample rep01 is no longer valid; it must never "
+                        "be replaced or rerun inside this campaign."
+                    )
+                continue
             if not _entry_is_valid(
                 repo_root,
                 manifest,
@@ -2814,6 +3256,16 @@ def verify_campaign(args: argparse.Namespace) -> None:
             entry = pair.get(arm) or {}
             complete = _entry_complete(repo_root, entry)
             if status == "prepared":
+                if (
+                    _sample_as_rep01_enabled(manifest)
+                    and pair.get("replication") == BOUND_SAMPLE_REPLICATION
+                    and arm == "online"
+                ):
+                    if not _entry_is_valid(repo_root, manifest, entry, arm):
+                        errors.append(
+                            "replication 1 imported release sample is not valid"
+                        )
+                    continue
                 if entry.get("execution_status") != "queued":
                     errors.append(
                         f"replication {pair.get('replication')} {arm} is not queued"
@@ -2916,6 +3368,15 @@ def main() -> None:
         help=(
             "Record an explicit researcher-authorized waiver of the preliminary "
             "one-run sample gate; campaign-replication integrity gates remain strict."
+        ),
+    )
+    prepare.add_argument(
+        "--sample-as-rep01",
+        action="store_true",
+        help=(
+            "Opt in to bind the immutable passing release sample as online rep01, "
+            "launch only rep02-rep10, aggregate all ten, and classify the result "
+            "as adaptive selection-conditioned descriptive evidence."
         ),
     )
     prepare.add_argument(

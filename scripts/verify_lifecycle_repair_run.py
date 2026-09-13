@@ -12,11 +12,13 @@ import argparse
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
 
 try:
     from scripts import verify_publication_run as _strict_run_verifier
@@ -24,6 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution from scripts/
     import verify_publication_run as _strict_run_verifier
 
 LIFECYCLE_USE_CASE_TOOL = "prepare_safe_action_or_abstain"
+TRANSFER_MANIFEST_TYPE = "development_diagnostic_lifecycle_repair_transfer_dev30"
 LIFECYCLE_FAULT_FIXTURE_SHA256 = (
     "285604ee15dcb3b066816267ef1730bb40dffab7a9880160ddd885b2894a5630"
 )
@@ -170,6 +173,53 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    TRANSFER_MANIFEST_TYPE: {
+        "order": DEV30_ORDER,
+        "order_sha256": "4ab88c1b5c110b0681eb64763f8ca7870fba8b23271a980edf02d40a8424c39f",
+        "roles": {
+            "safe_abstain_confirmation": DEV30_ORDER[:26],
+            "contact_repair_confirmation": DEV30_ORDER[:9],
+            "preservation": DEV30_ORDER[26:],
+        },
+        "safe_role": "safe_abstain_confirmation",
+        "contact_role": "contact_repair_confirmation",
+        "safe_visible_called_minimum": 26,
+        "safe_exact_minimum": 21,
+        "contact_exact_no_remove_minimum": 8,
+        "preservation_exact_hidden_minimum": 4,
+        "overall_exact_minimum": 25,
+        "future_v2_success_flip_minimum": 1,
+        "predeclared_gates": {
+            "exact_promoted_registry_transfer": {"required": True},
+            "registry_unchanged_after_transfer": {"required": True},
+            "safe_abstain_visible_and_called": {
+                "role": "safe_abstain_confirmation",
+                "minimum": 26,
+                "total": 26,
+            },
+            "contact_exact_without_forbidden_remove": {
+                "role": "contact_repair_confirmation",
+                "minimum": 8,
+                "total": 9,
+            },
+            "insufficiency_exact": {
+                "role": "safe_abstain_confirmation",
+                "minimum": 21,
+                "total": 26,
+            },
+            "fresh_control_success_flips": {
+                "role": "safe_abstain_confirmation",
+                "minimum": 1,
+                "total": 26,
+            },
+            "preservation_exact_hidden_and_nonregressing": {
+                "role": "preservation",
+                "minimum": 4,
+                "total": 4,
+            },
+            "overall_exact_outcomes": {"minimum": 25, "total": 30},
+        },
+    },
 }
 
 
@@ -230,9 +280,11 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _manifest_task_names(manifest: dict[str, Any]) -> tuple[str, ...]:
+def _manifest_task_names(
+    manifest: dict[str, Any], split: str = "full_benchmark"
+) -> tuple[str, ...]:
     splits = manifest.get("splits")
-    rows = splits.get("full_benchmark") if isinstance(splits, dict) else None
+    rows = splits.get(split) if isinstance(splits, dict) else None
     if not isinstance(rows, list):
         return ()
     names: list[str] = []
@@ -309,7 +361,15 @@ def _verify_execution_artifacts(
     *,
     expected_tasks: int,
     expected_evaluator: dict[str, Any],
-) -> tuple[Path, Path, dict[str, Any]]:
+    expected_mode: str = "online_build_full",
+    allow_candidate_generation_usage: bool = True,
+) -> tuple[
+    Path,
+    Path,
+    dict[str, Any],
+    dict[str, dict[str, dict[str, tuple[str, ...]]]],
+    str | None,
+]:
     """Apply the publication verifier's execution-integrity schema to dev runs."""
 
     parallel_execution = _strict_run_verifier._verify_parallel_arm_execution(
@@ -363,13 +423,13 @@ def _verify_execution_artifacts(
             "dashboard opened externally before either model process."
         )
 
-    control_rows, _control_order, control_totals = _strict_run_verifier._uncached_rows(
+    control_rows, control_order, control_totals = _strict_run_verifier._uncached_rows(
         control_dir,
         expected_tasks=expected_tasks,
         arm="control",
         expected_outcome_evaluator=expected_evaluator,
     )
-    candidate_rows, _candidate_order, candidate_totals = (
+    candidate_rows, candidate_order, candidate_totals = (
         _strict_run_verifier._uncached_rows(
             candidate_dir,
             expected_tasks=expected_tasks,
@@ -382,7 +442,7 @@ def _verify_execution_artifacts(
         rows=control_rows,
         row_totals=control_totals,
         arm="control",
-        expected_event_arm="online_build_full_control",
+        expected_event_arm=f"{expected_mode}_control",
         allow_generation_source=False,
     )
     _strict_run_verifier._verify_llm_usage_artifacts(
@@ -390,10 +450,177 @@ def _verify_execution_artifacts(
         rows=candidate_rows,
         row_totals=candidate_totals,
         arm="candidate",
-        expected_event_arm="online_build_full_candidate",
-        allow_generation_source=True,
+        expected_event_arm=f"{expected_mode}_candidate",
+        allow_generation_source=allow_candidate_generation_usage,
     )
-    return control_dir, candidate_dir, parallel_execution
+    registry_dir = _strict_run_verifier._resolve_declared_path(
+        run_root,
+        protocol.get("registry_dir"),
+        "registry_dir",
+    )
+    registry = _load_json(registry_dir / "registry_manifest.json")
+    registry_tools = registry.get("tools") if isinstance(registry, dict) else None
+    if not isinstance(registry_tools, dict) or any(
+        not isinstance(tool_name, str) or not tool_name for tool_name in registry_tools
+    ):
+        raise ValueError("Development registry has an invalid tool mapping.")
+    trajectory_evidence: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {}
+    trajectory_error: str | None = None
+    try:
+        trajectory_evidence = {
+            "control": _strict_run_verifier._verify_trajectory_artifacts(
+                control_dir,
+                rows=control_rows,
+                order=control_order,
+                arm="control",
+                generated_tool_names=set(registry_tools),
+            ),
+            "candidate": _strict_run_verifier._verify_trajectory_artifacts(
+                candidate_dir,
+                rows=candidate_rows,
+                order=candidate_order,
+                arm="candidate",
+                generated_tool_names=set(registry_tools),
+            ),
+        }
+        if any(
+            any(values for values in task_evidence.values())
+            for task_evidence in trajectory_evidence["control"].values()
+        ):
+            raise ValueError(
+                "Development control trajectories expose or execute a generated "
+                "registry tool."
+            )
+    except (KeyError, TypeError, ValueError) as exc:
+        trajectory_error = str(exc)
+    return (
+        control_dir,
+        candidate_dir,
+        parallel_execution,
+        trajectory_evidence,
+        trajectory_error,
+    )
+
+
+def _trajectory_selection_mismatches(
+    selection_by_name: dict[str, dict[str, Any]],
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+) -> list[str]:
+    """Return tasks whose adapter selection record disagrees with raw execution."""
+
+    mismatches: list[str] = []
+    fields = (
+        "generated_tools_visible",
+        "generated_tools_called",
+        "generated_tools_attempted",
+        "generated_tools_failed",
+    )
+    if set(selection_by_name) != set(trajectory_evidence):
+        return ["task_coverage"]
+    for scenario_name, raw in trajectory_evidence.items():
+        selection = selection_by_name[scenario_name]
+        for field in fields:
+            values = selection.get(field)
+            if (
+                not isinstance(values, list)
+                or any(not isinstance(item, str) or not item for item in values)
+                or len(values) != len(set(values))
+                or set(values) != set(raw[field])
+            ):
+                mismatches.append(f"{scenario_name}:{field}")
+    return mismatches
+
+
+def _safe_checkpoint_name(scenario_name: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", scenario_name).strip("_")
+    return slug[:120] or "scenario"
+
+
+def _verify_registry_checkpoint_versions(
+    *,
+    candidate_dir: Path,
+    registry_dir: Path,
+    scenario_order: tuple[str, ...],
+    selection_by_name: dict[str, dict[str, Any]],
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+) -> tuple[int, list[str]]:
+    """Bind call-time generated-tool versions to after-task registry snapshots."""
+
+    checkpoint_root = candidate_dir / "registry_checkpoints"
+    if not checkpoint_root.is_dir() or checkpoint_root.is_symlink():
+        return 0, ["checkpoint_root"]
+    mismatches: list[str] = []
+    bound_tools = 0
+    expected_registry_dir = str(registry_dir.resolve())
+    for completed_count, scenario_name in enumerate(scenario_order, start=1):
+        checkpoint_dir = checkpoint_root / (
+            f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario_name)}"
+        )
+        metadata_path = checkpoint_dir / "checkpoint.json"
+        manifest_path = checkpoint_dir / "registry_manifest.json"
+        if (
+            not checkpoint_dir.is_dir()
+            or checkpoint_dir.is_symlink()
+            or not metadata_path.is_file()
+            or metadata_path.is_symlink()
+            or not manifest_path.is_file()
+            or manifest_path.is_symlink()
+        ):
+            mismatches.append(f"{scenario_name}:missing_checkpoint")
+            continue
+        try:
+            metadata = _load_json(metadata_path)
+            manifest = _load_json(manifest_path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            mismatches.append(f"{scenario_name}:invalid_checkpoint")
+            continue
+        copied_files = metadata.get("copied_files")
+        if (
+            metadata.get("scenario") != scenario_name
+            or metadata.get("completed_count") != completed_count
+            or str(Path(str(metadata.get("registry_dir") or "")).resolve())
+            != expected_registry_dir
+            or not isinstance(copied_files, list)
+            or "registry_manifest.json" not in copied_files
+        ):
+            mismatches.append(f"{scenario_name}:checkpoint_metadata")
+            continue
+        tools = manifest.get("tools") if isinstance(manifest, dict) else None
+        raw = trajectory_evidence.get(scenario_name)
+        selection = selection_by_name.get(scenario_name)
+        if (
+            not isinstance(tools, dict)
+            or not isinstance(raw, dict)
+            or not isinstance(selection, dict)
+        ):
+            mismatches.append(f"{scenario_name}:checkpoint_coverage")
+            continue
+        observed_tools = set().union(*(set(values) for values in raw.values()))
+        versions = selection.get("generated_tool_versions")
+        if not isinstance(versions, dict) or set(versions) != observed_tools:
+            mismatches.append(f"{scenario_name}:version_coverage")
+            continue
+        for tool_name in sorted(observed_tools):
+            version = versions.get(tool_name)
+            entry = tools.get(tool_name)
+            tool = entry.get("tool") if isinstance(entry, dict) else None
+            code = tool.get("code") if isinstance(tool, dict) else None
+            code_hash = entry.get("code_hash") if isinstance(entry, dict) else None
+            if (
+                isinstance(version, bool)
+                or not isinstance(version, int)
+                or version < 1
+                or not isinstance(entry, dict)
+                or entry.get("version") != version
+                or not isinstance(code, str)
+                or not isinstance(code_hash, str)
+                or re.fullmatch(r"[0-9a-f]{64}", code_hash) is None
+                or hashlib.sha256(code.encode("utf-8")).hexdigest() != code_hash
+            ):
+                mismatches.append(f"{scenario_name}:{tool_name}:version_or_hash")
+                continue
+            bound_tools += 1
+    return bound_tools, mismatches
 
 
 def _lifecycle_integrity(
@@ -529,6 +756,499 @@ def _lifecycle_integrity(
     }
 
 
+def _registry_inventory(registry_dir: Path) -> list[dict[str, Any]]:
+    inventory: list[dict[str, Any]] = []
+    for path in sorted(registry_dir.rglob("*")):
+        relative_path = path.relative_to(registry_dir).as_posix()
+        if path.is_symlink():
+            inventory.append(
+                {
+                    "path": relative_path,
+                    "kind": "symlink",
+                    "target": path.readlink().as_posix(),
+                }
+            )
+        elif path.is_dir():
+            inventory.append({"path": relative_path, "kind": "directory"})
+        elif path.is_file():
+            inventory.append(
+                {
+                    "path": relative_path,
+                    "kind": "file",
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                }
+            )
+        else:
+            inventory.append({"path": relative_path, "kind": "other"})
+    return inventory
+
+
+def _inventory_sha256(inventory: list[dict[str, Any]]) -> str:
+    return hashlib.sha256(
+        json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _target_tool_identity(registry_dir: Path) -> dict[str, Any] | None:
+    manifest_path = registry_dir / "registry_manifest.json"
+    if not manifest_path.is_file():
+        return None
+    manifest = _load_json(manifest_path)
+    tools = manifest.get("tools") if isinstance(manifest, dict) else None
+    entry = tools.get(LIFECYCLE_USE_CASE_TOOL) if isinstance(tools, dict) else None
+    tool = entry.get("tool") if isinstance(entry, dict) else None
+    spec = tool.get("spec") if isinstance(tool, dict) else None
+    code = tool.get("code") if isinstance(tool, dict) else None
+    stored_hash = entry.get("code_hash") if isinstance(entry, dict) else None
+    if (
+        not isinstance(entry, dict)
+        or entry.get("retired") is not False
+        or not isinstance(entry.get("version"), int)
+        or isinstance(entry.get("version"), bool)
+        or int(entry["version"]) < 2
+        or not isinstance(spec, dict)
+        or not isinstance(code, str)
+        or not isinstance(stored_hash, str)
+        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_hash
+    ):
+        return None
+    return {
+        "tool_name": LIFECYCLE_USE_CASE_TOOL,
+        "version": entry["version"],
+        "retired": False,
+        "code_hash": stored_hash,
+        "public_spec_sha256": hashlib.sha256(
+            json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
+def _write_report(run_root: Path, report: dict[str, Any]) -> dict[str, Any]:
+    (run_root / "lifecycle_repair_validation_report.json").write_text(
+        json.dumps(report, indent=2) + "\n", encoding="utf-8"
+    )
+    return report
+
+
+def _verify_frozen_transfer(
+    *,
+    run_root: Path,
+    protocol: dict[str, Any],
+    comparison: dict[str, Any],
+    cache_report: dict[str, Any],
+    benchmark_manifest_path: Path,
+    benchmark_manifest: dict[str, Any],
+    expected_tasks: int,
+) -> dict[str, Any]:
+    """Verify the exact promoted dev10 registry on the disjoint dev30 cohort."""
+
+    spec = COHORT_SPECS[TRANSFER_MANIFEST_TYPE]
+    expected_order = tuple(spec["order"])
+    roles = spec["roles"]
+    safe_names = tuple(roles[str(spec["safe_role"])])
+    contact_names = tuple(roles[str(spec["contact_role"])])
+    preservation_names = tuple(roles["preservation"])
+    reasons: list[str] = []
+
+    manifest_order = _manifest_task_names(benchmark_manifest, "transfer_30")
+    benchmark_sha256 = hashlib.sha256(benchmark_manifest_path.read_bytes()).hexdigest()
+    if expected_tasks != 30 or protocol.get("scenario_count") != 30:
+        reasons.append("transfer_task_count_mismatch")
+    if manifest_order != expected_order or len(set(manifest_order)) != 30:
+        reasons.append("transfer_scenario_order_mismatch")
+    if benchmark_manifest.get("scenario_order_sha256") != spec["order_sha256"]:
+        reasons.append("transfer_manifest_order_pin_mismatch")
+    if protocol.get("scenario_order_sha256") != spec["order_sha256"]:
+        reasons.append("transfer_protocol_order_pin_mismatch")
+    if protocol.get("benchmark_manifest_sha256") != benchmark_sha256:
+        reasons.append("transfer_benchmark_bytes_do_not_match_protocol")
+    if protocol.get("manifest_type") != TRANSFER_MANIFEST_TYPE:
+        reasons.append("transfer_protocol_manifest_type_mismatch")
+    if (
+        benchmark_manifest.get("lifecycle_evidence_mode")
+        != "frozen_promoted_registry_transfer"
+    ):
+        reasons.append("transfer_lifecycle_evidence_mode_mismatch")
+    if benchmark_manifest.get("predeclared_gates") != spec["predeclared_gates"]:
+        reasons.append("transfer_predeclared_gate_contract_mismatch")
+    observed_roles = benchmark_manifest.get("validation_roles")
+    if not isinstance(observed_roles, dict) or set(observed_roles) != set(roles):
+        reasons.append("transfer_validation_role_set_mismatch")
+    else:
+        for role, expected_names in roles.items():
+            if _role_names(benchmark_manifest, role) != tuple(expected_names):
+                reasons.append(f"transfer_{role}_membership_mismatch")
+
+    required_protocol = {
+        "mode": "transfer_30",
+        "publication_gate_purpose": "development-diagnostic",
+        "generation_enabled": False,
+        "candidate_generated_tools_enabled": False,
+        "lifecycle_mutation_enabled": False,
+        "sage_policy": "none",
+        "actor_selection_mode": "policy",
+        "control_condition": "matched_policy_wrapper_without_generated_tools",
+        "control_agent_runtime": "sage_wrapped",
+        "candidate_agent_runtime": "sage_wrapped",
+        "fresh_control_required": True,
+        "parallel_arms": True,
+        "control_cache_mode": "off",
+        "control_source": "fresh",
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 30,
+        "openai_response_cache_enabled": False,
+        "openai_response_cache_mode": "off",
+        "sage_task_cache_enabled": False,
+        "cross_run_failure_memory_enabled": False,
+    }
+    for field, expected in required_protocol.items():
+        if protocol.get(field) != expected:
+            reasons.append(f"transfer_protocol_{field}_mismatch")
+    required_cache = {
+        "mode": "off",
+        "control_source": "fresh",
+        "cached_control_tasks": 0,
+        "fresh_control_tasks": 30,
+        "cache_accessed": False,
+        "fresh_control_enforced": True,
+    }
+    if any(
+        cache_report.get(field) != expected
+        for field, expected in required_cache.items()
+    ):
+        reasons.append("transfer_control_cache_not_fully_fresh")
+    cache = comparison.get("control_cache")
+    if not isinstance(cache, dict) or any(
+        cache.get(field) != expected
+        for field, expected in {
+            "mode": "off",
+            "cache_accessed": False,
+            "cached_control_tasks": 0,
+            "fresh_control_tasks": 30,
+        }.items()
+    ):
+        reasons.append("transfer_comparison_control_not_fully_fresh")
+    if comparison.get("runtime_exception_count") != 0:
+        reasons.append("transfer_runtime_exceptions_present")
+    if comparison.get("candidate_stopped_early") is not False:
+        reasons.append("transfer_candidate_stopped_early")
+
+    evaluator = outcome_evaluator_manifest()
+    (
+        control_dir,
+        candidate_dir,
+        parallel_execution,
+        trajectory_evidence,
+        trajectory_error,
+    ) = _verify_execution_artifacts(
+        run_root,
+        protocol,
+        expected_tasks=30,
+        expected_evaluator=evaluator,
+        expected_mode="transfer_30",
+        allow_candidate_generation_usage=False,
+    )
+    if trajectory_error is not None:
+        reasons.append("transfer_trajectory_integrity_failed")
+    matched_runtimes = _strict_run_verifier._verify_matched_policy_runtimes(
+        control_dir, candidate_dir
+    )
+    _strict_run_verifier._verify_no_scenario_transform_failures(candidate_dir)
+    control_rows = _result_rows(control_dir)
+    candidate_rows = _result_rows(candidate_dir)
+    control_by_name = {str(row.get("name") or ""): row for row in control_rows}
+    candidate_by_name = {str(row.get("name") or ""): row for row in candidate_rows}
+    if (
+        tuple(control_by_name) != expected_order
+        or tuple(candidate_by_name) != expected_order
+    ):
+        reasons.append("transfer_result_task_order_mismatch")
+    if len(control_by_name) != 30 or len(candidate_by_name) != 30:
+        reasons.append("transfer_result_task_coverage_mismatch")
+
+    provenance = protocol.get("registry_transfer_provenance")
+    source_report: dict[str, Any] = {}
+    source_inventory: list[dict[str, Any]] = []
+    source_order: tuple[str, ...] = ()
+    source_run_root: Path | None = None
+    source_registry_dir: Path | None = None
+    if not isinstance(provenance, dict):
+        reasons.append("transfer_registry_provenance_missing")
+        provenance = {}
+    try:
+        source_run_root = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            provenance.get("source_run_root"),
+            "registry_transfer_provenance.source_run_root",
+        )
+        if source_run_root == run_root.resolve():
+            reasons.append("transfer_source_is_destination")
+        source_report = verify(source_run_root, 10)
+        if (
+            source_report.get("status") != "pass"
+            or source_report.get("manifest_type")
+            != "development_diagnostic_lifecycle_repair_dev10"
+        ):
+            reasons.append("transfer_source_dev10_not_passing")
+        source_protocol_path = source_run_root / "protocol_manifest.json"
+        source_report_path = source_run_root / "lifecycle_repair_validation_report.json"
+        source_protocol = _load_json(source_protocol_path)
+        source_manifest_path = _strict_run_verifier._resolve_declared_path(
+            source_run_root,
+            source_protocol.get("benchmark_manifest_path"),
+            "source benchmark_manifest_path",
+        )
+        source_order = _manifest_task_names(_load_json(source_manifest_path))
+        source_registry_dir = _strict_run_verifier._resolve_declared_path(
+            source_run_root,
+            source_protocol.get("registry_dir"),
+            "source registry_dir",
+        )
+        source_inventory = _registry_inventory(source_registry_dir)
+        source_inventory_hash = _inventory_sha256(source_inventory)
+        source_identity = _target_tool_identity(source_registry_dir)
+        if any(
+            item.get("kind") not in {"directory", "file"} for item in source_inventory
+        ):
+            reasons.append("transfer_source_registry_contains_nonregular_object")
+        expected_provenance = {
+            "mode": "frozen_promoted_registry_transfer",
+            "source_run_root": str(source_run_root),
+            "source_protocol_path": str(source_protocol_path),
+            "source_protocol_sha256": hashlib.sha256(
+                source_protocol_path.read_bytes()
+            ).hexdigest(),
+            "source_validation_report_path": str(source_report_path),
+            "source_validation_report_sha256": hashlib.sha256(
+                source_report_path.read_bytes()
+            ).hexdigest(),
+            "source_registry_dir": str(source_registry_dir),
+            "source_registry_inventory_count": len(source_inventory),
+            "source_registry_inventory_sha256": source_inventory_hash,
+            "installed_registry_dir": str(
+                _strict_run_verifier._resolve_declared_path(
+                    run_root, protocol.get("registry_dir"), "registry_dir"
+                )
+            ),
+            "installed_registry_inventory_sha256": source_inventory_hash,
+            "target_tool": source_identity,
+        }
+        if provenance != expected_provenance:
+            reasons.append("transfer_registry_provenance_mismatch")
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        reasons.append("transfer_source_dev10_unverifiable")
+
+    if set(source_order) & set(expected_order):
+        reasons.append("transfer_source_and_confirmation_cohorts_overlap")
+    if source_order != DEV10_ORDER:
+        reasons.append("transfer_source_is_not_pinned_dev10_cohort")
+
+    registry_dir = _strict_run_verifier._resolve_declared_path(
+        run_root, protocol.get("registry_dir"), "registry_dir"
+    )
+    snapshot = protocol.get("registry_gate_snapshot")
+    snapshot_artifact = run_root / "registry_gate" / "registry_gate_snapshot.json"
+    if not isinstance(snapshot, dict) or not snapshot_artifact.is_file():
+        reasons.append("transfer_initial_registry_snapshot_missing")
+        initial_inventory: list[dict[str, Any]] = []
+    else:
+        if _load_json(snapshot_artifact) != snapshot:
+            reasons.append("transfer_initial_registry_snapshot_artifact_mismatch")
+        initial_inventory = snapshot.get("registry_inventory_before_run")
+        if not isinstance(initial_inventory, list):
+            initial_inventory = []
+            reasons.append("transfer_initial_registry_inventory_invalid")
+        if (
+            snapshot.get("manifest_existed_before_run") is not True
+            or snapshot.get("registry_directory_existed_before_run") is not True
+            or snapshot.get("registry_inventory_count_before_run")
+            != len(initial_inventory)
+            or snapshot.get("registry_inventory_sha256")
+            != _inventory_sha256(initial_inventory)
+        ):
+            reasons.append("transfer_initial_registry_snapshot_invalid")
+    if initial_inventory != source_inventory:
+        reasons.append("transfer_installed_registry_not_byte_identical_to_source")
+    final_inventory = _registry_inventory(registry_dir)
+    if final_inventory != initial_inventory:
+        reasons.append("transfer_registry_mutated_during_confirmation")
+    target_identity = _target_tool_identity(registry_dir)
+    if target_identity is None or target_identity != provenance.get("target_tool"):
+        reasons.append("transfer_target_tool_identity_mismatch")
+    registry_manifest_path = registry_dir / "registry_manifest.json"
+    if (
+        not registry_manifest_path.is_file()
+        or protocol.get("registry_manifest_digest_after_run")
+        != hashlib.sha256(registry_manifest_path.read_bytes()).hexdigest()
+    ):
+        reasons.append("transfer_final_registry_digest_mismatch")
+
+    forbidden_jsonl = (
+        "capability_observations.jsonl",
+        "tool_birth_events.jsonl",
+        "self_evolution_reflections.jsonl",
+        "self_evolution_task_feedback.jsonl",
+        "self_evolution_tool_lifecycle.jsonl",
+        "self_evolution_tool_repair_requests.jsonl",
+        "self_evolution_tool_repair_acknowledgements.jsonl",
+    )
+    if any(_read_jsonl(candidate_dir / name) for name in forbidden_jsonl):
+        reasons.append("transfer_lifecycle_activity_present")
+    if any(
+        (candidate_dir / name).exists()
+        for name in (
+            "post_deployment_repair_state.json",
+            "self_evolution_reflection_state.json",
+            "tool_generation_status.json",
+        )
+    ):
+        reasons.append("transfer_lifecycle_state_present")
+    run_events = _read_jsonl(candidate_dir / "sage_run_events.jsonl")
+    registry_loads = [row for row in run_events if row.get("event") == "registry_load"]
+    finishes = [row for row in run_events if row.get("event") == "run_finished"]
+    if (
+        len(registry_loads) != 1
+        or registry_loads[0].get("generation_enabled") is not False
+        or len(finishes) != 1
+        or finishes[0].get("lifecycle_finalization_count") != 0
+    ):
+        reasons.append("transfer_generation_off_runtime_evidence_missing")
+    if any(
+        any(
+            token in str(row.get("event") or "")
+            for token in ("birth", "repair", "inadequacy")
+        )
+        for row in run_events
+    ):
+        reasons.append("transfer_forbidden_lifecycle_event_present")
+
+    selection_rows = _read_jsonl(candidate_dir / "scenario_tool_selection.jsonl")
+    selection_by_name, selection_order = _rows_by_scenario(selection_rows)
+    if selection_order != expected_order or len(selection_by_name) != 30:
+        reasons.append("transfer_tool_selection_order_or_coverage_mismatch")
+    if trajectory_error is None and _trajectory_selection_mismatches(
+        selection_by_name,
+        trajectory_evidence["candidate"],
+    ):
+        reasons.append("transfer_tool_selection_trajectory_mismatch")
+    checkpoint_version_binding_count = 0
+    if trajectory_error is None:
+        (
+            checkpoint_version_binding_count,
+            checkpoint_version_mismatches,
+        ) = _verify_registry_checkpoint_versions(
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            scenario_order=expected_order,
+            selection_by_name=selection_by_name,
+            trajectory_evidence=trajectory_evidence["candidate"],
+        )
+        if checkpoint_version_mismatches:
+            reasons.append("transfer_registry_checkpoint_version_mismatch")
+    target_version = (
+        target_identity.get("version") if isinstance(target_identity, dict) else None
+    )
+    visible_called_names = [
+        name
+        for name in safe_names
+        if name in selection_by_name
+        and _selection_has_tool(
+            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        )
+        and _selection_has_tool(
+            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        )
+        and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
+        and selection_by_name[name]["generated_tool_versions"].get(
+            LIFECYCLE_USE_CASE_TOOL
+        )
+        == target_version
+    ]
+    if len(visible_called_names) != 26:
+        reasons.append("transfer_helper_not_visible_called_at_exact_version_26_of_26")
+    exact_safe_names = [
+        name
+        for name in safe_names
+        if name in candidate_by_name
+        and _exact_targeted_abstention(candidate_by_name[name])
+    ]
+    if len(exact_safe_names) < 21:
+        reasons.append("transfer_safe_exact_outcome_gate_failed")
+    contact_exact_names = [
+        name
+        for name in contact_names
+        if name in candidate_by_name
+        and _exact_targeted_abstention(candidate_by_name[name])
+        and not _forbidden_remove_contact(candidate_by_name[name])
+    ]
+    if len(contact_exact_names) < 8:
+        reasons.append("transfer_contact_exact_without_remove_gate_failed")
+    success_flip_names = [
+        name
+        for name in safe_names
+        if name in candidate_by_name
+        and name in control_by_name
+        and _exact_targeted_abstention(candidate_by_name[name])
+        and not _exact_outcome(control_by_name[name])
+    ]
+    if not success_flip_names:
+        reasons.append("transfer_fresh_control_success_flip_missing")
+    preservation_pass_names = [
+        name
+        for name in preservation_names
+        if name in candidate_by_name
+        and name in control_by_name
+        and _exact_outcome(candidate_by_name[name])
+        and (_outcome(candidate_by_name[name]) or 0.0)
+        >= (_outcome(control_by_name[name]) or 0.0)
+        and name in selection_by_name
+        and not _selection_has_tool(
+            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        )
+        and not _selection_has_tool(
+            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        )
+    ]
+    if len(preservation_pass_names) != 4:
+        reasons.append("transfer_preservation_exact_hidden_nonregression_gate_failed")
+    overall_exact = sum(_exact_outcome(row) for row in candidate_rows)
+    if overall_exact < 25:
+        reasons.append("transfer_overall_exact_outcome_gate_failed")
+
+    report = {
+        "status": "pass" if not reasons else "fail",
+        "run_root": str(run_root),
+        "development_only": True,
+        "publication_eligible": False,
+        "manifest_type": TRANSFER_MANIFEST_TYPE,
+        "lifecycle_evidence_mode": "frozen_promoted_registry_transfer",
+        "expected_tasks": 30,
+        "source_dev10_run_root": str(source_run_root) if source_run_root else None,
+        "source_dev10_status": source_report.get("status"),
+        "source_and_confirmation_cohorts_disjoint": not bool(
+            set(source_order) & set(expected_order)
+        ),
+        "registry_inventory_sha256": _inventory_sha256(final_inventory),
+        "registry_unchanged": final_inventory == initial_inventory,
+        "target_tool": target_identity,
+        "parallel_arm_execution": parallel_execution,
+        "matched_policy_runtimes": matched_runtimes,
+        "trajectory_audit_count": {
+            arm: len(evidence) for arm, evidence in trajectory_evidence.items()
+        },
+        "registry_checkpoint_version_binding_count": (checkpoint_version_binding_count),
+        "safe_abstain_visible_and_called_count": len(visible_called_names),
+        "safe_abstain_exact_outcome_count": len(exact_safe_names),
+        "contact_exact_without_forbidden_remove_count": len(contact_exact_names),
+        "fresh_control_success_flip_count": len(success_flip_names),
+        "preservation_exact_hidden_nonregression_count": len(preservation_pass_names),
+        "overall_exact_success_count": overall_exact,
+        "runtime_exception_count": comparison.get("runtime_exception_count"),
+        "reasons": sorted(set(reasons)),
+    }
+    return _write_report(run_root, report)
+
+
 def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
     run_root = _latest_run_root(search_root)
     protocol = _load_json(run_root / "protocol_manifest.json")
@@ -547,6 +1267,16 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         )
     benchmark_manifest = _load_json(benchmark_manifest_path)
     manifest_type = str(benchmark_manifest.get("manifest_type") or "")
+    if manifest_type == TRANSFER_MANIFEST_TYPE:
+        return _verify_frozen_transfer(
+            run_root=run_root,
+            protocol=protocol,
+            comparison=comparison,
+            cache_report=cache_report,
+            benchmark_manifest_path=benchmark_manifest_path,
+            benchmark_manifest=benchmark_manifest,
+            expected_tasks=expected_tasks,
+        )
     spec = COHORT_SPECS.get(manifest_type)
     if spec is None:
         raise ValueError(f"Unknown lifecycle development cohort: {manifest_type!r}")
@@ -643,12 +1373,20 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         reasons.append("control_was_not_fully_fresh")
 
     expected_evaluator = outcome_evaluator_manifest()
-    control_dir, candidate_dir, parallel_execution = _verify_execution_artifacts(
+    (
+        control_dir,
+        candidate_dir,
+        parallel_execution,
+        trajectory_evidence,
+        trajectory_error,
+    ) = _verify_execution_artifacts(
         run_root,
         protocol,
         expected_tasks=expected_tasks,
         expected_evaluator=expected_evaluator,
     )
+    if trajectory_error is not None:
+        reasons.append("trajectory_integrity_failed")
     control_rows = _result_rows(control_dir)
     candidate_rows = _result_rows(candidate_dir)
     if len(control_rows) != expected_tasks or len(candidate_rows) != expected_tasks:
@@ -705,10 +1443,41 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         selection_rows
     ):
         reasons.append("scenario_tool_selection_order_or_coverage_mismatch")
+    if trajectory_error is None and _trajectory_selection_mismatches(
+        selection_by_name,
+        trajectory_evidence["candidate"],
+    ):
+        reasons.append("scenario_tool_selection_trajectory_mismatch")
     feedback_rows = _read_jsonl(candidate_dir / "self_evolution_task_feedback.jsonl")
     feedback_by_name, feedback_order = _rows_by_scenario(feedback_rows)
     if feedback_order != expected_order or len(feedback_by_name) != len(feedback_rows):
         reasons.append("lifecycle_feedback_order_or_coverage_mismatch")
+    if trajectory_error is None:
+        try:
+            _strict_run_verifier._paired_lifecycle_evidence_rows(
+                candidate_dir,
+                trajectory_evidence=trajectory_evidence["candidate"],
+            )
+        except ValueError:
+            reasons.append("lifecycle_feedback_trajectory_mismatch")
+    checkpoint_version_binding_count = 0
+    if trajectory_error is None:
+        (
+            checkpoint_version_binding_count,
+            checkpoint_version_mismatches,
+        ) = _verify_registry_checkpoint_versions(
+            candidate_dir=candidate_dir,
+            registry_dir=_strict_run_verifier._resolve_declared_path(
+                run_root,
+                protocol.get("registry_dir"),
+                "registry_dir",
+            ),
+            scenario_order=expected_order,
+            selection_by_name=selection_by_name,
+            trajectory_evidence=trajectory_evidence["candidate"],
+        )
+        if checkpoint_version_mismatches:
+            reasons.append("registry_checkpoint_version_mismatch")
 
     safe_names = tuple(expected_roles[str(spec["safe_role"])])
     contact_names = tuple(expected_roles[str(spec["contact_role"])])
@@ -814,20 +1583,17 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             != LIFECYCLE_FAULT_FIXTURE_SHA256
         ):
             reasons.append("pinned_historical_fault_snapshot_bytes_mismatch")
-    prohibited_payload_keys = {
-        "scenario_name",
-        "task_id",
-        "expected_answer",
-        "target_state",
-        "evaluator_trace",
-    }
+    repair_request_prohibited_paths: dict[str, list[str]] = {}
     for request in repair_requests:
+        prohibited_paths = prohibited_repair_payload_paths(request)
+        if prohibited_paths:
+            reasons.append("repair_request_contains_prohibited_evidence")
+            repair_request_prohibited_paths[str(request.get("request_id") or "")] = (
+                list(prohibited_paths)
+            )
         public_evidence = request.get("public_evidence")
         if not isinstance(public_evidence, dict):
             reasons.append("repair_public_evidence_missing")
-            continue
-        if prohibited_payload_keys & set(public_evidence):
-            reasons.append("repair_request_contains_prohibited_evidence")
         if request.get("future_tasks_only") is not True:
             reasons.append("repair_not_future_only")
         if request.get("triggering_task_replay_allowed") is not False:
@@ -997,6 +1763,10 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "expected_tasks": expected_tasks,
         "scenario_order_sha256": expected_order_sha256,
         "parallel_arm_execution": parallel_execution,
+        "trajectory_audit_count": {
+            arm: len(evidence) for arm, evidence in trajectory_evidence.items()
+        },
+        "registry_checkpoint_version_binding_count": (checkpoint_version_binding_count),
         "candidate_audited_outcome_count": len(candidate_outcomes),
         "control_audited_outcome_count": len(control_outcomes),
         "outcome_evaluator": expected_evaluator,
@@ -1038,6 +1808,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "repaired_version_future_success_flip_count": future_v2_success_flips,
         "repair_acceptance_event_count": len(repair_acceptance_events),
         "repair_request_count": len(repair_requests),
+        "repair_request_prohibited_paths": repair_request_prohibited_paths,
         "repair_acknowledgement_count": len(acknowledgements),
         "unacknowledged_repair_request_ids": lifecycle[
             "unacknowledged_repair_request_ids"
@@ -1063,9 +1834,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         ],
         "reasons": sorted(set(reasons)),
     }
-    report_path = run_root / "lifecycle_repair_validation_report.json"
-    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    return report
+    return _write_report(run_root, report)
 
 
 def main() -> None:

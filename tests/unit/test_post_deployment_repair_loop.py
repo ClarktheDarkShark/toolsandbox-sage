@@ -265,6 +265,7 @@ def _repair_request(**extra: Any) -> dict[str, Any]:
         "public_evidence": {
             "called_count": 8,
             "candidate_outcome_mean": 0.25,
+            "success_flip_count": 2,
             "contract_failure_count": 2,
         },
         **extra,
@@ -444,6 +445,120 @@ def test_queued_repair_waits_for_future_processing_then_stores_v2_and_acknowledg
     assert accepted_event["canary_eligible_from_next_task"] is True
 
 
+def test_metadata_repair_discards_model_code_and_preserves_source_hash(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    source_tool = _repaired_tool()
+    store.put(_accepted_historical_entry(source_tool))
+    source_entry = store.get(TOOL_NAME)
+    assert source_entry is not None
+    improved_spec = replace(
+        source_tool.spec,
+        description=(
+            "Use this general helper before record actions when a required public "
+            "capability or target may be missing."
+        ),
+        positive_triggers=(
+            "required capability may be unavailable",
+            "record action may lack a target identifier",
+        ),
+    )
+    model_candidate = GeneratedTool(
+        spec=improved_spec,
+        code=(
+            "def prepare_safe_action_or_abstain(*args, **kwargs):\n"
+            "    raise RuntimeError('model-authored metadata code must not execute')\n"
+        ),
+    )
+    events: list[tuple[str, dict[str, Any]]] = []
+    generator = DeterministicRepairGenerator(store=store, candidate=model_candidate)
+    controller = _controller(tmp_path, generator, events=events)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    metadata_request = _repair_request(
+        repair_kind="metadata",
+        source_code_hash=source_entry.stored_code_hash,
+        trigger_reason_codes=["visible_repeatedly_without_adoption"],
+        public_evidence={"visible_count": 8, "called_count": 0},
+    )
+    assert controller.queue_post_deployment_repair_requests([metadata_request]) == (
+        "repair-request-1",
+    )
+    acknowledgements: list[tuple[Any, ...]] = []
+
+    assert controller.process_pending_repairs(
+        completed_count=8,
+        acknowledge=lambda *args: acknowledgements.append(args) or {},
+    ) == (TOOL_NAME,)
+
+    replacement = store.get(TOOL_NAME)
+    assert replacement is not None
+    assert replacement.version == 2
+    assert replacement.tool.code == source_tool.code
+    assert replacement.stored_code_hash == source_entry.stored_code_hash
+    assert replacement.code_hash_verified is True
+    assert replacement.tool.spec.description == improved_spec.description
+    assert acknowledgements[0][:4] == (
+        TOOL_NAME,
+        2,
+        "repair-request-1",
+        "canary_pending",
+    )
+    proof = acknowledgements[0][4]
+    assert proof == {
+        "proof_schema_version": 1,
+        "repair_kind": "metadata",
+        "source_code_hash": source_entry.stored_code_hash,
+        "replacement_code_hash": source_entry.stored_code_hash,
+        "replacement_activated": True,
+        "implementation_preserved": True,
+        "model_authored_code_change_discarded": True,
+    }
+    discard_event = next(
+        payload
+        for event, payload in events
+        if event == "post_deployment_metadata_code_change_discarded"
+    )
+    assert discard_event["model_authored_code_executed"] is False
+    assert discard_event["executable_candidate_code_hash"] == (
+        source_entry.stored_code_hash
+    )
+
+
+def test_metadata_repair_rejects_unbound_source_hash(tmp_path: Path) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_repaired_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+
+    assert controller.queue_post_deployment_repair_requests(
+        [
+            _repair_request(
+                repair_kind="metadata",
+                source_code_hash="0" * 64,
+                trigger_reason_codes=["visible_repeatedly_without_adoption"],
+            )
+        ]
+    ) == ("repair-request-1",)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    acknowledgements: list[tuple[Any, ...]] = []
+
+    assert (
+        controller.process_pending_repairs(
+            completed_count=8,
+            acknowledge=lambda *args: acknowledgements.append(args) or {},
+        )
+        == ()
+    )
+    current = store.get(TOOL_NAME)
+    assert current is not None
+    assert current.version == 1
+    assert current.retired is True
+    assert acknowledgements[0][3] == "rejected"
+    assert acknowledgements[0][4]["replacement_activated"] is False
+    assert acknowledgements[0][4]["implementation_preserved"] is True
+
+
 def test_run_end_sparse_failure_reason_survives_repair_queue_sanitization(
     tmp_path: Path,
 ) -> None:
@@ -566,21 +681,54 @@ def test_generation_and_repair_requests_omit_held_out_and_trigger_task_values(
                 task_id=HIDDEN_TASK_ID,
                 expected_answer=HIDDEN_EXPECTED_VALUE,
                 evaluator_trace={"expected": HIDDEN_EXPECTED_VALUE},
+                nested_diagnostics={
+                    "private": {
+                        "target_state": HIDDEN_NEGATIVE_VALUE,
+                        "candidate_outcome": 1.0,
+                        "candidate_success_flip": True,
+                    }
+                },
             )
         ]
     )
+    queued_request = controller.pending_repair_requests[0]
+    assert online_birth.prohibited_repair_payload_paths(queued_request) == ()
+    assert queued_request["public_evidence"] == {
+        "called_count": 8,
+        "contract_failure_count": 2,
+    }
+    queued_text = json.dumps(queued_request, default=str, sort_keys=True)
+    assert HIDDEN_TASK_ID not in queued_text
+    assert HIDDEN_EXPECTED_VALUE not in queued_text
+    assert HIDDEN_NEGATIVE_VALUE not in queued_text
+    assert "candidate_outcome" not in queued_text
+    assert "success_flip" not in queued_text
     assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
 
     repair_text = json.dumps(asdict(generator.requests[0]), default=str, sort_keys=True)
+    repair_prompt = generator.requests[0].prompt()
     repair_errors = json.dumps(generator.error_inputs[0], default=str, sort_keys=True)
-    assert HIDDEN_TASK_ID not in repair_text
-    assert HIDDEN_EXPECTED_VALUE not in repair_text
-    assert HIDDEN_NEGATIVE_VALUE not in repair_text
+    for private_value in (
+        HIDDEN_TASK_ID,
+        HIDDEN_EXPECTED_VALUE,
+        HIDDEN_NEGATIVE_VALUE,
+    ):
+        assert private_value not in repair_text
+        assert private_value not in repair_prompt
     assert HIDDEN_TASK_ID not in repair_errors
     assert HIDDEN_EXPECTED_VALUE not in repair_errors
     assert HIDDEN_NEGATIVE_VALUE not in repair_errors
     assert "candidate_outcome" not in repair_text
     assert "success_flip" not in repair_text
+    assert "candidate_outcome" not in repair_prompt
+    assert "success_flip" not in repair_prompt
+    assert (
+        online_birth.prohibited_repair_payload_paths(
+            asdict(generator.requests[0]),
+            allow_generic_root_scenario_name=True,
+        )
+        == ()
+    )
     assert len(generator.requests[0].validation_examples) == 2
     assert all(
         example.get("held_out") is False
@@ -608,6 +756,47 @@ def test_generation_and_repair_requests_omit_held_out_and_trigger_task_values(
     )
 
 
+def test_repair_payload_audit_recurses_through_nested_collections() -> None:
+    payload = {
+        "public_evidence": {
+            "safe": [
+                {"diagnostics": {"evaluator_trace": "private"}},
+                {"candidate_outcome_similarity": 1.0},
+            ]
+        },
+        "metadata": ({"fresh_control_success_flip": True},),
+        "future_task_ordinal": 9,
+    }
+
+    paths = online_birth.prohibited_repair_payload_paths(payload)
+
+    assert any(path.endswith("evaluator_trace") for path in paths)
+    assert any(path.endswith("candidate_outcome_similarity") for path in paths)
+    assert any(path.endswith("fresh_control_success_flip") for path in paths)
+    assert all(not path.endswith("future_task_ordinal") for path in paths)
+
+
+def test_generation_request_fails_closed_if_queued_payload_is_tampered(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+    observation = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    tampered_request = dict(controller.pending_repair_requests[0])
+    tampered_request["diagnostics"] = {
+        "nested": {"expected_answer": HIDDEN_EXPECTED_VALUE}
+    }
+
+    with pytest.raises(ValueError, match="evaluator-private fields"):
+        controller._generation_request(  # noqa: SLF001
+            observation,
+            suggested_name=TOOL_NAME,
+            lifecycle_request=tampered_request,
+        )
+
+
 def test_pending_request_and_canary_state_survive_controller_restart(
     tmp_path: Path,
 ) -> None:
@@ -627,6 +816,14 @@ def test_pending_request_and_canary_state_survive_controller_restart(
     assert [request["request_id"] for request in second.pending_repair_requests] == [
         "repair-request-1"
     ]
+    assert second.pending_repair_requests[0]["public_evidence"] == {
+        "called_count": 8,
+        "contract_failure_count": 2,
+    }
+    assert (
+        online_birth.prohibited_repair_payload_paths(second.pending_repair_requests[0])
+        == ()
+    )
     second.observations_by_tool_name[TOOL_NAME] = _observation()
     assert second.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
 
@@ -1144,6 +1341,65 @@ def test_run_finalization_rolls_back_incomplete_repaired_canary(
     assert acknowledgements == [(TOOL_NAME, 2, "repair-request-1", "rolled_back")]
     assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
     assert controller.pending_repair_requests == []
+    assert controller.canary_state_by_tool == {}
+
+
+def test_run_finalization_preserves_unacknowledged_pending_request(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+
+    def fail_acknowledgement(*_args: object) -> dict[str, object]:
+        raise RuntimeError("simulated acknowledgement failure")
+
+    decisions = controller.finalize_run(acknowledge=fail_acknowledgement)
+
+    assert len(decisions) == 1
+    assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
+    assert [
+        request["request_id"] for request in controller.pending_repair_requests
+    ] == ["repair-request-1"]
+    assert "repair-request-1" not in controller.handled_repair_request_ids
+
+    acknowledgements: list[tuple[str, int, str, str]] = []
+    controller.finalize_run(
+        acknowledge=lambda *args: acknowledgements.append(args) or {}
+    )
+    assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
+    assert controller.pending_repair_requests == []
+    assert "repair-request-1" in controller.handled_repair_request_ids
+
+
+def test_run_finalization_preserves_unacknowledged_canary_state(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    controller.process_pending_repairs(completed_count=8)
+
+    def fail_acknowledgement(*_args: object) -> dict[str, object]:
+        raise RuntimeError("simulated acknowledgement failure")
+
+    decisions = controller.finalize_run(acknowledge=fail_acknowledgement)
+
+    assert len(decisions) == 1
+    assert decisions[0]["status"] == "rolled_back"
+    assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
+    assert TOOL_NAME in controller.canary_state_by_tool
+
+    acknowledgements: list[tuple[str, int, str, str]] = []
+    controller.finalize_run(
+        acknowledge=lambda *args: acknowledgements.append(args) or {}
+    )
+    assert acknowledgements == [(TOOL_NAME, 2, "repair-request-1", "rolled_back")]
     assert controller.canary_state_by_tool == {}
 
 

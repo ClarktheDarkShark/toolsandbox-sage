@@ -130,10 +130,214 @@ def safe_record_action_gate(user_request: str, requested_action: str, target_ide
 """
 
 
+_TARGET_FIRST_IMPLEMENTATION = """
+def safe_record_action_gate(user_request: str, requested_action: str, target_identifier: str, required_original_tools: list, available_original_tools: list, visible_records_count: int) -> dict:
+    required = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools or [])
+    available = [available_original_tools] if isinstance(available_original_tools, str) else list(available_original_tools or [])
+    missing = [capability for capability in required if capability not in available]
+    if not str(target_identifier or '').strip():
+        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A target identifier is required.', 'abstain_reason': 'missing_target_identifier'}
+    if missing:
+        return {'should_abstain': True, 'missing_information': missing, 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.', 'abstain_reason': 'missing_required_original_tool'}
+    if int(visible_records_count or 0) > 1:
+        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
+    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
+"""
+
+
+_READ_ONLY_PRIORITY_IMPLEMENTATION = """
+def safe_record_action_gate(user_request: str, requested_action: str, target_identifier: str, required_original_tools: list, available_original_tools: list, visible_records_count: int) -> dict:
+    required = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools or [])
+    available = [available_original_tools] if isinstance(available_original_tools, str) else list(available_original_tools or [])
+    missing = [capability for capability in required if capability not in available]
+    if missing:
+        return {'should_abstain': True, 'missing_information': missing, 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Cannot continue because ' + ', '.join(item.replace('_', ' ') for item in missing) + ' is unavailable.', 'abstain_reason': 'missing_required_original_tool'}
+    action = str(requested_action or '').strip().lower()
+    read_only = any(marker in action for marker in ('search', 'lookup', 'find', 'list', 'read', 'check'))
+    mutating = any(marker in action for marker in ('add', 'archive', 'create', 'delete', 'modify', 'remove', 'send', 'set', 'update'))
+    if mutating and not read_only and not str(target_identifier or '').strip():
+        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A target identifier is required.', 'abstain_reason': 'missing_target_identifier'}
+    if mutating and not read_only and int(visible_records_count or 0) > 1:
+        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
+    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
+"""
+
+
+def _relative_time_examples() -> tuple[ToolExample, ...]:
+    return (
+        ToolExample(
+            {
+                "user_request": "Search for records from yesterday.",
+                "requested_action": "relative_time_search",
+                "target_identifier": "",
+                "required_original_tools": ["get_current_timestamp"],
+                "available_original_tools": [],
+                "visible_records_count": 0,
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["current_time"],
+                "required_original_tools": ["current_time"],
+                "safe_next_action": "ask_user_or_abstain",
+                "final_answer_recommendation": (
+                    "Current time is unavailable, so the search cannot continue."
+                ),
+                "abstain_reason": "missing_required_original_tool",
+            },
+        ),
+        ToolExample(
+            {
+                "user_request": "Search for records from yesterday.",
+                "requested_action": "relative_time_search",
+                "target_identifier": "",
+                "required_original_tools": ["get_current_timestamp"],
+                "available_original_tools": ["get_current_timestamp"],
+                "visible_records_count": 0,
+            },
+            {
+                "should_abstain": False,
+                "missing_information": [],
+                "required_original_tools": ["current_time"],
+                "safe_next_action": "continue_with_original_tool",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "Archive a record.",
+                "requested_action": "archive_record",
+                "target_identifier": "",
+                "required_original_tools": ["record_archive"],
+                "available_original_tools": ["record_archive"],
+                "visible_records_count": 0,
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["target_identifier"],
+                "required_original_tools": ["record_archive"],
+                "safe_next_action": "ask_user_or_abstain",
+                "final_answer_recommendation": (
+                    "A target record identifier is required before archiving."
+                ),
+                "abstain_reason": "missing_target_identifier",
+            },
+            negative_applicability=True,
+        ),
+    )
+
+
 def test_validator_accepts_raw_semantics_and_fact_preserving_paraphrases() -> None:
     result = validate_generated_tool(
         _abstention_tool(_GENERAL_IMPLEMENTATION),
         _examples(),
+    )
+
+    assert result.accepted, result.errors
+
+
+def test_validator_accepts_clear_dynamic_deficit_recommendation() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        "'Cannot continue because ' + ', '.join(item.replace('_', ' ') for item in missing) + ' is unavailable.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert result.accepted, result.errors
+
+
+def test_validator_rejects_fact_named_only_as_successful() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        "', '.join(item.replace('_', ' ') for item in missing) + ' succeeded.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_final_recommendation_missing_deficit_semantics" in error
+        for error in result.errors
+    )
+
+
+def test_validator_rejects_negated_deficit_recommendation() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        "', '.join(item.replace('_', ' ') for item in missing) + ' is not needed.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_final_recommendation_missing_deficit_semantics" in error
+        for error in result.errors
+    )
+
+
+def test_validator_rejects_contradictory_missing_success_recommendation() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        "'The missing ' + ', '.join(item.replace('_', ' ') for item in missing) + ' succeeded.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_final_recommendation_missing_deficit_semantics" in error
+        for error in result.errors
+    )
+
+
+def test_validator_rejects_extra_abstention_output_key() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'abstain_reason': 'missing_required_original_tool'",
+        (
+            "'abstain_reason': 'missing_required_original_tool', "
+            "'downstream_tool_name': 'remove_contact'"
+        ),
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any("source_0_raw_extra_keys" in error for error in result.errors)
+
+
+def test_validator_rejects_truthy_non_boolean_abstention_decision() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'should_abstain': True", "'should_abstain': 'yes'"
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_should_abstain_not_bool" in error for error in result.errors
+    )
+
+
+def test_validator_enforces_capability_priority_for_simultaneous_deficits() -> None:
+    result = validate_generated_tool(
+        _abstention_tool(_TARGET_FIRST_IMPLEMENTATION),
+        _examples(),
+    )
+
+    assert not result.accepted
+    assert any(
+        "_missing_capability_0_and_target_abstain_reason" in error
+        for error in result.errors
+    )
+
+
+def test_relative_time_search_allows_blank_target_after_clock_is_available() -> None:
+    result = validate_generated_tool(
+        _abstention_tool(_READ_ONLY_PRIORITY_IMPLEMENTATION),
+        _relative_time_examples(),
     )
 
     assert result.accepted, result.errors

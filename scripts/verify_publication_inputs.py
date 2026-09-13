@@ -17,7 +17,7 @@ try:
         sanitized_rapid_fixture_bytes,
     )
 except ModuleNotFoundError:  # Direct ``python scripts/...`` execution.
-    from build_publication_freeze import (  # type: ignore[import-not-found,no-redef]
+    from build_publication_freeze import (  # type: ignore[import-not-found]
         FreezeError,
         sanitized_rapid_fixture_bytes,
     )
@@ -27,7 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASE_INPUT_MANIFEST = Path(
     "docs/sage_protocol/publication_input_manifest_20260901.json"
 )
-DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260910.json")
+DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260913.json")
 EXPECTED_REPLACEMENT_POLICY = {
     "generator_contract_and_repair_analysis_memoization": "within_run_only",
     "repository_whole_response_replay": "disabled",
@@ -961,6 +961,121 @@ def _verify_active_validation_thresholds_v3(
     }
 
 
+def _verify_active_validation_thresholds_v4(
+    repo_root: Path,
+    declaration: dict[str, Any],
+    *,
+    benchmark: dict[str, Any],
+    fixture: dict[str, Any],
+    analysis: dict[str, dict[str, Any]],
+    superseded: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the additive technical-readiness amendment over frozen v3."""
+
+    verified = _verify_thresholds(
+        repo_root,
+        declaration,
+        benchmark=benchmark,
+        fixture=fixture,
+        analysis=analysis,
+    )
+    path = repo_root / verified["path"]
+    payload = _read_object(path, "active publication validation thresholds")
+    if payload.get("schema_version") != 4:
+        raise InputVerificationError(
+            "Active publication validation thresholds schema version is not 4"
+        )
+    if payload.get("performance_endpoint_policy") != "dual_scoped_outcome_endpoints":
+        raise InputVerificationError(
+            "Active publication validation does not declare dual scoped endpoints"
+        )
+    if (
+        payload.get("canonical_metric_policy")
+        != "descriptive_only_never_a_release_gate"
+    ):
+        raise InputVerificationError(
+            "Active publication validation does not make canonical report-only"
+        )
+
+    supersedes = _object(payload, "supersedes", "active validation thresholds")
+    if supersedes.get("path") != superseded["path"] or supersedes.get(
+        "sha256"
+    ) != superseded.get("sha256"):
+        raise InputVerificationError(
+            "Active validation thresholds do not identify frozen schema v3"
+        )
+    superseded_payload = _read_object(
+        repo_root / superseded["path"],
+        "superseded publication validation thresholds",
+    )
+    if superseded_payload.get("schema_version") != 3:
+        raise InputVerificationError("Superseded validation thresholds are not v3")
+
+    unchanged_sections = (
+        "benchmark",
+        "performance_endpoints",
+        "historical_reference",
+        "required_integrity",
+        "required_no_regression",
+    )
+    for section in unchanged_sections:
+        if payload.get(section) != superseded_payload.get(section):
+            raise InputVerificationError(
+                f"Technical-readiness amendment changed frozen v3 section {section!r}"
+            )
+
+    readiness = _object(
+        payload,
+        "required_technical_readiness",
+        "active validation thresholds",
+    )
+    expected_readiness = {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+    }
+    if set(readiness) != set(expected_readiness) or any(
+        type(readiness[field]) is not type(expected) or readiness[field] != expected
+        for field, expected in expected_readiness.items()
+    ):
+        raise InputVerificationError(
+            "Active technical-readiness threshold is not exactly an exclusive 0.80"
+        )
+    if any("canonical" in field for field in readiness):
+        raise InputVerificationError(
+            "Technical-readiness policy may not gate canonical similarity"
+        )
+
+    report_only = _object(payload, "report_only", "active validation thresholds")
+    superseded_report_only = _object(
+        superseded_payload,
+        "report_only",
+        "superseded validation thresholds",
+    )
+    for field in (
+        "paper_comparable_candidate_outcome_historical_mean",
+        "canonical_metric",
+    ):
+        if report_only.get(field) != superseded_report_only.get(field):
+            raise InputVerificationError(
+                f"Technical-readiness amendment changed report-only field {field!r}"
+            )
+    if (
+        not isinstance(report_only.get("rationale"), str)
+        or not report_only["rationale"]
+    ):
+        raise InputVerificationError(
+            "Technical-readiness amendment does not explain its gate rationale"
+        )
+
+    return {
+        **verified,
+        "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+        "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+        "audited_current_endpoint": EXPECTED_AUDITED_OUTCOME_ENDPOINT,
+        "paper_comparable_endpoint": EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT,
+        "technical_readiness": expected_readiness,
+    }
+
+
 def verify_inputs(
     repo_root: Path = REPO_ROOT,
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -983,7 +1098,7 @@ def verify_inputs(
     if selected_payload.get("manifest_type") != "publication_release_input_chain":
         return _verify_base_inputs(root, selected)
     release_schema_version = selected_payload.get("schema_version")
-    if release_schema_version not in {1, 2}:
+    if release_schema_version not in {1, 2, 3}:
         raise InputVerificationError("Unsupported publication release manifest schema")
 
     base_declaration = _object(
@@ -1033,11 +1148,16 @@ def verify_inputs(
         )
         return result
 
+    frozen_v2_declaration_field = (
+        "superseded_validation_thresholds"
+        if release_schema_version == 2
+        else "superseded_validation_thresholds_v2"
+    )
     frozen_v2 = _verify_active_validation_thresholds_v2(
         root,
         _object(
             selected_payload,
-            "superseded_validation_thresholds",
+            frozen_v2_declaration_field,
             "publication release manifest",
         ),
         benchmark=result["benchmark"],
@@ -1046,8 +1166,37 @@ def verify_inputs(
         superseded=base_thresholds,
     )
     result["base_validation_thresholds"] = base_thresholds
-    result["superseded_validation_thresholds"] = frozen_v2
-    result["validation_thresholds"] = _verify_active_validation_thresholds_v3(
+    if release_schema_version == 2:
+        result["superseded_validation_thresholds"] = frozen_v2
+        result["validation_thresholds"] = _verify_active_validation_thresholds_v3(
+            root,
+            _object(
+                selected_payload,
+                "active_validation_thresholds",
+                "publication release manifest",
+            ),
+            benchmark=result["benchmark"],
+            fixture=result["rapidapi_fixture"],
+            analysis=result["historical_analysis_inputs"],
+            superseded=frozen_v2,
+        )
+        return result
+
+    frozen_v3 = _verify_active_validation_thresholds_v3(
+        root,
+        _object(
+            selected_payload,
+            "superseded_validation_thresholds_v3",
+            "publication release manifest",
+        ),
+        benchmark=result["benchmark"],
+        fixture=result["rapidapi_fixture"],
+        analysis=result["historical_analysis_inputs"],
+        superseded=frozen_v2,
+    )
+    result["frozen_validation_thresholds_v2"] = frozen_v2
+    result["superseded_validation_thresholds"] = frozen_v3
+    result["validation_thresholds"] = _verify_active_validation_thresholds_v4(
         root,
         _object(
             selected_payload,
@@ -1057,7 +1206,7 @@ def verify_inputs(
         benchmark=result["benchmark"],
         fixture=result["rapidapi_fixture"],
         analysis=result["historical_analysis_inputs"],
-        superseded=frozen_v2,
+        superseded=frozen_v3,
     )
     return result
 

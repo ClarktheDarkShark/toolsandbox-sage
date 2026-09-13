@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -13,10 +14,60 @@ import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
 from scripts.run_chapter4_evidence_campaign import _job_command
 from scripts.verify_publication_run import verify_run
+from tool_sandbox.common.execution_context import ExecutionContext
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TEST_GIT_COMMIT = "1" * 40
 TEST_GIT_TREE = "2" * 40
+_TEST_OUTCOME_MARKER = "__publication_test_outcome__"
+_REAL_LOAD_PUBLICATION_SCENARIOS = publication_verifier._load_publication_scenarios
+_REAL_RECOMPUTE_TRAJECTORY = publication_verifier._independently_recompute_trajectory
+
+
+def _test_audited_outcome(value: float) -> dict[str, Any]:
+    identity = publication_verifier.outcome_evaluator_manifest()
+    return {
+        "outcome_similarity": value,
+        "outcome_milestone_similarity": value,
+        "outcome_minefield_similarity": 0.0,
+        "outcome_check_count": 1,
+        "outcome_checks": [
+            {
+                "index": 0,
+                "kind": "synthetic_test_outcome",
+                "included": True,
+                "score": value,
+            }
+        ],
+        "outcome_evaluator_version": identity["version"],
+        "outcome_evaluator_contract_sha256": identity["contract_sha256"],
+        "outcome_evaluator_source_sha256": identity["source_sha256"],
+    }
+
+
+def _fake_trajectory_recomputation(
+    _scenario: object,
+    execution_context: ExecutionContext,
+    *,
+    scenario_name: str,
+) -> dict[str, Any]:
+    del scenario_name
+    marker = next(
+        (
+            item
+            for item in (execution_context.tool_allow_list or [])
+            if item.startswith(_TEST_OUTCOME_MARKER)
+        ),
+        None,
+    )
+    if marker is None:
+        raise ValueError("synthetic trajectory has no outcome marker")
+    value = float(marker.removeprefix(_TEST_OUTCOME_MARKER))
+    return {
+        "audited_outcome": _test_audited_outcome(value),
+        "paper_outcome": {"outcome_similarity": None},
+        "conversation": [],
+    }
 
 
 def _test_environment_identity(repo_root: Path) -> dict[str, object]:
@@ -63,11 +114,38 @@ def _exact_publication_host(
         "_active_publication_environment",
         lambda lock_path, repo_root: _test_environment_identity(repo_root),
     )
+    monkeypatch.setattr(
+        publication_verifier,
+        "_load_publication_scenarios",
+        lambda scenario_names: {name: object() for name in scenario_names},
+    )
+    monkeypatch.setattr(
+        publication_verifier,
+        "_independently_recompute_trajectory",
+        _fake_trajectory_recomputation,
+    )
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+
+def _write_synthetic_trajectory(
+    run_dir: Path,
+    *,
+    scenario_name: str,
+    outcome_similarity: float,
+) -> None:
+    trajectory_dir = run_dir / "trajectories" / scenario_name
+    trajectory_dir.mkdir(parents=True, exist_ok=True)
+    context = ExecutionContext()
+    context.tool_allow_list = [f"{_TEST_OUTCOME_MARKER}{outcome_similarity!r}"]
+    _write_json(
+        trajectory_dir / "execution_context.json",
+        context.to_dict(serialize_console=False),
+    )
+    (trajectory_dir / "conversation.json").write_text("[]\n", encoding="utf-8")
 
 
 def _feedback_outcome_with_source(
@@ -106,6 +184,14 @@ def _reflection_feedback_row(
             if control_outcome is not None and candidate_outcome is not None
             else None
         ),
+        "task_family_key": "synthetic_family",
+        "source_task_id_redacted": True,
+        "generated_tools_visible": [],
+        "generated_tools_called": [],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {},
     }
 
 
@@ -355,6 +441,11 @@ def _fresh_run(tmp_path: Path) -> Path:
         },
     ]
     for row in (*control_rows, *candidate_rows):
+        row.update(_test_audited_outcome(float(row["outcome_similarity"])))
+        row["online_feedback_outcome_similarity"] = None
+        row["online_feedback_evaluator_version"] = (
+            publication_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION
+        )
         row["traceback"] = None
         row["exception_type"] = None
     _write_json(
@@ -365,6 +456,28 @@ def _fresh_run(tmp_path: Path) -> Path:
         candidate_dir / "result_summary.json",
         {"per_scenario_results": candidate_rows},
     )
+    for run_dir, rows in (
+        (control_dir, control_rows),
+        (candidate_dir, candidate_rows),
+    ):
+        for row in rows:
+            _write_synthetic_trajectory(
+                run_dir,
+                scenario_name=str(row["name"]),
+                outcome_similarity=float(row["outcome_similarity"]),
+            )
+    for run_dir, run_type in (
+        (control_dir, "online_build_full_control"),
+        (candidate_dir, "online_build_full_candidate"),
+    ):
+        _write_json(
+            run_dir / "sage_ts_run_manifest.json",
+            {
+                "run_type": run_type,
+                "agent_runtime": publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME,
+                "actor_selection_mode": "policy",
+            },
+        )
     _write_llm_usage_artifacts(
         control_dir,
         control_rows,
@@ -388,6 +501,26 @@ def _fresh_run(tmp_path: Path) -> Path:
     ]
     (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in feedback),
+        encoding="utf-8",
+    )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {
+                    "scenario": row["scenario"],
+                    "generated_tools_visible": row["generated_tools_visible"],
+                    "generated_tools_called": row["generated_tools_called"],
+                    "generated_tools_attempted": row["generated_tools_attempted"],
+                    "generated_tools_failed": row["generated_tools_failed"],
+                    "generated_tool_contract_failures": row[
+                        "generated_tool_contract_failures"
+                    ],
+                    "generated_tool_versions": row["generated_tool_versions"],
+                }
+            )
+            + "\n"
+            for row in feedback
+        ),
         encoding="utf-8",
     )
     _write_json(
@@ -515,6 +648,15 @@ def _fresh_run(tmp_path: Path) -> Path:
             "scenario_transform_failure_policy": "abort",
             "publication_performance_endpoint": "outcome_task_completion_similarity",
             "actor_selection_mode": "policy",
+            "control_condition": publication_verifier.MATCHED_CONTROL_CONDITION,
+            "control_agent_runtime": (publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME),
+            "control_actor_selection_mode": "policy",
+            "control_generated_tools_enabled": False,
+            "candidate_agent_runtime": (
+                publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME
+            ),
+            "candidate_actor_selection_mode": "policy",
+            "candidate_generated_tools_enabled": True,
             "reporting_outcome_evaluator": (
                 publication_verifier.outcome_evaluator_manifest()
             ),
@@ -713,6 +855,40 @@ def _lifecycle_artifacts(
             + "\n",
             encoding="utf-8",
         )
+    feedback_row = {
+        "event": "self_evolution_task_assessed",
+        "scenario": "synthetic_task",
+        "task_family_key": "synthetic_family",
+        "source_task_id_redacted": True,
+        "generated_tools_visible": [],
+        "generated_tools_called": [],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {},
+    }
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        json.dumps(feedback_row) + "\n",
+        encoding="utf-8",
+    )
+    selection_row = {
+        key: value
+        for key, value in feedback_row.items()
+        if key
+        in {
+            "scenario",
+            "generated_tools_visible",
+            "generated_tools_called",
+            "generated_tools_attempted",
+            "generated_tools_failed",
+            "generated_tool_contract_failures",
+            "generated_tool_versions",
+        }
+    }
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        json.dumps(selection_row) + "\n",
+        encoding="utf-8",
+    )
     _write_json(
         candidate_dir / "post_deployment_repair_state.json",
         {
@@ -731,6 +907,149 @@ def _lifecycle_artifacts(
         registry_dir / "registry_manifest.json",
         {"tools": {"helper": {"version": 2, "retired": retired}}},
     )
+    return candidate_dir, registry_dir
+
+
+def _mark_lifecycle_request_as_metadata(
+    candidate_dir: Path,
+    *,
+    source_code_hash: str = "a" * 64,
+) -> None:
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request.update(
+        {
+            "repair_kind": "metadata",
+            "source_code_hash": source_code_hash,
+        }
+    )
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+    acknowledgement_path = (
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    acknowledgement = json.loads(acknowledgement_path.read_text(encoding="utf-8"))
+    acknowledgement["implementation_proof"] = {
+        "proof_schema_version": 1,
+        "repair_kind": "metadata",
+        "source_code_hash": source_code_hash,
+        "replacement_code_hash": None,
+        "replacement_activated": False,
+        "implementation_preserved": True,
+        "model_authored_code_change_discarded": False,
+    }
+    acknowledgement_path.write_text(
+        json.dumps(acknowledgement) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _promoted_lifecycle_artifacts(
+    tmp_path: Path,
+    *,
+    retired: bool = False,
+) -> tuple[Path, Path]:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        acknowledgement_status=None,
+        retired=retired,
+    )
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request.update(
+        {
+            "source_tool_version": 1,
+            "repair_kind": "implementation",
+            "target_task_family": "synthetic_family",
+            "trigger_reason_codes": ["deterministic_public_contract_failure"],
+        }
+    )
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+    acknowledgements = [
+        {
+            "schema_version": 1,
+            "request_id": "request-1",
+            "tool_name": "helper",
+            "new_version": 2,
+            "status": "canary_pending",
+            "acknowledged_after_completed_count": 0,
+            "eligible_from_completed_count": 1,
+            "future_tasks_only": True,
+            "triggering_task_replay_allowed": False,
+        },
+        {
+            "schema_version": 1,
+            "request_id": "request-1",
+            "tool_name": "helper",
+            "new_version": 2,
+            "status": "promoted",
+            "acknowledged_after_completed_count": 3,
+            "eligible_from_completed_count": 4,
+            "future_tasks_only": True,
+            "triggering_task_replay_allowed": False,
+        },
+    ]
+    (candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in acknowledgements),
+        encoding="utf-8",
+    )
+    feedback_rows: list[dict[str, Any]] = []
+    selection_rows: list[dict[str, Any]] = []
+    for completed_count, (control_outcome, candidate_outcome) in enumerate(
+        ((0.0, 1.0), (1.0, 1.0), (0.0, 0.0)),
+        start=1,
+    ):
+        scenario = f"synthetic_task_{completed_count}"
+        outcome_delta = candidate_outcome - control_outcome
+        common = {
+            "scenario": scenario,
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": ["helper"],
+            "generated_tools_attempted": ["helper"],
+            "generated_tools_failed": [],
+            "generated_tool_contract_failures": [],
+            "generated_tool_versions": {"helper": 2},
+        }
+        selection_rows.append(
+            {
+                **common,
+                "outcome_similarity": candidate_outcome,
+                "exception_type": None,
+            }
+        )
+        feedback_rows.append(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "completed_count": completed_count,
+                "task_family_key": "synthetic_family",
+                "source_task_id_redacted": True,
+                "control_source": "same_run_fresh",
+                "control_outcome": control_outcome,
+                "control_outcome_source": "audited_outcome",
+                "candidate_outcome": candidate_outcome,
+                "candidate_outcome_source": "audited_outcome",
+                "outcome_delta": outcome_delta,
+                "candidate_success_flip": bool(
+                    candidate_outcome == 1.0
+                    and control_outcome < 1.0
+                    and outcome_delta > 0.0
+                ),
+            }
+        )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+    registry_path = registry_dir / "registry_manifest.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["tools"]["helper"]["birth_scenario"] = (
+        "post_deployment_repair:synthetic_family"
+    )
+    _write_json(registry_path, registry)
     return candidate_dir, registry_dir
 
 
@@ -769,6 +1088,398 @@ def test_lifecycle_verifier_accepts_terminal_retired_disposition(
     assert report["active_unresolved_tool_count"] == 0
 
 
+def test_lifecycle_verifier_accepts_independently_proven_promotion(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _promoted_lifecycle_artifacts(tmp_path)
+
+    report = publication_verifier._verify_lifecycle_closed(
+        candidate_dir,
+        registry_dir,
+    )
+
+    assert report["verified_promoted_canary_count"] == 1
+    assert report["repair_acknowledgement_count"] == 2
+
+
+def test_lifecycle_verifier_requires_ordered_canary_transition(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _promoted_lifecycle_artifacts(tmp_path)
+    acknowledgement_path = (
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    promoted = json.loads(
+        acknowledgement_path.read_text(encoding="utf-8").splitlines()[-1]
+    )
+    acknowledgement_path.write_text(json.dumps(promoted) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="ordered canary_pending -> promoted"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_rejects_promotion_hidden_by_later_acknowledgement(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _promoted_lifecycle_artifacts(tmp_path)
+    acknowledgement_path = (
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    promoted = json.loads(
+        acknowledgement_path.read_text(encoding="utf-8").splitlines()[-1]
+    )
+    promoted["status"] = "rolled_back"
+    with acknowledgement_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(promoted) + "\n")
+
+    with pytest.raises(ValueError, match="ordered canary_pending -> promoted"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "too_few_calls",
+        "wrong_family",
+        "multiple_generated_calls",
+        "wrong_version",
+        "too_few_exact_outcomes",
+        "audited_regression",
+        "no_fresh_control_flip",
+    ],
+)
+def test_lifecycle_verifier_recomputes_promoted_canary_evidence(
+    tmp_path: Path,
+    corruption: str,
+) -> None:
+    candidate_dir, registry_dir = _promoted_lifecycle_artifacts(tmp_path)
+    selection_path = candidate_dir / "scenario_tool_selection.jsonl"
+    feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+    selection_rows = [
+        json.loads(line)
+        for line in selection_path.read_text(encoding="utf-8").splitlines()
+    ]
+    feedback_rows = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+    ]
+
+    if corruption == "too_few_calls":
+        for row in (selection_rows[2], feedback_rows[2]):
+            row["generated_tools_visible"] = []
+            row["generated_tools_called"] = []
+            row["generated_tools_attempted"] = []
+            row["generated_tool_versions"] = {}
+    elif corruption == "wrong_family":
+        feedback_rows[0]["task_family_key"] = "different_family"
+    elif corruption == "multiple_generated_calls":
+        for row in (selection_rows[0], feedback_rows[0]):
+            row["generated_tools_called"].append("other_helper")
+            row["generated_tools_attempted"].append("other_helper")
+            row["generated_tool_versions"]["other_helper"] = 1
+    elif corruption == "wrong_version":
+        for row in (selection_rows[0], feedback_rows[0]):
+            row["generated_tool_versions"]["helper"] = 3
+    elif corruption == "too_few_exact_outcomes":
+        selection_rows[1]["outcome_similarity"] = 0.0
+        feedback_rows[1]["control_outcome"] = 0.0
+        feedback_rows[1]["candidate_outcome"] = 0.0
+        feedback_rows[1]["outcome_delta"] = 0.0
+        feedback_rows[1]["candidate_success_flip"] = False
+    elif corruption == "audited_regression":
+        feedback_rows[2]["control_outcome"] = 1.0
+        feedback_rows[2]["outcome_delta"] = -1.0
+    elif corruption == "no_fresh_control_flip":
+        feedback_rows[0]["control_outcome"] = 1.0
+        feedback_rows[0]["outcome_delta"] = 0.0
+        feedback_rows[0]["candidate_success_flip"] = False
+    else:  # pragma: no cover - the parametrization is exhaustive.
+        raise AssertionError(corruption)
+
+    selection_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    feedback_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Promoted canary"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_rejects_nested_private_repair_evidence(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["public_evidence"] = {
+        "called_count": 1,
+        "nested": {"expected_answer": "PRIVATE_SENTINEL"},
+    }
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="evaluator-private evidence"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_rejects_selection_feedback_failure_drift(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+    feedback = json.loads(feedback_path.read_text(encoding="utf-8"))
+    feedback["generated_tools_visible"] = ["helper"]
+    feedback["generated_tools_attempted"] = ["helper"]
+    feedback["generated_tools_failed"] = ["helper"]
+    feedback["generated_tool_versions"] = {"helper": 2}
+    feedback_path.write_text(json.dumps(feedback) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="generated-tool evidence disagree"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+@pytest.mark.parametrize(
+    ("called", "failed", "contract_failed", "reason"),
+    [
+        ([], ["helper"], [], "unresolved_generated_tool_execution_failure"),
+        (
+            ["helper"],
+            [],
+            ["helper"],
+            "deterministic_public_contract_failure",
+        ),
+    ],
+)
+def test_lifecycle_verifier_requires_terminal_attributable_failure_disposition(
+    tmp_path: Path,
+    called: list[str],
+    failed: list[str],
+    contract_failed: list[str],
+    reason: str,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    common = {
+        "generated_tools_visible": ["helper"],
+        "generated_tools_called": called,
+        "generated_tools_attempted": ["helper"],
+        "generated_tools_failed": failed,
+        "generated_tool_contract_failures": contract_failed,
+        "generated_tool_versions": {"helper": 2},
+    }
+    for filename in (
+        "self_evolution_task_feedback.jsonl",
+        "scenario_tool_selection.jsonl",
+    ):
+        path = candidate_dir / filename
+        row = json.loads(path.read_text(encoding="utf-8"))
+        row.update(common)
+        path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="lifecycle obligations"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request.update(
+        {
+            "repair_kind": "implementation",
+            "target_task_family": "synthetic_family",
+            "trigger_reason_codes": [reason],
+        }
+    )
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+
+    report = publication_verifier._verify_lifecycle_closed(
+        candidate_dir,
+        registry_dir,
+    )
+    assert report["derived_repair_obligation_count"] == 1
+
+
+def test_lifecycle_verifier_requires_applied_attributable_route_repair(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        request=False,
+        acknowledgement_status=None,
+        retired=False,
+    )
+    feedback_rows: list[dict[str, Any]] = []
+    selection_rows: list[dict[str, Any]] = []
+    for index in (1, 2):
+        scenario = f"private_route_case_{index}"
+        common = {
+            "scenario": scenario,
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": ["helper"],
+            "generated_tools_attempted": ["helper"],
+            "generated_tools_failed": [],
+            "generated_tool_contract_failures": [],
+            "generated_tool_versions": {"helper": 2},
+        }
+        selection_rows.append({**common, "exception_type": None})
+        feedback_rows.append(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "completed_count": index,
+                "task_family_key": "public_route_family",
+                "source_task_id_redacted": True,
+                "control_source": "same_run_fresh",
+                "control_outcome": 1.0,
+                "control_outcome_source": "audited_outcome",
+                "candidate_outcome": 0.0,
+                "candidate_outcome_source": "audited_outcome",
+                "outcome_delta": -1.0,
+                "candidate_success_flip": False,
+                "exception_type": None,
+            }
+        )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="no durable lifecycle routing state"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+    _write_json(
+        registry_dir / "tool_lifecycle.json",
+        {
+            "artifact_type": "self_evolution_tool_lifecycle",
+            "tool_lifecycle": {
+                "helper": {
+                    "tool_version": 2,
+                    "decision": "needs_route_repair",
+                    "repair_kind": "routing",
+                    "routing_disposition": "family_suppression_active",
+                    "route_repair_families": ["public_route_family"],
+                }
+            },
+        },
+    )
+    report = publication_verifier._verify_lifecycle_closed(
+        candidate_dir,
+        registry_dir,
+    )
+    assert report["derived_repair_obligation_count"] == 1
+    assert report["verified_route_repair_count"] == 1
+
+
+def test_lifecycle_verifier_requires_metadata_repair_after_nonadoption_threshold(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    feedback_rows: list[dict[str, Any]] = []
+    selection_rows: list[dict[str, Any]] = []
+    for index in range(publication_verifier.LIFECYCLE_METADATA_VISIBLE_THRESHOLD):
+        common = {
+            "scenario": f"synthetic_task_{index}",
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": [],
+            "generated_tools_attempted": [],
+            "generated_tools_failed": [],
+            "generated_tool_contract_failures": [],
+            "generated_tool_versions": {"helper": 2},
+        }
+        selection_rows.append(dict(common))
+        feedback_rows.append(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "task_family_key": "synthetic_family",
+                "source_task_id_redacted": True,
+            }
+        )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="lifecycle obligations"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+    _mark_lifecycle_request_as_metadata(candidate_dir)
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request.update(
+        {
+            "repair_kind": "metadata",
+            "target_task_family": "synthetic_family",
+            "trigger_reason_codes": ["visible_repeatedly_without_adoption"],
+        }
+    )
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+
+    report = publication_verifier._verify_lifecycle_closed(
+        candidate_dir,
+        registry_dir,
+    )
+    assert report["derived_repair_obligation_count"] == 1
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "missing_proof",
+        "replacement_hash_changed",
+        "false_preservation_claim",
+        "malformed_source_hash",
+        "registry_hash_changed",
+    ],
+)
+def test_lifecycle_verifier_rejects_metadata_implementation_proof_corruption(
+    tmp_path: Path,
+    corruption: str,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    _mark_lifecycle_request_as_metadata(candidate_dir)
+    request_path = candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    acknowledgement_path = (
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    acknowledgement = json.loads(acknowledgement_path.read_text(encoding="utf-8"))
+    proof = acknowledgement["implementation_proof"]
+    if corruption == "missing_proof":
+        acknowledgement.pop("implementation_proof")
+    elif corruption == "replacement_hash_changed":
+        proof["replacement_activated"] = True
+        proof["replacement_code_hash"] = "b" * 64
+        proof["implementation_preserved"] = False
+    elif corruption == "false_preservation_claim":
+        proof["implementation_preserved"] = False
+    elif corruption == "malformed_source_hash":
+        request["source_code_hash"] = "not-a-sha256"
+    else:
+        proof["replacement_activated"] = True
+        proof["replacement_code_hash"] = "a" * 64
+        registry_path = registry_dir / "registry_manifest.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        registry["tools"]["helper"]["code_hash"] = "b" * 64
+        _write_json(registry_path, registry)
+    request_path.write_text(json.dumps(request) + "\n", encoding="utf-8")
+    acknowledgement_path.write_text(
+        json.dumps(acknowledgement) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="source|preserve|registry code hash"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
 def test_lifecycle_verifier_rejects_wrong_tool_or_unhandled_request(
     tmp_path: Path,
 ) -> None:
@@ -796,11 +1507,7 @@ def test_lifecycle_verifier_rejects_wrong_tool_or_unhandled_request(
 def test_lifecycle_verifier_requires_current_promoted_tool_to_be_active(
     tmp_path: Path,
 ) -> None:
-    candidate_dir, registry_dir = _lifecycle_artifacts(
-        tmp_path,
-        acknowledgement_status="promoted",
-        retired=True,
-    )
+    candidate_dir, registry_dir = _promoted_lifecycle_artifacts(tmp_path, retired=True)
 
     with pytest.raises(ValueError, match="promoted tool as retired"):
         publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
@@ -904,6 +1611,7 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["status"] == "pass"
     assert result["cached_control_tasks"] == 0
     assert result["repository_whole_response_replay_hits"] == 0
+    assert result["trajectory_audit_count"] == {"control": 2, "candidate": 2}
     assert result["openai_provider_prompt_prefix_cache_policy"] == "automatic_implicit"
     assert result["openai_provider_cached_prompt_tokens"] == {
         "control": 64,
@@ -918,6 +1626,12 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
         "candidate": 4,
     }
     assert result["reflection_control_source"] == "same_run_fresh"
+    assert result["matched_policy_runtimes"] == {
+        "control_condition": publication_verifier.MATCHED_CONTROL_CONDITION,
+        "control_agent_runtime": publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME,
+        "candidate_agent_runtime": publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME,
+        "actor_selection_mode": "policy",
+    }
     assert result["git_commit"] == TEST_GIT_COMMIT
     assert result["git_tree"] == TEST_GIT_TREE
     assert result["python_version"] == "3.12.7"
@@ -925,6 +1639,289 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+@pytest.mark.parametrize("arm", ("control", "candidate"))
+def test_verifier_requires_complete_trajectory_for_every_task(
+    tmp_path: Path,
+    arm: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    execution_path = (
+        Path(protocol[f"{arm}_dir"])
+        / "trajectories"
+        / "task_b"
+        / "execution_context.json"
+    )
+    execution_path.unlink()
+
+    with pytest.raises(ValueError, match="missing complete trajectory artifacts"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_trajectory_backed_v9_outcome_corruption(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["outcome_check_count"] = 2
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match="independently recomputed audited v9"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_execution_context_outcome_corruption(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    execution_path = (
+        Path(protocol["candidate_dir"])
+        / "trajectories"
+        / "task_a"
+        / "execution_context.json"
+    )
+    execution_context = json.loads(execution_path.read_text(encoding="utf-8"))
+    execution_context["tool_allow_list"] = [f"{_TEST_OUTCOME_MARKER}0.25"]
+    _write_json(execution_path, execution_context)
+
+    with pytest.raises(ValueError, match="independently recomputed audited v9"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_trajectory_backed_v1_outcome_corruption(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["control_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["online_feedback_outcome_similarity"] = 1.0
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match="paper-era v1 outcome"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_noncanonical_trajectory_conversation(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    conversation_path = (
+        Path(protocol["candidate_dir"])
+        / "trajectories"
+        / "task_a"
+        / "conversation.json"
+    )
+    conversation_path.write_text(
+        json.dumps([{"role": "assistant", "content": "tampered"}]) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="canonical serialization"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_lifecycle_verifier_rejects_selection_omitted_from_raw_trajectory(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, _ = _lifecycle_artifacts(tmp_path)
+    trajectory_evidence = {
+        "synthetic_task": {
+            "generated_tools_visible": ("helper",),
+            "generated_tools_called": (),
+            "generated_tools_attempted": (),
+            "generated_tools_failed": (),
+        }
+    }
+
+    with pytest.raises(ValueError, match="disagrees with raw trajectory"):
+        publication_verifier._paired_lifecycle_evidence_rows(
+            candidate_dir,
+            trajectory_evidence=trajectory_evidence,
+        )
+
+
+def test_trajectory_reconstructs_generated_attempt_and_failure() -> None:
+    serialized_context = {
+        "tool_allow_list": ["native_tool", "helper"],
+        "tool_deny_list": None,
+        "_dbs": {
+            "SANDBOX": [
+                {
+                    "sender": "AGENT",
+                    "recipient": "EXECUTION_ENVIRONMENT",
+                    "openai_function_name": "helper",
+                    "tool_call_exception": None,
+                },
+                {
+                    "sender": "EXECUTION_ENVIRONMENT",
+                    "recipient": "AGENT",
+                    "openai_function_name": "helper",
+                    "tool_call_exception": "ValueError: invalid input",
+                },
+            ]
+        },
+    }
+    conversation = [
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{"function": {"name": "helper", "arguments": "{}"}}],
+        },
+        {
+            "role": "tool",
+            "name": "helper",
+            "content": "ValueError: invalid input",
+        },
+    ]
+
+    assert publication_verifier._trajectory_generated_tool_evidence(
+        serialized_context,
+        conversation,
+        generated_tool_names={"helper"},
+        scenario_name="synthetic_task",
+    ) == {
+        "generated_tools_visible": ("helper",),
+        "generated_tools_attempted": ("helper",),
+        "generated_tools_failed": ("helper",),
+        "generated_tools_called": (),
+    }
+
+
+def test_real_scenario_trajectory_round_trip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario_name = "search_phone_number_with_name"
+    scenario = _REAL_LOAD_PUBLICATION_SCENARIOS([scenario_name])[scenario_name]
+    execution_context = copy.deepcopy(scenario.starting_context)
+    recomputed = _REAL_RECOMPUTE_TRAJECTORY(
+        scenario,
+        execution_context,
+        scenario_name=scenario_name,
+    )
+    run_dir = tmp_path / "real_trajectory"
+    trajectory_dir = run_dir / "trajectories" / scenario_name
+    _write_json(
+        trajectory_dir / "execution_context.json",
+        execution_context.to_dict(serialize_console=False),
+    )
+    (trajectory_dir / "conversation.json").write_text(
+        json.dumps(recomputed["conversation"]) + "\n",
+        encoding="utf-8",
+    )
+    row = json.loads(json.dumps(recomputed["audited_outcome"]))
+    row["online_feedback_outcome_similarity"] = recomputed["paper_outcome"].get(
+        "outcome_similarity"
+    )
+    row["online_feedback_evaluator_version"] = (
+        publication_verifier.ONLINE_FEEDBACK_EVALUATOR_VERSION
+    )
+    monkeypatch.setattr(
+        publication_verifier,
+        "_load_publication_scenarios",
+        _REAL_LOAD_PUBLICATION_SCENARIOS,
+    )
+    monkeypatch.setattr(
+        publication_verifier,
+        "_independently_recompute_trajectory",
+        _REAL_RECOMPUTE_TRAJECTORY,
+    )
+
+    evidence = publication_verifier._verify_trajectory_artifacts(
+        run_dir,
+        rows={scenario_name: row},
+        order=[scenario_name],
+        arm="candidate",
+        generated_tool_names=set(),
+    )
+
+    assert evidence[scenario_name] == {
+        "generated_tools_visible": (),
+        "generated_tools_attempted": (),
+        "generated_tools_failed": (),
+        "generated_tools_called": (),
+    }
+
+
+@pytest.mark.parametrize("arm", ("control", "candidate"))
+def test_verifier_rejects_native_or_unrecorded_arm_runtime(
+    tmp_path: Path,
+    arm: str,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    run_manifest_path = Path(protocol[f"{arm}_dir"]) / "sage_ts_run_manifest.json"
+    run_manifest = json.loads(run_manifest_path.read_text(encoding="utf-8"))
+    run_manifest["agent_runtime"] = "toolsandbox_native"
+    _write_json(run_manifest_path, run_manifest)
+
+    with pytest.raises(ValueError, match="matched SAGE policy wrapper"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_control_condition_label_drift(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["control_condition"] = "pure_toolsandbox"
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match="control_condition"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 def test_verifier_rejects_any_scenario_transform_failure(tmp_path: Path) -> None:
@@ -1777,6 +2774,7 @@ def test_verifier_rejects_generation_calls_in_frozen_candidate(
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
     protocol["mode"] = "full_benchmark"
     protocol["generation_enabled"] = False
+    protocol["candidate_generated_tools_enabled"] = False
     protocol["sage_policy"] = "none"
     protocol["reflection_control_source"] = "not_applicable"
     protocol["reflection_control_delivery"] = "not_applicable_generation_disabled"

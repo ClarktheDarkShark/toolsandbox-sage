@@ -1,3 +1,4 @@
+import inspect
 import json
 from types import SimpleNamespace
 
@@ -6,6 +7,7 @@ from openai import NOT_GIVEN
 import sage_ts.adapters.openai_toolsandbox_roles as toolsandbox_roles
 from sage_ts.adapters.openai_toolsandbox_roles import (
     _contact_lookup_answer_actor_policy_message,
+    _contact_lookup_request,
     _declared_service_answer_producers,
     _derived_actor_policy_message,
     _derived_value_tool_names,
@@ -31,6 +33,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _relative_time_actor_policy_message,
     _reminder_recency_search_result_actor_policy_message,
     _reminder_recency_workflow_tool_choice,
+    _safe_action_capability,
     _scheduling_timestamp_actor_policy_message,
     _search_window_result_handoff_actor_policy_message,
     _state_action_planner_tool_choice,
@@ -46,6 +49,37 @@ def _first_tool_call(completion):
     tool_calls = completion.choices[0].message.tool_calls
     assert tool_calls
     return tool_calls[0]
+
+
+def _native_action_description(*action_names: str) -> str:
+    actions = ", ".join(action_names)
+    return (
+        "This generated composite completes one final action by delegating to "
+        f"an approved native ToolSandbox tool ({actions}). The native tool "
+        "remains the state-changing implementation."
+    )
+
+
+def test_host_policy_does_not_encode_benchmark_gold_response_templates() -> None:
+    source = "\n".join(
+        inspect.getsource(function)
+        for function in (
+            toolsandbox_roles._next_service_direct_completion_response,
+            toolsandbox_roles._contact_creation_completion_actor_policy_message,
+            toolsandbox_roles._message_contact_lookup_completion_actor_policy_message,
+            toolsandbox_roles._service_answer_text,
+        )
+    ).lower()
+    forbidden = (
+        "has been turned on",
+        "has been turned off",
+        "has been added to your contact",
+        "your message to",
+        "you are approximately",
+        "cellphone signal",
+    )
+
+    assert [phrase for phrase in forbidden if phrase in source] == []
 
 
 def test_selector_actor_policy_supports_non_native_tool_bundle() -> None:
@@ -140,22 +174,13 @@ def test_visible_record_continuation_precedes_generic_generated_tool_choice(
     assert selected == ["record_consumer"]
 
 
-def test_native_device_action_requires_visible_device_state_need(monkeypatch) -> None:
-    runtime_tool = SimpleNamespace(
-        sage_native_action_delegation=True,
-        sage_native_action_names=("set_wifi_status",),
-    )
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_device_action": runtime_tool}),
-    )
+def test_native_device_action_requires_visible_device_state_need() -> None:
     tools = [
         {
             "type": "function",
             "function": {
                 "name": "generated_device_action",
-                "description": "Apply one validated device state action.",
+                "description": _native_action_description("set_wifi_status"),
                 "parameters": {"type": "object", "properties": {}},
             },
         }
@@ -173,24 +198,15 @@ def test_native_device_action_requires_visible_device_state_need(monkeypatch) ->
     )
 
 
-def test_native_device_action_is_ready_after_visible_repair_status(
-    monkeypatch,
-) -> None:
-    runtime_tool = SimpleNamespace(
-        sage_native_action_delegation=True,
-        sage_native_action_names=("set_location_service_status",),
-    )
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_device_action": runtime_tool}),
-    )
+def test_native_device_action_is_ready_after_visible_repair_status() -> None:
     tools = [
         {
             "type": "function",
             "function": {
                 "name": "generated_device_action",
-                "description": "Apply one validated device state action.",
+                "description": _native_action_description(
+                    "set_location_service_status"
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -523,6 +539,26 @@ def test_relationship_batch_request_parses_switch_back_to_being_followup() -> No
         "source_relationship": "enemy",
         "target_relationship": "friend",
     }
+
+
+def test_contact_lookup_request_composes_relationship_and_identity_intent() -> None:
+    for request_text, relationship in (
+        ("Please identify my coworker.", "coworker"),
+        ("Whom among my friends is recorded?", "friend"),
+        ("Give me my boss's identity.", "boss"),
+    ):
+        request = _contact_lookup_request([{"role": "user", "content": request_text}])
+        assert request == {
+            "contact_name": "",
+            "phone_number": "",
+            "relationship": relationship,
+            "requested_field": "name",
+        }
+
+
+def test_safe_action_capability_composes_personal_location_lookup_terms() -> None:
+    assert _safe_action_capability("identify-my-present-town") == "location_lookup"
+    assert _safe_action_capability("where-i-happen-to-be") == "location_lookup"
 
 
 def test_derived_policy_does_not_force_distance_scalar_into_service_helper() -> None:
@@ -1308,26 +1344,16 @@ def test_safe_abstention_call_uses_host_grounded_available_inventory() -> None:
     ]
 
 
-def test_safe_abstention_inventory_grounding_supports_scrambled_names(
-    monkeypatch,
-) -> None:
-    aliases = {
-        "generated_tools_0": "prepare_safe_action_or_abstain",
-        "reminder_3": "search_reminder",
-    }
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(
-            get_execution_facing_tool_name=lambda name: aliases.get(name, name)
-        ),
-    )
+def test_safe_abstention_inventory_grounding_uses_visible_scrambled_schemas() -> None:
     tools = [
         {
             "type": "function",
             "function": {
                 "name": "generated_tools_0",
-                "description": "Prepare a safe action or abstain decision.",
+                "description": (
+                    "Prepare a safe action or abstain decision. "
+                    "Generated SAGE tool usage."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1339,7 +1365,17 @@ def test_safe_abstention_inventory_grounding_supports_scrambled_names(
                 },
             },
         },
-        {"type": "function", "function": {"name": "reminder_3"}},
+        {
+            "type": "function",
+            "function": {
+                "name": "reminder_3",
+                "description": "Search for reminders using the supplied criteria.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"content": {"type": "string"}},
+                },
+            },
+        },
     ]
     completion = toolsandbox_roles.ChatCompletion.model_validate(
         {
@@ -2294,13 +2330,7 @@ def test_native_action_policy_is_absent_for_preparatory_generated_tool() -> None
     assert policy is None
 
 
-def test_native_action_metadata_survives_description_scrambling(monkeypatch) -> None:
-    runtime_tool = SimpleNamespace(sage_native_action_delegation=True)
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_action": runtime_tool}),
-    )
+def test_native_action_requires_actor_visible_contract() -> None:
     tools = [
         {
             "type": "function",
@@ -2312,25 +2342,19 @@ def test_native_action_metadata_survives_description_scrambling(monkeypatch) -> 
         }
     ]
 
+    assert not _generated_tool_uses_native_action(tools, "generated_action")
+
+    tools[0]["function"]["description"] = _native_action_description("add_reminder")
     assert _generated_tool_uses_native_action(tools, "generated_action")
 
 
-def test_native_action_tool_hides_its_wrapped_original_from_actor(monkeypatch) -> None:
-    runtime_tool = SimpleNamespace(
-        sage_native_action_delegation=True,
-        sage_native_action_names=("add_reminder",),
-    )
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_action": runtime_tool}),
-    )
+def test_native_action_tool_hides_its_wrapped_original_from_actor() -> None:
     tools = [
         {
             "type": "function",
             "function": {
                 "name": "generated_action",
-                "description": "unrelated scrambled description",
+                "description": _native_action_description("add_reminder"),
                 "parameters": {"type": "object", "properties": {}},
             },
         },
@@ -2349,20 +2373,17 @@ def test_native_action_tool_hides_its_wrapped_original_from_actor(monkeypatch) -
     }
 
 
-def test_generated_contract_continuation_keeps_selected_wrapped_action(
-    monkeypatch,
-) -> None:
-    runtime_tool = SimpleNamespace(
-        sage_native_action_delegation=True,
-        sage_native_action_names=("set_location_service_status",),
-    )
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_action": runtime_tool}),
-    )
+def test_generated_contract_continuation_keeps_selected_wrapped_action() -> None:
     tools = [
-        {"type": "function", "function": {"name": "generated_action"}},
+        {
+            "type": "function",
+            "function": {
+                "name": "generated_action",
+                "description": _native_action_description(
+                    "set_location_service_status"
+                ),
+            },
+        },
         {
             "type": "function",
             "function": {"name": "set_location_service_status"},
@@ -2569,16 +2590,7 @@ def test_projected_state_sequence_completes_after_available_action() -> None:
     assert "continue the user's original task" in policy["content"].lower()
 
 
-def test_preparatory_tool_does_not_hide_original_action(monkeypatch) -> None:
-    runtime_tool = SimpleNamespace(
-        sage_native_action_delegation=False,
-        sage_native_action_names=("add_reminder",),
-    )
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_prep": runtime_tool}),
-    )
+def test_preparatory_tool_does_not_hide_original_action() -> None:
     tools = [
         {"type": "function", "function": {"name": "generated_prep"}},
         {"type": "function", "function": {"name": "add_reminder"}},
@@ -2679,21 +2691,13 @@ def test_dynamic_schema_keeps_multi_action_selector_for_removal() -> None:
     assert "select_action_target_by_recency" in _tool_names_execution_facing(filtered)
 
 
-def test_successful_native_action_gets_tool_free_confirmation_turn(
-    monkeypatch,
-) -> None:
-    runtime_tool = SimpleNamespace(sage_native_action_delegation=True)
-    monkeypatch.setattr(
-        toolsandbox_roles,
-        "get_current_context",
-        lambda: SimpleNamespace(name_to_tool={"generated_action": runtime_tool}),
-    )
+def test_successful_native_action_gets_tool_free_confirmation_turn() -> None:
     tools = [
         {
             "type": "function",
             "function": {
                 "name": "generated_action",
-                "description": "unrelated scrambled description",
+                "description": _native_action_description("add_reminder"),
                 "parameters": {"type": "object", "properties": {}},
             },
         },
@@ -2918,7 +2922,7 @@ def test_state_sequence_completion_retries_blocked_original_call_without_bridge(
         [
             {
                 "role": "user",
-                "content": "Add a reminder to buy chocolate milk at Whole Foods.",
+                "content": "Add a reminder to collect samples at Example Market.",
             },
             {
                 "role": "assistant",
@@ -2927,7 +2931,7 @@ def test_state_sequence_completion_retries_blocked_original_call_without_bridge(
                         "id": "call_search",
                         "function": {
                             "name": "search_location_around_lat_lon",
-                            "arguments": '{"location": "Whole Foods on McKinley Ave"}',
+                            "arguments": '{"location": "Example Market on Fiction Avenue"}',
                         },
                     }
                 ],
@@ -2988,7 +2992,7 @@ def test_state_sequence_completion_retries_blocked_original_call_without_bridge(
 
     assert policy is not None
     assert "search_location_around_lat_lon" in policy["content"]
-    assert '"location": "Whole Foods on McKinley Ave"' in policy["content"]
+    assert '"location": "Example Market on Fiction Avenue"' in policy["content"]
     assert "Do not ask the user again" in policy["content"]
 
 
@@ -2996,17 +3000,77 @@ def test_visible_location_phrase_extracts_on_street_qualifier() -> None:
     assert (
         _visible_location_phrase_from_user_request(
             [
-                {"role": "user", "content": "Add a reminder at Whole Foods."},
-                {"role": "user", "content": "It's on McKinley Ave."},
+                {"role": "user", "content": "Add a reminder at Example Market."},
+                {"role": "user", "content": "It's on Fiction Avenue."},
             ]
         )
-        == "McKinley Ave"
+        == "Fiction Avenue"
     )
     assert (
         _visible_location_phrase_from_user_request(
             [{"role": "user", "content": "Remind me on Friday at 5 PM."}]
         )
         == ""
+    )
+
+
+def test_location_policy_helpers_use_generic_visible_structure() -> None:
+    parts = toolsandbox_roles._reminder_location_parts(
+        [
+            {
+                "role": "user",
+                "content": (
+                    "Add a reminder to collect samples at that Example Market."
+                ),
+            }
+        ]
+    )
+    assert parts == {
+        "content": "Collect samples",
+        "location": "that Example Market",
+    }
+
+    assert toolsandbox_roles._location_query_is_specific(
+        "47 Fiction Avenue, Sample City"
+    )
+    assert not toolsandbox_roles._location_query_is_specific("Example Market")
+
+    matching = toolsandbox_roles._location_record_token_score(
+        {"name": "One Example Market"},
+        "One Example Market",
+    )
+    nonmatching = toolsandbox_roles._location_record_token_score(
+        {"name": "Two Example Market"},
+        "One Example Market",
+    )
+    assert matching > nonmatching
+
+
+def test_visible_lookup_cleanup_and_holiday_label_are_not_fixture_specific() -> None:
+    assert (
+        toolsandbox_roles._clean_lookup_query_fragment(
+            "Example Plaza; resolve this issue independently"
+        )
+        == "Example Plaza"
+    )
+    assert (
+        toolsandbox_roles._holiday_context_label(
+            [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_holiday",
+                            "function": {
+                                "name": "search_holiday",
+                                "arguments": '{"holiday_name": "Founders Day"}',
+                            },
+                        }
+                    ],
+                }
+            ]
+        )
+        == "Founders Day"
     )
 
 
@@ -3032,7 +3096,10 @@ def test_location_search_retries_generated_prepare_after_coordinates() -> None:
         {"type": "function", "function": {"name": "add_reminder"}},
     ]
     messages = [
-        {"role": "user", "content": "Add a reminder to buy milk at Whole Foods."},
+        {
+            "role": "user",
+            "content": "Add a reminder to collect samples at Example Market.",
+        },
         {
             "role": "assistant",
             "tool_calls": [
@@ -3042,8 +3109,8 @@ def test_location_search_retries_generated_prepare_after_coordinates() -> None:
                         "name": "prepare_location_search_args",
                         "arguments": json.dumps(
                             {
-                                "user_request": "Add a reminder to buy milk at Whole Foods.",
-                                "location_phrase": "Whole Foods",
+                                "user_request": "Add a reminder to collect samples at Example Market.",
+                                "location_phrase": "Example Market",
                             }
                         ),
                     },
@@ -3064,7 +3131,7 @@ def test_location_search_retries_generated_prepare_after_coordinates() -> None:
                 "'missing_current_coordinates_for_broad_location_query'}"
             ),
         },
-        {"role": "user", "content": "It's on McKinley Ave."},
+        {"role": "user", "content": "It's on Fiction Avenue."},
         {
             "role": "assistant",
             "tool_calls": [
@@ -3091,7 +3158,7 @@ def test_location_search_retries_generated_prepare_after_coordinates() -> None:
 
     assert policy is not None
     assert "prepare_location_search_args" in policy["content"]
-    assert "McKinley Ave" in policy["content"]
+    assert "Fiction Avenue" in policy["content"]
     assert "37.334606" in policy["content"]
     assert "search_location_around_lat_lon" in policy["content"]
     assert (

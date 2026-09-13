@@ -401,6 +401,53 @@ def _wrap_public_repo_v3(repo: Path, release_v2_path: Path) -> Path:
     return release_v3_path
 
 
+def _wrap_public_repo_v4(repo: Path, release_v3_path: Path) -> Path:
+    release_v3 = _read_json(release_v3_path)
+    v3_declaration = release_v3["active_validation_thresholds"]
+    v3_path = repo / v3_declaration["path"]
+    v3 = _read_json(v3_path)
+    v4_path = repo / "active_thresholds_v4.json"
+    _write_json(
+        v4_path,
+        {
+            **v3,
+            "schema_version": 4,
+            "supersedes": {
+                "path": v3_declaration["path"],
+                "sha256": _sha256(v3_path),
+            },
+            "required_technical_readiness": {
+                "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+            },
+            "report_only": {
+                **v3["report_only"],
+                "rationale": "Adaptive technical-readiness threshold.",
+            },
+        },
+    )
+    release_v4_path = repo / "publication_release_v4.json"
+    _write_json(
+        release_v4_path,
+        {
+            "schema_version": 3,
+            "manifest_type": "publication_release_input_chain",
+            "base_input_manifest": release_v3["base_input_manifest"],
+            "checkpoint_policy_amendment": release_v3["checkpoint_policy_amendment"],
+            "superseded_validation_thresholds_v2": release_v3[
+                "superseded_validation_thresholds"
+            ],
+            "superseded_validation_thresholds_v3": v3_declaration,
+            "active_validation_thresholds": {
+                "path": v4_path.relative_to(repo).as_posix(),
+                "sha256": _sha256(v4_path),
+            },
+        },
+    )
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "technical readiness release chain")
+    return release_v4_path
+
+
 def test_compact_verifier_accepts_tracked_inputs_without_local_bundle(
     tmp_path: Path,
 ) -> None:
@@ -466,6 +513,75 @@ def test_release_verifier_accepts_content_addressed_dual_endpoint_amendment(
     assert (
         result["validation_thresholds"]["paper_comparable_endpoint"]["task_count"] == 2
     )
+
+
+def test_release_verifier_accepts_content_addressed_technical_readiness_amendment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    release_v2_path = _wrap_public_repo(repo, base_manifest_path)
+    release_v3_path = _wrap_public_repo_v3(repo, release_v2_path)
+    release_v4_path = _wrap_public_repo_v4(repo, release_v3_path)
+    active_v3 = _read_json(repo / "active_thresholds_v3.json")
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_AUDITED_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["audited_current_all_tasks"],
+    )
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["paper_comparable_historical_subset"],
+    )
+
+    result = verify_inputs(repo, release_v4_path)
+
+    assert result["frozen_validation_thresholds_v2"]["path"] == (
+        "active_thresholds.json"
+    )
+    assert result["superseded_validation_thresholds"]["path"] == (
+        "active_thresholds_v3.json"
+    )
+    assert result["validation_thresholds"]["technical_readiness"] == {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+    }
+
+
+def test_release_verifier_rejects_rehashed_technical_readiness_threshold_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, base_manifest_path = _build_public_repo(tmp_path)
+    release_v2_path = _wrap_public_repo(repo, base_manifest_path)
+    release_v3_path = _wrap_public_repo_v3(repo, release_v2_path)
+    release_v4_path = _wrap_public_repo_v4(repo, release_v3_path)
+    active_v3 = _read_json(repo / "active_thresholds_v3.json")
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_AUDITED_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["audited_current_all_tasks"],
+    )
+    monkeypatch.setattr(
+        publication_inputs,
+        "EXPECTED_PAPER_COMPARABLE_OUTCOME_ENDPOINT",
+        active_v3["performance_endpoints"]["paper_comparable_historical_subset"],
+    )
+    release_v4 = _read_json(release_v4_path)
+    v4_path = repo / release_v4["active_validation_thresholds"]["path"]
+    v4 = _read_json(v4_path)
+    v4["required_technical_readiness"][
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive"
+    ] = 0.79
+    _write_json(v4_path, v4)
+    release_v4["active_validation_thresholds"]["sha256"] = _sha256(v4_path)
+    _write_json(release_v4_path, release_v4)
+
+    with pytest.raises(
+        InputVerificationError,
+        match="exactly an exclusive 0.80",
+    ):
+        verify_inputs(repo, release_v4_path)
 
 
 def test_dual_endpoint_release_requires_parallel_arms_true(
