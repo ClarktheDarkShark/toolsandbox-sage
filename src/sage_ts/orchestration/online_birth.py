@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import time
 from collections import Counter
@@ -39,6 +40,7 @@ class GeneratedToolFactory(Protocol):
 
 
 CampaignEventHook = Callable[[str, dict[str, Any]], None]
+RepairAcknowledgementHook = Callable[[str, int, str, str], dict[str, Any]]
 
 
 def suggested_tool_name(canonical_key: str) -> str | None:
@@ -82,6 +84,15 @@ BROADER_HELPER_OVERLAPS = {
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 CANDIDATE_REPAIR_ATTEMPTS = 7
 MAX_REJECTIONS_PER_TOOL_KEY = 2
+POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS = 3
+POST_DEPLOYMENT_CANARY_REQUIRED_EXACT_SUCCESSES = 2
+POST_DEPLOYMENT_CANARY_REQUIRED_FRESH_CONTROL_SUCCESS_FLIPS = 1
+POST_DEPLOYMENT_CANARY_MAX_FAMILY_TASKS = 8
+POST_DEPLOYMENT_REPAIR_STATE_FILENAME = "post_deployment_repair_state.json"
+POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME = "self_evolution_tool_repair_requests.jsonl"
+POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME = (
+    "self_evolution_tool_repair_acknowledgements.jsonl"
+)
 
 
 def _native_action_observation_priority(
@@ -454,6 +465,54 @@ def _validation_failure_score(validation: ValidationResult) -> int:
     if not validation.errors:
         return 1000
     return sum(_validation_error_distance(error) for error in validation.errors)
+
+
+def _model_visible_generation_examples(
+    examples: tuple[ToolExample, ...],
+) -> tuple[ToolExample, ...]:
+    """Keep claim-grade validation cases out of model generation prompts.
+
+    Explicitly marked held-out cases are never shown to the generator.  Older
+    contracts without markers reserve their final non-negative case, matching
+    the validator's legacy partition.  Negative-applicability examples remain
+    part of the public generation contract.
+    """
+
+    marked_held_out = {
+        index for index, example in enumerate(examples) if example.held_out
+    }
+    if marked_held_out:
+        return tuple(
+            example
+            for index, example in enumerate(examples)
+            if index not in marked_held_out
+        )
+    non_negative_indexes = [
+        index
+        for index, example in enumerate(examples)
+        if not example.negative_applicability
+    ]
+    if len(non_negative_indexes) < 2:
+        return examples
+    reserved_index = non_negative_indexes[-1]
+    return tuple(
+        example for index, example in enumerate(examples) if index != reserved_index
+    )
+
+
+def _repair_prompt_errors(errors: tuple[str, ...]) -> tuple[str, ...]:
+    """Remove held-out values while retaining actionable invariant labels."""
+
+    sanitized: list[str] = []
+    for raw_error in errors:
+        error = str(raw_error)
+        if error.startswith(("held_out_", "blind_property_")):
+            error = error.split(":", 1)[0]
+        elif "expected=" in error:
+            error = error.split(":expected=", 1)[0]
+        if error and error not in sanitized:
+            sanitized.append(error)
+    return tuple(sanitized)
 
 
 def _validation_error_distance(error: str) -> int:
@@ -1016,6 +1075,429 @@ class OnlineBirthController:
     max_rejections_per_key: int = MAX_REJECTIONS_PER_TOOL_KEY
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
     pre_scenario_visible_observations: set[str] = field(default_factory=set)
+    observations_by_tool_name: dict[str, CapabilityObservation] = field(
+        default_factory=dict
+    )
+    pending_repair_requests: list[dict[str, Any]] = field(default_factory=list)
+    handled_repair_request_ids: set[str] = field(default_factory=set)
+    canary_state_by_tool: dict[str, dict[str, Any]] = field(default_factory=dict)
+    repair_transactions_by_tool: dict[str, dict[str, Any]] = field(default_factory=dict)
+    last_completed_count: int = 0
+
+    def __post_init__(self) -> None:
+        self._load_repair_state()
+
+    @property
+    def repair_state_path(self) -> Path:
+        return self.output_dir / POST_DEPLOYMENT_REPAIR_STATE_FILENAME
+
+    @staticmethod
+    def _jsonl_rows(path: Path) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+        return rows
+
+    @staticmethod
+    def _prepared_canary_state(
+        *,
+        request_id: str,
+        tool_version: int,
+        source_tool_version: int,
+        target_task_family: str,
+        eligible_from_completed_count: int,
+    ) -> dict[str, Any]:
+        """Create an empty, claim-grade prospective canary state."""
+
+        return {
+            "evidence_schema_version": 2,
+            "request_id": request_id,
+            "tool_version": tool_version,
+            "source_tool_version": source_tool_version,
+            "target_task_family": target_task_family,
+            "eligible_from_completed_count": eligible_from_completed_count,
+            "called_count": 0,
+            "visible_count": 0,
+            "eligible_family_task_count": 0,
+            "outcomes": [],
+            "outcome_deltas": [],
+            "attributable_call_count": 0,
+            "attributable_observation_count": 0,
+            "exact_success_count": 0,
+            "audited_regression_count": 0,
+            "fresh_control_success_flip_count": 0,
+            "version_mismatch_call_count": 0,
+            "contract_failure_count": 0,
+            "runtime_failure_count": 0,
+        }
+
+    @staticmethod
+    def _nonnegative_int(value: Any, *, default: int = 0) -> int:
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+        return default
+
+    def _normalize_loaded_canary_state(
+        self,
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Preserve v2 evidence; reset untyped legacy soft evidence fail-closed."""
+
+        request_id = str(state.get("request_id") or "")
+        raw_version = state.get("tool_version")
+        tool_version = (
+            raw_version
+            if isinstance(raw_version, int) and not isinstance(raw_version, bool)
+            else 0
+        )
+        raw_source_version = state.get("source_tool_version")
+        source_tool_version = (
+            raw_source_version
+            if isinstance(raw_source_version, int)
+            and not isinstance(raw_source_version, bool)
+            and raw_source_version > 0
+            else max(tool_version - 1, 1)
+        )
+        raw_eligible = state.get("eligible_from_completed_count")
+        eligible = (
+            raw_eligible
+            if isinstance(raw_eligible, int)
+            and not isinstance(raw_eligible, bool)
+            and raw_eligible > 0
+            else self.last_completed_count + 1
+        )
+        if state.get("evidence_schema_version") != 2:
+            reset = self._prepared_canary_state(
+                request_id=request_id,
+                tool_version=tool_version,
+                source_tool_version=source_tool_version,
+                target_task_family=self._normalized_task_family(
+                    state.get("target_task_family")
+                ),
+                eligible_from_completed_count=eligible,
+            )
+            # Deterministic contract/runtime failures remain valid hard evidence;
+            # old outcome/call counters lacked sufficient attribution metadata.
+            reset["contract_failure_count"] = self._nonnegative_int(
+                state.get("contract_failure_count")
+            )
+            reset["runtime_failure_count"] = self._nonnegative_int(
+                state.get("runtime_failure_count")
+            )
+            return reset
+        normalized = dict(state)
+        defaults = self._prepared_canary_state(
+            request_id=request_id,
+            tool_version=tool_version,
+            source_tool_version=source_tool_version,
+            target_task_family=self._normalized_task_family(
+                state.get("target_task_family")
+            ),
+            eligible_from_completed_count=eligible,
+        )
+        for key, value in defaults.items():
+            normalized.setdefault(key, value)
+        return normalized
+
+    def _append_recovery_acknowledgement(
+        self,
+        *,
+        request_id: str,
+        tool_name: str,
+        version: int,
+        status: str,
+    ) -> None:
+        """Durably close a transaction recovered before hooks are constructed."""
+
+        if not request_id or not tool_name or version < 1:
+            return
+        append_jsonl(
+            self.output_dir / POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME,
+            {
+                "event": "post_deployment_tool_repair_acknowledged",
+                "schema_version": 1,
+                "request_id": request_id,
+                "tool_name": tool_name,
+                "new_version": version,
+                "status": status,
+                "acknowledged_after_completed_count": self.last_completed_count,
+                "eligible_from_completed_count": self.last_completed_count + 1,
+                "future_tasks_only": True,
+                "triggering_task_replay_allowed": False,
+                "recovered_transaction": True,
+            },
+        )
+
+    def _load_repair_state(self) -> None:
+        if self.repair_state_path.exists():
+            try:
+                payload = json.loads(self.repair_state_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+            if isinstance(payload, dict):
+                pending = payload.get("pending_repair_requests")
+                if isinstance(pending, list):
+                    self.pending_repair_requests = [
+                        dict(item) for item in pending if isinstance(item, dict)
+                    ]
+                handled = payload.get("handled_repair_request_ids")
+                if isinstance(handled, list):
+                    self.handled_repair_request_ids = {
+                        str(item) for item in handled if str(item)
+                    }
+                canaries = payload.get("canary_state_by_tool")
+                if isinstance(canaries, dict):
+                    self.canary_state_by_tool = {
+                        str(name): dict(state)
+                        for name, state in canaries.items()
+                        if isinstance(name, str) and isinstance(state, dict)
+                    }
+                transactions = payload.get("repair_transactions_by_tool")
+                if isinstance(transactions, dict):
+                    self.repair_transactions_by_tool = {
+                        str(name): dict(state)
+                        for name, state in transactions.items()
+                        if isinstance(name, str) and isinstance(state, dict)
+                    }
+                completed_count = payload.get("last_completed_count")
+                if (
+                    isinstance(completed_count, int)
+                    and not isinstance(completed_count, bool)
+                    and completed_count >= 0
+                ):
+                    self.last_completed_count = completed_count
+
+        request_rows = self._jsonl_rows(
+            self.output_dir / POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME
+        )
+        request_by_id = {
+            str(row.get("request_id")): row
+            for row in request_rows
+            if str(row.get("request_id") or "")
+        }
+
+        acknowledgement_rows = self._jsonl_rows(
+            self.output_dir / POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME
+        )
+        final_status_by_request: dict[str, dict[str, Any]] = {}
+        for row in acknowledgement_rows:
+            request_id = str(row.get("request_id") or "")
+            if request_id:
+                final_status_by_request[request_id] = row
+        terminal_statuses = {"promoted", "rejected", "rolled_back"}
+        terminal_request_ids = {
+            request_id
+            for request_id, row in final_status_by_request.items()
+            if str(row.get("status") or "") in terminal_statuses
+        }
+        for request_id in terminal_request_ids:
+            acknowledgement = final_status_by_request[request_id]
+            if str(acknowledgement.get("status") or "") == "promoted":
+                continue
+            tool_name = str(acknowledgement.get("tool_name") or "")
+            version = acknowledgement.get("new_version")
+            entry = self.store.get(tool_name) if tool_name else None
+            if (
+                entry is not None
+                and isinstance(version, int)
+                and not isinstance(version, bool)
+                and entry.version == version
+                and not entry.retired
+            ):
+                self.store.retire(tool_name)
+        self.pending_repair_requests = [
+            request
+            for request in self.pending_repair_requests
+            if str(request.get("request_id") or "") not in terminal_request_ids
+        ]
+        self.canary_state_by_tool = {
+            tool_name: state
+            for tool_name, state in self.canary_state_by_tool.items()
+            if str(state.get("request_id") or "") not in terminal_request_ids
+        }
+        self.repair_transactions_by_tool = {
+            tool_name: state
+            for tool_name, state in self.repair_transactions_by_tool.items()
+            if str(state.get("request_id") or "") not in terminal_request_ids
+        }
+        self.handled_repair_request_ids.update(terminal_request_ids)
+
+        # A crash after the preactivation state write can leave either an exact
+        # active vN+1 (recover it into its empty canary) or no trustworthy target
+        # version (retire the affected entry and close the request).
+        for tool_name, transaction in list(self.repair_transactions_by_tool.items()):
+            request_id = str(transaction.get("request_id") or "")
+            target_version = transaction.get("target_tool_version")
+            source_version = transaction.get("source_tool_version")
+            expected_code_hash = str(transaction.get("replacement_code_hash") or "")
+            entry = self.store.get(tool_name)
+            matches_target = bool(
+                isinstance(target_version, int)
+                and not isinstance(target_version, bool)
+                and entry is not None
+                and entry.version == target_version
+                and not entry.retired
+                and entry.birth_scenario.startswith("post_deployment_repair:")
+                and (
+                    not expected_code_hash
+                    or entry.stored_code_hash == expected_code_hash
+                )
+            )
+            if matches_target:
+                raw_canary = transaction.get("canary_state")
+                canary = dict(raw_canary) if isinstance(raw_canary, dict) else {}
+                canary.setdefault("request_id", request_id)
+                canary.setdefault("tool_version", target_version)
+                canary.setdefault("source_tool_version", source_version)
+                self.canary_state_by_tool[tool_name] = (
+                    self._normalize_loaded_canary_state(canary)
+                )
+                self.handled_repair_request_ids.add(request_id)
+                self.pending_repair_requests = [
+                    request
+                    for request in self.pending_repair_requests
+                    if str(request.get("request_id") or "") != request_id
+                ]
+                self._event(
+                    "post_deployment_tool_repair_transaction_recovered",
+                    {
+                        "request_id": request_id,
+                        "tool_name": tool_name,
+                        "tool_version": target_version,
+                        "recovery_disposition": "canary",
+                    },
+                )
+            else:
+                if entry is not None and not entry.retired:
+                    self.store.retire(tool_name)
+                self.pending_repair_requests = [
+                    request
+                    for request in self.pending_repair_requests
+                    if str(request.get("request_id") or "") != request_id
+                ]
+                self.handled_repair_request_ids.add(request_id)
+                if request_id in request_by_id:
+                    acknowledgement_version = (
+                        source_version
+                        if isinstance(source_version, int)
+                        and not isinstance(source_version, bool)
+                        and source_version > 0
+                        else 1
+                    )
+                    self._append_recovery_acknowledgement(
+                        request_id=request_id,
+                        tool_name=tool_name,
+                        version=acknowledgement_version,
+                        status="rejected",
+                    )
+                self._event(
+                    "post_deployment_tool_repair_transaction_recovered",
+                    {
+                        "request_id": request_id,
+                        "tool_name": tool_name,
+                        "source_tool_version": source_version,
+                        "target_tool_version": target_version,
+                        "recovery_disposition": "retired",
+                    },
+                )
+            self.repair_transactions_by_tool.pop(tool_name, None)
+
+        self.canary_state_by_tool = {
+            tool_name: self._normalize_loaded_canary_state(state)
+            for tool_name, state in self.canary_state_by_tool.items()
+        }
+        for request_id, row in final_status_by_request.items():
+            status = str(row.get("status") or "")
+            if status in terminal_statuses:
+                continue
+            if status != "canary_pending":
+                continue
+            tool_name = str(row.get("tool_name") or "")
+            version = row.get("new_version")
+            if (
+                tool_name
+                and isinstance(version, int)
+                and not isinstance(version, bool)
+                and version > 0
+                and tool_name not in self.canary_state_by_tool
+            ):
+                request = request_by_id.get(request_id, {})
+                entry = self.store.get(tool_name)
+                if (
+                    entry is not None
+                    and entry.version == version
+                    and not entry.retired
+                    and entry.birth_scenario.startswith("post_deployment_repair:")
+                ):
+                    self.canary_state_by_tool[tool_name] = self._prepared_canary_state(
+                        request_id=request_id,
+                        tool_version=version,
+                        source_tool_version=max(version - 1, 1),
+                        target_task_family=self._normalized_task_family(
+                            request.get("target_task_family")
+                        ),
+                        eligible_from_completed_count=self._nonnegative_int(
+                            request.get("eligible_from_completed_count"),
+                            default=self.last_completed_count + 1,
+                        ),
+                    )
+                else:
+                    if (
+                        entry is not None
+                        and entry.version == version
+                        and not entry.retired
+                    ):
+                        self.store.retire(tool_name)
+                    if request_id in request_by_id:
+                        self._append_recovery_acknowledgement(
+                            request_id=request_id,
+                            tool_name=tool_name,
+                            version=version,
+                            status="rolled_back",
+                        )
+                self.handled_repair_request_ids.add(request_id)
+
+        acknowledged_ids = set(final_status_by_request)
+        pending_ids = {
+            str(item.get("request_id") or "") for item in self.pending_repair_requests
+        }
+        for row in request_rows:
+            request_id = str(row.get("request_id") or "")
+            if (
+                request_id
+                and request_id not in acknowledged_ids
+                and request_id not in self.handled_repair_request_ids
+                and request_id not in pending_ids
+            ):
+                self.pending_repair_requests.append(dict(row))
+                pending_ids.add(request_id)
+        self._write_repair_state()
+
+    def _write_repair_state(self) -> None:
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": 1,
+            "pending_repair_requests": self.pending_repair_requests,
+            "handled_repair_request_ids": sorted(self.handled_repair_request_ids),
+            "canary_state_by_tool": self.canary_state_by_tool,
+            "repair_transactions_by_tool": self.repair_transactions_by_tool,
+            "last_completed_count": self.last_completed_count,
+        }
+        temporary_path = self.repair_state_path.with_suffix(".tmp")
+        temporary_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, self.repair_state_path)
 
     def _write_generation_status(self, event: str, payload: dict[str, Any]) -> None:
         status_path = self.output_dir / "tool_generation_status.json"
@@ -1058,6 +1540,1183 @@ class OnlineBirthController:
                         **payload,
                     },
                 )
+
+    @staticmethod
+    def _normalized_task_family(value: Any) -> str:
+        normalized = str(value or "").strip().lower()
+        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_.:-")
+        if (
+            not normalized
+            or len(normalized) > 128
+            or any(character not in allowed for character in normalized)
+        ):
+            return "unclassified"
+        return normalized
+
+    def _trusted_target_task_family(
+        self,
+        tool_name: str,
+        value: Any,
+        *,
+        visible_task_family: str | None = None,
+    ) -> str:
+        """Keep repair and canary families in the routed-task namespace.
+
+        Reflection receives the same public ``VisibleTaskContext`` family that
+        routing uses. Capability observations use a different namespace (for
+        example ``safe_abstain`` rather than ``contact``), so they are only a
+        compatibility fallback for direct controller callers.
+        """
+
+        normalized = self._normalized_task_family(value)
+        if normalized == "unclassified":
+            return normalized
+        expected_family = self._normalized_task_family(visible_task_family)
+        if expected_family == "unclassified":
+            observation = self.observations_by_tool_name.get(tool_name)
+            expected_family = self._normalized_task_family(
+                observation.task_family_key if observation is not None else None
+            )
+        if expected_family != "unclassified" and normalized != expected_family:
+            return "unclassified"
+        return normalized
+
+    def queue_post_deployment_repair_requests(
+        self,
+        requests: tuple[dict[str, Any], ...] | list[dict[str, Any]],
+        *,
+        visible_task_family: str | None = None,
+    ) -> tuple[str, ...]:
+        """Accept only future-only, sanitized lifecycle repair handoffs."""
+
+        queued: list[str] = []
+        already_pending = {
+            str(item.get("request_id") or "") for item in self.pending_repair_requests
+        }
+        for raw_request in requests:
+            request_id = str(raw_request.get("request_id") or "").strip()
+            tool_name = str(raw_request.get("tool_name") or "").strip()
+            repair_kind = str(raw_request.get("repair_kind") or "").strip()
+            if (
+                not request_id
+                or not tool_name
+                or repair_kind not in {"implementation", "metadata"}
+                or not bool(raw_request.get("future_tasks_only"))
+                or bool(raw_request.get("triggering_task_replay_allowed"))
+                or request_id in self.handled_repair_request_ids
+                or request_id in already_pending
+            ):
+                continue
+            raw_evidence = raw_request.get("public_evidence")
+            public_evidence = (
+                {
+                    str(key): value
+                    for key, value in raw_evidence.items()
+                    if str(key)
+                    in {
+                        "called_count",
+                        "visible_count",
+                        "public_visible_context_count",
+                        "candidate_outcome_observation_count",
+                        "candidate_outcome_mean",
+                        "candidate_outcome_success_rate",
+                        "contract_failure_count",
+                        "success_flip_count",
+                        "failed_count",
+                    }
+                    and isinstance(value, (bool, int, float, type(None)))
+                }
+                if isinstance(raw_evidence, dict)
+                else {}
+            )
+            trusted_target_family = self._trusted_target_task_family(
+                tool_name,
+                raw_request.get("target_task_family"),
+                visible_task_family=visible_task_family,
+            )
+            raw_trigger_count = raw_request.get("trigger_completed_count")
+            raw_eligible_count = raw_request.get("eligible_from_completed_count")
+            trigger_count_valid = bool(
+                isinstance(raw_trigger_count, int)
+                and not isinstance(raw_trigger_count, bool)
+                and raw_trigger_count >= 0
+            )
+            eligible_count_valid = bool(
+                isinstance(raw_eligible_count, int)
+                and not isinstance(raw_eligible_count, bool)
+                and raw_eligible_count > 0
+                and trigger_count_valid
+                and raw_eligible_count > raw_trigger_count
+            )
+            sanitized = {
+                "request_id": request_id,
+                "request_key": str(raw_request.get("request_key") or request_id),
+                "repair_kind": repair_kind,
+                "tool_name": tool_name,
+                "source_tool_version": raw_request.get("source_tool_version"),
+                "target_task_family": trusted_target_family,
+                "trigger_reason_codes": [
+                    str(item)
+                    for item in raw_request.get("trigger_reason_codes", [])
+                    if str(item)
+                    in {
+                        "deterministic_public_contract_failure",
+                        "repeated_generated_tool_execution_failure",
+                        "unresolved_generated_tool_execution_failure",
+                        "repeated_visible_not_called",
+                        "visible_repeatedly_without_adoption",
+                    }
+                ],
+                "trigger_completed_count": (
+                    raw_trigger_count if trigger_count_valid else None
+                ),
+                "eligible_from_completed_count": (
+                    raw_eligible_count if eligible_count_valid else None
+                ),
+                "repair_request_validation_error": (
+                    None
+                    if trigger_count_valid and eligible_count_valid
+                    else "invalid_future_task_completed_count"
+                ),
+                "future_tasks_only": True,
+                "triggering_task_replay_allowed": False,
+                "public_evidence": public_evidence,
+            }
+            self.pending_repair_requests.append(sanitized)
+            already_pending.add(request_id)
+            queued.append(request_id)
+            self._event(
+                "post_deployment_tool_repair_queued",
+                {
+                    "request_id": request_id,
+                    "tool_name": tool_name,
+                    "repair_kind": repair_kind,
+                    "source_tool_version": sanitized["source_tool_version"],
+                    "target_task_family": sanitized["target_task_family"],
+                    "eligible_from_completed_count": sanitized[
+                        "eligible_from_completed_count"
+                    ],
+                    "future_tasks_only": True,
+                },
+            )
+        if queued:
+            self._write_repair_state()
+        return tuple(queued)
+
+    def contract_failures_for_tools(
+        self, tool_names: list[str] | tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Recheck called deployed tools against their public frozen contracts."""
+
+        failed: list[str] = []
+        for tool_name in dict.fromkeys(str(item) for item in tool_names if item):
+            entry = self.store.get(tool_name)
+            observation = self.observations_by_tool_name.get(tool_name)
+            if entry is None or observation is None:
+                continue
+            validation = validate_generated_tool(
+                entry.tool,
+                examples=_validation_examples_for_tool(entry.tool, observation),
+            )
+            original_contract_errors = _original_tool_contract_errors(
+                entry.tool, observation
+            )
+            if validation.accepted and not original_contract_errors:
+                continue
+            failed.append(tool_name)
+            self._event(
+                "post_deployment_public_contract_failure",
+                {
+                    "tool_name": tool_name,
+                    "tool_version": entry.version,
+                    "canonical_key": observation.canonical_key,
+                    "error_labels": list(
+                        _repair_prompt_errors(
+                            (*original_contract_errors, *validation.errors)
+                        )
+                    ),
+                    "raw_hidden_case_values_logged": False,
+                },
+            )
+        return tuple(failed)
+
+    def record_canary_result(
+        self,
+        *,
+        called_tools: list[str] | tuple[str, ...],
+        called_tool_versions: dict[str, int],
+        attributable_tools: list[str] | tuple[str, ...],
+        candidate_outcome: float | None,
+        audited_outcome_delta: float | None,
+        fresh_control_success_flip: bool,
+        contract_failures: list[str] | tuple[str, ...],
+        exception_type: Any,
+        task_family_key: str,
+        visible_tools: list[str] | tuple[str, ...] = (),
+        failed_tools: list[str] | tuple[str, ...] = (),
+        acknowledge: RepairAcknowledgementHook | None = None,
+    ) -> tuple[dict[str, Any], ...]:
+        """Promote only from attributable, current-version, prospective evidence."""
+
+        decisions: list[dict[str, Any]] = []
+        called_set = {str(item) for item in called_tools if item}
+        visible_set = {str(item) for item in visible_tools if item}
+        failed_set = {str(item) for item in failed_tools if item}
+        all_called_set = called_set | failed_set
+        attributable_set = {str(item) for item in attributable_tools if item}
+        version_by_tool = {
+            str(tool_name): version
+            for tool_name, version in called_tool_versions.items()
+            if isinstance(tool_name, str)
+            and isinstance(version, int)
+            and not isinstance(version, bool)
+            and version > 0
+        }
+        contract_failure_set = set(contract_failures)
+        for tool_name, state in list(self.canary_state_by_tool.items()):
+            entry = self.store.get(tool_name)
+            if entry is None or entry.retired or entry.version != state["tool_version"]:
+                request_id = str(state.get("request_id") or "")
+                version = state.get("tool_version")
+                acknowledgement_version = (
+                    version if isinstance(version, int) and version > 0 else 1
+                )
+                decision = {
+                    "event": "post_deployment_tool_canary_retired",
+                    "request_id": request_id,
+                    "tool_name": tool_name,
+                    "tool_version": acknowledgement_version,
+                    "status": "rolled_back",
+                    "reason": "canary_registry_version_missing_or_superseded",
+                    "run_finalization": False,
+                    "decision_uses_score": False,
+                }
+                self._event(decision["event"], decision)
+                if acknowledge is not None and request_id:
+                    acknowledge(
+                        tool_name,
+                        acknowledgement_version,
+                        request_id,
+                        "rolled_back",
+                    )
+                if request_id:
+                    self.handled_repair_request_ids.add(request_id)
+                self.canary_state_by_tool.pop(tool_name, None)
+                decisions.append(decision)
+                continue
+            state.setdefault("evidence_schema_version", 2)
+            state.setdefault("called_count", 0)
+            state.setdefault("visible_count", 0)
+            state.setdefault("eligible_family_task_count", 0)
+            state.setdefault("outcomes", [])
+            state.setdefault("outcome_deltas", [])
+            state.setdefault("attributable_call_count", 0)
+            state.setdefault("attributable_observation_count", 0)
+            state.setdefault("exact_success_count", 0)
+            state.setdefault("audited_regression_count", 0)
+            state.setdefault("fresh_control_success_flip_count", 0)
+            state.setdefault("version_mismatch_call_count", 0)
+            state.setdefault("contract_failure_count", 0)
+            state.setdefault("runtime_failure_count", 0)
+            target_family = str(state.get("target_task_family") or "unclassified")
+            reported_called = tool_name in all_called_set
+            current_version_called = bool(
+                reported_called
+                and version_by_tool.get(tool_name) == entry.version
+                and entry.version == state["tool_version"]
+            )
+            if reported_called and not current_version_called:
+                state["version_mismatch_call_count"] += 1
+            # ``unclassified`` is a real fail-closed bucket, not a wildcard.
+            # Otherwise a malformed or mismatched repair family could collect
+            # favorable evidence from arbitrary later tasks and be promoted.
+            in_target_family = task_family_key == target_family
+            attributable_call = bool(
+                current_version_called
+                and len(all_called_set) == 1
+                and tool_name in attributable_set
+            )
+            if current_version_called and tool_name in contract_failure_set:
+                state["contract_failure_count"] += 1
+            # A scenario-level exception can happen in the actor, user simulator,
+            # evaluator, or framework after a valid helper call. Only the tool's
+            # own failed result is attributable runtime evidence.
+            if current_version_called and tool_name in failed_set:
+                state["runtime_failure_count"] += 1
+            if not in_target_family:
+                if reported_called:
+                    self._event(
+                        "post_deployment_tool_canary_out_of_family_call_ignored",
+                        {
+                            "request_id": state["request_id"],
+                            "tool_name": tool_name,
+                            "tool_version": entry.version,
+                            "target_task_family": target_family,
+                            "observed_task_family": task_family_key,
+                            "soft_evidence_ignored": True,
+                            "called_version": version_by_tool.get(tool_name),
+                            "current_version_call": current_version_called,
+                            "hard_failure_applied": bool(
+                                state["contract_failure_count"]
+                                or state["runtime_failure_count"]
+                            ),
+                        },
+                    )
+                if not (
+                    state["contract_failure_count"] or state["runtime_failure_count"]
+                ):
+                    continue
+            else:
+                state["eligible_family_task_count"] = (
+                    int(state.get("eligible_family_task_count") or 0) + 1
+                )
+                if tool_name in visible_set:
+                    state["visible_count"] = int(state.get("visible_count") or 0) + 1
+            if current_version_called and in_target_family:
+                state["called_count"] += 1
+            # A scenario-level exception is not attributable to the generated
+            # tool.  In particular, the audited runner records a zero outcome
+            # for framework/actor/user failures, so consuming that delta here
+            # would silently turn the same generic exception back into a tool
+            # regression.  Explicit failed_tools/contract_failures above remain
+            # immediate hard evidence for this exact current version.
+            attributable_outcome_observation = bool(
+                attributable_call and in_target_family and not exception_type
+            )
+            if attributable_call and in_target_family:
+                state["attributable_call_count"] += 1
+                if (
+                    attributable_outcome_observation
+                    and candidate_outcome is not None
+                    and audited_outcome_delta is not None
+                ):
+                    outcome = float(candidate_outcome)
+                    outcome_delta = float(audited_outcome_delta)
+                    state["outcomes"].append(outcome)
+                    state["outcome_deltas"].append(outcome_delta)
+                    state["attributable_observation_count"] += 1
+                    if outcome == 1.0:
+                        state["exact_success_count"] += 1
+                    if outcome_delta < 0.0:
+                        state["audited_regression_count"] += 1
+                    if (
+                        fresh_control_success_flip
+                        and outcome == 1.0
+                        and outcome_delta > 0.0
+                    ):
+                        state["fresh_control_success_flip_count"] += 1
+
+            hard_failure = bool(
+                state["contract_failure_count"]
+                or state["runtime_failure_count"]
+                or state["audited_regression_count"]
+            )
+            enough_attributable_observations = (
+                state["attributable_observation_count"]
+                >= POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS
+            )
+            deadline_reached = (
+                state["eligible_family_task_count"]
+                >= POST_DEPLOYMENT_CANARY_MAX_FAMILY_TASKS
+            )
+            if (
+                not hard_failure
+                and not enough_attributable_observations
+                and not deadline_reached
+            ):
+                self._event(
+                    "post_deployment_tool_canary_observed",
+                    {
+                        "request_id": state["request_id"],
+                        "tool_name": tool_name,
+                        "tool_version": entry.version,
+                        "called_count": state["called_count"],
+                        "visible_count": state.get("visible_count", 0),
+                        "eligible_family_task_count": state[
+                            "eligible_family_task_count"
+                        ],
+                        "attributable_call_count": state["attributable_call_count"],
+                        "attributable_observation_count": state[
+                            "attributable_observation_count"
+                        ],
+                        "required_attributable_observations": (
+                            POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS
+                        ),
+                        "exact_success_count": state["exact_success_count"],
+                        "audited_regression_count": state["audited_regression_count"],
+                        "fresh_control_success_flip_count": state[
+                            "fresh_control_success_flip_count"
+                        ],
+                        "version_mismatch_call_count": state[
+                            "version_mismatch_call_count"
+                        ],
+                        "attribution_policy": (
+                            "sole_generated_tool_called_current_version_same_family"
+                        ),
+                        "nonattributable_task_exception_observed": bool(exception_type),
+                    },
+                )
+                continue
+
+            outcomes = list(state["outcomes"])
+            outcome_deltas = list(state["outcome_deltas"])
+            success_count = int(state["exact_success_count"])
+            success_rate = success_count / len(outcomes) if outcomes else 0.0
+            promoted = (
+                not hard_failure
+                and enough_attributable_observations
+                and success_count >= POST_DEPLOYMENT_CANARY_REQUIRED_EXACT_SUCCESSES
+                and state["fresh_control_success_flip_count"]
+                >= POST_DEPLOYMENT_CANARY_REQUIRED_FRESH_CONTROL_SUCCESS_FLIPS
+            )
+            status = "promoted" if promoted else "rolled_back"
+            event_name = (
+                "post_deployment_tool_canary_promoted"
+                if promoted
+                else "post_deployment_tool_canary_retired"
+            )
+            if promoted:
+                decision_reason = "attributable_audited_canary_gate_passed"
+            elif state["contract_failure_count"]:
+                decision_reason = "public_contract_failure"
+            elif state["runtime_failure_count"]:
+                decision_reason = "generated_tool_runtime_failure"
+            elif state["audited_regression_count"]:
+                decision_reason = "attributable_audited_outcome_regression"
+            elif deadline_reached:
+                decision_reason = "canary_deadline_without_sufficient_evidence"
+            else:
+                decision_reason = "attributable_canary_gate_not_met"
+            if not promoted:
+                self.store.retire(tool_name)
+            decision = {
+                "event": event_name,
+                "request_id": state["request_id"],
+                "tool_name": tool_name,
+                "tool_version": entry.version,
+                "status": status,
+                "reason": decision_reason,
+                "called_count": state["called_count"],
+                "visible_count": state.get("visible_count", 0),
+                "eligible_family_task_count": state["eligible_family_task_count"],
+                "attributable_call_count": state["attributable_call_count"],
+                "attributable_observation_count": state[
+                    "attributable_observation_count"
+                ],
+                "outcome_observation_count": len(outcomes),
+                "outcome_success_count": success_count,
+                "outcome_success_rate": success_rate,
+                "audited_outcome_delta_observation_count": len(outcome_deltas),
+                "audited_outcome_delta_mean": (
+                    sum(outcome_deltas) / len(outcome_deltas)
+                    if outcome_deltas
+                    else None
+                ),
+                "audited_regression_count": state["audited_regression_count"],
+                "fresh_control_success_flip_count": state[
+                    "fresh_control_success_flip_count"
+                ],
+                "version_mismatch_call_count": state["version_mismatch_call_count"],
+                "contract_failure_count": state["contract_failure_count"],
+                "runtime_failure_count": state["runtime_failure_count"],
+                "canary_deadline_reached": deadline_reached,
+                "attribution_policy": (
+                    "sole_generated_tool_called_current_version_same_family"
+                ),
+                "nonattributable_task_exception_observed": bool(exception_type),
+                "decision_uses_score": False,
+            }
+            self._event(event_name, decision)
+            if acknowledge is not None:
+                acknowledge(
+                    tool_name,
+                    entry.version,
+                    state["request_id"],
+                    status,
+                )
+            self.canary_state_by_tool.pop(tool_name, None)
+            decisions.append(decision)
+        self._write_repair_state()
+        return tuple(decisions)
+
+    def _generation_request(
+        self,
+        observation: CapabilityObservation,
+        *,
+        suggested_name: str | None,
+        lifecycle_request: dict[str, Any] | None = None,
+    ) -> ToolGenerationRequest:
+        generation_examples = observation.validation_examples
+        if (
+            suggested_name == "resolve_search_window_or_bounds"
+            and observation.canonical_key
+            in {
+                "derived_value:recency_timestamp_bounds",
+                "derived_value:resolve_search_window_or_bounds",
+            }
+        ):
+            generation_examples = _resolve_window_validation_examples()
+        model_visible_examples = _model_visible_generation_examples(generation_examples)
+        cluster_context = self._cluster_context(observation)
+        scenario_label = observation.task_context_label or observation.scenario_name
+        inadequacy_evidence = observation.to_inadequacy_evidence().to_json()
+        if lifecycle_request is not None:
+            repair_kind = str(lifecycle_request.get("repair_kind") or "implementation")
+            target_family = str(
+                lifecycle_request.get("target_task_family") or "unclassified"
+            )
+            raw_public_evidence = lifecycle_request.get("public_evidence")
+            # Outcome values and success flips are lifecycle reward.  They may
+            # determine whether a version is repaired/retired, but must never
+            # become generator prompt content.  The repair model receives only
+            # public operational evidence describing adoption and explicit
+            # tool-level failures.
+            prompt_safe_public_evidence = (
+                {
+                    key: value
+                    for key, value in raw_public_evidence.items()
+                    if key
+                    in {
+                        "called_count",
+                        "visible_count",
+                        "public_visible_context_count",
+                        "contract_failure_count",
+                        "failed_count",
+                    }
+                }
+                if isinstance(raw_public_evidence, dict)
+                else {}
+            )
+            scenario_label = (
+                f"post_deployment_repair(kind={repair_kind};family={target_family})"
+            )
+            inadequacy_evidence = {
+                **inadequacy_evidence,
+                "post_deployment_repair": {
+                    "repair_kind": repair_kind,
+                    "reason_codes": list(
+                        lifecycle_request.get("trigger_reason_codes") or []
+                    ),
+                    "public_aggregate_evidence": prompt_safe_public_evidence,
+                    "future_tasks_only": True,
+                    "task_specific_expected_values_available": False,
+                },
+            }
+            cluster_context = {
+                **cluster_context,
+                "scenarios": [],
+                "source_task_ids_available": False,
+                "repair_kind": repair_kind,
+                "target_task_family": target_family,
+            }
+        return ToolGenerationRequest(
+            scenario_name=scenario_label,
+            observation=observation.observation,
+            allowed_families=observation.allowed_families,
+            validation_examples=tuple(
+                {
+                    "inputs": item.inputs,
+                    "expected": item.expected,
+                    "held_out": False,
+                    "negative_applicability": item.negative_applicability,
+                }
+                for item in model_visible_examples
+            ),
+            suggested_tool_name=suggested_name,
+            inadequacy_evidence=inadequacy_evidence,
+            failure_memory_context=(
+                None
+                if lifecycle_request is not None
+                else generation_failure_memory_context(
+                    self.failure_memory_path,
+                    canonical_key=observation.canonical_key,
+                    suggested_tool_name=suggested_name,
+                )
+            ),
+            shortfall_cluster_context=cluster_context,
+        )
+
+    def _remove_pending_repair_request(self, request_id: str) -> None:
+        self.pending_repair_requests = [
+            request
+            for request in self.pending_repair_requests
+            if str(request.get("request_id") or "") != request_id
+        ]
+
+    def _acknowledge_repair_without_escaping(
+        self,
+        acknowledge: RepairAcknowledgementHook | None,
+        *,
+        tool_name: str,
+        version: int,
+        request_id: str,
+        status: str,
+    ) -> bool:
+        if acknowledge is None or not request_id or not tool_name:
+            return True
+        try:
+            acknowledge(tool_name, max(version, 1), request_id, status)
+        except Exception as exc:
+            self._event(
+                "post_deployment_tool_repair_acknowledgement_failed",
+                {
+                    "request_id": request_id,
+                    "tool_name": tool_name,
+                    "tool_version": version,
+                    "status": status,
+                    "error": f"{type(exc).__name__}:{exc}",
+                },
+            )
+            return False
+        return True
+
+    def _reject_pending_repair(
+        self,
+        lifecycle_request: dict[str, Any],
+        *,
+        reason: str,
+        acknowledge: RepairAcknowledgementHook | None,
+        event_name: str = "post_deployment_tool_repair_retired",
+        error: BaseException | None = None,
+        retire_current: bool = True,
+    ) -> None:
+        request_id = str(lifecycle_request.get("request_id") or "")
+        tool_name = str(lifecycle_request.get("tool_name") or "")
+        source_version = self._nonnegative_int(
+            lifecycle_request.get("source_tool_version"), default=1
+        )
+        entry = self.store.get(tool_name) if tool_name else None
+        retired = False
+        if retire_current and entry is not None and not entry.retired:
+            self.store.retire(tool_name)
+            retired = True
+        payload: dict[str, Any] = {
+            "request_id": request_id,
+            "tool_name": tool_name,
+            "source_tool_version": source_version,
+            "current_tool_version": entry.version if entry is not None else None,
+            "reason": reason,
+            "entry_retired": retired,
+            "status": "rejected",
+            "future_tasks_only": True,
+            "triggering_task_replayed": False,
+        }
+        if error is not None:
+            payload["error"] = f"{type(error).__name__}:{error}"
+        self._event(event_name, payload)
+        acknowledged = self._acknowledge_repair_without_escaping(
+            acknowledge,
+            tool_name=tool_name,
+            version=source_version,
+            request_id=request_id,
+            status="rejected",
+        )
+        if acknowledged:
+            self._remove_pending_repair_request(request_id)
+            self.repair_transactions_by_tool.pop(tool_name, None)
+            if request_id:
+                self.handled_repair_request_ids.add(request_id)
+        self._write_repair_state()
+
+    def process_pending_repairs(
+        self,
+        *,
+        completed_count: int,
+        acknowledge: RepairAcknowledgementHook | None = None,
+    ) -> tuple[str, ...]:
+        """Repair or retire requests only before their eligible future task."""
+
+        if (
+            not isinstance(completed_count, int)
+            or isinstance(completed_count, bool)
+            or completed_count < 0
+        ):
+            self._event(
+                "post_deployment_tool_repair_deferred",
+                {"reason": "invalid_durable_completed_count"},
+            )
+            return ()
+        self.last_completed_count = completed_count
+        self._write_repair_state()
+
+        accepted_tools: list[str] = []
+        for raw_lifecycle_request in list(self.pending_repair_requests):
+            lifecycle_request = dict(raw_lifecycle_request)
+            request_id = str(lifecycle_request.get("request_id") or "")
+            tool_name = str(lifecycle_request.get("tool_name") or "")
+            trigger_count = lifecycle_request.get("trigger_completed_count")
+            eligible_count = lifecycle_request.get("eligible_from_completed_count")
+            valid_ordinals = bool(
+                isinstance(trigger_count, int)
+                and not isinstance(trigger_count, bool)
+                and trigger_count >= 0
+                and isinstance(eligible_count, int)
+                and not isinstance(eligible_count, bool)
+                and eligible_count > trigger_count
+            )
+            if (
+                not request_id
+                or not tool_name
+                or lifecycle_request.get("repair_request_validation_error")
+                or not valid_ordinals
+            ):
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="malformed_future_task_repair_request",
+                    acknowledge=acknowledge,
+                )
+                continue
+            prospective_completed_count = completed_count + 1
+            if prospective_completed_count < eligible_count:
+                self._event(
+                    "post_deployment_tool_repair_deferred",
+                    {
+                        "request_id": request_id,
+                        "tool_name": tool_name,
+                        "reason": "future_task_eligibility_not_reached",
+                        "completed_count": completed_count,
+                        "prospective_completed_count": prospective_completed_count,
+                        "trigger_completed_count": trigger_count,
+                        "eligible_from_completed_count": eligible_count,
+                        "triggering_task_replayed": False,
+                    },
+                )
+                continue
+
+            entry = self.store.get(tool_name)
+            observation = self.observations_by_tool_name.get(tool_name)
+            if entry is None:
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="registry_entry_missing",
+                    acknowledge=acknowledge,
+                    retire_current=False,
+                )
+                continue
+            source_version = lifecycle_request.get("source_tool_version")
+            if (
+                not isinstance(source_version, int)
+                or isinstance(source_version, bool)
+                or source_version < 1
+            ):
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="invalid_source_tool_version",
+                    acknowledge=acknowledge,
+                )
+                continue
+            if entry.version != source_version:
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="source_tool_version_superseded",
+                    acknowledge=acknowledge,
+                    event_name="post_deployment_tool_repair_stale",
+                    retire_current=False,
+                )
+                continue
+            if observation is None:
+                self._event(
+                    "post_deployment_tool_repair_deferred",
+                    {
+                        "request_id": request_id,
+                        "tool_name": tool_name,
+                        "reason": "public_contract_observation_not_available",
+                    },
+                )
+                continue
+            lifecycle_request["target_task_family"] = self._normalized_task_family(
+                lifecycle_request.get("target_task_family")
+            )
+
+            # The known-bad source is unavailable while bounded repair runs.
+            self.store.retire(tool_name)
+            self._event(
+                "post_deployment_tool_repair_started",
+                {
+                    "request_id": request_id,
+                    "tool_name": tool_name,
+                    "source_tool_version": entry.version,
+                    "repair_kind": lifecycle_request.get("repair_kind"),
+                    "completed_count": completed_count,
+                    "eligible_from_completed_count": eligible_count,
+                    "future_tasks_only": True,
+                    "triggering_task_replayed": False,
+                },
+            )
+            try:
+                request = self._generation_request(
+                    observation,
+                    suggested_name=tool_name,
+                    lifecycle_request=lifecycle_request,
+                )
+                validation_examples = _validation_examples_for_tool(
+                    entry.tool, observation
+                )
+                prior_validation = validate_generated_tool(
+                    entry.tool,
+                    examples=validation_examples,
+                )
+                base_task_families = tuple(
+                    self._cluster_context(observation)["base_task_families"]
+                )
+            except Exception as exc:
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="repair_setup_failed",
+                    acknowledge=acknowledge,
+                    error=exc,
+                )
+                continue
+
+            repair_errors = list(_repair_prompt_errors(prior_validation.errors))
+            repair_errors.extend(
+                f"post_deployment_{reason}"
+                for reason in lifecycle_request.get("trigger_reason_codes", [])
+            )
+            if not repair_errors:
+                repair_errors.append(
+                    "post_deployment_public_contract_or_adoption_shortfall"
+                )
+
+            best_tool: GeneratedTool | None = None
+            best_validation: ValidationResult | None = None
+            seed_tool = entry.tool
+            seed_errors = tuple(dict.fromkeys(repair_errors))
+            for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
+                try:
+                    candidates_method = getattr(
+                        self.generator, "repair_candidates", None
+                    )
+                    repair_method = getattr(self.generator, "repair", None)
+                    attempt_errors = (*seed_errors, f"repair_strategy:{attempt}")
+                    if callable(candidates_method):
+                        candidates = tuple(
+                            candidates_method(request, seed_tool, attempt_errors)
+                        )
+                    elif callable(repair_method):
+                        candidates = (
+                            repair_method(request, seed_tool, attempt_errors),
+                        )
+                    else:
+                        candidates = (self.generator.generate(request),)
+                except Exception as exc:
+                    self._event(
+                        "post_deployment_tool_repair_attempt_failed",
+                        {
+                            "request_id": request_id,
+                            "tool_name": tool_name,
+                            "attempt": attempt,
+                            "stage": "candidate_generation",
+                            "error": f"{type(exc).__name__}:{exc}",
+                        },
+                    )
+                    continue
+                candidate_results: list[
+                    tuple[GeneratedTool, ValidationResult, int]
+                ] = []
+                for candidate_index, raw_candidate in enumerate(candidates):
+                    try:
+                        candidate = _normalize_live_birth_routing_metadata(
+                            raw_candidate,
+                            observation,
+                            base_task_families,
+                        )
+                        if candidate.spec.tool_name != tool_name:
+                            validation = ValidationResult(
+                                False,
+                                ("post_deployment_repair_changed_tool_name",),
+                            )
+                        else:
+                            _gate, _live_check, validation = self._gate_and_validate(
+                                candidate, observation
+                            )
+                    except Exception as exc:
+                        self._event(
+                            "post_deployment_tool_repair_attempt_failed",
+                            {
+                                "request_id": request_id,
+                                "tool_name": tool_name,
+                                "attempt": attempt,
+                                "candidate_index": candidate_index,
+                                "stage": "candidate_normalization_and_validation",
+                                "error": f"{type(exc).__name__}:{exc}",
+                            },
+                        )
+                        continue
+                    candidate_results.append(
+                        (candidate, validation, _validation_failure_score(validation))
+                    )
+                if not candidate_results:
+                    continue
+                candidate, validation, _score = min(
+                    candidate_results,
+                    key=lambda item: (not item[1].accepted, item[2]),
+                )
+                self._event(
+                    "post_deployment_tool_repair_attempted",
+                    {
+                        "request_id": request_id,
+                        "tool_name": tool_name,
+                        "attempt": attempt,
+                        "candidate_count": len(candidate_results),
+                        "accepted": validation.accepted,
+                        "error_labels": list(_repair_prompt_errors(validation.errors)),
+                    },
+                )
+                seed_tool = candidate
+                seed_errors = tuple(
+                    dict.fromkeys(
+                        (*seed_errors, *_repair_prompt_errors(validation.errors))
+                    )
+                )
+                if validation.accepted:
+                    best_tool = candidate
+                    best_validation = validation
+                    break
+
+            if best_tool is None or best_validation is None:
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="bounded_repair_failed_validation",
+                    acknowledge=acknowledge,
+                )
+                continue
+
+            birth_scenario = (
+                "post_deployment_repair:"
+                f"{lifecycle_request.get('target_task_family', 'unclassified')}"
+            )
+            replacement = RegistryEntry.accepted(
+                best_tool,
+                best_validation,
+                birth_scenario=birth_scenario,
+            )
+            target_version = entry.version + 1
+            canary_state = self._prepared_canary_state(
+                request_id=request_id,
+                tool_version=target_version,
+                source_tool_version=entry.version,
+                target_task_family=str(lifecycle_request["target_task_family"]),
+                eligible_from_completed_count=eligible_count,
+            )
+            self.repair_transactions_by_tool[tool_name] = {
+                "phase": "canary_prepared",
+                "request_id": request_id,
+                "tool_name": tool_name,
+                "source_tool_version": entry.version,
+                "target_tool_version": target_version,
+                "target_task_family": lifecycle_request["target_task_family"],
+                "eligible_from_completed_count": eligible_count,
+                "prepared_after_completed_count": completed_count,
+                "replacement_code_hash": replacement.stored_code_hash,
+                "canary_state": canary_state,
+            }
+            # This write is the transaction boundary: an active vN+1 must never
+            # exist without enough durable lineage to recover its empty canary.
+            self._write_repair_state()
+            try:
+                self.store.put(replacement)
+                saved_entry = self.store.get(tool_name)
+                if (
+                    saved_entry is None
+                    or saved_entry.version != target_version
+                    or saved_entry.retired
+                    or saved_entry.birth_scenario != birth_scenario
+                    or saved_entry.stored_code_hash != replacement.stored_code_hash
+                ):
+                    raise RuntimeError("activated repair version did not match lineage")
+                snapshot_dir = self.output_dir / "generated_tool_snapshots"
+                snapshot_dir.mkdir(parents=True, exist_ok=True)
+                snapshot_path = snapshot_dir / f"{tool_name}_v{saved_entry.version}.py"
+                snapshot_path.write_text(best_tool.code + "\n", encoding="utf-8")
+            except Exception as exc:
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason="repair_activation_failed",
+                    acknowledge=acknowledge,
+                    error=exc,
+                )
+                continue
+
+            self.canary_state_by_tool[tool_name] = canary_state
+            self.repair_transactions_by_tool.pop(tool_name, None)
+            self._remove_pending_repair_request(request_id)
+            self.handled_repair_request_ids.add(request_id)
+            accepted_tools.append(tool_name)
+            self._write_repair_state()
+            self._event(
+                "post_deployment_tool_repair_accepted",
+                {
+                    "request_id": request_id,
+                    "tool_name": tool_name,
+                    "source_tool_version": entry.version,
+                    "new_tool_version": saved_entry.version,
+                    "repair_kind": lifecycle_request.get("repair_kind"),
+                    "snapshot_path": str(snapshot_path),
+                    "canary_eligible_from_next_task": True,
+                    "eligible_from_completed_count": eligible_count,
+                    "activated_after_completed_count": completed_count,
+                    "triggering_task_replayed": False,
+                },
+            )
+            self._acknowledge_repair_without_escaping(
+                acknowledge,
+                tool_name=tool_name,
+                version=saved_entry.version,
+                request_id=request_id,
+                status="canary_pending",
+            )
+        self._write_repair_state()
+        return tuple(accepted_tools)
+
+    def finalize_run(
+        self,
+        *,
+        acknowledge: RepairAcknowledgementHook | None = None,
+    ) -> tuple[dict[str, Any], ...]:
+        """Conservatively close lifecycle work when no future task remains.
+
+        A request emitted by the final task cannot be applied without violating
+        future-only semantics. Likewise, an incomplete canary has insufficient
+        prospective evidence. Both dispositions retire only the affected current
+        version and record a terminal acknowledgement.
+        """
+
+        decisions: list[dict[str, Any]] = []
+        for request in list(self.pending_repair_requests):
+            request_id = str(request.get("request_id") or "")
+            tool_name = str(request.get("tool_name") or "")
+            source_version = request.get("source_tool_version")
+            entry = self.store.get(tool_name) if tool_name else None
+            version = (
+                source_version
+                if isinstance(source_version, int) and source_version > 0
+                else entry.version
+                if entry is not None
+                else 1
+            )
+            retired = False
+            if entry is not None and (
+                not isinstance(source_version, int) or entry.version == source_version
+            ):
+                self.store.retire(tool_name)
+                retired = True
+            decision = {
+                "event": "post_deployment_tool_repair_retired",
+                "request_id": request_id,
+                "tool_name": tool_name,
+                "source_tool_version": source_version,
+                "current_tool_version": entry.version if entry is not None else None,
+                "status": "rejected",
+                "reason": "run_ended_before_future_repair_task",
+                "entry_retired": retired,
+                "run_finalization": True,
+                "future_tasks_only": True,
+                "triggering_task_replayed": False,
+            }
+            self._event(decision["event"], decision)
+            append_jsonl(
+                self.output_dir / "post_deployment_lifecycle_finalization.jsonl",
+                decision,
+            )
+            if acknowledge is not None and request_id and tool_name:
+                acknowledge(tool_name, version, request_id, "rejected")
+            if request_id:
+                self.handled_repair_request_ids.add(request_id)
+            decisions.append(decision)
+        self.pending_repair_requests.clear()
+
+        for tool_name, state in list(self.canary_state_by_tool.items()):
+            request_id = str(state.get("request_id") or "")
+            raw_version = state.get("tool_version")
+            version = (
+                raw_version if isinstance(raw_version, int) and raw_version > 0 else 1
+            )
+            entry = self.store.get(tool_name)
+            retired = False
+            if entry is not None and entry.version == version:
+                self.store.retire(tool_name)
+                retired = True
+            outcomes = [
+                float(value)
+                for value in state.get("outcomes", [])
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+            ]
+            outcome_deltas = [
+                float(value)
+                for value in state.get("outcome_deltas", [])
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+            ]
+            success_count = int(
+                state.get("exact_success_count")
+                if isinstance(state.get("exact_success_count"), int)
+                and not isinstance(state.get("exact_success_count"), bool)
+                else sum(value == 1.0 for value in outcomes)
+            )
+            decision = {
+                "event": "post_deployment_tool_canary_retired",
+                "request_id": request_id,
+                "tool_name": tool_name,
+                "tool_version": version,
+                "status": "rolled_back",
+                "reason": "run_ended_before_canary_completed",
+                "entry_retired": retired,
+                "called_count": int(state.get("called_count") or 0),
+                "visible_count": int(state.get("visible_count") or 0),
+                "eligible_family_task_count": int(
+                    state.get("eligible_family_task_count") or 0
+                ),
+                "attributable_call_count": int(
+                    state.get("attributable_call_count") or 0
+                ),
+                "attributable_observation_count": int(
+                    state.get("attributable_observation_count") or 0
+                ),
+                "outcome_observation_count": len(outcomes),
+                "outcome_success_count": success_count,
+                "outcome_success_rate": (
+                    success_count / len(outcomes) if outcomes else 0.0
+                ),
+                "audited_outcome_delta_observation_count": len(outcome_deltas),
+                "audited_outcome_delta_mean": (
+                    sum(outcome_deltas) / len(outcome_deltas)
+                    if outcome_deltas
+                    else None
+                ),
+                "audited_regression_count": int(
+                    state.get("audited_regression_count") or 0
+                ),
+                "fresh_control_success_flip_count": int(
+                    state.get("fresh_control_success_flip_count") or 0
+                ),
+                "version_mismatch_call_count": int(
+                    state.get("version_mismatch_call_count") or 0
+                ),
+                "contract_failure_count": int(state.get("contract_failure_count") or 0),
+                "runtime_failure_count": int(state.get("runtime_failure_count") or 0),
+                "canary_deadline_reached": False,
+                "run_finalization": True,
+                "attribution_policy": (
+                    "sole_generated_tool_called_current_version_same_family"
+                ),
+                "decision_uses_score": False,
+                "future_tasks_only": True,
+                "triggering_task_replayed": False,
+            }
+            self._event(decision["event"], decision)
+            append_jsonl(
+                self.output_dir / "post_deployment_lifecycle_finalization.jsonl",
+                decision,
+            )
+            if acknowledge is not None and request_id:
+                acknowledge(tool_name, version, request_id, "rolled_back")
+            if request_id:
+                self.handled_repair_request_ids.add(request_id)
+            self.canary_state_by_tool.pop(tool_name, None)
+            decisions.append(decision)
+
+        self._write_repair_state()
+        return tuple(decisions)
 
     def prime_before_scenario(
         self, scenario_name: str, scenario: Any | None = None
@@ -1277,6 +2936,9 @@ class OnlineBirthController:
         self.base_families_by_key.setdefault(observation.canonical_key, set()).add(
             _observation_family_key(observation)
         )
+        suggested_name = suggested_tool_name(observation.canonical_key)
+        if suggested_name is not None:
+            self.observations_by_tool_name[suggested_name] = observation
         # Log heuristic observations that cannot be transcript-verified.
         if observation.evidence_source == "heuristic":
             verified = self._check_heuristic_signal(observation)
@@ -1336,7 +2998,6 @@ class OnlineBirthController:
         ):
             return None
 
-        suggested_name = suggested_tool_name(observation.canonical_key)
         if suggested_name is not None:
             existing_entry = self.store.get(suggested_name)
             if (
@@ -1395,41 +3056,9 @@ class OnlineBirthController:
             self._event("tool_birth_skipped_existing_broader_helper", payload)
             return None
 
-        generation_examples = observation.validation_examples
-        if (
-            suggested_name == "resolve_search_window_or_bounds"
-            and observation.canonical_key
-            in {
-                "derived_value:recency_timestamp_bounds",
-                "derived_value:resolve_search_window_or_bounds",
-            }
-        ):
-            # Generation and deterministic validation must see the same public
-            # broad contract. Otherwise a narrow source observation can produce
-            # code that is judged against capabilities never shown to the model.
-            generation_examples = _resolve_window_validation_examples()
-
-        request = ToolGenerationRequest(
-            scenario_name=observation.task_context_label or observation.scenario_name,
-            observation=observation.observation,
-            allowed_families=observation.allowed_families,
-            validation_examples=tuple(
-                {
-                    "inputs": item.inputs,
-                    "expected": item.expected,
-                    "held_out": item.held_out,
-                    "negative_applicability": item.negative_applicability,
-                }
-                for item in generation_examples
-            ),
-            suggested_tool_name=suggested_name,
-            inadequacy_evidence=observation.to_inadequacy_evidence().to_json(),
-            failure_memory_context=generation_failure_memory_context(
-                self.failure_memory_path,
-                canonical_key=observation.canonical_key,
-                suggested_tool_name=suggested_name,
-            ),
-            shortfall_cluster_context=self._cluster_context(observation),
+        request = self._generation_request(
+            observation,
+            suggested_name=suggested_name,
         )
         self._event(
             "tool_birth_started",
@@ -1509,9 +3138,9 @@ class OnlineBirthController:
             best_validation_score = _validation_failure_score(validation)
             repair_seed_tool = tool
             repair_seed_validation = validation
-            repair_error_history = list(validation.errors)
+            repair_error_history = list(_repair_prompt_errors(validation.errors))
             if not validation.accepted and callable(repair_method):
-                repair_errors = tuple(validation.errors)
+                repair_errors = _repair_prompt_errors(validation.errors)
                 for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
                     if validation.accepted:
                         break
@@ -1521,7 +3150,7 @@ class OnlineBirthController:
                         dict.fromkeys(
                             (
                                 *repair_error_history,
-                                *repair_seed_validation.errors,
+                                *_repair_prompt_errors(repair_seed_validation.errors),
                             )
                         )
                     )
@@ -1529,7 +3158,9 @@ class OnlineBirthController:
                         # Repair the best candidate's remaining failures only. Old
                         # errors describe branches that candidate already fixed and
                         # can make model repair reintroduce those failures.
-                        current_errors = tuple(repair_seed_validation.errors)
+                        current_errors = _repair_prompt_errors(
+                            repair_seed_validation.errors
+                        )
                     self._event(
                         "tool_repair_started",
                         {
@@ -1615,7 +3246,7 @@ class OnlineBirthController:
                     )
                     repair_error_history.extend(
                         error
-                        for error in repaired_validation.errors
+                        for error in _repair_prompt_errors(repaired_validation.errors)
                         if error not in repair_error_history
                     )
                     improved = repaired_validation.accepted or (
@@ -1624,7 +3255,9 @@ class OnlineBirthController:
                     repair_record = {
                         "attempt": attempt,
                         "input_errors": list(current_errors),
-                        "repaired_errors": list(repaired_validation.errors),
+                        "repaired_errors": list(
+                            _repair_prompt_errors(repaired_validation.errors)
+                        ),
                         "accepted": repaired_validation.accepted,
                         "repaired_tool_name": repaired_tool.spec.tool_name,
                         "elapsed_seconds": round(repair_elapsed, 3),
@@ -1640,7 +3273,9 @@ class OnlineBirthController:
                                 "candidate_index": index,
                                 "accepted": candidate_validation.accepted,
                                 "validation_score": candidate_score,
-                                "errors": list(candidate_validation.errors),
+                                "errors": list(
+                                    _repair_prompt_errors(candidate_validation.errors)
+                                ),
                             }
                             for index, (
                                 _candidate,
@@ -1728,7 +3363,7 @@ class OnlineBirthController:
                 "applicable_task_families": list(tool.spec.applicable_task_families),
                 "reason_tool_is_decisive": tool.spec.reason_tool_is_decisive,
                 "accepted": validation.accepted,
-                "errors": list(validation.errors),
+                "errors": list(_repair_prompt_errors(validation.errors)),
                 "source_example_count": validation.source_example_count,
                 "held_out_check_count": validation.held_out_check_count,
                 "runtime_smoke_passed": validation.runtime_smoke_passed,
@@ -1747,7 +3382,7 @@ class OnlineBirthController:
                 "repair_attempted": repair_attempted,
                 "repair_attempt_count": repair_attempt_count,
                 "repair_errors": list(repair_errors),
-                "repair_final_errors": list(validation.errors)
+                "repair_final_errors": list(_repair_prompt_errors(validation.errors))
                 if repair_attempted
                 else [],
                 "repair_history": repair_history,
@@ -1759,7 +3394,7 @@ class OnlineBirthController:
                 "canonical_key": observation.canonical_key,
                 "tool_name": tool.spec.tool_name,
                 **_observation_public_context(observation),
-                "errors": list(validation.errors),
+                "errors": list(_repair_prompt_errors(validation.errors)),
                 "source_example_count": validation.source_example_count,
                 "held_out_check_count": validation.held_out_check_count,
                 "runtime_smoke_passed": validation.runtime_smoke_passed,
@@ -1831,7 +3466,7 @@ class OnlineBirthController:
                     "canonical_key": observation.canonical_key,
                     "tool_name": tool.spec.tool_name,
                     **_observation_public_context(observation),
-                    "errors": list(validation.errors),
+                    "errors": list(_repair_prompt_errors(validation.errors)),
                     "code": tool.code,
                     "rejection_count": self.rejected_counts[observation.canonical_key],
                 },

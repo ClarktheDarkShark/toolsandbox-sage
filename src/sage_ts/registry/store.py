@@ -53,6 +53,83 @@ class RegistryStore:
         )
         self.save_entries(entries)
 
+    def record_success_flip(
+        self,
+        tool_name: str,
+        observation_id: str,
+        *,
+        tool_version: int | None = None,
+    ) -> bool:
+        """Record one idempotent prospective failure-to-success transition.
+
+        Reuse is recorded when the generated function executes, before paired
+        post-task feedback exists.  Keeping success-flip accounting separate
+        prevents a later lifecycle assessment from incrementing reuse twice and
+        makes resumable runs safe when the same completed task is hydrated.
+        """
+
+        observation_id = str(observation_id or "").strip()
+        if not observation_id:
+            raise ValueError("success-flip observation_id must be nonempty")
+        entries = self.load_entries()
+        entry = entries.get(tool_name)
+        if entry is None:
+            return False
+        version = entry.version if tool_version is None else int(tool_version)
+        if version != entry.version:
+            # Registry manifests keep only the current implementation. Never
+            # charge a late observation to a different version.
+            return False
+
+        event_path = self.root / "success_flip_events.jsonl"
+        event_key = f"{tool_name}\0{version}\0{observation_id}"
+        observed_keys: set[str] = set()
+        if event_path.exists():
+            for line in event_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                event_version = event.get("tool_version")
+                if not isinstance(event_version, int) or isinstance(
+                    event_version, bool
+                ):
+                    # Pre-versioned events are retained as historical records,
+                    # but cannot be assigned to a replacement implementation.
+                    continue
+                prior_key = (
+                    f"{str(event.get('tool_name') or '')}\0{event_version}\0"
+                    f"{str(event.get('observation_id') or '')}"
+                )
+                observed_keys.add(prior_key)
+
+        added = event_key not in observed_keys
+        if added:
+            with event_path.open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "event": "generated_tool_success_flip",
+                            "tool_name": tool_name,
+                            "tool_version": version,
+                            "observation_id": observation_id,
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n"
+                )
+            observed_keys.add(event_key)
+
+        durable_count = sum(
+            1 for key in observed_keys if key.startswith(f"{tool_name}\0{version}\0")
+        )
+        if entry.success_flips != durable_count:
+            entries[tool_name] = replace(entry, success_flips=durable_count)
+            self.save_entries(entries)
+        return added
+
     def retire(self, tool_name: str) -> None:
         entries = self.load_entries()
         entry = entries.get(tool_name)

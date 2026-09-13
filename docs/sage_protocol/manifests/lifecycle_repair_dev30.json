@@ -1,0 +1,101 @@
+{
+  "manifest_type": "development_diagnostic_lifecycle_repair_dev30",
+  "lifecycle_evidence_mode": "seeded_historical_v1_postdeployment_repair",
+  "scenario_order_sha256": "4ab88c1b5c110b0681eb64763f8ca7870fba8b23271a980edf02d40a8424c39f",
+  "strategy": "Development-only disjoint confirmation cohort for lifecycle repair, contact-family robustness, reminder-family preservation, and ordinary-task non-regression. This cohort is not a publication sample or unseen test set.",
+  "predeclared_gates": {
+    "safe_abstain_visible_and_called": {"role": "safe_abstain_confirmation", "minimum": 26, "total": 26},
+    "contact_exact_without_forbidden_remove": {"role": "contact_repair_confirmation", "minimum": 8, "total": 9},
+    "insufficiency_exact": {"role": "safe_abstain_confirmation", "minimum": 21, "total": 26},
+    "preservation_exact_and_safe_helper_hidden": {"role": "preservation", "minimum": 4, "total": 4},
+    "overall_exact_outcomes": {"minimum": 25, "total": 30},
+    "before_after": {"trigger_version": 1, "trigger_outcome_less_than": 1.0, "future_version": 2, "minimum_future_exact_successes": 21, "minimum_future_success_flips": 1}
+  },
+  "validation_roles": {
+    "safe_abstain_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools",
+      "find_days_till_holiday_insufficient_information_10_distraction_tools",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_days_till_holiday_insufficient_information",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools",
+      "modify_contact_with_message_recency_insufficient_information_10_distraction_tools",
+      "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"
+    ],
+    "cross_family_safe_abstain": [
+      "find_days_till_holiday_insufficient_information_10_distraction_tools",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "find_days_till_holiday_insufficient_information",
+      "find_days_till_holiday_insufficient_information_3_distraction_tools"
+    ],
+    "contact_repair_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"
+    ],
+    "preservation": [
+      "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+      "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools",
+      "search_phone_number_with_name_10_distraction_tools",
+      "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled"
+    ]
+  },
+  "splits": {
+    "full_benchmark": [
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"},
+      {"name": "find_days_till_holiday_insufficient_information_10_distraction_tools"},
+      {"name": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "find_days_till_holiday_insufficient_information"},
+      {"name": "find_days_till_holiday_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools"},
+      {"name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"},
+      {"name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"},
+      {"name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled"},
+      {"name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"},
+      {"name": "search_phone_number_with_name_10_distraction_tools"},
+      {"name": "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled"}
+    ]
+  }
+}

@@ -71,6 +71,7 @@ class ToolSandboxRunConfig:
     agent_runtime: str = SAGE_WRAPPED_AGENT_RUNTIME
     resume_from_dir: Path | None = None
     resume_completed_limit: int | None = None
+    fail_on_scenario_transform_error: bool = False
 
 
 def git_sha() -> str | None:
@@ -170,6 +171,16 @@ def _copy_resume_artifacts(
         for row in retained_rows
         if str(row.get("name", "")).strip()
     }
+    lifecycle_journal_count_fields = {
+        "self_evolution_tool_repair_requests.jsonl": "trigger_completed_count",
+        "self_evolution_tool_repair_acknowledgements.jsonl": (
+            "acknowledged_after_completed_count"
+        ),
+    }
+    durable_lifecycle_journals = {
+        "self_evolution_task_feedback.jsonl",
+        *lifecycle_journal_count_fields,
+    }
 
     def record_warning(stage: str, src: Path, error: BaseException) -> None:
         warnings.append(
@@ -207,14 +218,41 @@ def _copy_resume_artifacts(
                 shutil.copy2(path, output_directory / path.name)
             else:
                 filtered_lines: list[str] = []
-                for line in path.read_text(encoding="utf-8").splitlines():
+                for line_number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(),
+                    start=1,
+                ):
+                    if not line.strip():
+                        continue
                     try:
                         row = json.loads(line)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as exc:
+                        if path.name in durable_lifecycle_journals:
+                            raise ValueError(
+                                "Cannot partially resume from malformed lifecycle "
+                                f"journal row at {path}:{line_number}."
+                            ) from exc
+                        continue
+                    if not isinstance(row, dict):
+                        if path.name in durable_lifecycle_journals:
+                            raise ValueError(
+                                "Cannot partially resume from non-object lifecycle "
+                                f"journal row at {path}:{line_number}."
+                            )
                         continue
                     scenario = row.get("scenario")
                     if scenario in retained_names:
                         filtered_lines.append(json.dumps(row, sort_keys=True))
+                        continue
+                    count_field = lifecycle_journal_count_fields.get(path.name)
+                    if count_field is not None:
+                        completed_count = row.get(count_field)
+                        if (
+                            isinstance(completed_count, int)
+                            and not isinstance(completed_count, bool)
+                            and completed_count <= completed_limit
+                        ):
+                            filtered_lines.append(json.dumps(row, sort_keys=True))
                 if filtered_lines:
                     (output_directory / path.name).write_text(
                         "\n".join(filtered_lines) + "\n",
@@ -222,6 +260,18 @@ def _copy_resume_artifacts(
                     )
         except OSError as exc:
             record_warning("copy_jsonl", path, exc)
+    if completed_limit is None:
+        for state_name in (
+            "post_deployment_repair_state.json",
+            "self_evolution_reflection_state.json",
+        ):
+            state_path = resume_from_dir / state_name
+            if not state_path.exists():
+                continue
+            try:
+                shutil.copy2(state_path, output_directory / state_path.name)
+            except OSError as exc:
+                record_warning("copy_resume_state", state_path, exc)
     if warnings:
         (output_directory / "resume_artifact_copy_warnings.json").write_text(
             json.dumps(warnings, indent=2) + "\n",
@@ -507,15 +557,33 @@ def run_scenario_sequence(
                     output_directory,
                 )
             except Exception:
+                transform_error = traceback.format_exc()
+                transform_failure_path = (
+                    output_directory / "scenario_transform_failures.jsonl"
+                )
+                with transform_failure_path.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        json.dumps(
+                            {
+                                "event": "scenario_transform_failed",
+                                "scenario": name,
+                                "error": transform_error,
+                            },
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
                 if event_hook is not None:
                     event_hook(
                         "scenario_transform_failed",
                         output_directory,
                         {
                             "scenario": name,
-                            "error": traceback.format_exc(),
+                            "error": transform_error,
                         },
                     )
+                if config.fail_on_scenario_transform_error:
+                    raise
         result = run_one_scenario(
             name,
             active_scenario,

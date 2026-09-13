@@ -4,7 +4,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import sage_ts.runtime.toolsandbox_integration as toolsandbox_integration
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.toolsandbox_integration import (
@@ -14,7 +20,11 @@ from sage_ts.runtime.toolsandbox_integration import (
     route_registry_entries,
     with_registry_tools,
 )
-from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from sage_ts.validation.sandbox_validator import (
+    ToolExample,
+    ValidationResult,
+    validate_generated_tool,
+)
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
@@ -1925,6 +1935,154 @@ def test_lifecycle_keeps_mixed_positive_route_repair_visible(
     )
 
     assert "prepare_reminder_creation_args" in result.starting_context.name_to_tool
+
+
+def test_lifecycle_family_suppression_wins_after_two_harmful_one_helpful_calls(
+    tmp_path: Path,
+) -> None:
+    """A fresh visible match must not undo an actuated family route repair."""
+
+    store = _registry_with_reminder_creation_args(tmp_path)
+    lifecycle_state = {
+        "prepare_reminder_creation_args": {
+            "decision": "retain_with_route_repair",
+            "failed_count": 0,
+            "side_effect_incident_count": 0,
+            "harmful_called_count": 2,
+            "harmful_called_families": [
+                "reminder_create",
+                "reminder_create_alt",
+            ],
+            "helpful_called_families": [
+                "reminder_create_3_distraction_tools",
+            ],
+            "route_repair_families": ["reminder_create"],
+        }
+    }
+
+    routed, decisions = route_registry_entries(
+        store.load_entries(),
+        scenario_name="redacted",
+        available_base_tools={"add_reminder", "end_conversation"},
+        lifecycle_state=lifecycle_state,
+        task_context_text=(
+            "request=Remind me tomorrow at 9 AM tools=add_reminder "
+            "signals=reminder_create relative_datetime family=reminder_create"
+        ),
+        task_family_key="reminder_create",
+    )
+
+    assert routed == []
+    decision = decisions["prepare_reminder_creation_args"]
+    assert decision.visible is False
+    assert decision.reason == "lifecycle_suppressed_harmful_called_family"
+
+
+def test_validated_abstention_helper_remains_visible_when_lookup_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A generated guard may explain a missing producer without doing the action."""
+
+    spec = ToolSpec(
+        tool_name="safe_record_action_gate",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        description=(
+            "Decide whether a record action has enough visible information and "
+            "capabilities to proceed safely."
+        ),
+        inputs=(
+            ToolInput("requested_action", "str", "Requested record action."),
+            ToolInput("target_identifier", "str", "Visible target identifier."),
+            ToolInput("required_tools", "list", "Required capabilities."),
+            ToolInput("available_tools", "list", "Available capabilities."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_abstain": {"type": "boolean"},
+                "missing_information": {"type": "array"},
+                "safe_next_action": {"type": "string"},
+                "final_answer_recommendation": {"type": "string"},
+            },
+        },
+        positive_triggers=(
+            "insufficient_information",
+            "missing capability",
+            "missing contact lookup",
+        ),
+        negative_triggers=("complete safe request",),
+        required_original_tool_calls=("search_contacts", "remove_contact"),
+        preserves_side_effect_tools=("remove_contact",),
+        abstain_behavior=(
+            "Return an abstention and name each missing capability; never perform "
+            "the downstream action."
+        ),
+        generalization_rationale=(
+            "Record actions across contact and reminder families require the same "
+            "dependency check."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("contact", "contact_lookup"),
+        reason_tool_is_decisive=(
+            "It prevents an unsupported action and gives the actor the exact "
+            "missing-capability explanation."
+        ),
+        shortfall_cluster_evidence=("missing producer capability",),
+        known_failure_mechanisms_addressed=("unsafe action without lookup",),
+        inadequacy_evidence=StructuredInadequacyEvidence(
+            summary=(
+                "Visible contact tasks can expose a removal action without the "
+                "lookup needed to resolve a phone number to a stable record."
+            ),
+            signals=("missing contact lookup",),
+        ),
+    )
+    tool = GeneratedTool(
+        spec=spec,
+        code=(
+            "def safe_record_action_gate(requested_action: str, target_identifier: str, "
+            "required_tools: list, available_tools: list) -> dict:\n"
+            "    missing = [item for item in required_tools if item not in available_tools]\n"
+            "    return {'should_abstain': bool(missing), 'missing_information': missing, "
+            "'safe_next_action': 'ask_user_or_abstain' if missing else 'continue_with_original_tool', "
+            "'final_answer_recommendation': 'Missing: ' + ', '.join(missing) if missing else ''}\n"
+        ),
+    )
+    store = RegistryStore(tmp_path / "registry")
+    store.put(
+        RegistryEntry.accepted(
+            tool,
+            ValidationResult(
+                True,
+                (),
+                source_example_count=1,
+                held_out_check_count=1,
+                negative_applicability_count=1,
+                runtime_smoke_passed=True,
+            ),
+            birth_scenario="public_contract_test",
+        )
+    )
+    scenario = Scenario(
+        starting_context=ExecutionContext(
+            tool_allow_list=["remove_contact", "end_conversation"]
+        )
+    )
+
+    result = with_registry_tools(
+        scenario,
+        store,
+        scenario_name="redacted",
+        task_context_text=(
+            "family=contact signals=contact safe_abstain_needed "
+            "insufficient_information remove_contact missing contact lookup"
+        ),
+        task_family_key="contact",
+    )
+
+    assert "safe_record_action_gate" in result.starting_context.name_to_tool
 
 
 def test_contact_constraint_helper_is_suppressed_after_low_adoption(

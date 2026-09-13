@@ -1,13 +1,16 @@
 # mypy: ignore-errors
 import json
 import os
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from scripts.run_sage_protocol import (
     DIAGNOSTIC_FORCE_ENV_VARS,
     PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC,
     PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
@@ -21,6 +24,7 @@ from scripts.run_sage_protocol import (
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
     _snapshot_registry_for_gate,
+    _validate_gate_purpose_for_cohort,
     _validate_uncached_result_rows,
 )
 from scripts.run_sage_protocol import (
@@ -51,6 +55,75 @@ def test_discovery_manifest_enables_generation_in_transfer_mode() -> None:
 
 def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:
     assert _generation_enabled_by_default("transfer_40", "frozen_transfer") is False
+
+
+@pytest.mark.parametrize(
+    "purpose",
+    (
+        PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
+        PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    ),
+)
+def test_publication_gate_purpose_rejects_development_cohort(purpose: str) -> None:
+    with pytest.raises(ValueError, match="development cohorts require"):
+        _validate_gate_purpose_for_cohort(
+            purpose=purpose,
+            mode="online_build_full",
+            scenario_count=30,
+        )
+
+
+def test_development_gate_purpose_rejects_complete_publication_cohort() -> None:
+    with pytest.raises(ValueError, match="cannot label"):
+        _validate_gate_purpose_for_cohort(
+            purpose=PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC,
+            mode="online_build_full",
+            scenario_count=1032,
+        )
+
+
+@pytest.mark.parametrize(
+    ("purpose", "mode", "scenario_count"),
+    (
+        (PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE, "online_build_full", 1032),
+        (PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION, "full_benchmark", 1032),
+        (PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC, "online_build_full", 10),
+    ),
+)
+def test_gate_purpose_accepts_only_matching_cohort_class(
+    purpose: str,
+    mode: str,
+    scenario_count: int,
+) -> None:
+    _validate_gate_purpose_for_cohort(
+        purpose=purpose,
+        mode=mode,
+        scenario_count=scenario_count,
+    )
+
+
+@pytest.mark.parametrize(
+    "launcher_args",
+    (
+        ("full", "63105", "native-only", "development-diagnostic"),
+        ("dev10", "63105", "development-only", "release-sample"),
+        ("dev30", "63105", "development-only", "campaign-inclusion"),
+    ),
+)
+def test_launcher_rejects_mismatched_gate_purpose_and_execution_mode(
+    launcher_args: tuple[str, ...],
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        ["bash", "scripts/run_native_action_4omini_ab.sh", *launcher_args],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "development" in result.stderr.lower()
 
 
 def test_mechanism_mode_enables_generation_by_default() -> None:
@@ -312,6 +385,42 @@ def test_campaign_inclusion_rejects_runtime_or_completeness_failure() -> None:
     assert "candidate_exceptions_present" in reasons
 
 
+def test_development_diagnostic_uses_mechanical_not_publication_performance_gate() -> (
+    None
+):
+    comparison = {
+        "mean_outcome_similarity_delta": -0.25,
+        "runtime_exception_count": 0,
+        "candidate_stopped_early": False,
+        "control": {
+            "run_status": "complete",
+            "scenario_count": 10,
+            "planned_scenario_count": 10,
+            "exception_count": 0,
+        },
+        "candidate": {
+            "run_status": "complete",
+            "scenario_count": 10,
+            "planned_scenario_count": 10,
+            "exception_count": 0,
+            "accepted_tool_count": 1,
+            "generated_tool_called_scenarios": 1,
+        },
+    }
+
+    selected, reasons, performance, performance_reasons = _publication_gate_decisions(
+        comparison,
+        scenario_count=10,
+        outcome_only=True,
+        purpose=PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC,
+    )
+
+    assert selected is True
+    assert reasons == []
+    assert performance is False
+    assert performance_reasons
+
+
 def test_protocol_gate_accepts_outcome_success_with_exact_canonical_accounting_loss() -> (
     None
 ):
@@ -408,6 +517,15 @@ def test_failed_gate_restores_existing_registry_manifest(tmp_path) -> None:
     manifest.write_text('{"tools": {"kept": {}}}\n')
 
     snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
+    assert snapshot["registry_directory_existed_before_run"] is True
+    assert snapshot["registry_inventory_count_before_run"] == 1
+    assert snapshot["registry_inventory_before_run"] == [
+        {
+            "path": "registry_manifest.json",
+            "kind": "file",
+            "sha256": snapshot["manifest_digest_before_run"],
+        }
+    ]
     manifest.write_text('{"tools": {"kept": {}, "failed": {}}}\n')
 
     result = _restore_registry_after_failed_gate(
@@ -427,6 +545,8 @@ def test_failed_gate_removes_new_registry_manifest_when_none_existed(tmp_path) -
     registry_dir.mkdir()
 
     snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
+    assert snapshot["registry_directory_existed_before_run"] is True
+    assert snapshot["registry_inventory_before_run"] == []
     manifest = registry_dir / "registry_manifest.json"
     manifest.write_text('{"tools": {"failed": {}}}\n')
 
@@ -439,6 +559,37 @@ def test_failed_gate_removes_new_registry_manifest_when_none_existed(tmp_path) -
     assert result["restored"] is True
     assert not manifest.exists()
     assert (run_root / "registry_gate" / "registry_manifest_failed_gate.json").exists()
+
+
+def test_registry_gate_snapshot_records_all_preexisting_sidecars(tmp_path) -> None:
+    run_root = tmp_path / "run"
+    registry_dir = tmp_path / "registry"
+    nested = registry_dir / "nested"
+    nested.mkdir(parents=True)
+    (registry_dir / "tool_lifecycle.json").write_text("{}\n", encoding="utf-8")
+    (nested / "success_flip_events.jsonl").write_text("{}\n", encoding="utf-8")
+
+    snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
+
+    assert snapshot["registry_directory_existed_before_run"] is True
+    assert snapshot["registry_inventory_count_before_run"] == 3
+    assert [row["path"] for row in snapshot["registry_inventory_before_run"]] == [
+        "nested",
+        "nested/success_flip_events.jsonl",
+        "tool_lifecycle.json",
+    ]
+
+
+def test_registry_gate_snapshot_treats_dangling_symlink_as_preexisting(
+    tmp_path,
+) -> None:
+    registry_dir = tmp_path / "registry"
+    registry_dir.symlink_to(tmp_path / "missing-registry", target_is_directory=True)
+
+    snapshot = _snapshot_registry_for_gate(tmp_path / "run", registry_dir)
+
+    assert snapshot["registry_directory_existed_before_run"] is True
+    assert snapshot["manifest_existed_before_run"] is False
 
 
 def test_strict_fresh_rows_require_exact_uncached_task_mapping(tmp_path) -> None:

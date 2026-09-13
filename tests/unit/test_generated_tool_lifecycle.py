@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from sage_ts.generation.tool_spec import (
@@ -85,6 +86,67 @@ def test_generated_tool_birth_reuse_and_success_flip(tmp_path: Path) -> None:
     assert entry is not None
     assert entry.reuse_count == 1
     assert entry.success_flips == 1
+
+
+def test_success_flip_accounting_is_idempotent_and_does_not_increment_reuse(
+    tmp_path: Path,
+) -> None:
+    tool = _wifi_canonicalizer()
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample({"label": "Wi-Fi"}, "wifi"),
+            ToolExample({"label": "mobile data"}, "cellular"),
+        ),
+    )
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    store.record_reuse(tool.spec.tool_name)
+
+    assert store.record_success_flip(tool.spec.tool_name, "run-a:task-1") is True
+    assert store.record_success_flip(tool.spec.tool_name, "run-a:task-1") is False
+    assert store.record_success_flip(tool.spec.tool_name, "run-a:task-2") is True
+
+    entry = store.get(tool.spec.tool_name)
+    assert entry is not None
+    assert entry.reuse_count == 1
+    assert entry.success_flips == 2
+
+
+def test_success_flip_accounting_is_isolated_by_tool_version(tmp_path: Path) -> None:
+    tool = _wifi_canonicalizer()
+    validation = validate_generated_tool(
+        tool,
+        examples=(
+            ToolExample({"label": "Wi-Fi"}, "wifi"),
+            ToolExample({"label": "mobile data"}, "cellular"),
+        ),
+    )
+    store = RegistryStore(tmp_path)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="v1"))
+
+    assert store.record_success_flip(tool.spec.tool_name, "task-1", tool_version=1)
+    store.put(RegistryEntry.accepted(tool, validation, birth_scenario="v2"))
+    replacement = store.get(tool.spec.tool_name)
+    assert replacement is not None
+    assert replacement.version == 2
+    assert replacement.success_flips == 0
+
+    assert store.record_success_flip(tool.spec.tool_name, "task-2", tool_version=2)
+    replacement = store.get(tool.spec.tool_name)
+    assert replacement is not None
+    assert replacement.success_flips == 1
+    assert not store.record_success_flip(
+        tool.spec.tool_name, "late-v1-task", tool_version=1
+    )
+
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "success_flip_events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [event["tool_version"] for event in events] == [1, 2]
 
 
 def test_generated_tool_validation_allows_safe_filter_builtin() -> None:

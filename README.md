@@ -74,6 +74,16 @@ The other critical components are:
 - native/generated ToolSandbox injection and execution;
 - output normalization, reuse accounting, and outcome evaluation.
 
+Generated-tool lifecycle failures now have enforced outcomes rather than only
+diagnostic labels. Direct contract or execution failures enter a bounded
+repair-and-validation loop; failed replacements are retired. Repeatedly harmful
+routes are narrowed, repeated non-adoption triggers metadata repair, and every
+replacement must pass a future-task canary before promotion. Whole-task outcome
+alone remains an alarm because it cannot reliably identify which co-called tool
+caused the failure. The prospective protocol, evidence boundary, contact-tool
+use case, and validation ladder are documented in
+[`docs/sage_protocol/generated_tool_lifecycle_repair_20260913.md`](docs/sage_protocol/generated_tool_lifecycle_repair_20260913.md).
+
 These mechanisms remain intact. Cleanup removed obsolete reporting, cohort,
 registry-migration, cache-accounting, and dashboard patch utilities that are not
 reachable from the production runner. Chapter 4 aggregation remains available
@@ -81,20 +91,22 @@ under `scripts/research/`, outside the installed `sage_ts` package.
 
 ## Outcome measurement and behavioral compatibility
 
-The paper-era outcome evaluator influenced online tool birth and lifecycle
-decisions. Replacing it in place would change later registry contents and would
-not restore the validated algorithm. This release therefore keeps the feedback
-and reporting roles distinct:
+The paper-era outcome evaluator influenced the historical registry trajectory,
+so it remains available as a separately named comparability endpoint. The
+prospective repair lifecycle must not mix two reward definitions across tasks,
+however. Reporting and new lifecycle decisions therefore use one audited
+endpoint, while the legacy measurement is diagnostic only:
 
 - `outcome_similarity` is computed by audited v9 for all 1,032 tasks. It is the
-  current same-run outcome endpoint and supplies the control-to-SAGE lift gate;
+  current same-run outcome endpoint, supplies the control-to-SAGE lift gate,
+  and is the prospective birth, routing, repair, and canary feedback signal;
 - `online_feedback_outcome_similarity` is computed by paper-era v1 on its exact
   ordered 800-task applicability subset. It is the only endpoint compared with
-  the historical paper range and is also the preferred lifecycle feedback
-  signal on those tasks; and
-- on the other 232 tasks, lifecycle feedback falls back to the audited v9
-  outcome. Canonical score deltas can inform internal lifecycle decisions but
-  are never a release or paper-result gate.
+  the historical paper range, but it does not control the prospective repair
+  lifecycle; and
+- a missing audited outcome is an integrity failure; the paper-era value never
+  fills that gap. Canonical score deltas can inform descriptive analysis but are
+  never a release, repair, canary, or paper-result gate.
 
 These are post-task, evaluator-derived scalar feedback signals. Benchmark
 answer and state targets are used by the evaluators, but raw targets, expected
@@ -194,6 +206,20 @@ The canonical launcher:
 
 OpenAI may still report provider-managed prompt-prefix cached input tokens. That
 does not replay a response or task outcome and is recorded separately.
+
+Before a full run, the lifecycle repair mechanism can be checked with the
+development-only ladder:
+
+```bash
+make lifecycle-mechanics
+make lifecycle-dev10 PORT=64620
+make lifecycle-dev30 PORT=64621
+```
+
+The 10- and 30-task runs deliberately seed the pinned historical faulty
+abstention helper so they can prove fail, repair-or-retire, prospective canary,
+and unrelated-task preservation. Their manifests and verifier mark them as
+development diagnostics; they cannot qualify as publication runs.
 
 To verify an already completed run:
 

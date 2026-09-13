@@ -37,32 +37,41 @@ def _scenario() -> Scenario:
                 "online_feedback_outcome_similarity": None,
             },
             0.75,
-            "audited_outcome_fallback",
-            id="null-paper-feedback-falls-back",
+            "audited_outcome",
+            id="audited-outcome-with-null-legacy-diagnostic",
         ),
         pytest.param(
             {"outcome_similarity": 0.75},
             0.75,
-            "audited_outcome_fallback",
-            id="missing-paper-feedback-falls-back",
+            "audited_outcome",
+            id="audited-outcome-without-legacy-diagnostic",
         ),
         pytest.param(
             {
                 "outcome_similarity": 0.75,
                 "online_feedback_outcome_similarity": 0.0,
             },
-            0.0,
-            "paper_era_online_feedback",
-            id="zero-paper-feedback-is-preserved",
+            0.75,
+            "audited_outcome",
+            id="audited-outcome-wins-over-zero-legacy-diagnostic",
         ),
         pytest.param(
             {
                 "outcome_similarity": 0.25,
                 "online_feedback_outcome_similarity": 0.75,
             },
-            0.75,
-            "paper_era_online_feedback",
-            id="nonzero-paper-feedback-is-preserved",
+            0.25,
+            "audited_outcome",
+            id="audited-outcome-wins-over-nonzero-legacy-diagnostic",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": None,
+                "online_feedback_outcome_similarity": 0.75,
+            },
+            None,
+            "unavailable",
+            id="legacy-diagnostic-never-fills-missing-audited-outcome",
         ),
         pytest.param(
             {
@@ -261,6 +270,518 @@ def test_reflection_routes_repairs_harmful_calls_without_global_retirement(
     decision = lifecycle["tool_lifecycle"]["relative_day_time_to_timestamp"]
     assert decision["decision"] == "needs_route_repair"
     assert decision["harmful_called_count"] == 1
+
+
+def test_reflection_reports_outcome_only_shortfall_without_repairing_co_called_tools(
+    tmp_path: Path,
+) -> None:
+    scenario_names = tuple(f"private_benchmark_case_{index}" for index in range(3))
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+        min_outcome_diagnostic_calls=3,
+    )
+
+    last_feedback: dict[str, object] = {}
+    for scenario_name in scenario_names:
+        last_feedback = controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.25, "outcome_similarity": 0.25},
+            selection_record={
+                "generated_tools_visible": [
+                    "generic_dependency_helper",
+                    "generic_formatting_helper",
+                ],
+                "generated_tools_called": [
+                    "generic_dependency_helper",
+                    "generic_formatting_helper",
+                ],
+                "generated_tools_attempted": [
+                    "generic_dependency_helper",
+                    "generic_formatting_helper",
+                ],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label=(
+                "visible_task_context(family=dependency_resolution; "
+                "signals=missing_capability; request='visible request')"
+            ),
+            task_family_key="dependency_resolution",
+        )
+
+    lifecycle_by_tool = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]
+    for tool_name in (
+        "generic_dependency_helper",
+        "generic_formatting_helper",
+    ):
+        lifecycle = lifecycle_by_tool[tool_name]
+        assert lifecycle["decision"] == "diagnostic_alarm"
+        assert lifecycle["decision_reason"] == (
+            "low_task_outcome_not_tool_attributable"
+        )
+        assert lifecycle["repair_kind"] is None
+        assert lifecycle["routing_disposition"] == "unchanged"
+        assert lifecycle["candidate_outcome_mean"] == 0.25
+        assert lifecycle["called_outcome_delta_mean"] == 0.25
+        assert lifecycle["implementation_repair_families"] == []
+        assert lifecycle["outcome_shortfall_alarm_families"] == [
+            "dependency_resolution"
+        ]
+
+    assert controller.drain_pending_repair_requests() == ()
+    assert not controller.repair_request_path.exists()
+    assert last_feedback["candidate_success_flip"] is False
+    assert last_feedback["post_deployment_repair_request_ids"] == []
+
+
+def test_reflection_keeps_relative_regression_as_route_repair(
+    tmp_path: Path,
+) -> None:
+    scenario_names = tuple(f"route_case_{index}" for index in range(2))
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+        min_outcome_diagnostic_calls=2,
+    )
+
+    for scenario_name in scenario_names:
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.75, "outcome_similarity": 0.75},
+            selection_record={
+                "generated_tools_visible": ["generic_routed_helper"],
+                "generated_tools_called": ["generic_routed_helper"],
+                "generated_tools_attempted": ["generic_routed_helper"],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label=(
+                "visible_task_context(family=lookup; signals=lookup; "
+                "request='visible request')"
+            ),
+            task_family_key="lookup",
+        )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["generic_routed_helper"]
+    assert lifecycle["decision"] == "needs_route_repair"
+    assert lifecycle["repair_kind"] == "routing"
+    assert lifecycle["implementation_repair_families"] == []
+    assert controller.drain_pending_repair_requests() == ()
+    assert not controller.repair_request_path.exists()
+
+
+def test_reflection_single_contract_failure_triggers_attributable_repair(
+    tmp_path: Path,
+) -> None:
+    scenario_names = ("contract_case",)
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    for scenario_name in scenario_names:
+        feedback = controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 1.0, "outcome_similarity": 1.0},
+            selection_record={
+                "generated_tools_visible": ["generic_contract_helper"],
+                "generated_tools_called": ["generic_contract_helper"],
+                "generated_tools_attempted": ["generic_contract_helper"],
+                "generated_tools_failed": [],
+                "generated_tool_contract_failures": ["generic_contract_helper"],
+            },
+            side_effect_failures=[],
+            task_context_label=(
+                "visible_task_context(family=normalization; "
+                "signals=public_contract; request='visible request')"
+            ),
+            task_family_key="normalization",
+        )
+        assert feedback["candidate_success_flip"] is True
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["generic_contract_helper"]
+    assert lifecycle["decision"] == "needs_implementation_repair"
+    assert lifecycle["decision_reason"] == "deterministic_public_contract_failure"
+    assert lifecycle["contract_failure_count"] == 1
+    assert lifecycle["success_flip_count"] == 1
+    requests = controller.drain_pending_repair_requests()
+    assert len(requests) == 1
+    assert requests[0]["trigger_reason_codes"] == [
+        "deterministic_public_contract_failure"
+    ]
+    assert requests[0]["public_evidence"] == {
+        "called_count": 1,
+        "contract_failure_count": 1,
+        "failed_count": 0,
+    }
+    assert "post_task_scalar_outcome" not in requests[0]["evidence_policy"]["allowed"]
+
+
+def test_reflection_requires_repeated_generated_tool_execution_failures(
+    tmp_path: Path,
+) -> None:
+    scenario_names = tuple(f"execution_failure_case_{index}" for index in range(3))
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 0.5,
+                "outcome_similarity": 0.5,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    for index, scenario_name in enumerate(scenario_names):
+        feedback = controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.5, "outcome_similarity": 0.5},
+            selection_record={
+                "generated_tools_visible": ["generic_runtime_helper"],
+                "generated_tools_called": [],
+                "generated_tools_attempted": ["generic_runtime_helper"],
+                "generated_tools_failed": ["generic_runtime_helper"],
+            },
+            side_effect_failures=[],
+            task_context_label=(
+                "visible_task_context(family=runtime_transform; "
+                "signals=execution; request='visible request')"
+            ),
+            task_family_key="runtime_transform",
+        )
+        expected_request_count = 1 if index == 2 else 0
+        assert len(feedback["post_deployment_repair_request_ids"]) == (
+            expected_request_count
+        )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["generic_runtime_helper"]
+    assert lifecycle["decision"] == "needs_implementation_repair"
+    assert lifecycle["decision_reason"] == ("repeated_generated_tool_execution_failure")
+    assert lifecycle["failed_count"] == 3
+    assert lifecycle["candidate_outcome_observation_count"] == 0
+
+    requests = controller.drain_pending_repair_requests()
+    assert len(requests) == 1
+    request = requests[0]
+    assert request["trigger_reason_codes"] == [
+        "repeated_generated_tool_execution_failure"
+    ]
+    assert request["public_evidence"] == {
+        "called_count": 0,
+        "contract_failure_count": 0,
+        "failed_count": 3,
+    }
+
+
+def test_generic_task_exception_does_not_retire_called_generated_tool(
+    tmp_path: Path,
+) -> None:
+    scenario_name = "actor_failed_after_successful_tool_call"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    feedback = controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={
+            "similarity": 0.0,
+            "outcome_similarity": 0.0,
+            "exception_type": "RuntimeError",
+        },
+        selection_record={
+            "generated_tools_visible": ["successful_helper"],
+            "generated_tools_called": ["successful_helper"],
+            "generated_tools_attempted": ["successful_helper"],
+            "generated_tools_failed": [],
+        },
+        side_effect_failures=[],
+        task_context_label="visible_task_context(family=generic_actor_failure)",
+        task_family_key="generic_actor_failure",
+    )
+
+    assert feedback["immediate_actions"] == []
+    assert controller.retired_this_run == set()
+    assert controller.drain_pending_repair_requests() == ()
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["successful_helper"]
+    assert lifecycle["decision"] == "diagnostic"
+    assert lifecycle["implementation_repair_families"] == []
+
+
+def test_three_execution_failures_across_families_trigger_one_global_repair(
+    tmp_path: Path,
+) -> None:
+    scenario_names = tuple(f"cross_family_failure_{index}" for index in range(3))
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {"name": name, "similarity": 0.0, "outcome_similarity": 0.0}
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    for index, scenario_name in enumerate(scenario_names):
+        feedback = controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.0, "outcome_similarity": 0.0},
+            selection_record={
+                "generated_tools_visible": ["cross_family_helper"],
+                "generated_tools_called": [],
+                "generated_tools_attempted": ["cross_family_helper"],
+                "generated_tools_failed": ["cross_family_helper"],
+            },
+            side_effect_failures=[],
+            task_context_label=f"visible_task_context(family=family_{index})",
+            task_family_key=f"family_{index}",
+        )
+        assert len(feedback["post_deployment_repair_request_ids"]) == (
+            1 if index == 2 else 0
+        )
+
+    requests = controller.drain_pending_repair_requests()
+    assert len(requests) == 1
+    assert requests[0]["target_task_family"] == "cross_family_execution_failure"
+    assert requests[0]["trigger_reason_codes"] == [
+        "repeated_generated_tool_execution_failure"
+    ]
+    assert requests[0]["public_evidence"]["failed_count"] == 3
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["cross_family_helper"]
+    assert lifecycle["decision"] == "needs_implementation_repair"
+    assert lifecycle["implementation_repair_families"] == [
+        "cross_family_execution_failure"
+    ]
+
+
+def test_run_end_emits_sparse_direct_execution_failure_once(tmp_path: Path) -> None:
+    scenario_name = "single_direct_execution_failure"
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            scenario_name: {
+                "name": scenario_name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+    controller.assess_scenario(
+        scenario_name=scenario_name,
+        baseline_scenario=_scenario(),
+        result={"similarity": 0.0, "outcome_similarity": 0.0},
+        selection_record={
+            "generated_tools_visible": ["sparse_failure_helper"],
+            "generated_tools_called": [],
+            "generated_tools_attempted": ["sparse_failure_helper"],
+            "generated_tools_failed": ["sparse_failure_helper"],
+        },
+        side_effect_failures=[],
+        task_context_label="visible_task_context(family=sparse_failure)",
+        task_family_key="sparse_failure",
+    )
+
+    assert controller.drain_pending_repair_requests() == ()
+    requests = controller.drain_run_end_repair_requests()
+    assert len(requests) == 1
+    assert requests[0]["trigger_reason_codes"] == [
+        "unresolved_generated_tool_execution_failure"
+    ]
+    assert requests[0]["public_evidence"]["failed_count"] == 1
+    assert controller.drain_run_end_repair_requests() == ()
+
+
+def test_repaired_version_does_not_inherit_prior_version_retirement(
+    tmp_path: Path,
+) -> None:
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=ControlBaselineCache(tmp_path / "control_cache"),
+    )
+    controller.retired_this_run.add("repaired_helper")
+
+    controller.acknowledge_repair(
+        "repaired_helper",
+        2,
+        "repair-request-v1",
+        "canary_pending",
+    )
+
+    assert "repaired_helper" not in controller.retired_this_run
+    lifecycle = controller._tool_lifecycle_snapshot()["repaired_helper"]
+    assert lifecycle["tool_version"] == 2
+    assert lifecycle["decision"] != "parked"
+
+
+def test_reflection_emits_metadata_repair_for_repeated_non_adoption(
+    tmp_path: Path,
+) -> None:
+    scenario_names = tuple(f"private_adoption_case_{index}" for index in range(8))
+    controller = SelfEvolutionReflectionController(
+        store=RegistryStore(tmp_path / "registry"),
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            name: {
+                "name": name,
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            }
+            for name in scenario_names
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+    )
+
+    for scenario_name in scenario_names:
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": 0.0, "outcome_similarity": 0.0},
+            selection_record={
+                "generated_tools_visible": ["generic_unadopted_helper"],
+                "generated_tools_called": [],
+                "generated_tools_attempted": [],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label=(
+                "visible_task_context(family=record_selection; "
+                "signals=selection; request='visible request')"
+            ),
+            task_family_key="record_selection",
+        )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["generic_unadopted_helper"]
+    assert lifecycle["decision"] == "adoption_repair"
+    assert lifecycle["repair_kind"] == "metadata"
+    assert lifecycle["metadata_repair_families"] == ["record_selection"]
+
+    requests = controller.drain_pending_repair_requests()
+    assert len(requests) == 1
+    request = requests[0]
+    assert request["repair_kind"] == "metadata"
+    assert request["requested_action"] == (
+        "repair_public_metadata_and_revalidate_or_retire"
+    )
+    assert request["trigger_reason_codes"] == ["visible_repeatedly_without_adoption"]
+    assert request["eligible_from_completed_count"] == 9
+    assert request["public_evidence"]["visible_count"] == 8
+    assert request["public_evidence"]["called_count"] == 0
+    serialized_request = json.dumps(request)
+    assert all(name not in serialized_request for name in scenario_names)
 
 
 def test_reflection_keeps_positive_tool_with_side_effect_audit(
@@ -547,7 +1068,7 @@ def test_strict_reflection_rejects_duplicate_fresh_control_use(
         controller.assess_scenario(**kwargs)
 
 
-def test_reflection_uses_paper_feedback_signal_not_reporting_outcome(
+def test_reflection_uses_audited_outcome_not_legacy_paper_diagnostic(
     tmp_path: Path,
 ) -> None:
     scenario_name = "search_phone_number_with_name"
@@ -587,14 +1108,14 @@ def test_reflection_uses_paper_feedback_signal_not_reporting_outcome(
         .read_text(encoding="utf-8")
         .splitlines()[0]
     )
-    assert feedback["control_outcome"] == 0.25
-    assert feedback["control_outcome_source"] == "paper_era_online_feedback"
-    assert feedback["candidate_outcome"] == 0.75
-    assert feedback["candidate_outcome_source"] == "paper_era_online_feedback"
-    assert feedback["outcome_delta"] == 0.5
+    assert feedback["control_outcome"] == 1.0
+    assert feedback["control_outcome_source"] == "audited_outcome"
+    assert feedback["candidate_outcome"] == 0.0
+    assert feedback["candidate_outcome_source"] == "audited_outcome"
+    assert feedback["outcome_delta"] == -1.0
 
 
-def test_reflection_records_audited_fallback_outcome_sources(tmp_path: Path) -> None:
+def test_reflection_records_audited_outcome_sources(tmp_path: Path) -> None:
     scenario_name = "search_phone_number_with_name"
     controller = SelfEvolutionReflectionController(
         store=RegistryStore(tmp_path / "registry"),
@@ -633,9 +1154,9 @@ def test_reflection_records_audited_fallback_outcome_sources(tmp_path: Path) -> 
         .splitlines()[0]
     )
     assert feedback["control_outcome"] == 0.25
-    assert feedback["control_outcome_source"] == "audited_outcome_fallback"
+    assert feedback["control_outcome_source"] == "audited_outcome"
     assert feedback["candidate_outcome"] == 0.75
-    assert feedback["candidate_outcome_source"] == "audited_outcome_fallback"
+    assert feedback["candidate_outcome_source"] == "audited_outcome"
     assert feedback["outcome_delta"] == 0.5
 
 

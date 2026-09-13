@@ -16,8 +16,8 @@ VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v3
 COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 
 .PHONY: \
-	compile lint test-core test package \
-	paper-online paper-frozen sample full \
+	compile lint test-core test lifecycle-mechanics package \
+	paper-online paper-frozen lifecycle-dev10 lifecycle-dev30 sample full \
 	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
@@ -42,12 +42,17 @@ test-core:
 		tests/unit/test_tool_generator.py \
 		tests/unit/test_control_baseline_cache.py \
 		tests/unit/test_self_evolution_reflection.py \
+		tests/unit/test_reflection_resume_persistence.py \
+		tests/unit/test_post_deployment_repair_loop.py \
+		tests/unit/test_runtime_lifecycle_routing.py \
+		tests/unit/test_sandbox_validator_semantics.py \
 		tests/unit/test_online_feedback_score.py \
 		tests/unit/test_outcome_score.py \
 		tests/unit/test_outcome_score_v4_evidence.py \
 		tests/unit/test_outcome_score_v4_state_safety.py \
 		tests/unit/test_protocol_generation_policy.py \
 		tests/unit/test_publication_run_verifier.py \
+		tests/unit/test_lifecycle_repair_run_verifier.py \
 		tests/unit/test_publication_sample_verifier.py \
 		tests/unit/test_publication_campaign.py \
 		tests/unit/test_publication_environment.py \
@@ -60,6 +65,15 @@ test-core:
 
 test:
 	$(COMMON_ENV) $(PYTHON) -m pytest tests/unit tests/integration -q
+
+# Deterministic evidence for the historical faulty-v1 -> validated-v2/retired
+# use case. This is a mechanism check, not a benchmark result.
+lifecycle-mechanics:
+	$(COMMON_ENV) $(PYTHON) -m pytest \
+		tests/unit/test_post_deployment_repair_loop.py \
+		tests/unit/test_sandbox_validator_semantics.py \
+		tests/unit/test_runtime_lifecycle_routing.py \
+		-q
 
 package:
 	$(PYTHON) -m pip wheel --no-deps --wheel-dir $(DIST_DIR) .
@@ -75,6 +89,14 @@ paper-online:
 # Set RESUME_REGISTRY_CHECKPOINT to the source registry before invoking.
 paper-frozen:
 	bash scripts/run_native_action_4omini_ab.sh full $(PORT) frozen-only
+
+# Exposed development cohorts; never publication-eligible. Both arms run fresh
+# and in parallel, and the external Task Compare dashboard opens before calls.
+lifecycle-dev10:
+	bash scripts/run_native_action_4omini_ab.sh dev10 $(PORT) development-only development-diagnostic
+
+lifecycle-dev30:
+	bash scripts/run_native_action_4omini_ab.sh dev30 $(PORT) development-only development-diagnostic
 
 sample: paper-online
 

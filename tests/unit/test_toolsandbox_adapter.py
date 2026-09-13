@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from sage_ts.adapters.toolsandbox_adapter import (
     ToolSandboxRunConfig,
     run_scenario_sequence,
@@ -122,11 +124,62 @@ def test_run_scenario_sequence_continues_after_transform_failure(
     )
 
     assert ("scenario_transform_failed", scenario_name) in events
+    assert (output_directory / "scenario_transform_failures.jsonl").is_file()
     assert any(event == "scenario_finished" for event, _ in events)
     summary = json.loads(
         (output_directory / "result_summary.json").read_text(encoding="utf-8")
     )
     assert summary["per_scenario_results"][0]["name"] == scenario_name
+
+
+def test_run_scenario_sequence_aborts_after_transform_failure_when_strict(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    scenario_name = "toy_birth"
+    scenario = Scenario(
+        starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+    )
+    ran_scenario = False
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.toolsandbox_adapter.resolve_scenarios",
+        lambda *_args, **_kwargs: {scenario_name: scenario},
+    )
+
+    def fake_transform(_name: str, _base: Scenario, _path: Path) -> Scenario:
+        raise RuntimeError("transform failed")
+
+    def fake_run_one_scenario(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal ran_scenario
+        ran_scenario = True
+        return {}
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.toolsandbox_adapter.run_one_scenario",
+        fake_run_one_scenario,
+    )
+
+    with pytest.raises(RuntimeError, match="transform failed"):
+        run_scenario_sequence(
+            ToolSandboxRunConfig(
+                agent="Unhelpful",
+                user="GPT_4_o_2024_05_13",
+                scenario_names=(scenario_name,),
+                output_dir=tmp_path / "outputs",
+                fail_on_scenario_transform_error=True,
+            ),
+            scenario_transform=fake_transform,
+        )
+
+    assert ran_scenario is False
+    failure_files = list(
+        (tmp_path / "outputs").glob("*/scenario_transform_failures.jsonl")
+    )
+    assert len(failure_files) == 1
+    failure = json.loads(failure_files[0].read_text(encoding="utf-8"))
+    assert failure["event"] == "scenario_transform_failed"
+    assert failure["scenario"] == scenario_name
 
 
 def test_run_scenario_sequence_resume_completed_limit(
@@ -186,6 +239,24 @@ def test_run_scenario_sequence_resume_completed_limit(
         + "\n"
         + json.dumps({"scenario": "task_b", "status": "excluded"})
         + "\n",
+        encoding="utf-8",
+    )
+    (resume_dir / "self_evolution_tool_repair_requests.jsonl").write_text(
+        json.dumps({"request_id": "keep", "trigger_completed_count": 1})
+        + "\n"
+        + json.dumps({"request_id": "drop", "trigger_completed_count": 2})
+        + "\n",
+        encoding="utf-8",
+    )
+    (resume_dir / "self_evolution_tool_repair_acknowledgements.jsonl").write_text(
+        json.dumps({"request_id": "keep", "acknowledged_after_completed_count": 1})
+        + "\n"
+        + json.dumps({"request_id": "drop", "acknowledged_after_completed_count": 2})
+        + "\n",
+        encoding="utf-8",
+    )
+    (resume_dir / "post_deployment_repair_state.json").write_text(
+        json.dumps({"unsafe_after_rewind": True}) + "\n",
         encoding="utf-8",
     )
     (resume_dir / "trajectories" / "task_a").mkdir(parents=True)
@@ -261,3 +332,14 @@ def test_run_scenario_sequence_resume_completed_limit(
     assert "task_b" not in copied_selection
     assert (output_directory / "trajectories" / "task_a").exists()
     assert not (output_directory / "trajectories" / "task_b").exists()
+    copied_requests = (
+        output_directory / "self_evolution_tool_repair_requests.jsonl"
+    ).read_text(encoding="utf-8")
+    copied_acknowledgements = (
+        output_directory / "self_evolution_tool_repair_acknowledgements.jsonl"
+    ).read_text(encoding="utf-8")
+    assert '"keep"' in copied_requests
+    assert '"drop"' not in copied_requests
+    assert '"keep"' in copied_acknowledgements
+    assert '"drop"' not in copied_acknowledgements
+    assert not (output_directory / "post_deployment_repair_state.json").exists()

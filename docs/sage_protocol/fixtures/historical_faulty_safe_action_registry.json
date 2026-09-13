@@ -1,0 +1,163 @@
+{
+  "fixture_type": "development_only_historical_fault_injection",
+  "source_artifact": "artifacts/gate1_4omini_60/gate1_4omini_60_20260711_173723_registry/registry_manifest.json",
+  "source_run_date": "2026-07-11",
+  "tools": {
+    "prepare_safe_action_or_abstain": {
+      "schema_version": 2,
+      "tool": {
+        "spec": {
+          "schema_version": 2,
+          "tool_name": "prepare_safe_action_or_abstain",
+          "family": "validation_abstention_helper",
+          "description": "Determines if the actor can safely proceed with an action or must abstain due to missing information.",
+          "inputs": [
+            {
+              "name": "user_request",
+              "annotation": "str",
+              "description": "The user's request for an action."
+            },
+            {
+              "name": "requested_action",
+              "annotation": "str",
+              "description": "The action the user wants to perform."
+            },
+            {
+              "name": "target_identifier",
+              "annotation": "str",
+              "description": "The target of the action, such as a contact name or phone number."
+            },
+            {
+              "name": "required_original_tools",
+              "annotation": "list",
+              "description": "The tools required to perform the requested action."
+            },
+            {
+              "name": "available_original_tools",
+              "annotation": "list",
+              "description": "The tools available to the actor."
+            },
+            {
+              "name": "visible_records_count",
+              "annotation": "int",
+              "description": "The count of visible records related to the action."
+            }
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "should_abstain": "bool",
+            "missing_information": "list",
+            "required_original_tools": "list",
+            "safe_next_action": "str",
+            "final_answer_recommendation": "str",
+            "abstain_reason": "str",
+            "type": "object",
+            "properties": {
+              "should_abstain": {
+                "type": "boolean"
+              },
+              "missing_information": {
+                "type": "array"
+              },
+              "required_original_tools": {
+                "type": "array"
+              },
+              "safe_next_action": {
+                "type": "string"
+              },
+              "final_answer_recommendation": {
+                "type": "string"
+              },
+              "abstain_reason": {
+                "type": "string"
+              }
+            }
+          },
+          "positive_triggers": [
+            "missing_user_information",
+            "missing_original_tool_precondition",
+            "unsafe_guess_before_side_effect",
+            "safe_abstain",
+            "insufficient_information",
+            "safe_abstain_needed",
+            "missing_lookup"
+          ],
+          "negative_triggers": [
+            "insufficient_visible_information",
+            "ambiguous_visible_match",
+            "missing_required_input"
+          ],
+          "preserves_side_effect_tools": [
+            "search_contacts",
+            "remove_contact",
+            "modify_contact",
+            "send_message_with_phone_number"
+          ],
+          "required_original_tool_calls": [
+            "search_contacts",
+            "remove_contact",
+            "modify_contact",
+            "send_message_with_phone_number"
+          ],
+          "abstain_behavior": "",
+          "generalization_rationale": "Generated from recurring public validation examples and visible task evidence so the same deterministic transformation can be reused.",
+          "estimated_step_compression": 3,
+          "cross_task_applicability_count": 2,
+          "applicable_task_families": [
+            "safe_abstain",
+            "insufficient_information",
+            "safe_abstain_needed",
+            "missing_lookup"
+          ],
+          "reason_tool_is_decisive": "The tool turns visible task constraints into deterministic arguments or abstention signals before the actor chooses the preserved action.",
+          "diagnostic_only": true,
+          "shortfall_cluster_evidence": [
+            "validation:prepare_safe_action_or_abstain",
+            "diagnostic_only_near_duplicate_or_single_family_cluster"
+          ],
+          "known_failure_mechanisms_addressed": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "expected_milestone_calls_replaced": [],
+          "final_state_preservation_plan": "",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "summary": "Repeated insufficient-information and missing-precondition failures need a side-effect-free helper that decides whether the actor has enough visible information and original ToolSandbox affordances to continue, or must abstain instead of guessing. Generate a deterministic validation helper named prepare_safe_action_or_abstain. Inputs must be user_request: str, requested_action: str, target_identifier: str, required_original_tools: list, available_original_tools: list, and visible_records_count: int. Return exactly should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason. If any required original ToolSandbox tool is absent from available_original_tools, set should_abstain true, missing_information to those missing tool names, safe_next_action to ask_user_or_abstain, and a final answer recommendation that says the action cannot be completed with the currently available information/tools. For contact modify/remove requests, a raw phone number or name is not a safe record id unless a visible search/helper result resolved it to a stable contact record. If contact lookup is unavailable, abstain with a precise missing contact lookup/tool reason instead of a generic answer. If requested_action is a contact or reminder side-effect and target_identifier is blank, abstain with missing_target_identifier. If visible_records_count is greater than 1 and the target is not unique, abstain for ambiguity. If required tools are available and a unique target identifier is present, set should_abstain false, missing_information empty, safe_next_action continue_with_original_tool, and blank final answer recommendation. The helper must never call, select, modify, remove, send, create, or guess records; it only prepares a final abstention or safe-continue recommendation. The spec must list the original ToolSandbox calls it protects in both required_original_tool_calls and preserves_side_effect_tools, including search_contacts, remove_contact, modify_contact, search_messages, search_reminder, remove_reminder, modify_reminder, add_reminder, and send_message_with_phone_number when those actions are supported. Include positive triggers for insufficient_information, missing original tool, missing precondition, missing target, unavailable search tool, and ambiguous target. Include negative triggers for complete safe requests, known unique records, and tasks where the original side-effect tool is visible and all required user information is present.",
+            "signals": [
+              "missing_user_information",
+              "missing_original_tool_precondition",
+              "unsafe_guess_before_side_effect"
+            ],
+            "failed_tool_calls": [],
+            "repeated_failed_tool_calls": [],
+            "visible_data_gaps": [
+              "visible request and available tool list must be converted into a safe abstention decision"
+            ],
+            "planner_failures": [
+              "abstain_or_clarify_instead_of_guessing"
+            ],
+            "final_answer_route_mismatch": false
+          }
+        },
+        "code": "def prepare_safe_action_or_abstain(user_request: str=None, requested_action: str=None, target_identifier: str='', required_original_tools: list=[], available_original_tools: list=[], visible_records_count: int=0):\n    if isinstance(required_original_tools, str):\n        required_original_tools = [required_original_tools]\n    if isinstance(available_original_tools, str):\n        available_original_tools = [available_original_tools]\n    missing_information = []\n    should_abstain = False\n    abstain_reason = ''\n    if 'search_contacts' in required_original_tools and 'search_contacts' not in available_original_tools:\n        should_abstain = True\n        missing_information.append('search_contacts')\n        abstain_reason = 'missing_required_original_tool'\n        final_answer_recommendation = 'I do not have enough information to safely proceed.'\n        safe_next_action = 'ask_user_or_abstain'\n    elif 'contact_lookup' in required_original_tools and 'contact_lookup' not in available_original_tools:\n        should_abstain = True\n        missing_information.append('contact_lookup')\n        abstain_reason = 'missing_required_original_tool'\n        final_answer_recommendation = 'The recipient cannot be resolved to a phone number with the available information/tools.'\n        safe_next_action = 'ask_user_or_abstain'\n    else:\n        should_abstain = False\n        missing_information = []\n        abstain_reason = ''\n        final_answer_recommendation = ''\n        safe_next_action = 'continue_with_original_tool'\n    return {'should_abstain': should_abstain, 'missing_information': missing_information, 'required_original_tools': required_original_tools, 'safe_next_action': safe_next_action, 'final_answer_recommendation': final_answer_recommendation, 'abstain_reason': abstain_reason}\n"
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "source_example_count": 1,
+        "held_out_check_count": 1,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true
+      },
+      "birth_scenario": "visible_task_context(family=holiday; signals=holiday,calendar_distance,insufficient_information; request='How many days is it till Christmas Day')",
+      "accepted_at": "2026-07-11T21:54:46.473460+00:00",
+      "version": 1,
+      "reuse_count": 0,
+      "success_flips": 0,
+      "retired": false,
+      "code_hash": "16262a4c141901a7ec4f7fb8d289ec8067c09473352df77b1a1fd262743386a9",
+      "legacy_diagnostic": false
+    }
+  }
+}

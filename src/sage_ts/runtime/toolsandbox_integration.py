@@ -2007,16 +2007,30 @@ def load_tool_lifecycle_routing_state(registry_root: Path) -> dict[str, dict[str
         return {}
     try:
         payload = json.loads(lifecycle_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    lifecycle = payload.get("tool_lifecycle", {})
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            f"Malformed lifecycle routing state: {lifecycle_path}."
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"Malformed lifecycle routing state: {lifecycle_path} must contain "
+            "a top-level object."
+        )
+    lifecycle = payload.get("tool_lifecycle")
     if not isinstance(lifecycle, dict):
-        return {}
-    return {
-        str(tool_name): row
-        for tool_name, row in lifecycle.items()
-        if isinstance(row, dict)
-    }
+        raise ValueError(
+            f"Malformed lifecycle routing state: {lifecycle_path} must contain "
+            "a tool_lifecycle object."
+        )
+    parsed: dict[str, dict[str, Any]] = {}
+    for tool_name, row in lifecycle.items():
+        if not isinstance(tool_name, str) or not tool_name or not isinstance(row, dict):
+            raise ValueError(
+                f"Malformed lifecycle routing state: {lifecycle_path} contains "
+                "an invalid tool entry."
+            )
+        parsed[tool_name] = row
+    return parsed
 
 
 def _lifecycle_visibility_override(
@@ -2025,7 +2039,7 @@ def _lifecycle_visibility_override(
     scenario_name: str | None,
     lifecycle_state: dict[str, dict[str, Any]] | None,
 ) -> tuple[bool, str] | None:
-    if not scenario_name or not lifecycle_state:
+    if not lifecycle_state:
         return None
     row = lifecycle_state.get(tool_name)
     if not row:
@@ -2033,6 +2047,14 @@ def _lifecycle_visibility_override(
     decision = str(row.get("decision") or "")
     if decision in {"park", "parked"}:
         return False, "lifecycle_suppressed_parked_tool"
+    if decision == "needs_implementation_repair":
+        return False, "lifecycle_suppressed_pending_implementation_repair"
+    if decision == "quarantined":
+        return False, "lifecycle_suppressed_quarantined_tool"
+    if decision == "retired_after_failed_repair":
+        return False, "lifecycle_suppressed_retired_tool"
+    if not scenario_name:
+        return None
 
     scenario_family = base_task_family(scenario_name)
     route_repair_families = {
@@ -2065,23 +2087,7 @@ def _lifecycle_visibility_override(
 
     harmful_family_count = sum(1 for item in harmful_families_list if same_family(item))
     helpful_family_count = sum(1 for item in helpful_families if same_family(item))
-    is_validation_abstention_tool = tool_name == "prepare_safe_action_or_abstain"
-    if is_validation_abstention_tool:
-        try:
-            side_effect_incident_count = int(row.get("side_effect_incident_count") or 0)
-        except (TypeError, ValueError):
-            side_effect_incident_count = 0
-        try:
-            failed_count = int(row.get("failed_count") or 0)
-        except (TypeError, ValueError):
-            failed_count = 0
-        operationally_clean = side_effect_incident_count == 0 and failed_count == 0
-    else:
-        operationally_clean = False
-
     if decision == "retain_with_route_repair":
-        if is_validation_abstention_tool and operationally_clean:
-            return None
         if scenario_name in harmful_scenarios:
             return False, "lifecycle_suppressed_exact_harmful_called_scenario"
         if (
@@ -2093,11 +2099,7 @@ def _lifecycle_visibility_override(
         return None
 
     if scenario_family in route_repair_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if harmful_family_count < 2 and not (
-            is_validation_abstention_tool and not operationally_clean
-        ):
+        if harmful_family_count < 2:
             return None
         if harmful_family_count and harmful_family_count <= helpful_family_count:
             return None
@@ -2110,119 +2112,10 @@ def _lifecycle_visibility_override(
 
     harmful_families = {base_task_family(str(item)) for item in harmful_families_list}
     if scenario_family in harmful_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if (
-            harmful_family_count < 2
-            and harmful_count_int < 2
-            and not (is_validation_abstention_tool and not operationally_clean)
-        ):
+        if harmful_family_count < 2 and harmful_count_int < 2:
             return None
         return False, "lifecycle_suppressed_harmful_called_family"
     return None
-
-
-def _visible_signal_can_override_lifecycle_family_suppression(
-    *,
-    tool_name: str,
-    generic_decision: RuntimeRoutingDecision,
-    lifecycle_state: dict[str, dict[str, Any]] | None,
-) -> bool:
-    """Let strict visible-context evidence repair coarse lifecycle suppression.
-
-    Lifecycle feedback is allowed to suppress tools after harmful calls, but a
-    broad family label is intentionally coarse. If a retained tool is validated,
-    operationally clean, and the current task text/tools/signals explicitly
-    match that tool, the visible route is the more specific self-evolution
-    signal. Parked tools and tools needing implementation repair remain hidden.
-    """
-    if not lifecycle_state:
-        return False
-    if not generic_decision.visible:
-        return False
-    if generic_decision.reason != "visible_context_signal_match":
-        return False
-    row = lifecycle_state.get(tool_name)
-    if not row:
-        return False
-    if str(row.get("decision") or "") != "retain_with_route_repair":
-        return False
-    for key in ("failed_count", "side_effect_incident_count"):
-        try:
-            if int(row.get(key) or 0) > 0:
-                return False
-        except (TypeError, ValueError):
-            return False
-    return True
-
-
-def _abstention_guard_call_would_be_scored_as_forbidden_action(
-    entry: RegistryEntry,
-    task_context_text: str | None,
-    available_base_tools: set[str] | None,
-) -> bool:
-    """Avoid executable abstention helpers on no-tool guardrail lanes.
-
-    Some ToolSandbox insufficient-information tasks grade the absence of an
-    execution-environment action. In those lanes, calling even a side-effect-free
-    generated validation tool can be counted as the forbidden action if its
-    arguments necessarily name that action. Suppress the executable helper when
-    the original side-effect tool is visible but its required producer/search
-    precondition is absent; the actor can still abstain without any tool call.
-    """
-    if not task_context_text or available_base_tools is None:
-        return False
-    visible_context = task_context_text.lower()
-    if "insufficient_information" not in visible_context:
-        return False
-    if not _is_insufficient_information_guard(entry.tool.spec):
-        return False
-    available = {str(tool) for tool in available_base_tools}
-    if (
-        "remove_contact" in available
-        and "search_contacts" not in available
-        and "remove_contact" in visible_context
-    ):
-        return True
-    if (
-        "modify_contact" in available
-        and "search_contacts" not in available
-        and "modify_contact" in visible_context
-    ):
-        return True
-    if (
-        "modify_contact" in available
-        and "search_messages" not in available
-        and "message_recency" in visible_context
-    ):
-        # Message-recency contact updates are unsafe without message history. The
-        # validation abstention tool is the generated-tool mechanism that prevents
-        # guessed modify_contact calls in this lane, so keep it visible.
-        return False
-    if (
-        "send_message_with_phone_number" in available
-        and "search_contacts" not in available
-        and "send_message" in visible_context
-    ):
-        # Named-recipient send tasks are unsafe when the actor has a send tool
-        # but no contact lookup. The generated validation tool now uses
-        # semantic capability labels instead of original side-effect tool names,
-        # so keeping it visible routes the actor away from guessing a name as a
-        # phone number without adding a synthetic completion path.
-        return False
-    if (
-        "remove_reminder" in available
-        and "search_reminder" not in available
-        and "remove_reminder" in visible_context
-    ):
-        return True
-    if (
-        "modify_reminder" in available
-        and "search_reminder" not in available
-        and "modify_reminder" in visible_context
-    ):
-        return True
-    return False
 
 
 def _generated_tool_substitutes_available_original(
@@ -2307,16 +2200,7 @@ def route_registry_entries(
         )
         if lifecycle_override is not None:
             lifecycle_visible, lifecycle_reason = lifecycle_override
-            if not (
-                task_context_text
-                and lifecycle_reason == "lifecycle_suppressed_harmful_called_family"
-                and _visible_signal_can_override_lifecycle_family_suppression(
-                    tool_name=tool_name,
-                    generic_decision=generic,
-                    lifecycle_state=lifecycle_state,
-                )
-            ):
-                is_visible, reason = lifecycle_visible, lifecycle_reason
+            is_visible, reason = lifecycle_visible, lifecycle_reason
         status = "shown" if is_visible else "hidden"
         score = generic.score
         if generic.status == "hidden" and generic.reason in generic_hard_blocks:
@@ -2434,16 +2318,7 @@ def route_registry_entries(
                 downstream_tools = producer_tools
                 requires_any_downstream = True
         if is_visible and available_base_tools is not None and downstream_tools:
-            if _abstention_guard_call_would_be_scored_as_forbidden_action(
-                entry,
-                task_context_text,
-                available_base_tools,
-            ):
-                is_visible = False
-                status = "hidden"
-                reason = "abstention_guard_suppressed_for_no_tool_guardrail"
-                missing = set()
-            elif (
+            if (
                 "insufficient_information" in routing_lower
                 or "safe_abstain_needed" in routing_lower
             ) and _is_insufficient_information_guard(entry.tool.spec):

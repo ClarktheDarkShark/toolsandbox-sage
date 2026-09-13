@@ -36,8 +36,15 @@ PINNED_PUBLICATION_ENVIRONMENT_LOCK_SHA256 = (
 PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_MODEL = "gpt-4o-mini"
+PUBLICATION_TASK_COUNT = 1032
 PUBLICATION_TIMEZONE = "America/New_York"
 PUBLICATION_OUTCOME_EVALUATOR_VERSION = "sage_outcome_contracts_v9"
+PUBLICATION_OUTCOME_EVALUATOR_CONTRACT_SHA256 = (
+    "d6a7598e708b24e40823278c228c895c387ef1a4d116e3b92173885967ad1955"
+)
+PUBLICATION_OUTCOME_EVALUATOR_SOURCE_SHA256 = (
+    "8ed1595b3eb050004ba2cc161836fb78906e58d3c0127b2c421df03400f14c63"
+)
 PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
 PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
 PUBLICATION_GATE_PURPOSES = (
@@ -319,6 +326,272 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _read_jsonl_objects(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Lifecycle JSONL line {line_number} is invalid in {path}: {exc}"
+            ) from exc
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"Lifecycle JSONL line {line_number} is not an object in {path}."
+            )
+        rows.append(row)
+    return rows
+
+
+def _verify_lifecycle_closed(
+    candidate_dir: Path,
+    registry_dir: Path,
+) -> dict[str, Any]:
+    """Require every repair request to have a safe terminal run disposition."""
+
+    requests = _read_jsonl_objects(
+        candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+    )
+    acknowledgements = _read_jsonl_objects(
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    state_path = candidate_dir / "post_deployment_repair_state.json"
+    if not state_path.is_file():
+        raise ValueError("Completed SAGE run is missing lifecycle repair state.")
+    state = _read_json(state_path)
+    if state.get("schema_version") != 1:
+        raise ValueError("Completed SAGE run has an invalid lifecycle state schema.")
+    pending = state.get("pending_repair_requests")
+    canaries = state.get("canary_state_by_tool")
+    transactions = state.get("repair_transactions_by_tool", {})
+    handled = state.get("handled_repair_request_ids")
+    if not isinstance(pending, list) or pending:
+        raise ValueError("Completed SAGE run has pending lifecycle repair requests.")
+    if not isinstance(canaries, dict) or canaries:
+        raise ValueError("Completed SAGE run has open repaired-tool canaries.")
+    if not isinstance(transactions, dict) or transactions:
+        raise ValueError("Completed SAGE run has open lifecycle repair transactions.")
+    if not isinstance(handled, list) or any(
+        not isinstance(request_id, str) or not request_id for request_id in handled
+    ):
+        raise ValueError("Completed SAGE run has invalid handled lifecycle state.")
+
+    request_by_id: dict[str, dict[str, Any]] = {}
+    for row in requests:
+        request_id = str(row.get("request_id") or "")
+        tool_name = str(row.get("tool_name") or "")
+        source_version = row.get("source_tool_version")
+        if (
+            not request_id
+            or request_id in request_by_id
+            or not tool_name
+            or row.get("schema_version") != 1
+            or isinstance(source_version, bool)
+            or not isinstance(source_version, int)
+            or source_version < 1
+            or row.get("future_tasks_only") is not True
+            or row.get("triggering_task_replay_allowed") is not False
+        ):
+            raise ValueError("Completed SAGE run has a malformed lifecycle request.")
+        request_by_id[request_id] = row
+    final_ack_by_request: dict[str, dict[str, Any]] = {}
+    allowed_acknowledgement_statuses = {
+        "validation_failed",
+        "canary_pending",
+        "promoted",
+        "rejected",
+        "rolled_back",
+    }
+    for row in acknowledgements:
+        request_id = str(row.get("request_id") or "")
+        tool_name = str(row.get("tool_name") or "")
+        version = row.get("new_version")
+        if (
+            not request_id
+            or not tool_name
+            or row.get("schema_version") != 1
+            or isinstance(version, bool)
+            or not isinstance(version, int)
+            or version < 1
+            or row.get("status") not in allowed_acknowledgement_statuses
+            or row.get("future_tasks_only") is not True
+            or row.get("triggering_task_replay_allowed") is not False
+        ):
+            raise ValueError(
+                "Completed SAGE run has a malformed lifecycle acknowledgement."
+            )
+        final_ack_by_request[request_id] = row
+    request_ids = set(request_by_id)
+    unacknowledged = sorted(request_ids - set(final_ack_by_request))
+    if unacknowledged:
+        raise ValueError(
+            "Completed SAGE run has unacknowledged lifecycle repair requests: "
+            f"{unacknowledged!r}."
+        )
+    terminal_statuses = {"promoted", "rejected", "rolled_back"}
+    orphaned_acknowledgements = sorted(set(final_ack_by_request) - request_ids)
+    if orphaned_acknowledgements:
+        raise ValueError(
+            "Completed SAGE run has lifecycle acknowledgements without requests: "
+            f"{orphaned_acknowledgements!r}."
+        )
+    mismatched_tools = sorted(
+        request_id
+        for request_id, acknowledgement in final_ack_by_request.items()
+        if acknowledgement.get("tool_name")
+        != request_by_id[request_id].get("tool_name")
+    )
+    if mismatched_tools:
+        raise ValueError(
+            "Completed SAGE run has lifecycle acknowledgements for the wrong tool: "
+            f"{mismatched_tools!r}."
+        )
+    nonterminal = sorted(
+        request_id
+        for request_id in final_ack_by_request
+        if str(final_ack_by_request[request_id].get("status") or "")
+        not in terminal_statuses
+    )
+    if nonterminal:
+        raise ValueError(
+            "Completed SAGE run has nonterminal lifecycle acknowledgements: "
+            f"{nonterminal!r}."
+        )
+    unhandled = sorted(request_ids - set(handled))
+    if unhandled:
+        raise ValueError(
+            "Completed SAGE run has terminal lifecycle requests missing from state: "
+            f"{unhandled!r}."
+        )
+
+    registry = _read_json(registry_dir / "registry_manifest.json")
+    registry_tools = registry.get("tools")
+    if not isinstance(registry_tools, dict):
+        raise ValueError("Final registry manifest has no tool mapping.")
+    active_unresolved: list[str] = []
+    promoted_versions: set[tuple[str, int]] = set()
+    for request_id in sorted(final_ack_by_request):
+        acknowledgement = final_ack_by_request[request_id]
+        status = str(acknowledgement.get("status") or "")
+        tool_name = str(acknowledgement.get("tool_name") or "")
+        version = acknowledgement.get("new_version")
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise ValueError(
+                "Completed SAGE run has a malformed lifecycle acknowledgement version."
+            )
+        entry = registry_tools.get(tool_name)
+        if status == "promoted" and (
+            not isinstance(entry, dict)
+            or isinstance(entry.get("version"), bool)
+            or not isinstance(entry.get("version"), int)
+            or entry["version"] < version
+        ):
+            raise ValueError(
+                "Completed SAGE run has no registry version for promoted tool: "
+                f"{tool_name}:v{version}:{request_id}."
+            )
+        if (
+            status == "promoted"
+            and isinstance(entry, dict)
+            and entry.get("version") == version
+            and entry.get("retired") is not False
+        ):
+            raise ValueError(
+                "Completed SAGE run marks a current promoted tool as retired: "
+                f"{tool_name}:v{version}:{request_id}."
+            )
+        if status == "promoted":
+            promoted_versions.add((tool_name, version))
+            continue
+        if (
+            isinstance(entry, dict)
+            and entry.get("version") == version
+            and entry.get("retired") is not True
+        ):
+            active_unresolved.append(f"{tool_name}:v{version}:{request_id}")
+    if active_unresolved:
+        raise ValueError(
+            "Completed SAGE run leaves unresolved affected tools active: "
+            f"{active_unresolved!r}."
+        )
+    active_repairs_without_promotion = sorted(
+        f"{tool_name}:v{entry.get('version')}"
+        for tool_name, entry in registry_tools.items()
+        if isinstance(tool_name, str)
+        and isinstance(entry, dict)
+        # Registry loading treats every value other than literal ``true`` as
+        # active.  Verification must use the same fail-closed interpretation;
+        # otherwise a malformed repair entry with no ``retired`` field could
+        # remain callable without a matching promotion acknowledgement.
+        and entry.get("retired") is not True
+        and str(entry.get("birth_scenario") or "").startswith("post_deployment_repair:")
+        and (tool_name, entry.get("version")) not in promoted_versions
+    )
+    if active_repairs_without_promotion:
+        raise ValueError(
+            "Completed SAGE run has active post-deployment repair versions without "
+            "matching promoted acknowledgements: "
+            f"{active_repairs_without_promotion!r}."
+        )
+    return {
+        "repair_request_count": len(requests),
+        "repair_acknowledgement_count": len(acknowledgements),
+        "pending_repair_request_count": 0,
+        "open_canary_count": 0,
+        "open_repair_transaction_count": 0,
+        "active_unresolved_tool_count": 0,
+    }
+
+
+def _verify_empty_online_registry_start(
+    run_root: Path,
+    protocol: dict[str, Any],
+) -> dict[str, Any]:
+    """Require an online publication arm to start without registry sidecars."""
+
+    snapshot = protocol.get("registry_gate_snapshot")
+    if not isinstance(snapshot, dict):
+        raise ValueError("Online publication run has no pre-run registry snapshot.")
+    snapshot_path = run_root / "registry_gate" / "registry_gate_snapshot.json"
+    if _read_json(snapshot_path) != snapshot:
+        raise ValueError(
+            "Online publication pre-run registry snapshot differs from its artifact."
+        )
+    required: dict[str, object] = {
+        "manifest_existed_before_run": False,
+        "snapshot_path": None,
+        "manifest_digest_before_run": None,
+        "registry_directory_existed_before_run": False,
+        "registry_inventory_before_run": [],
+        "registry_inventory_count_before_run": 0,
+        "registry_inventory_sha256": hashlib.sha256(b"[]").hexdigest(),
+    }
+    for field, expected in required.items():
+        if snapshot.get(field) != expected:
+            raise ValueError(
+                "Online publication registry did not start exactly empty: "
+                f"{field}={snapshot.get(field)!r}, expected {expected!r}."
+            )
+    return snapshot
+
+
+def _verify_no_scenario_transform_failures(candidate_dir: Path) -> None:
+    """Reject a strict run that ever fell back after transformation failed."""
+
+    failure_path = candidate_dir / "scenario_transform_failures.jsonl"
+    if _read_jsonl_objects(failure_path):
+        raise ValueError(
+            "Candidate run contains scenario transformation failures; strict runs "
+            "must abort instead of falling back to the base scenario."
+        )
+
+
 def _verify_parallel_arm_execution(
     run_root: Path,
     protocol: dict[str, Any],
@@ -459,30 +732,29 @@ def _uncached_rows(
                 f"({exception_type or 'traceback recorded'})."
             )
         outcome_similarity = item.get("outcome_similarity")
-        if outcome_similarity is not None:
-            if (
-                isinstance(outcome_similarity, bool)
-                or not isinstance(outcome_similarity, (int, float))
-                or not math.isfinite(float(outcome_similarity))
-                or not 0.0 <= float(outcome_similarity) <= 1.0
-            ):
+        if (
+            isinstance(outcome_similarity, bool)
+            or not isinstance(outcome_similarity, (int, float))
+            or not math.isfinite(float(outcome_similarity))
+            or not 0.0 <= float(outcome_similarity) <= 1.0
+        ):
+            raise ValueError(
+                f"{arm} task {name!r} is missing a finite audited outcome similarity."
+            )
+        evaluator_fields = {
+            "outcome_evaluator_version": "version",
+            "outcome_evaluator_contract_sha256": "contract_sha256",
+            "outcome_evaluator_source_sha256": "source_sha256",
+        }
+        for result_field, manifest_field in evaluator_fields.items():
+            if result_field not in item or item[
+                result_field
+            ] != expected_outcome_evaluator.get(manifest_field):
                 raise ValueError(
-                    f"{arm} task {name!r} has an invalid outcome similarity."
+                    f"{arm} task {name!r} outcome evaluator field "
+                    f"{result_field!r} does not match the exact publication "
+                    "evaluator identity."
                 )
-            evaluator_fields = {
-                "outcome_evaluator_version": "version",
-                "outcome_evaluator_contract_sha256": "contract_sha256",
-                "outcome_evaluator_source_sha256": "source_sha256",
-            }
-            for result_field, manifest_field in evaluator_fields.items():
-                if result_field not in item or item[
-                    result_field
-                ] != expected_outcome_evaluator.get(manifest_field):
-                    raise ValueError(
-                        f"{arm} task {name!r} outcome evaluator field "
-                        f"{result_field!r} does not match the exact publication "
-                        "evaluator identity."
-                    )
         cache_source = str(item.get("control_cache_source") or "").lower()
         cache_detail = item.get("control_cache")
         if cache_source and cache_source != "fresh":
@@ -809,18 +1081,12 @@ def _feedback_outcome_with_source(
     *,
     label: str,
 ) -> tuple[float | None, str]:
-    paper_feedback = _optional_feedback_metric(
-        row.get("online_feedback_outcome_similarity"),
-        label=f"{label} paper-era online feedback outcome",
-    )
-    if paper_feedback is not None:
-        return paper_feedback, "paper_era_online_feedback"
     audited_outcome = _optional_feedback_metric(
         row.get("outcome_similarity"),
         label=f"{label} audited outcome",
     )
     if audited_outcome is not None:
-        return audited_outcome, "audited_outcome_fallback"
+        return audited_outcome, "audited_outcome"
     return None, "unavailable"
 
 
@@ -1023,6 +1289,14 @@ def verify_run(
 ) -> dict[str, Any]:
     if gate_purpose not in PUBLICATION_GATE_PURPOSES:
         raise ValueError(f"Unknown publication gate purpose: {gate_purpose!r}.")
+    if (
+        expected_benchmark_sha256 == PINNED_BENCHMARK_SHA256
+        and expected_tasks != PUBLICATION_TASK_COUNT
+    ):
+        raise ValueError(
+            "The pinned publication benchmark requires exactly "
+            f"{PUBLICATION_TASK_COUNT} tasks per arm."
+        )
     runs = _completed_run_roots(search_root)
     if not runs:
         raise ValueError(f"No completed paired run found under {search_root}.")
@@ -1031,13 +1305,18 @@ def verify_run(
     cache_report = _read_json(run_root / "control_cache_report.json")
     comparison = _read_json(run_root / "paired_comparison.json")
     current_outcome_evaluator = outcome_evaluator_manifest()
-    if (
-        current_outcome_evaluator.get("version")
-        != PUBLICATION_OUTCOME_EVALUATOR_VERSION
+    pinned_outcome_evaluator_identity = {
+        "version": PUBLICATION_OUTCOME_EVALUATOR_VERSION,
+        "contract_sha256": PUBLICATION_OUTCOME_EVALUATOR_CONTRACT_SHA256,
+        "source_sha256": PUBLICATION_OUTCOME_EVALUATOR_SOURCE_SHA256,
+    }
+    if any(
+        current_outcome_evaluator.get(field) != expected
+        for field, expected in pinned_outcome_evaluator_identity.items()
     ):
         raise ValueError(
             "The installed reporting outcome evaluator is not the exact "
-            f"{PUBLICATION_OUTCOME_EVALUATOR_VERSION} publication evaluator."
+            "pinned publication evaluator identity."
         )
     publication_provenance = _verify_publication_provenance(protocol)
     for model_field in ("agent", "user", "generation_model"):
@@ -1089,6 +1368,7 @@ def verify_run(
         "protocol_gate_passed": True,
         "protocol_gate_reasons": [],
         "fresh_control_required": True,
+        "scenario_transform_failure_policy": "abort",
         "publication_performance_endpoint": "outcome_task_completion_similarity",
         "actor_selection_mode": "policy",
         "reporting_outcome_evaluator": current_outcome_evaluator,
@@ -1282,7 +1562,10 @@ def verify_run(
         "candidate_dir",
         required_parent=run_root / "candidate",
     )
+    _verify_no_scenario_transform_failures(candidate_dir)
+    lifecycle_integrity: dict[str, Any] | None = None
     if expected_generation:
+        _verify_empty_online_registry_start(run_root, protocol)
         registry_dir = _resolve_declared_path(
             run_root,
             protocol.get("registry_dir"),
@@ -1308,6 +1591,7 @@ def verify_run(
             raise ValueError(
                 "Final registry manifest does not match the protocol digest."
             )
+        lifecycle_integrity = _verify_lifecycle_closed(candidate_dir, registry_dir)
     control_rows, control_order, control_llm_usage = _uncached_rows(
         control_dir,
         expected_tasks=expected_tasks,
@@ -1363,6 +1647,10 @@ def verify_run(
         "performance_gate_passed": performance_gate_passed,
         "performance_gate_reasons": performance_gate_reasons,
         "scenario_count": expected_tasks,
+        "audited_outcome_count": {
+            "control": len(control_rows),
+            "candidate": len(candidate_rows),
+        },
         "cached_control_tasks": 0,
         # Backward-compatible name: this counts repository response replays,
         # not provider prompt-prefix cached input tokens.
@@ -1393,6 +1681,7 @@ def verify_run(
         "parallel_arm_execution": parallel_execution,
         "reporting_outcome_evaluator": current_outcome_evaluator,
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+        "lifecycle_integrity": lifecycle_integrity,
         "external_fixture_sha256": observed_fixture_sha256,
         "git_commit": publication_provenance["git_commit"],
         "git_tree": publication_provenance["git_tree"],
@@ -1417,7 +1706,7 @@ def verify_run(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--search-root", type=Path, required=True)
-    parser.add_argument("--expected-tasks", type=int, default=1032)
+    parser.add_argument("--expected-tasks", type=int, default=PUBLICATION_TASK_COUNT)
     parser.add_argument(
         "--expect-reflection",
         choices=("same-run-fresh", "not-applicable"),

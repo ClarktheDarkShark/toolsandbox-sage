@@ -93,10 +93,14 @@ SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
 ACTOR_SELECTION_MODE = "policy"
 PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
 PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
+PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC = "development-diagnostic"
 PUBLICATION_GATE_PURPOSES = (
     PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
     PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+    PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC,
 )
+COMPLETE_PUBLICATION_MODES = frozenset({"online_build_full", "full_benchmark"})
+COMPLETE_PUBLICATION_TASK_COUNT = 1032
 SAGE_POLICIES = (
     SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
@@ -227,6 +231,39 @@ def _manifest_split_for_mode(mode: str) -> str:
     }:
         return "full_benchmark"
     return mode
+
+
+def _validate_gate_purpose_for_cohort(
+    *,
+    purpose: str,
+    mode: str,
+    scenario_count: int,
+) -> None:
+    """Keep development diagnostics and publication cohorts disjoint.
+
+    ``online_build_full`` is intentionally reused by the small lifecycle repair
+    manifests, so the mode name alone cannot distinguish a complete publication
+    run from a development cohort.  The gate therefore requires both a complete
+    publication mode and the frozen 1,032-task cohort size.
+    """
+
+    complete_publication_cohort = (
+        mode in COMPLETE_PUBLICATION_MODES
+        and scenario_count == COMPLETE_PUBLICATION_TASK_COUNT
+    )
+    if purpose == PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC:
+        if complete_publication_cohort:
+            raise ValueError(
+                "--publication-gate-purpose development-diagnostic cannot label "
+                "a complete 1,032-task publication cohort."
+            )
+        return
+    if not complete_publication_cohort:
+        raise ValueError(
+            f"--publication-gate-purpose {purpose} requires a complete "
+            "1,032-task publication cohort; development cohorts require "
+            "development-diagnostic."
+        )
 
 
 def _scenario_limit_for_mode(mode: str) -> int | None:
@@ -776,6 +813,34 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
     gate_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = registry_dir / "registry_manifest.json"
     snapshot_path = gate_dir / "registry_manifest_before_run.json"
+    # ``Path.exists`` follows symlinks and therefore misses a dangling path.
+    # A strict fresh registry must distinguish every pre-existing filesystem
+    # object from an actually absent path.
+    directory_existed = os.path.lexists(registry_dir)
+    inventory: list[dict[str, Any]] = []
+    if directory_existed:
+        for path in sorted(registry_dir.rglob("*")):
+            relative_path = path.relative_to(registry_dir).as_posix()
+            if path.is_symlink():
+                inventory.append(
+                    {
+                        "path": relative_path,
+                        "kind": "symlink",
+                        "target": os.readlink(path),
+                    }
+                )
+            elif path.is_dir():
+                inventory.append({"path": relative_path, "kind": "directory"})
+            elif path.is_file():
+                inventory.append(
+                    {
+                        "path": relative_path,
+                        "kind": "file",
+                        "sha256": _digest_file(path),
+                    }
+                )
+            else:
+                inventory.append({"path": relative_path, "kind": "other"})
     existed = manifest_path.exists()
     if existed:
         shutil.copy2(manifest_path, snapshot_path)
@@ -784,6 +849,12 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
         "manifest_existed_before_run": existed,
         "snapshot_path": str(snapshot_path) if existed else None,
         "manifest_digest_before_run": _digest_file(manifest_path) if existed else None,
+        "registry_directory_existed_before_run": directory_existed,
+        "registry_inventory_before_run": inventory,
+        "registry_inventory_count_before_run": len(inventory),
+        "registry_inventory_sha256": hashlib.sha256(
+            json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
     }
     (gate_dir / "registry_gate_snapshot.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
@@ -1040,7 +1111,10 @@ def _publication_gate_decisions(
             performance_passed,
             performance_reasons,
         )
-    if purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION:
+    if purpose in {
+        PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+        PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC,
+    }:
         inclusion_passed, inclusion_reasons = _campaign_inclusion_gate_decision(
             comparison,
             scenario_count=scenario_count,
@@ -1301,6 +1375,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                     if require_fresh_control
                     else Path("artifacts/summaries/failure_memory.json")
                 ),
+                fail_on_scenario_transform_error=require_fresh_control,
             ),
             generator=generator,
             progress_hook=progress,
@@ -1497,7 +1572,9 @@ def main() -> None:
         help=(
             "Select the recorded publication acceptance rule. release-sample "
             "retains the predeclared performance gate; campaign-inclusion uses "
-            "integrity/completeness only and reports performance diagnostically."
+            "integrity/completeness only and reports performance diagnostically; "
+            "development-diagnostic applies the same mechanical checks but is "
+            "explicitly ineligible for publication or campaign inclusion."
         ),
     )
     parser.add_argument(
@@ -1645,6 +1722,14 @@ def main() -> None:
     scenario_limit = _scenario_limit_for_mode(args.mode)
     if scenario_limit is not None:
         scenario_names = scenario_names[:scenario_limit]
+    try:
+        _validate_gate_purpose_for_cohort(
+            purpose=args.publication_gate_purpose,
+            mode=args.mode,
+            scenario_count=len(scenario_names),
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     benchmark_manifest_path = args.manifest.resolve()
     benchmark_manifest_sha256 = _digest_file(benchmark_manifest_path)
     scenario_order_sha256 = hashlib.sha256(
@@ -2359,6 +2444,7 @@ def main() -> None:
                 failure_memory_path=None
                 if args.require_fresh_control
                 else Path("artifacts/summaries/failure_memory.json"),
+                fail_on_scenario_transform_error=args.require_fresh_control,
             ),
             generator=generator,
             progress_hook=candidate_progress,
@@ -2545,6 +2631,9 @@ def main() -> None:
         "control_cache_report_path": str(control_cache_report_path),
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
         "fresh_control_required": args.require_fresh_control,
+        "scenario_transform_failure_policy": (
+            "abort" if args.require_fresh_control else "fallback_to_base_scenario"
+        ),
         "cross_run_failure_memory_enabled": not args.require_fresh_control,
         "cross_run_failure_memory_path": (
             None
@@ -2655,6 +2744,9 @@ def main() -> None:
                 "cache_manifest_hash"
             ),
             "fresh_control_required": args.require_fresh_control,
+            "scenario_transform_failure_policy": (
+                "abort" if args.require_fresh_control else "fallback_to_base_scenario"
+            ),
             "actor_selection_mode": ACTOR_SELECTION_MODE,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,

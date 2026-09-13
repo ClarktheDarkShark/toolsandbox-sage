@@ -2,10 +2,12 @@ import copy
 import json
 import ssl
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
 
 import pytest
 
+import sage_ts.adapters.sage_run_adapter as sage_run_adapter
 from sage_ts.adapters.sage_run_adapter import (
     SageRunConfig,
     _online_birth_feedback_result,
@@ -35,9 +37,9 @@ from tool_sandbox.common.scenario import Scenario
                 "outcome_similarity": 0.75,
                 "online_feedback_outcome_similarity": 0.0,
             },
-            0.0,
-            "paper_era_online_feedback",
-            id="paper-zero-remains-authoritative",
+            0.75,
+            "audited_outcome",
+            id="audited-outcome-is-authoritative",
         ),
         pytest.param(
             {
@@ -45,14 +47,23 @@ from tool_sandbox.common.scenario import Scenario
                 "online_feedback_outcome_similarity": None,
             },
             0.75,
-            "audited_outcome_fallback",
+            "audited_outcome",
             id="null-paper-feedback-falls-back",
         ),
         pytest.param(
             {"outcome_similarity": 0.75},
             0.75,
-            "audited_outcome_fallback",
+            "audited_outcome",
             id="missing-paper-feedback-falls-back",
+        ),
+        pytest.param(
+            {
+                "outcome_similarity": None,
+                "online_feedback_outcome_similarity": 0.25,
+            },
+            None,
+            "unavailable",
+            id="legacy-paper-feedback-is-never-prospective-reward",
         ),
         pytest.param(
             {
@@ -65,7 +76,7 @@ from tool_sandbox.common.scenario import Scenario
         ),
     ],
 )
-def test_online_birth_feedback_result_uses_audited_null_fallback(
+def test_online_birth_feedback_result_uses_only_audited_outcome(
     result: dict[str, object],
     expected_outcome: float | None,
     expected_source: str,
@@ -74,6 +85,164 @@ def test_online_birth_feedback_result_uses_audited_null_fallback(
 
     assert selected["outcome_similarity"] == expected_outcome
     assert selected["online_birth_outcome_source"] == expected_source
+
+
+def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: dict[str, object] = {}
+
+    class BirthControllerStub:
+        def __init__(self, **_kwargs: object) -> None:
+            self.pending_repair_requests: list[dict[str, object]] = []
+            self.pre_scenario_visible_observations: set[str] = set()
+
+        def process_pending_repairs(self, **_kwargs: object) -> tuple[str, ...]:
+            return ()
+
+        def prime_before_scenario(self, name: str, _scenario: Scenario) -> list[str]:
+            self.pre_scenario_visible_observations.add(name)
+            return []
+
+        def contract_failures_for_tools(self, _tools: object) -> tuple[str, ...]:
+            return ()
+
+        def record_canary_result(self, **kwargs: object) -> tuple[object, ...]:
+            calls["canary_family"] = kwargs["task_family_key"]
+            calls["canary_kwargs"] = kwargs
+            return ()
+
+        def observe(self, _observation: object) -> None:
+            return None
+
+        def queue_post_deployment_repair_requests(
+            self,
+            requests: object,
+            *,
+            visible_task_family: str | None = None,
+        ) -> tuple[str, ...]:
+            calls.setdefault("queue_calls", []).append((requests, visible_task_family))
+            calls["queued_requests"] = requests
+            calls["queue_family"] = visible_task_family
+            return ("request-1",)
+
+        def finalize_run(self, **_kwargs: object) -> tuple[dict[str, object], ...]:
+            calls["finalized"] = True
+            return ()
+
+    class ReflectionStub:
+        def assess_scenario(self, **_kwargs: object) -> dict[str, object]:
+            return {
+                "candidate_outcome": 1.0,
+                "candidate_outcome_source": "audited_outcome",
+                "control_outcome_source": "audited_outcome",
+                "control_source": "same_run_fresh",
+                "outcome_delta": 1.0,
+                "candidate_success_flip": True,
+            }
+
+        def drain_pending_repair_requests(self) -> tuple[dict[str, object], ...]:
+            return ({"request_id": "request-1", "target_task_family": "contact"},)
+
+        def drain_run_end_repair_requests(self) -> tuple[dict[str, object], ...]:
+            return (
+                {
+                    "request_id": "request-2",
+                    "target_task_family": "contact",
+                    "trigger_reason_codes": [
+                        "unresolved_generated_tool_execution_failure"
+                    ],
+                },
+            )
+
+        def acknowledge_repair(self, *_args: object) -> dict[str, object]:
+            return {}
+
+        def assert_fresh_control_complete(self, _names: object) -> None:
+            return None
+
+    reflection = ReflectionStub()
+    monkeypatch.setattr(
+        sage_run_adapter,
+        "OnlineBirthController",
+        BirthControllerStub,
+    )
+    monkeypatch.setattr(
+        sage_run_adapter.SelfEvolutionReflectionController,
+        "from_env",
+        classmethod(lambda _cls, **_kwargs: reflection),
+    )
+    monkeypatch.setattr(
+        sage_run_adapter,
+        "visible_task_context_from_scenario",
+        lambda _scenario: SimpleNamespace(
+            primary_family_key="contact",
+            routing_text=lambda: "family=contact",
+            generation_label=lambda: "visible_task_context(family=contact)",
+        ),
+    )
+
+    def fake_sequence(
+        _config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        enhanced = scenario_transform("contact_task", scenario, output_dir)
+        assert result_hook is not None
+        result_hook(
+            "contact_task",
+            enhanced,
+            {"similarity": 1.0, "outcome_similarity": 1.0},
+            output_dir,
+        )
+        return output_dir
+
+    monkeypatch.setattr(sage_run_adapter, "run_scenario_sequence", fake_sequence)
+    run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("contact_task",),
+            output_dir=tmp_path / "outputs",
+            registry_dir=tmp_path / "registry",
+        ),
+        generator=object(),  # type: ignore[arg-type]
+    )
+
+    assert calls["queue_calls"] == [
+        (
+            ({"request_id": "request-1", "target_task_family": "contact"},),
+            "contact",
+        ),
+        (
+            [
+                {
+                    "request_id": "request-2",
+                    "target_task_family": "contact",
+                    "trigger_reason_codes": [
+                        "unresolved_generated_tool_execution_failure"
+                    ],
+                }
+            ],
+            "contact",
+        ),
+    ]
+    assert calls["canary_family"] == "contact"
+    canary_kwargs = calls["canary_kwargs"]
+    assert isinstance(canary_kwargs, dict)
+    assert canary_kwargs["audited_outcome_delta"] == 1.0
+    assert canary_kwargs["fresh_control_success_flip"] is True
+    assert canary_kwargs["called_tool_versions"] == {}
+    assert canary_kwargs["attributable_tools"] == []
+    assert calls["finalized"] is True
 
 
 def canonicalizer_tool() -> GeneratedTool:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -74,31 +75,466 @@ def _benign_negative_abstain_reason_mismatch(
     return normalized_actual == expected
 
 
+_ABSTENTION_DECISION_KEYS = (
+    "should_abstain",
+    "missing_information",
+    "required_original_tools",
+    "safe_next_action",
+    "abstain_reason",
+    "final_answer_recommendation",
+)
+
+_CAPABILITY_ALIASES = {
+    "search_contacts": "contact_lookup",
+    "contact_search": "contact_lookup",
+    "remove_contact": "contact_removal",
+    "delete_contact": "contact_removal",
+    "modify_contact": "contact_update",
+    "update_contact": "contact_update",
+    "search_messages": "message_lookup",
+    "send_message": "message_send",
+    "send_message_with_phone_number": "message_send",
+    "search_reminder": "reminder_lookup",
+    "remove_reminder": "reminder_removal",
+    "modify_reminder": "reminder_update",
+    "add_reminder": "reminder_creation",
+    "get_current_timestamp": "current_time",
+    "current_timestamp": "current_time",
+    "get_current_location": "location_lookup",
+    "get_current_city": "location_lookup",
+    "find_current_city": "location_lookup",
+}
+
+_ABSTAIN_REASON_ALIASES = {
+    "missing_original_tool": "missing_required_original_tool",
+    "missing_tool": "missing_required_original_tool",
+    "missing_capability": "missing_required_original_tool",
+    "missing_target": "missing_target_identifier",
+    "target_missing": "missing_target_identifier",
+    "ambiguous": "ambiguous_target",
+    "multiple_matches": "ambiguous_target",
+    "ambiguous_multiple_matches": "ambiguous_target",
+}
+
+_FACT_PHRASE_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "contact_lookup": (
+        ("contact", "lookup"),
+        ("contact", "search"),
+        ("search", "contacts"),
+        ("find", "contact"),
+        ("recipient", "phone number"),
+        ("recipient", "resolve"),
+    ),
+    "contact_removal": (("remove", "contact"), ("delete", "contact")),
+    "contact_update": (("update", "contact"), ("modify", "contact")),
+    "message_lookup": (
+        ("message", "lookup"),
+        ("message", "search"),
+        ("message", "history"),
+    ),
+    "message_send": (("send", "message"), ("text", "recipient")),
+    "reminder_lookup": (
+        ("reminder", "lookup"),
+        ("reminder", "search"),
+        ("find", "reminder"),
+    ),
+    "reminder_removal": (("remove", "reminder"), ("delete", "reminder")),
+    "reminder_update": (("update", "reminder"), ("modify", "reminder")),
+    "reminder_creation": (("create", "reminder"), ("add", "reminder")),
+    "current_time": (
+        ("current", "time"),
+        ("current", "date"),
+        ("date", "time"),
+        ("explicit", "date"),
+    ),
+    "location_lookup": (
+        ("current", "location"),
+        ("location", "lookup"),
+        ("location", "access"),
+        ("gps",),
+        ("coordinates",),
+    ),
+    "target_identifier": (
+        ("target",),
+        ("identifier",),
+        ("record", "id"),
+        ("person", "id"),
+        ("phone", "number"),
+        ("contact", "name"),
+        ("which", "record"),
+        ("which", "contact"),
+        ("who",),
+    ),
+    "ambiguous_target": (
+        ("ambiguous",),
+        ("not", "unique"),
+        ("multiple", "matches"),
+        ("which", "one"),
+    ),
+}
+
+
+def _canonical_semantic_label(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if text.startswith("functions."):
+        text = text.split(".", 1)[1]
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return _CAPABILITY_ALIASES.get(text, text)
+
+
+def _canonical_abstain_reason(value: Any) -> str:
+    reason = _canonical_semantic_label(value)
+    return _ABSTAIN_REASON_ALIASES.get(reason, reason)
+
+
+def _semantic_labels(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        raw_items = (value,)
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = tuple(value)
+    elif value is None:
+        raw_items = ()
+    else:
+        raw_items = (value,)
+    return tuple(
+        dict.fromkeys(
+            label for item in raw_items if (label := _canonical_semantic_label(item))
+        )
+    )
+
+
+def _recommendation_mentions_fact(recommendation: str, fact: str) -> bool:
+    text = re.sub(r"[^a-z0-9]+", " ", recommendation.lower()).strip()
+    groups = _FACT_PHRASE_GROUPS.get(fact)
+    if groups is None:
+        tokens = tuple(
+            token
+            for token in fact.split("_")
+            if token not in {"missing", "required", "original", "tool", "capability"}
+        )
+        groups = (tokens,) if tokens else ()
+    return any(all(token in text for token in group) for group in groups if group)
+
+
+def _required_recommendation_facts(expected: dict[str, Any]) -> tuple[str, ...]:
+    facts = list(_semantic_labels(expected.get("missing_information")))
+    reason = _canonical_abstain_reason(expected.get("abstain_reason"))
+    if reason == "missing_target_identifier" and "target_identifier" not in facts:
+        facts.append("target_identifier")
+    if reason == "ambiguous_target" and "ambiguous_target" not in facts:
+        facts.append("ambiguous_target")
+    return tuple(facts)
+
+
+def _raw_structured_abstention_errors(
+    label: str,
+    actual: Any,
+    expected: Any,
+) -> tuple[str, ...]:
+    """Check semantic decisions before any runtime output repair is applied."""
+
+    if not isinstance(actual, dict):
+        return (f"{label}_raw_abstention_output_not_object",)
+    if not isinstance(expected, dict):
+        return (f"{label}_raw_abstention_expected_not_object",)
+
+    errors: list[str] = []
+    for key in _ABSTENTION_DECISION_KEYS:
+        if key not in actual:
+            errors.append(f"{label}_raw_missing_key:{key}")
+
+    expected_should_abstain = bool(expected.get("should_abstain"))
+    actual_should_abstain = bool(actual.get("should_abstain"))
+    if actual_should_abstain != expected_should_abstain:
+        errors.append(
+            f"{label}_raw_should_abstain:{actual_should_abstain!r}"
+            f"!={expected_should_abstain!r}"
+        )
+
+    for key in ("missing_information", "required_original_tools"):
+        if not isinstance(actual.get(key), list):
+            errors.append(f"{label}_raw_{key}_not_list")
+        actual_items = set(_semantic_labels(actual.get(key)))
+        expected_items = set(_semantic_labels(expected.get(key)))
+        if actual_items != expected_items:
+            errors.append(
+                f"{label}_raw_{key}:{sorted(actual_items)!r}"
+                f"!={sorted(expected_items)!r}"
+            )
+
+    actual_next_action = _canonical_semantic_label(actual.get("safe_next_action"))
+    expected_next_action = _canonical_semantic_label(expected.get("safe_next_action"))
+    if actual_next_action != expected_next_action:
+        errors.append(
+            f"{label}_raw_safe_next_action:{actual_next_action!r}"
+            f"!={expected_next_action!r}"
+        )
+
+    actual_reason = _canonical_abstain_reason(actual.get("abstain_reason"))
+    expected_reason = _canonical_abstain_reason(expected.get("abstain_reason"))
+    if actual_reason != expected_reason:
+        errors.append(
+            f"{label}_raw_abstain_reason:{actual_reason!r}!={expected_reason!r}"
+        )
+
+    recommendation = str(actual.get("final_answer_recommendation") or "").strip()
+    if expected_should_abstain:
+        if not recommendation:
+            errors.append(f"{label}_raw_final_recommendation_missing")
+        else:
+            missing_facts = [
+                fact
+                for fact in _required_recommendation_facts(expected)
+                if not _recommendation_mentions_fact(recommendation, fact)
+            ]
+            if missing_facts:
+                errors.append(
+                    f"{label}_raw_final_recommendation_missing_facts:"
+                    f"{','.join(missing_facts)}"
+                )
+    elif (
+        recommendation != str(expected.get("final_answer_recommendation") or "").strip()
+    ):
+        errors.append(f"{label}_raw_unexpected_final_recommendation")
+    return tuple(errors)
+
+
 def _structured_abstention_outputs_match(
     tool: GeneratedTool,
+    label: str,
     actual: Any,
     expected: Any,
 ) -> bool:
-    """Validate the safe-abstention decision, not one acceptable sentence."""
+    """Allow prose variation only when every required semantic fact remains."""
 
     if tool.spec.family is not ToolFamily.VALIDATION_ABSTENTION_HELPER:
         return False
-    if not isinstance(actual, dict) or not isinstance(expected, dict):
-        return False
-    if not bool(actual.get("should_abstain")) or not bool(
-        expected.get("should_abstain")
+    return not _raw_structured_abstention_errors(label, actual, expected)
+
+
+def _action_requires_target(value: Any) -> bool:
+    action = _canonical_semantic_label(value)
+    if any(
+        marker in action
+        for marker in ("search", "lookup", "find", "list", "read", "check")
     ):
         return False
-    for key in (
-        "should_abstain",
-        "missing_information",
-        "required_original_tools",
-        "safe_next_action",
-        "abstain_reason",
+    return any(
+        marker in action
+        for marker in (
+            "add",
+            "archive",
+            "create",
+            "delete",
+            "modify",
+            "remove",
+            "send",
+            "set",
+            "update",
+        )
+    )
+
+
+def _looks_like_stable_identifier(value: Any) -> bool:
+    return bool(
+        re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+            r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            str(value or "").strip(),
+        )
+    )
+
+
+def _blind_abstention_result_errors(
+    label: str,
+    actual: Any,
+    *,
+    required_fact: str,
+    expected_reason: str,
+    require_original_tool_fact: bool,
+) -> tuple[str, ...]:
+    """Validate a hidden metamorphic abstention without disclosing its full case."""
+
+    if not isinstance(actual, dict):
+        return (f"{label}_output_not_object",)
+    errors: list[str] = []
+    if not bool(actual.get("should_abstain")):
+        errors.append(f"{label}_should_abstain")
+    if _canonical_semantic_label(actual.get("safe_next_action")) != (
+        "ask_user_or_abstain"
     ):
-        if actual.get(key) != expected.get(key):
-            return False
-    return bool(str(actual.get("final_answer_recommendation") or "").strip())
+        errors.append(f"{label}_safe_next_action")
+    missing = set(_semantic_labels(actual.get("missing_information")))
+    if required_fact not in missing:
+        errors.append(f"{label}_missing_information")
+    if require_original_tool_fact:
+        required = set(_semantic_labels(actual.get("required_original_tools")))
+        if required_fact not in required:
+            errors.append(f"{label}_required_original_tools")
+    reason = _canonical_abstain_reason(actual.get("abstain_reason"))
+    if reason != expected_reason:
+        errors.append(f"{label}_abstain_reason")
+    recommendation = str(actual.get("final_answer_recommendation") or "").strip()
+    if not recommendation or not _recommendation_mentions_fact(
+        recommendation, required_fact
+    ):
+        errors.append(f"{label}_final_recommendation_fact")
+    return tuple(errors)
+
+
+def _raw_abstention_projection(value: Any) -> tuple[Any, ...] | None:
+    if not isinstance(value, dict):
+        return None
+    return (
+        bool(value.get("should_abstain")),
+        frozenset(_semantic_labels(value.get("missing_information"))),
+        frozenset(_semantic_labels(value.get("required_original_tools"))),
+        _canonical_semantic_label(value.get("safe_next_action")),
+        _canonical_abstain_reason(value.get("abstain_reason")),
+    )
+
+
+def _validate_blind_abstention_properties(
+    function: Any,
+    examples: tuple[ToolExample, ...],
+) -> tuple[str, ...]:
+    """Run metamorphic cases kept outside the model-visible generation request.
+
+    Errors intentionally report only the violated invariant. They never serialize
+    the hidden variant's inputs or expected output into a subsequent repair prompt.
+    """
+
+    errors: list[str] = []
+    for index, example in enumerate(examples):
+        if not isinstance(example.expected, dict):
+            continue
+        inputs = dict(example.inputs)
+        try:
+            original = function(**inputs)
+        except Exception as exc:
+            errors.append(f"blind_property_{index}_source_error:{type(exc).__name__}")
+            continue
+
+        # Equivalent singleton-list/string encodings must not change the decision.
+        representation_inputs = dict(inputs)
+        representation_changed = False
+        for key in ("required_original_tools", "available_original_tools"):
+            raw = representation_inputs.get(key)
+            if isinstance(raw, list) and len(raw) == 1:
+                representation_inputs[key] = raw[0]
+                representation_changed = True
+            elif isinstance(raw, str) and raw.strip():
+                representation_inputs[key] = [raw]
+                representation_changed = True
+        if representation_changed:
+            try:
+                represented = function(**representation_inputs)
+            except Exception as exc:
+                errors.append(
+                    f"blind_property_{index}_representation_error:{type(exc).__name__}"
+                )
+            else:
+                if _raw_abstention_projection(represented) != (
+                    _raw_abstention_projection(original)
+                ):
+                    errors.append(f"blind_property_{index}_representation_invariance")
+
+        if bool(example.expected.get("should_abstain")):
+            continue
+
+        # Withhold each required capability in turn. A safe-continue decision must
+        # become an explicit, capability-specific abstention.
+        required_items = _semantic_labels(
+            example.expected.get("required_original_tools")
+            or inputs.get("required_original_tools")
+        )
+        available_raw = inputs.get("available_original_tools")
+        if isinstance(available_raw, str):
+            available_values = [available_raw]
+        elif isinstance(available_raw, (list, tuple, set)):
+            available_values = list(available_raw)
+        else:
+            available_values = []
+        for capability_index, capability in enumerate(required_items):
+            reduced_available = [
+                item
+                for item in available_values
+                if _canonical_semantic_label(item) != capability
+            ]
+            if len(reduced_available) == len(available_values):
+                continue
+            variant = dict(inputs)
+            variant["available_original_tools"] = reduced_available
+            try:
+                actual = function(**variant)
+            except Exception as exc:
+                errors.append(
+                    f"blind_property_{index}_missing_capability_"
+                    f"{capability_index}_error:{type(exc).__name__}"
+                )
+                continue
+            errors.extend(
+                _blind_abstention_result_errors(
+                    f"blind_property_{index}_missing_capability_{capability_index}",
+                    actual,
+                    required_fact=capability,
+                    expected_reason="missing_required_original_tool",
+                    require_original_tool_fact=True,
+                )
+            )
+
+        target = str(inputs.get("target_identifier") or "").strip()
+        action = inputs.get("requested_action")
+        if target and _action_requires_target(action):
+            variant = dict(inputs)
+            variant["target_identifier"] = ""
+            try:
+                actual = function(**variant)
+            except Exception as exc:
+                errors.append(
+                    f"blind_property_{index}_missing_target_error:{type(exc).__name__}"
+                )
+            else:
+                errors.extend(
+                    _blind_abstention_result_errors(
+                        f"blind_property_{index}_missing_target",
+                        actual,
+                        required_fact="target_identifier",
+                        expected_reason="missing_target_identifier",
+                        require_original_tool_fact=False,
+                    )
+                )
+
+        try:
+            visible_records_count = int(inputs.get("visible_records_count") or 0)
+        except (TypeError, ValueError):
+            visible_records_count = 0
+        if (
+            visible_records_count == 1
+            and target
+            and not _looks_like_stable_identifier(target)
+            and _action_requires_target(action)
+        ):
+            variant = dict(inputs)
+            variant["visible_records_count"] = 2
+            try:
+                actual = function(**variant)
+            except Exception as exc:
+                errors.append(
+                    f"blind_property_{index}_ambiguous_target_error:"
+                    f"{type(exc).__name__}"
+                )
+            else:
+                errors.extend(
+                    _blind_abstention_result_errors(
+                        f"blind_property_{index}_ambiguous_target",
+                        actual,
+                        required_fact="ambiguous_target",
+                        expected_reason="ambiguous_target",
+                        require_original_tool_fact=False,
+                    )
+                )
+    return tuple(errors)
 
 
 def _partition_examples(
@@ -111,17 +547,18 @@ def _partition_examples(
     final case as source and reserve the final case as held-out. A single
     example is no longer sufficient for claim-grade acceptance.
     """
+    # Held-out status takes precedence over negative-applicability labeling so
+    # hidden expected values can never return to a repair prompt as `negative_*`
+    # mismatch details.
     negative_examples = tuple(
-        example for example in examples if example.negative_applicability
+        example
+        for example in examples
+        if example.negative_applicability and not example.held_out
     )
     non_negative_examples = tuple(
         example for example in examples if not example.negative_applicability
     )
-    marked_held_out = tuple(
-        example
-        for example in examples
-        if example.held_out and not example.negative_applicability
-    )
+    marked_held_out = tuple(example for example in examples if example.held_out)
     if marked_held_out:
         source = tuple(
             example
@@ -142,6 +579,7 @@ def _requires_negative_applicability(tool: GeneratedTool) -> bool:
         ToolFamily.STATE_PRECONDITION_HELPER,
         ToolFamily.SEARCH_FILTER_RANKING_HELPER,
         ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        ToolFamily.VALIDATION_ABSTENTION_HELPER,
     }
 
 
@@ -579,11 +1017,25 @@ def validate_generated_tool(
     )
     for label, example in all_examples:
         try:
+            raw_actual = schema.function(**example.inputs)
+            raw_replay = schema.function(**example.inputs)
+            if tool.spec.family is ToolFamily.VALIDATION_ABSTENTION_HELPER:
+                errors.extend(
+                    _raw_structured_abstention_errors(
+                        label,
+                        raw_actual,
+                        example.expected,
+                    )
+                )
+            if raw_actual != raw_replay:
+                errors.append(
+                    f"{label}_raw_nondeterministic:{raw_actual!r}!={raw_replay!r}"
+                )
             actual = normalize_generated_tool_output(
-                tool, schema.function(**example.inputs), inputs=example.inputs
+                tool, raw_actual, inputs=example.inputs
             )
             replay = normalize_generated_tool_output(
-                tool, schema.function(**example.inputs), inputs=example.inputs
+                tool, raw_replay, inputs=example.inputs
             )
             expected = normalize_generated_tool_output(
                 tool, example.expected, inputs=example.inputs
@@ -596,11 +1048,14 @@ def validate_generated_tool(
         if (
             actual != expected
             and not _benign_negative_abstain_reason_mismatch(label, actual, expected)
-            and not _structured_abstention_outputs_match(tool, actual, expected)
+            and not _structured_abstention_outputs_match(tool, label, actual, expected)
         ):
             errors.append(f"{label}_mismatch:{actual!r}!={expected!r}")
         if not _json_serializable(actual):
             errors.append(f"{label}_non_json_serializable_output")
+
+    if tool.spec.family is ToolFamily.VALIDATION_ABSTENTION_HELPER:
+        errors.extend(_validate_blind_abstention_properties(schema.function, examples))
 
     runtime_smoke_passed, runtime_error = _runtime_smoke(
         tool,

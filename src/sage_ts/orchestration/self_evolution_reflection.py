@@ -11,7 +11,9 @@ globally label-free.
 from __future__ import annotations
 
 import json
+import math
 import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Empty
@@ -32,6 +34,23 @@ FRESH_CONTROL_ROW_EVENT = "fresh_control_row"
 FRESH_CONTROL_COMPLETE_EVENT = "fresh_control_complete"
 FRESH_CONTROL_ERROR_EVENT = "fresh_control_error"
 FRESH_CONTROL_WAIT_TIMEOUT_SECONDS = 1800.0
+POST_DEPLOYMENT_REPAIR_REQUEST_EVENT = "post_deployment_tool_repair_requested"
+POST_DEPLOYMENT_REPAIR_REQUEST_SCHEMA_VERSION = 1
+POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME = "self_evolution_tool_repair_requests.jsonl"
+POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME = (
+    "self_evolution_tool_repair_acknowledgements.jsonl"
+)
+POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_STATUSES = frozenset(
+    {
+        "validation_failed",
+        "canary_pending",
+        "promoted",
+        "rejected",
+        "rolled_back",
+    }
+)
+CROSS_FAMILY_EXECUTION_FAILURE = "cross_family_execution_failure"
+RUN_END_EXECUTION_FAILURE_REASON = "unresolved_generated_tool_execution_failure"
 
 
 def _optional_float(value: Any) -> float | None:
@@ -46,25 +65,24 @@ def _optional_float(value: Any) -> float | None:
 def _online_feedback_outcome_with_source(
     row: dict[str, Any],
 ) -> tuple[float | None, str]:
-    """Return the lifecycle outcome and the signal that supplied it."""
+    """Return the audited lifecycle outcome and its explicit provenance.
 
-    paper_feedback = _optional_float(row.get("online_feedback_outcome_similarity"))
-    if paper_feedback is not None:
-        return paper_feedback, "paper_era_online_feedback"
+    ``online_feedback_outcome_similarity`` is a legacy paper-comparability
+    diagnostic. It is never substituted for a missing current endpoint because
+    that would silently mix reward definitions across tasks.
+    """
+
     audited_outcome = _optional_float(row.get("outcome_similarity"))
     if audited_outcome is not None:
-        return audited_outcome, "audited_outcome_fallback"
+        return audited_outcome, "audited_outcome"
     return None, "unavailable"
 
 
 def _online_feedback_outcome(row: dict[str, Any]) -> float | None:
-    """Return the outcome signal used only by lifecycle feedback.
+    """Return the outcome signal used by lifecycle feedback.
 
-    New runs also carry the audited reporting outcome in ``outcome_similarity``.
-    Keeping this signal separate preserves the validated policy/lifecycle behavior
-    without publishing the legacy evaluator as the final performance endpoint.
-    Rows with unavailable paper-era feedback, including historical cached rows
-    that predate the explicit field, fall back to ``outcome_similarity``.
+    New runs use the current route-independent audited reporting outcome. The
+    legacy paper-era feedback remains reporting-only.
     """
 
     return _online_feedback_outcome_with_source(row)[0]
@@ -74,14 +92,102 @@ def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def _read_jsonl_objects_strict(path: Path, *, label: str) -> list[dict[str, Any]]:
+    """Read an append-only journal without silently discarding corruption."""
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(f"Unable to read {label} journal: {path}") from exc
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Malformed {label} journal row at {path}:{line_number}."
+            ) from exc
+        if not isinstance(row, dict):
+            raise ValueError(f"Non-object {label} journal row at {path}:{line_number}.")
+        rows.append(row)
+    return rows
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Atomically replace one durable JSON state file in its own directory."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+@dataclass
+class ToolFamilyLifecycleStats:
+    """Post-deployment evidence for one visible, semantic task family."""
+
+    visible_count: int = 0
+    called_count: int = 0
+    failed_count: int = 0
+    contract_failure_count: int = 0
+    success_flip_count: int = 0
+    public_visible_context_count: int = 0
+    candidate_outcomes: list[float] = field(default_factory=list)
+    called_score_deltas: list[float] = field(default_factory=list)
+    called_outcome_deltas: list[float] = field(default_factory=list)
+
+    def to_json(self, *, outcome_success_threshold: float) -> dict[str, Any]:
+        outcome_success_count = sum(
+            outcome >= outcome_success_threshold for outcome in self.candidate_outcomes
+        )
+        outcome_observation_count = len(self.candidate_outcomes)
+        return {
+            "visible_count": self.visible_count,
+            "called_count": self.called_count,
+            "failed_count": self.failed_count,
+            "contract_failure_count": self.contract_failure_count,
+            "success_flip_count": self.success_flip_count,
+            "public_visible_context_count": self.public_visible_context_count,
+            "candidate_outcome_observation_count": outcome_observation_count,
+            "candidate_outcome_mean": _mean(self.candidate_outcomes),
+            "candidate_outcome_success_count": outcome_success_count,
+            "candidate_outcome_failure_count": (
+                outcome_observation_count - outcome_success_count
+            ),
+            "candidate_outcome_success_rate": (
+                outcome_success_count / outcome_observation_count
+                if outcome_observation_count
+                else None
+            ),
+            "called_score_delta_mean": _mean(self.called_score_deltas),
+            "called_outcome_delta_mean": _mean(self.called_outcome_deltas),
+        }
+
+
 @dataclass
 class ToolLifecycleStats:
+    tool_version: int | None = None
     visible_count: int = 0
     called_count: int = 0
     attempted_count: int = 0
     failed_count: int = 0
     visible_not_called_count: int = 0
     side_effect_incident_count: int = 0
+    contract_failure_count: int = 0
+    success_flip_count: int = 0
+    called_candidate_outcomes: list[float] = field(default_factory=list)
     called_score_deltas: list[float] = field(default_factory=list)
     called_outcome_deltas: list[float] = field(default_factory=list)
     visible_score_deltas: list[float] = field(default_factory=list)
@@ -92,19 +198,42 @@ class ToolLifecycleStats:
     families: list[str] = field(default_factory=list)
     harmful_called_families: list[str] = field(default_factory=list)
     helpful_called_families: list[str] = field(default_factory=list)
+    family_stats: dict[str, ToolFamilyLifecycleStats] = field(default_factory=dict)
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self, *, outcome_success_threshold: float = 1.0) -> dict[str, Any]:
         called_score_mean = _mean(self.called_score_deltas)
         called_outcome_mean = _mean(self.called_outcome_deltas)
         visible_score_mean = _mean(self.visible_score_deltas)
         visible_outcome_mean = _mean(self.visible_outcome_deltas)
+        candidate_outcome_mean = _mean(self.called_candidate_outcomes)
+        candidate_outcome_success_count = sum(
+            outcome >= outcome_success_threshold
+            for outcome in self.called_candidate_outcomes
+        )
+        candidate_outcome_observation_count = len(self.called_candidate_outcomes)
         return {
+            "tool_version": self.tool_version,
             "visible_count": self.visible_count,
             "called_count": self.called_count,
             "attempted_count": self.attempted_count,
             "failed_count": self.failed_count,
             "visible_not_called_count": self.visible_not_called_count,
             "side_effect_incident_count": self.side_effect_incident_count,
+            "contract_failure_count": self.contract_failure_count,
+            "success_flip_count": self.success_flip_count,
+            "candidate_outcome_observation_count": (
+                candidate_outcome_observation_count
+            ),
+            "candidate_outcome_mean": candidate_outcome_mean,
+            "candidate_outcome_success_count": candidate_outcome_success_count,
+            "candidate_outcome_failure_count": (
+                candidate_outcome_observation_count - candidate_outcome_success_count
+            ),
+            "candidate_outcome_success_rate": (
+                candidate_outcome_success_count / candidate_outcome_observation_count
+                if candidate_outcome_observation_count
+                else None
+            ),
             "called_score_delta_mean": called_score_mean,
             "called_outcome_delta_mean": called_outcome_mean,
             "visible_score_delta_mean": visible_score_mean,
@@ -120,6 +249,12 @@ class ToolLifecycleStats:
             "helpful_called_task_contexts": self.helpful_called_scenarios[-20:],
             "harmful_called_families": self.harmful_called_families[-20:],
             "helpful_called_families": self.helpful_called_families[-20:],
+            "family_evidence": {
+                family: stats.to_json(
+                    outcome_success_threshold=outcome_success_threshold
+                )
+                for family, stats in sorted(self.family_stats.items())
+            },
             "scenarios": self.scenarios[-20:],
             "harmful_called_scenarios": self.harmful_called_scenarios[-20:],
             "helpful_called_scenarios": self.helpful_called_scenarios[-20:],
@@ -144,6 +279,12 @@ class SelfEvolutionReflectionController:
     min_pulse_tasks: int = 8
     min_score_lift_percent: float = 8.0
     min_outcome_delta: float = 0.12
+    min_outcome_diagnostic_calls: int = 8
+    min_implementation_repair_contract_failures: int = 1
+    min_implementation_repair_execution_failures: int = 3
+    min_metadata_repair_visible_count: int = 8
+    min_acceptable_called_outcome_mean: float = 0.50
+    outcome_success_threshold: float = 1.0
     completed_count: int = 0
     cache_hit_count: int = 0
     cache_miss_count: int = 0
@@ -156,6 +297,17 @@ class SelfEvolutionReflectionController:
     tool_stats: dict[str, ToolLifecycleStats] = field(default_factory=dict)
     bucket_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
     retired_this_run: set[str] = field(default_factory=set)
+    pending_repair_requests: list[dict[str, Any]] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+    )
+    emitted_repair_request_keys: set[str] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+    )
+    _feedback_hydrated: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if (
@@ -182,6 +334,122 @@ class SelfEvolutionReflectionController:
             )
         if self.fresh_control_channel is not None:
             self.fresh_control_rows = {}
+        if self.min_outcome_diagnostic_calls < 1:
+            raise ValueError("Outcome-diagnostic call threshold must be positive.")
+        if self.min_implementation_repair_contract_failures < 1:
+            raise ValueError(
+                "Implementation-repair contract-failure threshold must be positive."
+            )
+        if self.min_implementation_repair_execution_failures < 1:
+            raise ValueError(
+                "Implementation-repair execution-failure threshold must be positive."
+            )
+        if self.min_metadata_repair_visible_count < 1:
+            raise ValueError("Metadata-repair visibility threshold must be positive.")
+        if not 0.0 <= self.min_acceptable_called_outcome_mean <= 1.0:
+            raise ValueError("Acceptable called-outcome mean must be in [0, 1].")
+        if not 0.0 <= self.outcome_success_threshold <= 1.0:
+            raise ValueError("Outcome success threshold must be in [0, 1].")
+        self._load_emitted_repair_request_keys()
+        self._restore_retired_registry_entries()
+        self._hydrate_from_existing_feedback()
+
+    @property
+    def repair_request_path(self) -> Path:
+        """Append-only handoff from reflection to the repair orchestrator."""
+
+        return self.output_dir / POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME
+
+    @property
+    def repair_acknowledgement_path(self) -> Path:
+        """Durable orchestration responses to lifecycle repair requests."""
+
+        return self.output_dir / POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME
+
+    def _load_emitted_repair_request_keys(self) -> None:
+        """Avoid duplicate repair requests when an online run resumes."""
+
+        if not self.repair_request_path.exists():
+            return
+        for row in _read_jsonl_objects_strict(
+            self.repair_request_path,
+            label="self-evolution repair request",
+        ):
+            request_key = row.get("request_key")
+            if not isinstance(request_key, str) or not request_key:
+                raise ValueError(
+                    "Self-evolution repair request journal contains a row without "
+                    "a durable request_key."
+                )
+            self.emitted_repair_request_keys.add(request_key)
+
+    def _restore_retired_registry_entries(self) -> None:
+        """Preserve durable quarantine decisions across process restarts."""
+
+        self.retired_this_run.update(
+            tool_name
+            for tool_name, entry in self.store.load_entries().items()
+            if entry.retired
+        )
+
+    def drain_pending_repair_requests(self) -> tuple[dict[str, Any], ...]:
+        """Return newly emitted future-only requests once to orchestration.
+
+        The append-only JSONL remains the durable source of record. This in-memory
+        drain is deliberately non-blocking and never applies a repair to the task
+        whose post-task evidence caused the transition.
+        """
+
+        requests = tuple(self.pending_repair_requests)
+        self.pending_repair_requests.clear()
+        return requests
+
+    def acknowledge_repair(
+        self,
+        tool_name: str,
+        new_version: int,
+        request_id: str,
+        status: str,
+    ) -> dict[str, Any]:
+        """Record orchestration's disposition and isolate new-version evidence.
+
+        A validated version may enter a prospective canary on the *next* task. Its
+        evidence starts empty so a vN+1 candidate is not immediately classified
+        using failures accumulated by vN.
+        """
+
+        if not tool_name:
+            raise ValueError("Repair acknowledgement requires a tool name.")
+        if new_version < 1:
+            raise ValueError("Repair acknowledgement requires a positive version.")
+        if not request_id:
+            raise ValueError("Repair acknowledgement requires a request id.")
+        if status not in POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_STATUSES:
+            raise ValueError(f"Unknown repair acknowledgement status: {status!r}.")
+        current_stats = self.tool_stats.get(tool_name)
+        if status in {"canary_pending", "promoted"} and (
+            current_stats is None or current_stats.tool_version != new_version
+        ):
+            self.tool_stats[tool_name] = ToolLifecycleStats(tool_version=new_version)
+        if status in {"canary_pending", "promoted"}:
+            # Retirement applies to the failed implementation version, not to a
+            # separately validated replacement with the same public tool name.
+            self.retired_this_run.discard(tool_name)
+        event = {
+            "event": "post_deployment_tool_repair_acknowledged",
+            "schema_version": POST_DEPLOYMENT_REPAIR_REQUEST_SCHEMA_VERSION,
+            "request_id": request_id,
+            "tool_name": tool_name,
+            "new_version": new_version,
+            "status": status,
+            "acknowledged_after_completed_count": self.completed_count,
+            "eligible_from_completed_count": self.completed_count + 1,
+            "future_tasks_only": True,
+            "triggering_task_replay_allowed": False,
+        }
+        append_jsonl(self.repair_acknowledgement_path, event)
+        self._write_current_state()
+        return event
 
     @classmethod
     def from_env(
@@ -242,33 +510,134 @@ class SelfEvolutionReflectionController:
             min_score_lift_percent=8.0,
             min_outcome_delta=0.12,
         )
-        controller._hydrate_from_existing_feedback()
         return controller
 
     def _hydrate_from_existing_feedback(self) -> None:
         """Restore cumulative lifecycle state after a resumable run restart."""
+        if self._feedback_hydrated:
+            return
         path = self.output_dir / "self_evolution_task_feedback.jsonl"
         if not path.exists():
+            self._feedback_hydrated = True
             return
-        by_scenario: dict[str, dict[str, Any]] = {}
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if row.get("event") != "self_evolution_task_assessed":
-                continue
-            scenario = row.get("scenario")
-            if isinstance(scenario, str) and scenario:
-                by_scenario[scenario] = row
-
-        for row in by_scenario.values():
+        rows = _read_jsonl_objects_strict(
+            path,
+            label="self-evolution task feedback",
+        )
+        self._validate_feedback_journal(rows, path=path)
+        for row in rows:
             self._consume_resumed_fresh_control(row)
             self._record_feedback_row(row)
-        if by_scenario:
+        self._feedback_hydrated = True
+        if rows:
             self._write_current_state()
+
+    @staticmethod
+    def _validate_feedback_journal(
+        rows: list[dict[str, Any]],
+        *,
+        path: Path,
+    ) -> None:
+        """Validate the durable replay source before mutating in-memory evidence."""
+
+        list_fields = (
+            "generated_tools_visible",
+            "generated_tools_called",
+            "generated_tools_attempted",
+            "generated_tools_failed",
+            "generated_tool_contract_failures",
+            "side_effect_failures",
+            "post_deployment_repair_request_ids",
+        )
+        numeric_fields = (
+            "control_score",
+            "candidate_score",
+            "score_delta",
+            "control_outcome",
+            "candidate_outcome",
+            "outcome_delta",
+        )
+        boolean_fields = (
+            "control_cache_eligible",
+            "control_cache_hit",
+            "candidate_success_flip",
+            "source_task_id_redacted",
+        )
+        scenarios: set[str] = set()
+        for line_number, row in enumerate(rows, start=1):
+            prefix = f"Malformed task feedback journal row at {path}:{line_number}"
+            if row.get("event") != "self_evolution_task_assessed":
+                raise ValueError(f"{prefix}: unexpected event.")
+            scenario = row.get("scenario")
+            if not isinstance(scenario, str) or not scenario:
+                raise ValueError(f"{prefix}: scenario must be a non-empty string.")
+            if scenario in scenarios:
+                raise ValueError(f"{prefix}: duplicate scenario {scenario!r}.")
+            scenarios.add(scenario)
+            completed_count = row.get("completed_count")
+            if (
+                not isinstance(completed_count, int)
+                or isinstance(completed_count, bool)
+                or completed_count != line_number
+            ):
+                raise ValueError(f"{prefix}: completed_count must equal {line_number}.")
+            family = row.get("task_family_key", row.get("base_family"))
+            if not isinstance(family, str) or not family:
+                raise ValueError(
+                    f"{prefix}: task_family_key/base_family must be a non-empty string."
+                )
+            if "task_context_label" in row and (
+                not isinstance(row["task_context_label"], str)
+                or not row["task_context_label"]
+            ):
+                raise ValueError(
+                    f"{prefix}: task_context_label must be a non-empty string."
+                )
+            for field_name in list_fields:
+                if field_name not in row:
+                    continue
+                value = row[field_name]
+                if not isinstance(value, list) or any(
+                    not isinstance(item, str) or not item for item in value
+                ):
+                    raise ValueError(
+                        f"{prefix}: {field_name} must be a list of non-empty strings."
+                    )
+            for field_name in numeric_fields:
+                if field_name not in row or row[field_name] is None:
+                    continue
+                value = row[field_name]
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                ):
+                    raise ValueError(
+                        f"{prefix}: {field_name} must be a finite number or null."
+                    )
+            for field_name in boolean_fields:
+                if field_name in row and not isinstance(row[field_name], bool):
+                    raise ValueError(f"{prefix}: {field_name} must be boolean.")
+            if "exception_type" in row and not (
+                row["exception_type"] is None or isinstance(row["exception_type"], str)
+            ):
+                raise ValueError(f"{prefix}: exception_type must be a string or null.")
+            versions = row.get("generated_tool_versions")
+            if versions is not None and (
+                not isinstance(versions, dict)
+                or any(
+                    not isinstance(tool_name, str)
+                    or not tool_name
+                    or not isinstance(version, int)
+                    or isinstance(version, bool)
+                    or version < 1
+                    for tool_name, version in versions.items()
+                )
+            ):
+                raise ValueError(
+                    f"{prefix}: generated_tool_versions must map non-empty tool "
+                    "names to positive integer versions."
+                )
 
     def _consume_resumed_fresh_control(self, feedback: dict[str, Any]) -> None:
         if not self.require_fresh_control:
@@ -471,6 +840,37 @@ class SelfEvolutionReflectionController:
                 f"extra={sorted(consumed - expected)!r})."
             )
 
+    @staticmethod
+    def _contract_failure_tools(row: dict[str, Any]) -> list[str]:
+        """Read public-contract failures without accepting diagnostic payloads.
+
+        Orchestration may provide only generated tool names in this field. Raw
+        validator messages are intentionally not carried into lifecycle state or
+        repair prompts because they could contain task-specific or hidden data.
+        """
+
+        raw = row.get("generated_tool_contract_failures") or []
+        if not isinstance(raw, list):
+            return []
+        return sorted({item for item in raw if isinstance(item, str) and item})
+
+    def _tool_stats_for_version(
+        self,
+        tool_name: str,
+        tool_version: int | None,
+    ) -> ToolLifecycleStats:
+        stats = self.tool_stats.get(tool_name)
+        if stats is None or (
+            tool_version is not None
+            and stats.tool_version is not None
+            and stats.tool_version != tool_version
+        ):
+            stats = ToolLifecycleStats(tool_version=tool_version)
+            self.tool_stats[tool_name] = stats
+        elif stats.tool_version is None and tool_version is not None:
+            stats.tool_version = tool_version
+        return stats
+
     def _record_feedback_row(self, row: dict[str, Any]) -> None:
         scenario_name = str(row.get("scenario") or "")
         if not scenario_name:
@@ -489,7 +889,14 @@ class SelfEvolutionReflectionController:
         control_score = _optional_float(row.get("control_score"))
         score_delta = _optional_float(row.get("score_delta"))
         control_outcome = _optional_float(row.get("control_outcome"))
+        candidate_outcome = _optional_float(row.get("candidate_outcome"))
         outcome_delta = _optional_float(row.get("outcome_delta"))
+        success_flip = bool(
+            candidate_outcome is not None
+            and control_outcome is not None
+            and candidate_outcome >= self.outcome_success_threshold
+            and control_outcome < self.outcome_success_threshold
+        )
         if score_delta is not None:
             self.score_deltas.append(score_delta)
             if control_score is not None:
@@ -549,31 +956,67 @@ class SelfEvolutionReflectionController:
             for item in (row.get("generated_tools_failed") or [])
             if isinstance(item, str)
         ]
+        contract_failures = self._contract_failure_tools(row)
+        raw_versions = row.get("generated_tool_versions")
+        generated_tool_versions = (
+            {
+                str(tool_name): int(version)
+                for tool_name, version in raw_versions.items()
+                if isinstance(tool_name, str)
+                and isinstance(version, int)
+                and not isinstance(version, bool)
+            }
+            if isinstance(raw_versions, dict)
+            else {}
+        )
         if not visible:
             bucket["no_visible_helper"] += 1
         if not called:
             bucket["no_called_helper"] += 1
 
         for tool_name in sorted(
-            set(visible) | set(called) | set(attempted) | set(failed)
+            set(visible)
+            | set(called)
+            | set(attempted)
+            | set(failed)
+            | set(contract_failures)
         ):
-            stats = self.tool_stats.setdefault(tool_name, ToolLifecycleStats())
+            stats = self._tool_stats_for_version(
+                tool_name,
+                generated_tool_versions.get(tool_name),
+            )
+            family_stats = stats.family_stats.setdefault(
+                family,
+                ToolFamilyLifecycleStats(),
+            )
             if task_context_label not in stats.scenarios:
                 stats.scenarios.append(task_context_label)
             if family not in stats.families:
                 stats.families.append(family)
+            if row.get("source_task_id_redacted"):
+                family_stats.public_visible_context_count += 1
             if tool_name in visible:
                 stats.visible_count += 1
+                family_stats.visible_count += 1
                 if score_delta is not None:
                     stats.visible_score_deltas.append(score_delta)
                 if outcome_delta is not None:
                     stats.visible_outcome_deltas.append(outcome_delta)
             if tool_name in called:
                 stats.called_count += 1
+                family_stats.called_count += 1
+                if candidate_outcome is not None:
+                    stats.called_candidate_outcomes.append(candidate_outcome)
+                    family_stats.candidate_outcomes.append(candidate_outcome)
+                if success_flip:
+                    stats.success_flip_count += 1
+                    family_stats.success_flip_count += 1
                 if score_delta is not None:
                     stats.called_score_deltas.append(score_delta)
+                    family_stats.called_score_deltas.append(score_delta)
                 if outcome_delta is not None:
                     stats.called_outcome_deltas.append(outcome_delta)
+                    family_stats.called_outcome_deltas.append(outcome_delta)
                 if self._is_harmful_call(score_delta, outcome_delta):
                     stats.harmful_called_scenarios.append(task_context_label)
                     stats.harmful_called_families.append(family)
@@ -584,6 +1027,10 @@ class SelfEvolutionReflectionController:
                 stats.attempted_count += 1
             if tool_name in failed:
                 stats.failed_count += 1
+                family_stats.failed_count += 1
+            if tool_name in contract_failures and tool_name in called:
+                stats.contract_failure_count += 1
+                family_stats.contract_failure_count += 1
             if tool_name in visible and tool_name not in called:
                 stats.visible_not_called_count += 1
             if tool_name in side_effect_failures:
@@ -599,7 +1046,7 @@ class SelfEvolutionReflectionController:
         side_effect_failures: list[str],
         task_context_label: str | None = None,
         task_family_key: str | None = None,
-    ) -> None:
+    ) -> dict[str, Any]:
         """Record feedback and update lifecycle state at pulse boundaries."""
 
         if self.require_fresh_control:
@@ -642,11 +1089,29 @@ class SelfEvolutionReflectionController:
                 score_delta = candidate_score - control_score
             if control_outcome is not None and candidate_outcome is not None:
                 outcome_delta = candidate_outcome - control_outcome
+        candidate_success_flip = bool(
+            candidate_outcome is not None
+            and control_outcome is not None
+            and candidate_outcome >= self.outcome_success_threshold
+            and control_outcome < self.outcome_success_threshold
+        )
 
         visible = list(selection_record.get("generated_tools_visible") or [])
         called = list(selection_record.get("generated_tools_called") or [])
         attempted = list(selection_record.get("generated_tools_attempted") or [])
         failed = list(selection_record.get("generated_tools_failed") or [])
+        contract_failures = self._contract_failure_tools(selection_record)
+        observed_tool_names = {
+            str(item)
+            for item in (*visible, *called, *attempted, *failed, *contract_failures)
+            if isinstance(item, str) and item
+        }
+        registry_entries = self.store.load_entries() if observed_tool_names else {}
+        generated_tool_versions = {
+            tool_name: registry_entries[tool_name].version
+            for tool_name in sorted(observed_tool_names)
+            if tool_name in registry_entries
+        }
         lifecycle_context = task_context_label or scenario_name
         family = task_family_key or base_task_family(scenario_name)
 
@@ -656,7 +1121,6 @@ class SelfEvolutionReflectionController:
             side_effect_failures=side_effect_failures,
             score_delta=score_delta,
             outcome_delta=outcome_delta,
-            exception_type=result.get("exception_type"),
         )
         task_feedback = {
             "event": "self_evolution_task_assessed",
@@ -683,22 +1147,30 @@ class SelfEvolutionReflectionController:
             "candidate_outcome": candidate_outcome,
             "candidate_outcome_source": candidate_outcome_source,
             "outcome_delta": outcome_delta,
+            "candidate_success_flip": candidate_success_flip,
             "generated_tools_visible": visible,
             "generated_tools_called": called,
             "generated_tools_attempted": attempted,
             "generated_tools_failed": failed,
+            "generated_tool_contract_failures": contract_failures,
+            "generated_tool_versions": generated_tool_versions,
             "side_effect_failures": side_effect_failures,
             "immediate_actions": immediate_actions,
         }
         self._record_feedback_row(task_feedback)
+        emitted_repair_requests = self._emit_post_deployment_repair_requests()
+        task_feedback["post_deployment_repair_request_ids"] = [
+            request["request_id"] for request in emitted_repair_requests
+        ]
         append_jsonl(
             self.output_dir / "self_evolution_task_feedback.jsonl", task_feedback
         )
 
         if self.completed_count % self.pulse_interval != 0:
             self._write_current_state()
-            return
+            return task_feedback
         self._pulse()
+        return task_feedback
 
     def _is_harmful_call(
         self,
@@ -772,11 +1244,10 @@ class SelfEvolutionReflectionController:
         side_effect_failures: list[str],
         score_delta: float | None,
         outcome_delta: float | None,
-        exception_type: Any,
     ) -> list[dict[str, Any]]:
         actions: list[dict[str, Any]] = []
         for tool_name in side_effect_failures:
-            if exception_type or self._is_harmful_call(score_delta, outcome_delta):
+            if self._is_harmful_call(score_delta, outcome_delta):
                 actions.append(
                     self._retire_tool(
                         tool_name,
@@ -795,15 +1266,6 @@ class SelfEvolutionReflectionController:
         for tool_name in called_tools:
             if tool_name in self.retired_this_run:
                 continue
-            if exception_type:
-                actions.append(
-                    self._retire_tool(
-                        tool_name,
-                        "runtime_exception_after_generated_tool_call",
-                        scenario_name,
-                    )
-                )
-                continue
             if self._is_harmful_call(score_delta, outcome_delta):
                 actions.append(
                     self._route_repair_tool(
@@ -814,16 +1276,305 @@ class SelfEvolutionReflectionController:
                 )
         return actions
 
+    def _implementation_repair_evidence(
+        self,
+        stats: ToolLifecycleStats,
+        *,
+        include_sparse_execution_failures: bool = False,
+    ) -> dict[str, tuple[str, ...]]:
+        """Classify implementation gaps separately from routing regressions.
+
+        Only evidence attributable to the generated tool may mutate its
+        implementation. A deterministic failure of the tool's public contract is
+        conclusive on its own. Transcript-confirmed execution failures require a
+        small repeated sample because malformed model arguments or transient
+        runtime conditions can otherwise look like an implementation defect.
+
+        Whole-task outcomes and paired deltas remain diagnostic/routing evidence;
+        they cannot establish that any one of several co-called tools was faulty.
+        """
+
+        classified: dict[str, tuple[str, ...]] = {}
+        for family, family_stats in sorted(stats.family_stats.items()):
+            reasons: list[str] = []
+            if (
+                family_stats.contract_failure_count
+                >= self.min_implementation_repair_contract_failures
+            ):
+                reasons.append("deterministic_public_contract_failure")
+            if (
+                family_stats.failed_count
+                >= self.min_implementation_repair_execution_failures
+            ):
+                reasons.append("repeated_generated_tool_execution_failure")
+            if reasons:
+                classified[family] = tuple(reasons)
+        if classified:
+            return classified
+
+        failed_families = sorted(
+            family
+            for family, family_stats in stats.family_stats.items()
+            if family_stats.failed_count > 0
+        )
+        if stats.failed_count >= self.min_implementation_repair_execution_failures:
+            target_family = (
+                failed_families[0]
+                if len(failed_families) == 1
+                else CROSS_FAMILY_EXECUTION_FAILURE
+            )
+            classified[target_family] = ("repeated_generated_tool_execution_failure",)
+        elif include_sparse_execution_failures and stats.failed_count > 0:
+            target_family = (
+                failed_families[0]
+                if len(failed_families) == 1
+                else CROSS_FAMILY_EXECUTION_FAILURE
+            )
+            classified[target_family] = (RUN_END_EXECUTION_FAILURE_REASON,)
+        return classified
+
+    def _outcome_shortfall_diagnostic_families(
+        self,
+        stats: ToolLifecycleStats,
+    ) -> list[str]:
+        """Flag low task outcomes without attributing them to a co-called tool."""
+
+        return sorted(
+            family
+            for family, family_stats in stats.family_stats.items()
+            if family_stats.called_count >= self.min_outcome_diagnostic_calls
+            and len(family_stats.candidate_outcomes)
+            >= self.min_outcome_diagnostic_calls
+            and (candidate_mean := _mean(family_stats.candidate_outcomes)) is not None
+            and candidate_mean < self.min_acceptable_called_outcome_mean
+        )
+
+    @staticmethod
+    def _public_family_label(
+        family: str,
+        family_stats: ToolFamilyLifecycleStats,
+    ) -> str:
+        """Return only a compact family label proved to come from visible context."""
+
+        if family_stats.public_visible_context_count <= 0:
+            return "unclassified"
+        normalized = str(family or "").strip().lower()
+        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_.:-")
+        if not normalized or len(normalized) > 128:
+            return "unclassified"
+        if any(character not in allowed for character in normalized):
+            return "unclassified"
+        return normalized
+
+    def _metadata_repair_families(
+        self,
+        stats: ToolLifecycleStats,
+    ) -> list[str]:
+        """Return families where public metadata repeatedly failed adoption."""
+
+        return sorted(
+            family
+            for family, family_stats in stats.family_stats.items()
+            if family_stats.visible_count >= self.min_metadata_repair_visible_count
+            and family_stats.called_count == 0
+        )
+
+    def _emit_post_deployment_repair_requests(
+        self,
+        *,
+        include_sparse_execution_failures: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Emit durable, future-only repair work without raw benchmark evidence."""
+
+        emitted: list[dict[str, Any]] = []
+        for tool_name, stats in sorted(self.tool_stats.items()):
+            classified = self._implementation_repair_evidence(
+                stats,
+                include_sparse_execution_failures=include_sparse_execution_failures,
+            )
+            for family, reason_codes in sorted(classified.items()):
+                if family == CROSS_FAMILY_EXECUTION_FAILURE:
+                    evidence = stats.to_json(
+                        outcome_success_threshold=self.outcome_success_threshold
+                    )
+                    public_family = CROSS_FAMILY_EXECUTION_FAILURE
+                else:
+                    family_stats = stats.family_stats[family]
+                    evidence = family_stats.to_json(
+                        outcome_success_threshold=self.outcome_success_threshold
+                    )
+                    public_family = self._public_family_label(family, family_stats)
+                version_label = (
+                    str(stats.tool_version)
+                    if stats.tool_version is not None
+                    else "unknown"
+                )
+                request_key = (
+                    f"implementation:{tool_name}:v{version_label}:{public_family}"
+                )
+                if request_key in self.emitted_repair_request_keys:
+                    continue
+                request_id = (
+                    f"{tool_name}:v{version_label}:{public_family}:"
+                    f"after-{self.completed_count}"
+                )
+                public_evidence = {
+                    key: evidence[key]
+                    for key in (
+                        "called_count",
+                        "contract_failure_count",
+                        "failed_count",
+                    )
+                }
+                request = {
+                    "event": POST_DEPLOYMENT_REPAIR_REQUEST_EVENT,
+                    "schema_version": POST_DEPLOYMENT_REPAIR_REQUEST_SCHEMA_VERSION,
+                    "request_id": request_id,
+                    "request_key": request_key,
+                    "status": "pending",
+                    "repair_kind": "implementation",
+                    "tool_name": tool_name,
+                    "source_tool_version": stats.tool_version,
+                    "target_task_family": public_family,
+                    "trigger_reason_codes": list(reason_codes),
+                    "trigger_completed_count": self.completed_count,
+                    "eligible_from_completed_count": self.completed_count + 1,
+                    "future_tasks_only": True,
+                    "triggering_task_replay_allowed": False,
+                    "requested_action": ("regenerate_validate_and_canary_new_version"),
+                    "public_evidence": public_evidence,
+                    "evidence_policy": {
+                        "allowed": [
+                            "public_contract_failure_count",
+                            "generated_tool_execution_failure_count",
+                            "visible_semantic_task_family",
+                            "visible_and_called_counts",
+                        ],
+                        "prohibited": [
+                            "scenario_name",
+                            "task_id",
+                            "expected_answer",
+                            "target_state",
+                            "evaluator_trace",
+                        ],
+                    },
+                }
+                append_jsonl(self.repair_request_path, request)
+                self.emitted_repair_request_keys.add(request_key)
+                self.pending_repair_requests.append(request)
+                emitted.append(request)
+            for family in self._metadata_repair_families(stats):
+                family_stats = stats.family_stats[family]
+                public_family = self._public_family_label(family, family_stats)
+                version_label = (
+                    str(stats.tool_version)
+                    if stats.tool_version is not None
+                    else "unknown"
+                )
+                request_key = f"metadata:{tool_name}:v{version_label}:{public_family}"
+                if request_key in self.emitted_repair_request_keys:
+                    continue
+                request_id = (
+                    f"metadata:{tool_name}:v{version_label}:{public_family}:"
+                    f"after-{self.completed_count}"
+                )
+                request = {
+                    "event": POST_DEPLOYMENT_REPAIR_REQUEST_EVENT,
+                    "schema_version": POST_DEPLOYMENT_REPAIR_REQUEST_SCHEMA_VERSION,
+                    "request_id": request_id,
+                    "request_key": request_key,
+                    "status": "pending",
+                    "repair_kind": "metadata",
+                    "tool_name": tool_name,
+                    "source_tool_version": stats.tool_version,
+                    "target_task_family": public_family,
+                    "trigger_reason_codes": ["visible_repeatedly_without_adoption"],
+                    "trigger_completed_count": self.completed_count,
+                    "eligible_from_completed_count": self.completed_count + 1,
+                    "future_tasks_only": True,
+                    "triggering_task_replay_allowed": False,
+                    "requested_action": (
+                        "repair_public_metadata_and_revalidate_or_retire"
+                    ),
+                    "public_evidence": {
+                        "visible_count": family_stats.visible_count,
+                        "called_count": family_stats.called_count,
+                        "public_visible_context_count": (
+                            family_stats.public_visible_context_count
+                        ),
+                        "failed_count": family_stats.failed_count,
+                    },
+                    "evidence_policy": {
+                        "allowed": [
+                            "visible_semantic_task_family",
+                            "runtime_failure_count",
+                            "visible_and_called_counts",
+                            "public_tool_schema_and_metadata",
+                        ],
+                        "prohibited": [
+                            "scenario_name",
+                            "task_id",
+                            "expected_answer",
+                            "target_state",
+                            "evaluator_trace",
+                        ],
+                    },
+                }
+                append_jsonl(self.repair_request_path, request)
+                self.emitted_repair_request_keys.add(request_key)
+                self.pending_repair_requests.append(request)
+                emitted.append(request)
+        return emitted
+
+    def drain_run_end_repair_requests(self) -> tuple[dict[str, Any], ...]:
+        """Close sparse direct failures before orchestration finalizes the run.
+
+        During a run, repeated execution failures trigger repair after three
+        observations. At run end, one or two remaining explicit
+        ``generated_tools_failed`` observations must not disappear merely because
+        no third opportunity occurred. The caller must queue the returned requests
+        before the online-birth controller performs its terminal repair/retirement
+        finalization.
+        """
+
+        self._emit_post_deployment_repair_requests(
+            include_sparse_execution_failures=True
+        )
+        self._write_current_state()
+        return self.drain_pending_repair_requests()
+
     def _tool_lifecycle_snapshot(self) -> dict[str, Any]:
         snapshot: dict[str, Any] = {}
         for tool_name, stats in sorted(self.tool_stats.items()):
-            row = stats.to_json()
+            row = stats.to_json(
+                outcome_success_threshold=self.outcome_success_threshold
+            )
             decision = "diagnostic"
             reason = "insufficient_evidence"
+            repair_kind: str | None = None
+            routing_disposition = "unchanged"
             called_outcome = row["called_outcome_delta_mean"]
             called_score = row["called_score_delta_mean"]
             helpful_count = len(stats.helpful_called_scenarios)
             harmful_count = len(stats.harmful_called_scenarios)
+            implementation_repair_evidence = self._implementation_repair_evidence(stats)
+            implementation_repair_families = sorted(implementation_repair_evidence)
+            outcome_shortfall_alarm_families = (
+                self._outcome_shortfall_diagnostic_families(stats)
+            )
+            metadata_repair_families = self._metadata_repair_families(stats)
+            row["implementation_repair_families"] = implementation_repair_families
+            row["implementation_repair_reason_codes"] = {
+                family: list(reason_codes)
+                for family, reason_codes in implementation_repair_evidence.items()
+            }
+            row["outcome_shortfall_alarm_families"] = outcome_shortfall_alarm_families
+            row["outcome_shortfall_alarm_reason"] = (
+                "low_task_outcome_not_tool_attributable"
+                if outcome_shortfall_alarm_families
+                else None
+            )
+            row["metadata_repair_families"] = metadata_repair_families
             if called_outcome is not None:
                 negative_called_subset = called_outcome < -0.05
             else:
@@ -833,11 +1584,26 @@ class SelfEvolutionReflectionController:
             if tool_name in self.retired_this_run:
                 decision = "parked"
                 reason = "retired_this_run"
+                routing_disposition = "quarantined"
             elif stats.side_effect_incident_count and negative_called_subset:
                 decision = "park"
                 reason = "side_effect_incident_with_negative_called_subset"
+                repair_kind = "safety"
+                routing_disposition = "quarantined"
+            elif implementation_repair_families:
+                decision = "needs_implementation_repair"
+                if any(
+                    "deterministic_public_contract_failure" in reason_codes
+                    for reason_codes in implementation_repair_evidence.values()
+                ):
+                    reason = "deterministic_public_contract_failure"
+                else:
+                    reason = "repeated_generated_tool_execution_failure"
+                repair_kind = "implementation"
+                routing_disposition = "quarantine_pending_repair"
             elif stats.harmful_called_scenarios and stats.helpful_called_scenarios:
                 decision = "retain_with_route_repair"
+                repair_kind = "routing"
                 if stats.side_effect_incident_count:
                     reason = (
                         "mixed_called_subset_family_specific_repair_with_safety_audit"
@@ -847,9 +1613,14 @@ class SelfEvolutionReflectionController:
             elif stats.side_effect_incident_count:
                 decision = "retain_with_safety_audit"
                 reason = "positive_called_subset_with_side_effect_audit"
+                repair_kind = "safety"
             elif stats.harmful_called_scenarios:
                 decision = "needs_route_repair"
                 reason = "harmful_called_subset_without_global_retirement"
+                repair_kind = "routing"
+            elif outcome_shortfall_alarm_families:
+                decision = "diagnostic_alarm"
+                reason = "low_task_outcome_not_tool_attributable"
             elif stats.called_count >= 2 and (
                 (called_outcome is not None and called_outcome > 0.05)
                 or (called_score is not None and called_score > 0.05)
@@ -862,9 +1633,11 @@ class SelfEvolutionReflectionController:
             ):
                 decision = "needs_repair"
                 reason = "negative_called_subset"
-            elif stats.visible_count >= 8 and stats.called_count == 0:
+                repair_kind = "routing"
+            elif metadata_repair_families:
                 decision = "adoption_repair"
                 reason = "visible_not_called_repeatedly"
+                repair_kind = "metadata"
             elif stats.called_count == 1 and (
                 (called_outcome is not None and called_outcome > 0.05)
                 or (called_score is not None and called_score > 0.05)
@@ -873,6 +1646,8 @@ class SelfEvolutionReflectionController:
                 reason = "single_positive_called_event"
             row["decision"] = decision
             row["decision_reason"] = reason
+            row["repair_kind"] = repair_kind
+            row["routing_disposition"] = routing_disposition
             snapshot[tool_name] = row
         return snapshot
 
@@ -951,20 +1726,16 @@ class SelfEvolutionReflectionController:
         }
         if extra is not None:
             payload["last_pulse"] = extra
-        (self.output_dir / "self_evolution_reflection_state.json").write_text(
-            json.dumps(payload, indent=2) + "\n",
-            encoding="utf-8",
+        _atomic_write_json(
+            self.output_dir / "self_evolution_reflection_state.json",
+            payload,
         )
         registry_state_path = self.store.root / "tool_lifecycle.json"
-        registry_state_path.write_text(
-            json.dumps(
-                {
-                    "artifact_type": "self_evolution_tool_lifecycle",
-                    "source_run": str(self.output_dir),
-                    "tool_lifecycle": payload["tool_lifecycle"],
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
+        _atomic_write_json(
+            registry_state_path,
+            {
+                "artifact_type": "self_evolution_tool_lifecycle",
+                "source_run": str(self.output_dir),
+                "tool_lifecycle": payload["tool_lifecycle"],
+            },
         )

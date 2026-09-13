@@ -42,16 +42,14 @@ from tool_sandbox.common.scenario import Scenario
 
 
 def _online_birth_feedback_result(result: dict[str, object]) -> dict[str, object]:
-    """Select the best available outcome signal for post-task tool birth."""
+    """Expose only the audited outcome as prospective tool-birth reward."""
 
     trace_result = dict(result)
-    paper_feedback = result.get("online_feedback_outcome_similarity")
-    if paper_feedback is not None:
-        trace_result["outcome_similarity"] = paper_feedback
-        trace_result["online_birth_outcome_source"] = "paper_era_online_feedback"
-    elif result.get("outcome_similarity") is not None:
-        trace_result["online_birth_outcome_source"] = "audited_outcome_fallback"
+    audited_outcome = result.get("outcome_similarity")
+    if audited_outcome is not None:
+        trace_result["online_birth_outcome_source"] = "audited_outcome"
     else:
+        trace_result["outcome_similarity"] = None
         trace_result["online_birth_outcome_source"] = "unavailable"
     return trace_result
 
@@ -233,6 +231,15 @@ def _snapshot_registry_checkpoint(
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     for filename in ("registry_manifest.json", "tool_lifecycle.json"):
         source = registry_dir / filename
+        if source.exists():
+            shutil.copy2(source, checkpoint_dir / filename)
+            copied.append(filename)
+    for filename in (
+        "post_deployment_repair_state.json",
+        "self_evolution_tool_repair_requests.jsonl",
+        "self_evolution_tool_repair_acknowledgements.jsonl",
+    ):
+        source = output_directory / filename
         if source.exists():
             shutil.copy2(source, checkpoint_dir / filename)
             copied.append(filename)
@@ -758,6 +765,7 @@ class SageRunConfig:
     require_fresh_reflection_control: bool = False
     reflection_control_channel: Any | None = None
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
+    fail_on_scenario_transform_error: bool = False
 
 
 def run_sage_with_registry(
@@ -809,6 +817,21 @@ def run_sage_with_registry(
                 fresh_control_rows=config.reflection_control_rows,
                 require_fresh_control=config.require_fresh_reflection_control,
                 fresh_control_channel=config.reflection_control_channel,
+            )
+        if birth_controller is not None and birth_controller.pending_repair_requests:
+            try:
+                completed_task_count = int(
+                    os.environ.get("SAGE_TS_SCENARIO_ORDER_INDEX", "0")
+                )
+            except ValueError:
+                completed_task_count = 0
+            birth_controller.process_pending_repairs(
+                completed_count=max(0, completed_task_count),
+                acknowledge=(
+                    reflection_controller.acknowledge_repair
+                    if reflection_controller is not None
+                    else None
+                ),
             )
         visible_task_context = visible_task_context_from_scenario(scenario)
         routing_context_text = visible_task_context.routing_text()
@@ -958,6 +981,11 @@ def run_sage_with_registry(
                 priority_injection_changed_tool_order
             ),
             "relevance_gating_hid_retained_tool": bool(filtered_out_generated_tools),
+            "generated_tool_versions": {
+                tool_name: loaded_entries[tool_name].version
+                for tool_name in generated_tools
+                if tool_name in loaded_entries
+            },
         }
         append_jsonl(
             output_directory / "scenario_tool_visibility.jsonl",
@@ -1072,6 +1100,11 @@ def run_sage_with_registry(
         else:
             selection_reason = "no_retained_tool_visible_after_relevance_filter"
         context = selection_context_by_scenario.get(name, {})
+        generated_contract_failures = (
+            list(birth_controller.contract_failures_for_tools(generated_called))
+            if birth_controller is not None and generated_called
+            else []
+        )
         selection_record = {
             "scenario": name,
             "base_tool_policy": config.base_tool_policy,
@@ -1102,6 +1135,8 @@ def run_sage_with_registry(
             "generated_tools_called": generated_called,
             "generated_tools_not_called": generated_not_called,
             "generated_tools_not_attempted": generated_not_attempted,
+            "generated_tool_versions": context.get("generated_tool_versions", {}),
+            "generated_tool_contract_failures": generated_contract_failures,
             "visible_generated_tool_count": len(generated_visible),
             "attempted_generated_tool_count": len(generated_attempted),
             "failed_generated_tool_count": len(generated_failed),
@@ -1167,8 +1202,9 @@ def run_sage_with_registry(
                     "generated_tools_called": generated_called,
                 },
             )
+        reflection_feedback: dict[str, Any] | None = None
         if reflection_controller is not None:
-            reflection_controller.assess_scenario(
+            reflection_feedback = reflection_controller.assess_scenario(
                 scenario_name=name,
                 baseline_scenario=baseline_scenario_by_name.get(name, scenario),
                 result=result,
@@ -1181,6 +1217,86 @@ def run_sage_with_registry(
                     "task_family_key"
                 ),
             )
+            if bool(reflection_feedback.get("candidate_success_flip")):
+                versions = selection_record.get("generated_tool_versions") or {}
+                for tool_name in generated_called:
+                    version = (
+                        versions.get(tool_name) if isinstance(versions, dict) else None
+                    )
+                    store.record_success_flip(
+                        tool_name,
+                        f"{name}:v{version if version is not None else 'unknown'}",
+                        tool_version=(version if isinstance(version, int) else None),
+                    )
+            if birth_controller is not None:
+                raw_canary_outcome = reflection_feedback.get("candidate_outcome")
+                canary_outcome = (
+                    float(raw_canary_outcome)
+                    if isinstance(raw_canary_outcome, (int, float))
+                    and not isinstance(raw_canary_outcome, bool)
+                    and reflection_feedback.get("candidate_outcome_source")
+                    == "audited_outcome"
+                    else None
+                )
+                audited_pair_available = bool(
+                    reflection_feedback.get("candidate_outcome_source")
+                    == "audited_outcome"
+                    and reflection_feedback.get("control_outcome_source")
+                    == "audited_outcome"
+                    and reflection_feedback.get("control_source") == "same_run_fresh"
+                )
+                raw_outcome_delta = reflection_feedback.get("outcome_delta")
+                audited_outcome_delta = (
+                    float(raw_outcome_delta)
+                    if audited_pair_available
+                    and isinstance(raw_outcome_delta, (int, float))
+                    and not isinstance(raw_outcome_delta, bool)
+                    else None
+                )
+                fresh_control_success_flip = bool(
+                    audited_pair_available
+                    and reflection_feedback.get("candidate_success_flip") is True
+                )
+                canary_called_tools = list(
+                    dict.fromkeys((*generated_called, *generated_failed))
+                )
+                raw_called_versions = selection_record.get("generated_tool_versions")
+                called_tool_versions = (
+                    {
+                        tool_name: version
+                        for tool_name in canary_called_tools
+                        if isinstance(
+                            version := raw_called_versions.get(tool_name), int
+                        )
+                        and not isinstance(version, bool)
+                    }
+                    if isinstance(raw_called_versions, dict)
+                    else {}
+                )
+                attributable_tools = (
+                    canary_called_tools
+                    if len(canary_called_tools) == 1
+                    and canary_called_tools[0] in called_tool_versions
+                    else []
+                )
+                birth_controller.record_canary_result(
+                    called_tools=canary_called_tools,
+                    called_tool_versions=called_tool_versions,
+                    attributable_tools=attributable_tools,
+                    visible_tools=generated_visible,
+                    failed_tools=generated_failed,
+                    candidate_outcome=canary_outcome,
+                    audited_outcome_delta=audited_outcome_delta,
+                    fresh_control_success_flip=fresh_control_success_flip,
+                    contract_failures=generated_contract_failures,
+                    exception_type=result.get("exception_type"),
+                    task_family_key=str(
+                        selection_context_by_scenario.get(name, {}).get(
+                            "task_family_key", ""
+                        )
+                    ),
+                    acknowledge=reflection_controller.acknowledge_repair,
+                )
 
         if birth_controller is None:
             checkpoint = _snapshot_registry_checkpoint(
@@ -1239,6 +1355,15 @@ def run_sage_with_registry(
                 )
             birth_controller.observe(observation)
         result["sage_observations"] = [item.to_json() for item in observations]
+        if reflection_controller is not None:
+            birth_controller.queue_post_deployment_repair_requests(
+                reflection_controller.drain_pending_repair_requests(),
+                visible_task_family=str(
+                    selection_context_by_scenario.get(name, {}).get(
+                        "task_family_key", ""
+                    )
+                ),
+            )
         checkpoint = _snapshot_registry_checkpoint(
             output_directory=output_directory,
             registry_dir=config.registry_dir,
@@ -1267,6 +1392,7 @@ def run_sage_with_registry(
             base_tool_policy=config.base_tool_policy,
             resume_from_dir=config.resume_from_dir,
             resume_completed_limit=config.resume_completed_limit,
+            fail_on_scenario_transform_error=(config.fail_on_scenario_transform_error),
         ),
         scenarios=scenarios,
         scenario_transform=transform,
@@ -1274,6 +1400,39 @@ def run_sage_with_registry(
         progress_hook=progress_hook,
         event_hook=event_hook,
     )
+    lifecycle_finalization: tuple[dict[str, Any], ...] = ()
+    if birth_controller is not None:
+        if reflection_controller is not None:
+            run_end_requests = reflection_controller.drain_run_end_repair_requests()
+            for run_end_request in run_end_requests:
+                birth_controller.queue_post_deployment_repair_requests(
+                    [run_end_request],
+                    visible_task_family=str(
+                        run_end_request.get("target_task_family") or ""
+                    ),
+                )
+        lifecycle_finalization = birth_controller.finalize_run(
+            acknowledge=(
+                reflection_controller.acknowledge_repair
+                if reflection_controller is not None
+                else None
+            )
+        )
+        if lifecycle_finalization:
+            final_checkpoint = _snapshot_registry_checkpoint(
+                output_directory=output_directory,
+                registry_dir=config.registry_dir,
+                scenario_name="run_finalization",
+            )
+            if final_checkpoint is not None:
+                append_jsonl(
+                    output_directory / "sage_run_events.jsonl",
+                    {
+                        "event": "registry_checkpoint_written_after_finalization",
+                        "checkpoint_dir": str(final_checkpoint),
+                        "registry_dir": str(config.registry_dir),
+                    },
+                )
     if reflection_controller is not None:
         reflection_controller.assert_fresh_control_complete(config.scenario_names)
     final_registry_tools = sorted(store.load_entries())
@@ -1285,6 +1444,7 @@ def run_sage_with_registry(
             "registry_tools": registry_tools,
             "final_registry_tools": final_registry_tools,
             "final_registry_size": len(final_registry_tools),
+            "lifecycle_finalization_count": len(lifecycle_finalization),
         },
     )
     selection_rows = _selection_log_rows(output_directory)

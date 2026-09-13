@@ -73,12 +73,9 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 def _feedback_outcome_with_source(
     row: dict[str, Any],
 ) -> tuple[float | None, str]:
-    paper_feedback = row.get("online_feedback_outcome_similarity")
-    if paper_feedback is not None:
-        return float(paper_feedback), "paper_era_online_feedback"
     audited_outcome = row.get("outcome_similarity")
     if audited_outcome is not None:
-        return float(audited_outcome), "audited_outcome_fallback"
+        return float(audited_outcome), "audited_outcome"
     return None, "unavailable"
 
 
@@ -120,8 +117,9 @@ def _reflection_feedback_row(
         "feedback_source",
     ),
     [
-        (None, 0.0, 0.0, "audited_outcome_fallback"),
-        (0.0, 1.0, 0.0, "paper_era_online_feedback"),
+        (None, 0.0, 0.0, "audited_outcome"),
+        (0.0, 1.0, 1.0, "audited_outcome"),
+        (0.0, None, None, "unavailable"),
         (None, None, None, "unavailable"),
     ],
 )
@@ -304,7 +302,8 @@ def _fresh_run(tmp_path: Path) -> Path:
         {
             "name": "task_b",
             "similarity": 1.0,
-            "outcome_similarity": None,
+            "outcome_similarity": 0.0,
+            **outcome_evaluator_fields,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 1,
@@ -340,7 +339,8 @@ def _fresh_run(tmp_path: Path) -> Path:
         {
             "name": "task_b",
             "similarity": 1.0,
-            "outcome_similarity": None,
+            "outcome_similarity": 0.0,
+            **outcome_evaluator_fields,
             "llm_usage_recorded": True,
             "llm_cached_call_count": 0,
             "llm_call_count": 1,
@@ -389,6 +389,15 @@ def _fresh_run(tmp_path: Path) -> Path:
     (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in feedback),
         encoding="utf-8",
+    )
+    _write_json(
+        candidate_dir / "post_deployment_repair_state.json",
+        {
+            "schema_version": 1,
+            "pending_repair_requests": [],
+            "handled_repair_request_ids": [],
+            "canary_state_by_tool": {},
+        },
     )
     dashboard_path = run_root / "dashboard" / "task_compare.html"
     dashboard_path.parent.mkdir(parents=True, exist_ok=True)
@@ -492,7 +501,18 @@ def _fresh_run(tmp_path: Path) -> Path:
             "candidate_dir": str(candidate_dir),
             "registry_dir": str(registry_dir),
             "registry_manifest_digest_after_run": registry_manifest_sha256,
+            "registry_gate_snapshot": {
+                "registry_dir": str(registry_dir),
+                "manifest_existed_before_run": False,
+                "snapshot_path": None,
+                "manifest_digest_before_run": None,
+                "registry_directory_existed_before_run": False,
+                "registry_inventory_before_run": [],
+                "registry_inventory_count_before_run": 0,
+                "registry_inventory_sha256": hashlib.sha256(b"[]").hexdigest(),
+            },
             "fresh_control_required": True,
+            "scenario_transform_failure_policy": "abort",
             "publication_performance_endpoint": "outcome_task_completion_similarity",
             "actor_selection_mode": "policy",
             "reporting_outcome_evaluator": (
@@ -577,6 +597,13 @@ def _fresh_run(tmp_path: Path) -> Path:
             },
         },
     )
+    protocol_payload = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    _write_json(
+        run_root / "registry_gate" / "registry_gate_snapshot.json",
+        protocol_payload["registry_gate_snapshot"],
+    )
     _write_json(
         run_root / "control_cache_report.json",
         {
@@ -600,13 +627,13 @@ def _fresh_run(tmp_path: Path) -> Path:
             "protocol_gate_reasons": [],
             "runtime_exception_count": 0,
             "scenario_count": 2,
-            "outcome_scenario_count": 1,
-            "control_mean_outcome_similarity": 0.5,
-            "candidate_mean_outcome_similarity": 1.0,
-            "mean_outcome_similarity_delta": 0.5,
+            "outcome_scenario_count": 2,
+            "control_mean_outcome_similarity": 0.25,
+            "candidate_mean_outcome_similarity": 0.5,
+            "mean_outcome_similarity_delta": 0.25,
             "outcome_gain_count": 1,
             "outcome_regression_count": 0,
-            "outcome_preserved_count": 0,
+            "outcome_preserved_count": 1,
             "control": {
                 "run_status": "complete",
                 "scenario_count": 2,
@@ -643,6 +670,227 @@ def _verification_pins(run_root: Path) -> dict[str, str]:
     }
 
 
+def _lifecycle_artifacts(
+    tmp_path: Path,
+    *,
+    request: bool = True,
+    acknowledgement_status: str | None = "rolled_back",
+    pending: bool = False,
+    canary: bool = False,
+    retired: bool = True,
+) -> tuple[Path, Path]:
+    candidate_dir = tmp_path / "candidate"
+    registry_dir = tmp_path / "registry"
+    candidate_dir.mkdir(parents=True)
+    registry_dir.mkdir(parents=True)
+    request_row = {
+        "schema_version": 1,
+        "request_id": "request-1",
+        "tool_name": "helper",
+        "source_tool_version": 2,
+        "future_tasks_only": True,
+        "triggering_task_replay_allowed": False,
+    }
+    if request:
+        (candidate_dir / "self_evolution_tool_repair_requests.jsonl").write_text(
+            json.dumps(request_row) + "\n", encoding="utf-8"
+        )
+    if acknowledgement_status is not None:
+        (
+            candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+        ).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "request_id": "request-1",
+                    "tool_name": "helper",
+                    "new_version": 2,
+                    "status": acknowledgement_status,
+                    "future_tasks_only": True,
+                    "triggering_task_replay_allowed": False,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    _write_json(
+        candidate_dir / "post_deployment_repair_state.json",
+        {
+            "schema_version": 1,
+            "pending_repair_requests": [request_row] if pending else [],
+            "handled_repair_request_ids": ["request-1"] if request else [],
+            "canary_state_by_tool": {
+                "helper": {"request_id": "request-1", "tool_version": 2}
+            }
+            if canary
+            else {},
+            "repair_transactions_by_tool": {},
+        },
+    )
+    _write_json(
+        registry_dir / "registry_manifest.json",
+        {"tools": {"helper": {"version": 2, "retired": retired}}},
+    )
+    return candidate_dir, registry_dir
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"acknowledgement_status": None}, "unacknowledged"),
+        ({"pending": True}, "pending lifecycle"),
+        ({"canary": True}, "open repaired-tool canaries"),
+        ({"retired": False}, "unresolved affected tools active"),
+        ({"acknowledgement_status": "canary_pending"}, "nonterminal"),
+    ],
+)
+def test_lifecycle_verifier_fails_closed(
+    tmp_path: Path,
+    kwargs: dict[str, Any],
+    message: str,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path, **kwargs)
+
+    with pytest.raises(ValueError, match=message):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_accepts_terminal_retired_disposition(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+
+    report = publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+    assert report["repair_request_count"] == 1
+    assert report["pending_repair_request_count"] == 0
+    assert report["open_canary_count"] == 0
+    assert report["open_repair_transaction_count"] == 0
+    assert report["active_unresolved_tool_count"] == 0
+
+
+def test_lifecycle_verifier_rejects_wrong_tool_or_unhandled_request(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    acknowledgement_path = (
+        candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+    )
+    acknowledgement = json.loads(acknowledgement_path.read_text(encoding="utf-8"))
+    acknowledgement["tool_name"] = "different_helper"
+    acknowledgement_path.write_text(
+        json.dumps(acknowledgement) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="wrong tool"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path / "unhandled")
+    state_path = candidate_dir / "post_deployment_repair_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["handled_repair_request_ids"] = []
+    _write_json(state_path, state)
+    with pytest.raises(ValueError, match="missing from state"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_requires_current_promoted_tool_to_be_active(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        acknowledgement_status="promoted",
+        retired=True,
+    )
+
+    with pytest.raises(ValueError, match="promoted tool as retired"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_rejects_open_repair_transaction(tmp_path: Path) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(tmp_path)
+    state_path = candidate_dir / "post_deployment_repair_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["repair_transactions_by_tool"] = {
+        "helper": {"request_id": "request-1", "phase": "canary_prepared"}
+    }
+    _write_json(state_path, state)
+
+    with pytest.raises(ValueError, match="open lifecycle repair transactions"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_rejects_active_repair_without_promoted_ack(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        request=False,
+        acknowledgement_status=None,
+        retired=False,
+    )
+    registry_path = registry_dir / "registry_manifest.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["tools"]["helper"]["birth_scenario"] = (
+        "post_deployment_repair:record_safety"
+    )
+    _write_json(registry_path, registry)
+
+    with pytest.raises(ValueError, match="without matching promoted acknowledgements"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_lifecycle_verifier_treats_missing_retired_flag_as_active(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        request=False,
+        acknowledgement_status=None,
+    )
+    registry_path = registry_dir / "registry_manifest.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["tools"]["helper"].pop("retired")
+    registry["tools"]["helper"]["birth_scenario"] = (
+        "post_deployment_repair:record_safety"
+    )
+    _write_json(registry_path, registry)
+
+    with pytest.raises(ValueError, match="without matching promoted acknowledgements"):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
+def test_pinned_publication_benchmark_requires_exactly_1032_tasks(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="requires exactly 1032 tasks per arm"):
+        verify_run(
+            tmp_path,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+        )
+
+
+def test_verifier_requires_exact_pinned_evaluator_hashes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    observed = publication_verifier.outcome_evaluator_manifest()
+    monkeypatch.setattr(
+        publication_verifier,
+        "outcome_evaluator_manifest",
+        lambda: {**observed, "contract_sha256": "0" * 64},
+    )
+
+    with pytest.raises(ValueError, match="exact pinned publication evaluator"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
 def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     run_root = _fresh_run(tmp_path)
 
@@ -677,6 +925,76 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+def test_verifier_rejects_any_scenario_transform_failure(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    failure_path = Path(protocol["candidate_dir"]) / (
+        "scenario_transform_failures.jsonl"
+    )
+    failure_path.write_text(
+        json.dumps(
+            {
+                "event": "scenario_transform_failed",
+                "scenario": "task_a",
+                "error": "Traceback ...",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="scenario transformation failures"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def test_verifier_rejects_nonempty_online_registry_start(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    inventory = [
+        {
+            "path": "tool_lifecycle.json",
+            "kind": "file",
+            "sha256": "3" * 64,
+        }
+    ]
+    snapshot = protocol["registry_gate_snapshot"]
+    snapshot.update(
+        {
+            "registry_directory_existed_before_run": True,
+            "registry_inventory_before_run": inventory,
+            "registry_inventory_count_before_run": 1,
+            "registry_inventory_sha256": hashlib.sha256(
+                json.dumps(
+                    inventory,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
+    )
+    _write_json(protocol_path, protocol)
+    _write_json(
+        run_root / "registry_gate" / "registry_gate_snapshot.json",
+        snapshot,
+    )
+
+    with pytest.raises(ValueError, match="did not start exactly empty"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 @pytest.mark.parametrize(
@@ -985,6 +1303,33 @@ def test_verifier_rejects_scored_row_outcome_evaluator_identity_drift(
 
 
 @pytest.mark.parametrize(
+    "invalid_outcome",
+    (None, float("nan"), float("inf"), -0.01, 1.01),
+)
+def test_verifier_rejects_nonfinite_or_missing_audited_outcome_even_with_legacy_value(
+    tmp_path: Path,
+    invalid_outcome: float | None,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    summary_path = Path(protocol["candidate_dir"]) / "result_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["per_scenario_results"][0]["outcome_similarity"] = invalid_outcome
+    summary["per_scenario_results"][0]["online_feedback_outcome_similarity"] = 1.0
+    _write_json(summary_path, summary)
+
+    with pytest.raises(ValueError, match="missing a finite audited outcome"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+@pytest.mark.parametrize(
     ("field", "tampered"),
     [
         ("scenario_count", 3),
@@ -994,7 +1339,7 @@ def test_verifier_rejects_scored_row_outcome_evaluator_identity_drift(
         ("mean_outcome_similarity_delta", 0.0),
         ("outcome_gain_count", 0),
         ("outcome_regression_count", 1),
-        ("outcome_preserved_count", 1),
+        ("outcome_preserved_count", 0),
     ],
 )
 def test_verifier_rejects_paired_outcome_aggregate_drift(

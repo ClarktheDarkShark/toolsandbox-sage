@@ -1,0 +1,43 @@
+{
+  "manifest_type": "development_diagnostic_lifecycle_repair_dev10",
+  "lifecycle_evidence_mode": "seeded_historical_v1_postdeployment_repair",
+  "scenario_order_sha256": "b59acee1559e254551ffe783acdaf351b45c4b6977b4a4bb990229afe733cf0e",
+  "strategy": "Development-only ordered cohort for raw pre-deployment validation, prospective lifecycle repair, future-task canarying, and unrelated-family non-regression. This cohort is not a publication sample or unseen test set.",
+  "predeclared_gates": {
+    "safe_abstain_visible_and_called": {"role": "repair_target", "minimum": 7, "total": 7},
+    "safe_abstain_exact_without_forbidden_remove": {"role": "repair_target", "minimum": 6, "total": 7},
+    "preservation_exact_and_safe_helper_hidden": {"role": "preservation", "minimum": 3, "total": 3},
+    "overall_exact_outcomes": {"minimum": 9, "total": 10},
+    "before_after": {"trigger_version": 1, "trigger_outcome_less_than": 1.0, "future_version": 2, "minimum_future_exact_successes": 6, "minimum_future_success_flips": 1}
+  },
+  "validation_roles": {
+    "repair_target": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"
+    ],
+    "preservation": [
+      "add_reminder_content_and_week_delta_and_time",
+      "add_reminder_content_and_weekday_delta_and_time",
+      "search_phone_number_with_name"
+    ]
+  },
+  "splits": {
+    "full_benchmark": [
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"},
+      {"name": "add_reminder_content_and_week_delta_and_time"},
+      {"name": "add_reminder_content_and_weekday_delta_and_time"},
+      {"name": "search_phone_number_with_name"}
+    ]
+  }
+}
