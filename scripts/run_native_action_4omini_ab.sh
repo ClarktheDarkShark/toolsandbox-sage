@@ -213,12 +213,14 @@ fi
 RUN_STAMP="${SAGE_RUN_STAMP:-$DEFAULT_RUN_STAMP}"
 OUTPUT_ROOT="${SAGE_OUTPUT_ROOT:-$DEFAULT_OUTPUT_ROOT/$RUN_STAMP}"
 ARTIFACT_ROOT="${SAGE_ARTIFACT_ROOT:-$DEFAULT_ARTIFACT_ROOT/$RUN_STAMP}"
-MANIFEST="${SAGE_BENCHMARK_MANIFEST:-docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json}"
 if [[ "$EXECUTION_MODE" == "development-only" ]]; then
-  MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_${SIZE}.json"
+  DEFAULT_MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_${SIZE}.json"
 elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
-  MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_transfer_dev30.json"
+  DEFAULT_MANIFEST="docs/sage_protocol/manifests/lifecycle_repair_transfer_dev30.json"
+else
+  DEFAULT_MANIFEST="docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json"
 fi
+MANIFEST="${SAGE_BENCHMARK_MANIFEST:-$DEFAULT_MANIFEST}"
 if [[ ! -f "$MANIFEST" ]]; then
   echo "Required publication benchmark is missing: $MANIFEST" >&2
   exit 1

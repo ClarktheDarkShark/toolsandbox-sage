@@ -464,25 +464,32 @@ class ToolGenerator:
         """Return independently authored repairs for contract validation."""
 
         prompt = _model_authored_repair_prompt(request, rejected_tool, errors)
-        stagnating = "repair_stagnation_duplicate_candidate" in errors
+        clean_room = any(
+            marker in errors
+            for marker in (
+                "repair_stagnation_duplicate_candidate",
+                "repair_independent_clean_room_candidate",
+            )
+        )
         if _request_is_validation_abstention_helper(request):
             # Validation helpers are pure decision procedures. A compact,
             # code-specific plan followed by one complete implementation converges
             # more reliably than concatenating the generic generation prompt, a
             # contract analysis, the rejected candidate, and a second long final
             # directive. The unchanged validator remains the acceptance boundary.
-            if not stagnating:
+            if not clean_room:
                 prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
             prompt += _model_authored_final_repair_directive(request, errors)
         else:
             prompt += self._contract_analysis_suffix(request)
-            prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+            if not clean_room:
+                prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
             prompt += _model_authored_final_repair_directive(request, errors)
         system = (
             "You synthesize a clean-room deterministic Python helper replacement. "
             "Do not reproduce the omitted rejected implementation. Return valid "
             "JSON only."
-            if _request_is_validation_abstention_helper(request) and stagnating
+            if clean_room
             else "You repair rejected deterministic Python helper tools. Return valid "
             "JSON only."
         )
@@ -752,6 +759,21 @@ MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL: dict[str, tuple[str, ...]] = {
         "contact_lookup",
         "side_effect_guard",
     ),
+    "assess_contact_removal_readiness": (
+        "contact_removal_readiness",
+        "contact_lookup",
+        "contact_side_effect_guard",
+    ),
+    "assess_message_recipient_readiness": (
+        "message_recipient_readiness",
+        "named_message_recipient",
+        "message_side_effect_guard",
+    ),
+    "assess_temporal_request_readiness": (
+        "temporal_readiness",
+        "relative_time",
+        "current_time_guard",
+    ),
     "extract_service_answer_field": (
         "service_answer_extraction",
         "convert_currency",
@@ -846,6 +868,21 @@ MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL: dict[str, tuple[str, ...]] = {
         "search_reminder",
         "search_messages",
         "get_current_timestamp",
+    ),
+    "assess_contact_removal_readiness": (
+        "search_contacts",
+        "remove_contact",
+    ),
+    "assess_message_recipient_readiness": (
+        "search_contacts",
+        "send_message_with_phone_number",
+    ),
+    "assess_temporal_request_readiness": (
+        "get_current_timestamp",
+        "search_holiday",
+        "search_messages",
+        "search_reminder",
+        "timestamp_diff",
     ),
     "extract_service_answer_field": (
         "search_location_around_lat_lon",
@@ -1717,6 +1754,7 @@ def _validation_helper_repair_payload(
     """Build the compact public CEGIS payload used by both repair stages."""
 
     stagnating = "repair_stagnation_duplicate_candidate" in errors
+    clean_room = stagnating or "repair_independent_clean_room_candidate" in errors
     return {
         "required_tool_name": request.suggested_tool_name
         or rejected_tool.spec.tool_name,
@@ -1735,14 +1773,18 @@ def _validation_helper_repair_payload(
             errors,
         ),
         "repair_mode": (
-            "clean_room_after_duplicate" if stagnating else "incremental_cegis"
+            "clean_room_after_duplicate"
+            if stagnating
+            else "independent_clean_room"
+            if clean_room
+            else "incremental_cegis"
         ),
         "repair_strategy": strategy_number,
-        # Once both code and validation frontier repeat, showing the same source
-        # again anchors a deterministic model to the failed predicates. The exact
-        # omitted candidate remains preserved in the append-only repair journal.
+        # A clean-room attempt deliberately omits the source implementation so the
+        # model is not anchored to already-rejected control flow. The exact omitted
+        # candidate remains preserved in the append-only repair journal.
         "current_candidate": (
-            None if stagnating else _minimal_validation_helper_candidate(rejected_tool)
+            None if clean_room else _minimal_validation_helper_candidate(rejected_tool)
         ),
     }
 
@@ -1806,15 +1848,31 @@ def _model_authored_validation_helper_repair_prompt(
         errors,
         strategy_number=strategy_number,
     )
-    clean_room = payload["repair_mode"] == "clean_room_after_duplicate"
-    return (
-        (
+    if payload["repair_mode"] == "clean_room_after_duplicate":
+        opening = (
             "Synthesize a clean-room replacement for a stagnating pure deterministic "
             "validation helper. The repeated implementation is intentionally omitted; "
             "derive new control flow only from the model-visible public contract. "
-            if clean_room
-            else "Repair one rejected pure deterministic validation helper. "
         )
+    elif payload["repair_mode"] == "independent_clean_room":
+        opening = (
+            "Synthesize an independent clean-room replacement for a rejected pure "
+            "deterministic validation helper. The rejected implementation is "
+            "intentionally omitted; derive new control flow only from the "
+            "model-visible public contract. "
+        )
+    else:
+        opening = "Repair one rejected pure deterministic validation helper. "
+    analysis_transition = (
+        "Use only this public payload and the final binding directive; no "
+        "code-specific plan or prior implementation is supplied. "
+        if payload["repair_mode"]
+        in {"clean_room_after_duplicate", "independent_clean_room"}
+        else "A separate code-specific decision plan follows this payload and must "
+        "guide the replacement. "
+    )
+    return (
+        opening
         + "Resolve the focused public failure first, then replay every model-visible "
         "public case as a regression check. Return exactly "
         "one JSON object with top-level keys spec and code_lines; do not return a "
@@ -1837,9 +1895,9 @@ def _model_authored_validation_helper_repair_prompt(
         "calls for a clean implementation. Generalize predicates across task "
         "families; never branch on a complete example object or copy a visible "
         "example literal into code. Hidden and blind cases remain validation-only. "
-        "A separate code-specific decision plan follows this payload and must guide "
-        "the replacement, while the public cases and interface remain authoritative. "
-        "Public repair payload: " + json.dumps(payload, sort_keys=True)
+        + analysis_transition
+        + "The public cases and interface remain authoritative. Public repair payload: "
+        + json.dumps(payload, sort_keys=True)
     )
 
 
@@ -2024,6 +2082,20 @@ def _model_authored_final_repair_directive(
             if named_recipient_prerequisite_is_public
             else ""
         )
+        contact_readiness_rule = (
+            " PUBLIC CONTACT-REMOVAL-READINESS RULE: contact_lookup_available and "
+            "contact_removal_available are host-grounded booleans for the routed "
+            "native inventory. Never infer or override them. This helper handles "
+            "contact removal before contact-record resolution. Every case requires "
+            "contact_removal followed by contact_lookup; target_identifier is an "
+            "unresolved user-facing name or phone number, never a database record "
+            "id. Compute missing capabilities from the corresponding booleans. "
+            "After the missing-capability branch, a blank target must abstain for "
+            "both contact update and contact removal, and more than one visible "
+            "record for a non-UUID target must abstain as ambiguous. "
+            if request.suggested_tool_name == "assess_contact_removal_readiness"
+            else ""
+        )
         relative_time_exception_is_public = all(
             token in public_observation
             for token in (
@@ -2050,6 +2122,15 @@ def _model_authored_final_repair_directive(
             "replace its failing predicate or decision structure with substantively "
             "different general logic. "
             if "repair_stagnation_duplicate_candidate" in errors
+            else ""
+        )
+        independent_clean_room_rule = (
+            " INDEPENDENT CLEAN-ROOM RULE: every ordinary candidate for this "
+            "public frontier was rejected. The previous implementation is omitted "
+            "intentionally. Derive a fresh compact decision procedure from the "
+            "complete model-visible public case table, and mentally replay every "
+            "listed case before returning one complete implementation. "
+            if "repair_independent_clean_room_candidate" in errors
             else ""
         )
         strategy_number = next(
@@ -2089,9 +2170,8 @@ def _model_authored_final_repair_directive(
                 "each precedence gate once using normalized semantic values."
             ),
             7: (
-                "Author an independent final implementation from the public cases "
-                "and invariants; do not copy a branch that still appears in the "
-                "validator feedback."
+                "Make the smallest general change that resolves the focused public "
+                "case while preserving every public regression case already passing."
             ),
         }.get(strategy_number, "Rewrite from the complete public contract.")
         focused_public_failure = _validation_helper_public_failure_focus(
@@ -2179,8 +2259,10 @@ def _model_authored_final_repair_directive(
             "do not embed task ids, scenario names, benchmark answers, contact names, "
             "phone numbers, dates, or other example-specific constants in code. "
             + named_recipient_rule
+            + contact_readiness_rule
             + relative_time_rule
             + stagnation_rule
+            + independent_clean_room_rule
             + "REPAIR STRATEGY "
             + str(strategy_number)
             + ": "
@@ -2530,6 +2612,35 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "A blank target_identifier is valid for a read-only relative_time_search and must not by itself cause abstention.",
             "The function must never return should_abstain false when the action would require guessing a phone number, person_id, reminder_id, current location, or missing search result.",
         )
+    if request.suggested_tool_name == "assess_contact_removal_readiness":
+        return (
+            "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
+            "Treat contact_lookup_available and contact_removal_available as authoritative host-grounded booleans describing the routed native inventory. Never derive or change them from user_request.",
+            "This helper applies only to contact removal before record resolution. Ignore user_request and requested_action when constructing requirements and always set required_original_tools to contact_removal followed by contact_lookup.",
+            "Treat target_identifier as an unresolved user-facing name or phone number, never as an already-resolved database record id. Both required capabilities remain required when the target is blank or visible_records_count is nonzero.",
+            "Compute missing capabilities from the two matching availability booleans. Missing capabilities take priority over blank-target and ambiguity checks; a missing contact_lookup must recommend: 'I need contact lookup before I can safely complete this contact removal.'",
+            "On every abstention set safe_next_action to ask_user_or_abstain. A blank target with no missing capability uses missing_target_identifier; more than one visible record with no missing capability uses ambiguous_target.",
+            "Only when capabilities, target, and uniqueness are ready may should_abstain be false, missing_information and abstain_reason be empty, safe_next_action be continue_with_original_tool, and final_answer_recommendation be empty.",
+            "Never call a native tool and never guess or manufacture a contact identifier.",
+        )
+    if request.suggested_tool_name == "assess_message_recipient_readiness":
+        return (
+            "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
+            "Treat a string capability input as one item. Normalize search_contacts to contact_lookup and send_message_with_phone_number to message_send while preserving first-seen order and removing duplicates.",
+            "Every message-send action requires message_send. A nonblank recipient that is not a concrete phone number also requires contact_lookup; append inferred requirements before computing missing capabilities.",
+            "A missing capability takes priority over blank-recipient and ambiguity checks. Missing contact_lookup for a named recipient must recommend that the recipient cannot be resolved to a phone number because contact lookup is unavailable.",
+            "On abstention set safe_next_action to ask_user_or_abstain. Otherwise return continue_with_original_tool with empty missing_information, recommendation, and abstain_reason.",
+            "Never search contacts, send a message, or invent a recipient phone number.",
+        )
+    if request.suggested_tool_name == "assess_temporal_request_readiness":
+        return (
+            "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
+            "Treat a string capability input as one item. Normalize get_current_timestamp to current_time, search_messages to message_lookup, search_reminder to reminder_lookup, and search_holiday to holiday_lookup while preserving first-seen order and removing duplicates.",
+            "If user_request contains a relative current-time anchor such as yesterday, today, tomorrow, upcoming, later, or next and contains no explicit absolute date, append current_time before computing missing capabilities.",
+            "A read-only temporal request may have a blank target_identifier. Never use the generic missing-target branch for that blank value.",
+            "When current_time is missing, abstain with missing_required_original_tool, safe_next_action ask_user_or_abstain, and the public recommendation requesting current date/time or an explicit date. Otherwise report any other missing required capability without inventing data.",
+            "When all requirements are available, return continue_with_original_tool with empty missing_information, recommendation, and abstain_reason. Never read the clock, search, mutate state, or invent a timestamp.",
+        )
     if request.suggested_tool_name == "prepare_upcoming_reminder_search_args":
         return (
             "Return exactly target_tool_name, search_kwargs, should_call_search, and abstain_reason on every branch.",
@@ -2865,6 +2976,13 @@ def _model_authored_repair_prompt(
     errors = tuple(
         error for error in errors if not error.startswith("repair_strategy:")
     )
+    clean_room_requested = any(
+        marker in errors
+        for marker in (
+            "repair_stagnation_duplicate_candidate",
+            "repair_independent_clean_room_candidate",
+        )
+    )
     if _request_is_validation_abstention_helper(request):
         return _model_authored_validation_helper_repair_prompt(
             request,
@@ -2901,7 +3019,7 @@ def _model_authored_repair_prompt(
         or error.startswith("undefined_name:")
         for error in errors
     )
-    force_rewrite = request.suggested_tool_name in {
+    force_rewrite = clean_room_requested or request.suggested_tool_name in {
         "prepare_location_search_args",
         "prepare_specific_location_search_args",
         "prepare_broad_location_search_args",
@@ -3406,6 +3524,23 @@ def _model_authored_repair_prompt(
         if request.suggested_tool_name == "prepare_direct_contact_action_args"
         else ""
     )
+    readiness_guidance = (
+        "For assess_contact_removal_readiness repairs, use one ordered decision "
+        "procedure rather than independent special cases. Treat the two "
+        "*_available inputs as authoritative host-grounded booleans. This helper "
+        "is removal-only and runs before record resolution: start every branch with "
+        "required_original_tools equal to ['contact_removal', 'contact_lookup'] and "
+        "do not infer the action from text or treat the user-facing target as a "
+        "database id. Compute "
+        "all missing capabilities from the matching booleans next. Branch in this "
+        "order: missing capability, blank target, multiple matches, then safe "
+        "continue. Every branch must return all six public output fields. Preserve "
+        "the normalized required capability order. Recommendations must state the "
+        "missing fact and a need/cannot/required deficit; copy the exact public "
+        "example wording where an exact expected object is shown. "
+        if request.suggested_tool_name == "assess_contact_removal_readiness"
+        else ""
+    )
     location_arg_guidance = (
         "For prepare_specific_location_search_args repairs, do not use missing "
         "reminder time as an abstention gate. This generated tool only prepares "
@@ -3528,6 +3663,7 @@ def _model_authored_repair_prompt(
         + status_lookup_guidance
         + relationship_batch_guidance
         + direct_contact_guidance
+        + readiness_guidance
         + location_arg_guidance
         + broad_location_arg_guidance
         + service_extraction_guidance
@@ -4366,6 +4502,24 @@ def _model_authored_optional_input_default(
             "user_request": "",
         },
         "prepare_safe_action_or_abstain": {
+            "target_identifier": "",
+            "required_original_tools": [],
+            "available_original_tools": [],
+            "visible_records_count": 0,
+        },
+        "assess_contact_removal_readiness": {
+            "target_identifier": "",
+            "contact_lookup_available": False,
+            "contact_removal_available": False,
+            "visible_records_count": 0,
+        },
+        "assess_message_recipient_readiness": {
+            "target_identifier": "",
+            "required_original_tools": [],
+            "available_original_tools": [],
+            "visible_records_count": 0,
+        },
+        "assess_temporal_request_readiness": {
             "target_identifier": "",
             "required_original_tools": [],
             "available_original_tools": [],

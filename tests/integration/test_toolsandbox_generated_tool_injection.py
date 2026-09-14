@@ -3,6 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import sage_ts.adapters.openai_toolsandbox_roles as toolsandbox_roles
 import sage_ts.runtime.toolsandbox_integration as toolsandbox_integration
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
@@ -39,6 +40,7 @@ from tool_sandbox.common.tool_conversion import (
     convert_to_openai_tools,
 )
 from tool_sandbox.roles.execution_environment import respond_to_single_message
+from tool_sandbox.tools.messaging import send_message_with_phone_number
 
 
 def test_chained_payload_expands_only_an_exact_visible_subset(monkeypatch) -> None:
@@ -129,6 +131,133 @@ def test_derived_tool_openai_schema_exposes_declared_producer() -> None:
         function["parameters"]["properties"]["service_payload"]["description"]
         == "Visible weather payload. Visible keys: current_temperature."
     )
+
+
+def test_safe_helper_real_conversion_supports_policy_grounding_and_result() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    fixture = json.loads(
+        (
+            repository_root
+            / "docs/sage_protocol/fixtures/historical_faulty_safe_action_registry.json"
+        ).read_text(encoding="utf-8")
+    )
+    entry = RegistryEntry.from_json(fixture["tools"]["prepare_safe_action_or_abstain"])
+    compiled = compile_toolsandbox_tool(entry)
+
+    with new_context(ExecutionContext()):
+        helper_schema = convert_to_openai_tool(compiled)
+        message_schema = convert_to_openai_tool(send_message_with_phone_number)
+    schemas = [helper_schema, message_schema]
+
+    # This is the same callable -> ToolSandbox -> OpenAI conversion used live.
+    assert helper_schema["function"]["output_schema"] == entry.tool.spec.output_schema
+    assert "output_schema" not in message_schema["function"]
+    assert toolsandbox_roles._validation_abstention_tool_names(schemas) == {
+        entry.tool.spec.tool_name
+    }
+    adoption_policy = toolsandbox_roles._safe_abstention_helper_actor_policy_message(
+        [{"role": "user", "content": "Text Pat that dinner is at seven."}],
+        schemas,
+    )
+    assert adoption_policy is not None
+    assert (
+        toolsandbox_roles.SAFE_ABSTENTION_HELPER_POLICY_SENTINEL
+        in (adoption_policy["content"])
+    )
+
+    completion = toolsandbox_roles.ChatCompletion.model_validate(
+        {
+            "id": "real-converted-safe-helper",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": entry.tool.spec.tool_name,
+                                    "arguments": json.dumps(
+                                        {
+                                            "user_request": (
+                                                "Text Pat that dinner is at seven."
+                                            ),
+                                            "requested_action": "message_send",
+                                            "target_identifier": "Pat",
+                                            "required_original_tools": [
+                                                "contact_lookup",
+                                                "message_send",
+                                            ],
+                                            "available_original_tools": [
+                                                "invented_lookup"
+                                            ],
+                                            "visible_records_count": 0,
+                                        }
+                                    ),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "created": 0,
+            "model": "gpt-4o-mini",
+            "object": "chat.completion",
+        }
+    )
+    grounded = toolsandbox_roles._ground_safe_abstention_available_tools(
+        completion,
+        schemas,
+    )
+    tool_call = grounded.choices[0].message.tool_calls[0]
+    arguments = json.loads(tool_call.function.arguments)
+    assert arguments["available_original_tools"] == ["message_send"]
+
+    with new_context(ExecutionContext()):
+        result = compiled(**arguments)
+    assert result["should_abstain"] is True
+    assert result["missing_information"] == ["contact_lookup"]
+
+    result_policy = toolsandbox_roles._safe_abstention_helper_actor_policy_message(
+        [
+            {"role": "user", "content": "Text Pat that dinner is at seven."},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments,
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "name": entry.tool.spec.tool_name,
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result),
+            },
+        ],
+        schemas,
+    )
+    assert result_policy is not None
+    assert (
+        toolsandbox_roles.SAFE_ABSTENTION_RESULT_POLICY_SENTINEL
+        in (result_policy["content"])
+    )
+    assert result["final_answer_recommendation"] in result_policy["content"]
+
+    request_schemas = toolsandbox_roles._tools_for_openai_request(schemas)
+    assert all("output_schema" not in schema["function"] for schema in request_schemas)
+    assert "output_schema" in helper_schema["function"]
 
 
 def canonicalizer_tool() -> GeneratedTool:

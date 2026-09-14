@@ -1,0 +1,128 @@
+{
+  "manifest_type": "development_diagnostic_lifecycle_retirement_successor_transfer_dev30",
+  "lifecycle_evidence_mode": "frozen_retired_source_and_successor_registry_transfer",
+  "scenario_order_sha256": "4ab88c1b5c110b0681eb64763f8ca7870fba8b23271a980edf02d40a8424c39f",
+  "strategy": "Development-only disjoint frozen transfer of the exact retired source and validated successor registry produced by a passing retirement-successor dev10. Generation and lifecycle mutation are disabled. This is not a publication sample or unseen test set.",
+  "preserved_working_tool_provenance": {
+    "claim_boundary": "two historically successful generated tools preserved on overlapping reminder routes and a disjoint transfer cohort",
+    "source_artifact": "artifacts/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action_registry/registry_manifest.json",
+    "source_registry_sha256": "5fe8323c69cb17b3c0e45f3ccf2bc3708583ab9d01a48e5ca2d4b5082686d653",
+    "tools": {
+      "relative_day_time_to_timestamp": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab",
+        "public_spec_sha256": "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95",
+        "source_entry_sha256": "34a186250638fe21c62dde6baef1af34381f9ce0d867e1e41f97d84362edbd0b"
+      },
+      "prepare_reminder_creation_args": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292",
+        "public_spec_sha256": "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765",
+        "source_entry_sha256": "68ed674b51cd5b434417be9f5c727b8c65d2dd7b032c78bee5a4567be33179a9"
+      }
+    }
+  },
+  "working_path_evidence": {
+    "artifact": "docs/sage_protocol/fixtures/paper_rep01_working_path_evidence.json",
+    "sha256": "840dcfeacd00dadea8e2ea54676326b51f12457af66317eef3e30ef5837d8a3f"
+  },
+  "predeclared_gates": {
+    "exact_retired_source_and_promoted_successor_registry_transfer": {"required": true},
+    "registry_unchanged_after_transfer": {"required": true},
+    "exact_validated_successor_set": {
+      "tools": {
+        "assess_contact_removal_readiness": {
+          "canonical_key": "validation:assess_contact_removal_readiness",
+          "version": 1,
+          "role": "successor_confirmation",
+          "minimum_visible_and_called": 8,
+          "minimum_exact_successes": 8,
+          "minimum_success_flips": 1
+        }
+      },
+      "exact_new_validation_successor_set": true
+    },
+    "working_generated_overlap_visible_called_exact_failure_free": {
+      "role": "working_generated_overlap",
+      "expected_tool_paths": {
+        "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+        "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools": ["next_weekday_time_to_timestamp", "prepare_reminder_creation_args"]
+      },
+      "preserved_tools_exercised_across_cohort": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+      "successor_contracts": {"next_weekday_time_to_timestamp": "canonicalizer:next_weekday_time_to_timestamp"},
+      "minimum": 2,
+      "total": 2
+    },
+    "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {"role": "unrelated_native_preservation", "minimum": 2, "total": 2},
+    "working_generated_entries_unchanged": {"required": true},
+    "overall_exact_outcomes": {"minimum": 12, "total": 30}
+  },
+  "validation_roles": {
+    "successor_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"
+    ],
+    "contact_repair_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"
+    ],
+    "working_generated_overlap": [
+      "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled",
+      "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"
+    ],
+    "unrelated_native_preservation": [
+      "search_phone_number_with_name_10_distraction_tools",
+      "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled"
+    ]
+  },
+  "splits": {
+    "transfer_30": [
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_alt_all_tools"},
+      {"name": "find_days_till_holiday_insufficient_information_10_distraction_tools"},
+      {"name": "find_days_till_holiday_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "find_days_till_holiday_insufficient_information"},
+      {"name": "find_days_till_holiday_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_10_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_remove_contact_insufficient_information_all_tools"},
+      {"name": "modify_contact_with_message_recency_insufficient_information_10_distraction_tools"},
+      {"name": "modify_contact_with_message_recency_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_10_distraction_tools"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "search_reminder_with_creation_recency_yesterday_insufficient_information_implicit"},
+      {"name": "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled"},
+      {"name": "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools"},
+      {"name": "search_phone_number_with_name_10_distraction_tools"},
+      {"name": "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled"}
+    ]
+  }
+}

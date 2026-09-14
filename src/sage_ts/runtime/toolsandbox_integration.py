@@ -8,6 +8,7 @@ import inspect
 import json
 import re
 from collections.abc import Iterable, Mapping, MutableMapping
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Literal, cast
 
@@ -41,6 +42,40 @@ from tool_sandbox.common.utils import add_tool_trace
 
 tool_conversion.PYTHON_TO_JSON_TYPES.setdefault("dict", "object")
 tool_conversion.PYTHON_TO_JSON_TYPES.setdefault("list", "array")
+
+
+def _install_generated_output_schema_conversion() -> None:
+    """Expose validated generated-tool outputs to SAGE's actor policy.
+
+    ToolSandbox's public OpenAI converter describes callable inputs but omits
+    return schemas.  SAGE needs the registry's validated public output contract
+    to recognize generated helper families and ground their calls.  Keep the
+    augmentation attached to the compiled generated callable so native
+    ToolSandbox schemas are unchanged.
+    """
+
+    converter = tool_conversion.convert_python_function_to_openai_function
+    if getattr(converter, "_sage_generated_output_schema_aware", False):
+        return
+
+    @wraps(converter)
+    def convert_with_generated_output_schema(
+        name: str,
+        function: Callable[..., Any],
+    ) -> dict[str, Any]:
+        function_schema = cast(dict[str, Any], converter(name, function))
+        output_schema = getattr(function, "sage_public_output_schema", None)
+        if isinstance(output_schema, Mapping):
+            function_schema["output_schema"] = copy.deepcopy(dict(output_schema))
+        return function_schema
+
+    convert_with_generated_output_schema._sage_generated_output_schema_aware = True  # type: ignore[attr-defined]
+    tool_conversion.convert_python_function_to_openai_function = (
+        convert_with_generated_output_schema
+    )
+
+
+_install_generated_output_schema_conversion()
 
 PYTHON_TYPES: dict[str, Any] = {
     "str": str,
@@ -1250,6 +1285,9 @@ def _compile_toolsandbox_tool(
     fn.sage_native_action_delegation = native_action_tool_enabled(entry.tool)  # type: ignore[attr-defined]
     fn.sage_native_action_names = native_action_names  # type: ignore[attr-defined]
     fn.sage_generated_input_domains = finite_string_domains  # type: ignore[attr-defined]
+    fn.sage_public_output_schema = copy.deepcopy(  # type: ignore[attr-defined]
+        entry.tool.spec.output_schema
+    )
 
     # Set ToolSandbox tool metadata directly — avoids the register_as_tool
     # decorator which wraps the function with new_context_with_attribute, a
@@ -1370,6 +1408,9 @@ VISIBLE_CONTEXT_TOOL_SIGNALS: dict[str, tuple[str, ...]] = {
         "insufficient_information",
         "safe_abstain_needed",
     ),
+    "assess_contact_removal_readiness": ("contact_action_readiness_gap",),
+    "assess_message_recipient_readiness": ("message_recipient_readiness_gap",),
+    "assess_temporal_request_readiness": ("temporal_request_readiness_gap",),
     "plan_device_status_lookup": ("device_status_read",),
     "plan_device_state_action_sequence_v3": (
         "device_state_action",
@@ -1708,6 +1749,17 @@ def _visible_context_route_decision(
         request_part = context.split(" tools=", 1)[0]
         signal_part = context.split(" signals=", 1)[1]
         match_context = f"{request_part} signals={signal_part}"
+    if (
+        tool_name == "assess_contact_removal_readiness"
+        and "requested_remove_contact" not in match_context
+    ):
+        return RuntimeRoutingDecision(
+            tool_name,
+            False,
+            "hidden",
+            "contact_removal_readiness_requires_removal_intent",
+            -50,
+        )
     matched_negative = tuple(
         token
         for token in spec.negative_triggers
@@ -1969,7 +2021,6 @@ def _visible_context_route_decision(
             or "safe_abstain_needed" in match_context
         )
         and (spec.preserves_side_effect_tools or spec.required_original_tool_calls)
-        and tool_name != "prepare_safe_action_or_abstain"
         and not (
             tool_name == "prepare_direct_contact_action_args"
             and "direct_contact_action" in match_context
@@ -2155,6 +2206,7 @@ def route_registry_entries(
     generic_hard_blocks = {
         "blocked_by_negative_trigger",
         "blocked_by_visible_not_called_adoption_risk",
+        "contact_removal_readiness_requires_removal_intent",
         "recency_action_selector_requires_recency_action_task",
         "side_effect_selector_suppressed_for_insufficient_information",
         "side_effect_composite_suppressed_for_insufficient_information",

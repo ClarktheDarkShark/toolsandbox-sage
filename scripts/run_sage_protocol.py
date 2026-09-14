@@ -102,10 +102,21 @@ MATCHED_CONTROL_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
 MATCHED_CANDIDATE_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
 MATCHED_CONTROL_CONDITION = "matched_policy_wrapper_without_generated_tools"
 LIFECYCLE_USE_CASE_TOOL = "prepare_safe_action_or_abstain"
+RETIRE_REPLACE_DEV10_MANIFEST_TYPE = (
+    "development_diagnostic_lifecycle_retirement_successor_dev10"
+)
+RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE = (
+    "development_diagnostic_lifecycle_retirement_successor_transfer_dev30"
+)
+CONTACT_REMOVAL_READINESS_SUCCESSOR = "assess_contact_removal_readiness"
+CONTACT_REMOVAL_READINESS_SUCCESSOR_CANONICAL_KEY = (
+    "validation:assess_contact_removal_readiness"
+)
 LIFECYCLE_DEVELOPMENT_MANIFEST_TYPES = frozenset(
     {
         "development_diagnostic_lifecycle_repair_dev10",
         "development_diagnostic_lifecycle_repair_dev30",
+        RETIRE_REPLACE_DEV10_MANIFEST_TYPE,
     }
 )
 PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256 = (
@@ -942,6 +953,51 @@ def _inventory_sha256(inventory: list[dict[str, Any]]) -> str:
     ).hexdigest()
 
 
+def _registry_tool_identity(
+    registry_dir: Path,
+    *,
+    tool_name: str,
+) -> dict[str, Any] | None:
+    """Return the immutable public identity of one registry entry."""
+
+    manifest_path = registry_dir / "registry_manifest.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    tools = manifest.get("tools") if isinstance(manifest, dict) else None
+    entry = tools.get(tool_name) if isinstance(tools, dict) else None
+    tool = entry.get("tool") if isinstance(entry, dict) else None
+    spec = tool.get("spec") if isinstance(tool, dict) else None
+    code = tool.get("code") if isinstance(tool, dict) else None
+    version = entry.get("version") if isinstance(entry, dict) else None
+    retired = entry.get("retired") if isinstance(entry, dict) else None
+    stored_code_hash = entry.get("code_hash") if isinstance(entry, dict) else None
+    if (
+        not isinstance(spec, dict)
+        or spec.get("tool_name") != tool_name
+        or not isinstance(code, str)
+        or isinstance(version, bool)
+        or not isinstance(version, int)
+        or version < 1
+        or not isinstance(retired, bool)
+        or not isinstance(stored_code_hash, str)
+        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_code_hash
+    ):
+        return None
+    return {
+        "tool_name": tool_name,
+        "version": version,
+        "retired": retired,
+        "code_hash": stored_code_hash,
+        "public_spec_sha256": hashlib.sha256(
+            json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+    }
+
+
 def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str, Any]:
     """Snapshot registry state so failed gated runs cannot contaminate follow-ups."""
     gate_dir = run_root / "registry_gate"
@@ -1173,6 +1229,7 @@ def _registry_transfer_provenance(
     source_run_root: Path,
     installed_registry_dir: Path,
     installed_snapshot: dict[str, Any],
+    destination_manifest_type: str,
 ) -> dict[str, Any]:
     """Fail before model calls unless an exact passing dev10 registry was installed."""
 
@@ -1185,10 +1242,17 @@ def _registry_transfer_provenance(
         )
     source_protocol = json.loads(source_protocol_path.read_text(encoding="utf-8"))
     source_report = json.loads(source_report_path.read_text(encoding="utf-8"))
+    retirement_successor_transfer = (
+        destination_manifest_type == RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE
+    )
+    expected_source_manifest_type = (
+        RETIRE_REPLACE_DEV10_MANIFEST_TYPE
+        if retirement_successor_transfer
+        else "development_diagnostic_lifecycle_repair_dev10"
+    )
     if (
         source_report.get("status") != "pass"
-        or source_report.get("manifest_type")
-        != "development_diagnostic_lifecycle_repair_dev10"
+        or source_report.get("manifest_type") != expected_source_manifest_type
         or source_report.get("expected_tasks") != 10
     ):
         raise ValueError("Frozen lifecycle transfer requires a passing dev10 report.")
@@ -1218,25 +1282,33 @@ def _registry_transfer_provenance(
         != source_manifest_sha256
     ):
         raise ValueError("Source dev10 registry no longer matches its protocol digest.")
-    source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
-    tools = source_manifest.get("tools") if isinstance(source_manifest, dict) else None
-    entry = (
-        tools.get("prepare_safe_action_or_abstain") if isinstance(tools, dict) else None
+    source_identity = _registry_tool_identity(
+        source_registry_dir,
+        tool_name=LIFECYCLE_USE_CASE_TOOL,
     )
-    tool = entry.get("tool") if isinstance(entry, dict) else None
-    spec = tool.get("spec") if isinstance(tool, dict) else None
-    code = tool.get("code") if isinstance(tool, dict) else None
-    stored_code_hash = entry.get("code_hash") if isinstance(entry, dict) else None
-    if (
-        not isinstance(entry, dict)
-        or entry.get("retired") is not False
-        or not isinstance(entry.get("version"), int)
-        or isinstance(entry.get("version"), bool)
-        or int(entry["version"]) < 2
-        or not isinstance(spec, dict)
-        or not isinstance(code, str)
-        or not isinstance(stored_code_hash, str)
-        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_code_hash
+    successor_identities: dict[str, dict[str, Any]] = {}
+    if retirement_successor_transfer:
+        successor_identity = _registry_tool_identity(
+            source_registry_dir,
+            tool_name=CONTACT_REMOVAL_READINESS_SUCCESSOR,
+        )
+        if (
+            not isinstance(source_identity, dict)
+            or source_identity.get("version") != 1
+            or source_identity.get("retired") is not True
+            or not isinstance(successor_identity, dict)
+            or successor_identity.get("version") != 1
+            or successor_identity.get("retired") is not False
+        ):
+            raise ValueError(
+                "Passing dev10 source does not contain the exact retired source "
+                "and active validated successor."
+            )
+        successor_identities[CONTACT_REMOVAL_READINESS_SUCCESSOR] = successor_identity
+    elif (
+        not isinstance(source_identity, dict)
+        or source_identity.get("retired") is not False
+        or int(source_identity.get("version") or 0) < 2
     ):
         raise ValueError(
             "Passing dev10 source does not contain a valid active repaired helper."
@@ -1265,10 +1337,7 @@ def _registry_transfer_provenance(
         raise ValueError(
             "Installed transfer validation-contract bindings are not byte-identical."
         )
-    spec_sha256 = hashlib.sha256(
-        json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-    return {
+    provenance = {
         "mode": "frozen_promoted_registry_transfer",
         "source_run_root": str(source_run_root),
         "source_protocol_path": str(source_protocol_path),
@@ -1280,19 +1349,43 @@ def _registry_transfer_provenance(
         "source_registry_inventory_sha256": source_inventory_sha256,
         "installed_registry_dir": str(installed_registry_dir.resolve()),
         "installed_registry_inventory_sha256": source_inventory_sha256,
-        "target_tool": {
-            "tool_name": "prepare_safe_action_or_abstain",
-            "version": entry["version"],
-            "retired": False,
-            "code_hash": stored_code_hash,
-            "public_spec_sha256": spec_sha256,
-        },
-        "target_validation_contract": {
-            key: source_contracts[LIFECYCLE_USE_CASE_TOOL][key]
-            for key in sorted(contract_identity_keys)
-        },
         "validation_contract_bindings": source_contract_identities,
     }
+    if retirement_successor_transfer:
+        successor_contracts = {
+            tool_name: {
+                key: source_contracts[tool_name][key]
+                for key in sorted(contract_identity_keys)
+            }
+            for tool_name in sorted(successor_identities)
+        }
+        if (
+            successor_contracts[CONTACT_REMOVAL_READINESS_SUCCESSOR].get(
+                "canonical_key"
+            )
+            != CONTACT_REMOVAL_READINESS_SUCCESSOR_CANONICAL_KEY
+        ):
+            raise ValueError(
+                "Passing dev10 source successor has the wrong validation contract."
+            )
+        provenance.update(
+            {
+                "source_tool": source_identity,
+                "successor_tools": successor_identities,
+                "successor_validation_contracts": successor_contracts,
+            }
+        )
+    else:
+        provenance.update(
+            {
+                "target_tool": source_identity,
+                "target_validation_contract": {
+                    key: source_contracts[LIFECYCLE_USE_CASE_TOOL][key]
+                    for key in sorted(contract_identity_keys)
+                },
+            }
+        )
+    return provenance
 
 
 def _restore_registry_after_failed_gate(
@@ -2264,6 +2357,7 @@ def main() -> None:
             source_run_root=args.registry_transfer_source_run,
             installed_registry_dir=registry_dir,
             installed_snapshot=registry_gate_snapshot,
+            destination_manifest_type=manifest_type,
         )
     else:
         if args.registry_transfer_source_run is not None:

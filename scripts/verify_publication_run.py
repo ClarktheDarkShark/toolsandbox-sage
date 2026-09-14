@@ -43,6 +43,7 @@ from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.online_birth import (
     REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,
     _repair_prompt_errors,
+    _validation_error_distance,
     _validation_failure_score,
     prohibited_repair_payload_paths,
 )
@@ -95,6 +96,7 @@ LIFECYCLE_METADATA_VISIBLE_THRESHOLD = 8
 LIFECYCLE_ROUTE_HARMFUL_CALL_THRESHOLD = 2
 LIFECYCLE_ROUTE_HARM_DELTA = -0.25
 LIFECYCLE_ROUTE_HELP_DELTA = 0.10
+LIFECYCLE_GLOBAL_RETIREMENT_REASON = "repeated_attributable_harm_without_helpful_route"
 LIFECYCLE_CROSS_FAMILY_EXECUTION_FAILURE = "cross_family_execution_failure"
 LIFECYCLE_CANARY_ATTRIBUTABLE_OBSERVATION_MINIMUM = 3
 LIFECYCLE_CANARY_EXACT_OUTCOME_MINIMUM = 2
@@ -585,9 +587,12 @@ def _json_values_equal(left: Any, right: Any) -> bool:
             _json_values_equal(left[key], right[key]) for key in left
         )
     if isinstance(left, list) and isinstance(right, list):
+        # The explicit length check is the strictness guarantee.  Avoid
+        # ``zip(strict=True)`` so legacy development fixtures can still be
+        # verified under their Python 3.9 test environment.
         return len(left) == len(right) and all(
             _json_values_equal(left_item, right_item)
-            for left_item, right_item in zip(left, right, strict=True)
+            for left_item, right_item in zip(left, right)
         )
     return type(left) is type(right) and left == right
 
@@ -879,15 +884,18 @@ _LIFECYCLE_SELECTION_FIELDS = (
 )
 _SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 _REPAIR_CANDIDATE_ARTIFACT_FILENAME = "post_deployment_repair_candidates.jsonl"
-_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION = 2
+_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION = 3
 _REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION = 1
+_REPAIR_CANDIDATE_ARTIFACT_BEST_STATE_SCHEMA_VERSION = 2
 _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS = frozenset(
     {
         _REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION,
+        _REPAIR_CANDIDATE_ARTIFACT_BEST_STATE_SCHEMA_VERSION,
         _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION,
     }
 )
-_REPAIR_CANDIDATE_RECORD_KEYS = {
+_REPAIR_CANDIDATE_ORIGINS = frozenset({"ordinary", "clean_room"})
+_REPAIR_CANDIDATE_RECORD_KEYS_V1_V2 = {
     "schema_version",
     "event",
     "request_id",
@@ -912,6 +920,17 @@ _REPAIR_CANDIDATE_RECORD_KEYS = {
     "evidence_policy",
     "record_sha256",
 }
+_REPAIR_CANDIDATE_RECORD_KEYS_BY_VERSION = {
+    _REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_RECORD_KEYS_V1_V2
+    ),
+    _REPAIR_CANDIDATE_ARTIFACT_BEST_STATE_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_RECORD_KEYS_V1_V2
+    ),
+    _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_RECORD_KEYS_V1_V2 | {"candidate_origin"}
+    ),
+}
 _REPAIR_CANDIDATE_VALIDATION_KEYS = {
     "available",
     "accepted",
@@ -924,7 +943,7 @@ _REPAIR_CANDIDATE_VALIDATION_KEYS = {
     "sanitized_frontier_count",
     "raw_validation_errors_persisted",
 }
-_REPAIR_CANDIDATE_REFERENCE_KEYS = {
+_REPAIR_CANDIDATE_REFERENCE_KEYS_V1_V2 = {
     "candidate_index",
     "candidate_code_hash",
     "accepted",
@@ -935,6 +954,25 @@ _REPAIR_CANDIDATE_REFERENCE_KEYS = {
     "candidate_artifact_schema_version",
     "candidate_artifact_record_sha256",
 }
+_REPAIR_CANDIDATE_REFERENCE_KEYS_BY_VERSION = {
+    _REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_REFERENCE_KEYS_V1_V2
+    ),
+    _REPAIR_CANDIDATE_ARTIFACT_BEST_STATE_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_REFERENCE_KEYS_V1_V2
+    ),
+    _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION: (
+        _REPAIR_CANDIDATE_REFERENCE_KEYS_V1_V2
+        | {
+            "candidate_origin",
+            "focused_public_case_failed",
+            "public_failed_case_count",
+            "public_validation_score",
+            "regressed_public_case_count",
+        }
+    ),
+}
+_REPAIR_PUBLIC_CASE_LABEL_PATTERN = re.compile(r"^((?:source|negative)_\d+)_")
 
 
 class _RepairCandidateArtifactVerificationError(ValueError):
@@ -1207,7 +1245,7 @@ def _verified_repair_source_bindings(
 def _verified_repair_source_state(
     candidate_dir: Path,
     identity: tuple[int, str, int, str, str, str],
-) -> tuple[str, tuple[str, ...], int]:
+) -> tuple[str, tuple[str, ...], int, bool]:
     """Revalidate the exact checkpointed source tool against its bound contract."""
 
     completed, tool_name, version, contract_hash, code_sha256, spec_sha256 = identity
@@ -1282,6 +1320,7 @@ def _verified_repair_source_state(
         actual_code_sha256,
         _repair_prompt_errors(source_validation.errors),
         _validation_failure_score(source_validation),
+        source_validation.accepted,
     )
 
 
@@ -1319,17 +1358,45 @@ def _repair_candidate_event_references(
             )
             item_rows = cast(list[Any], items)
             seen: set[int] = set()
+            event_schema_versions: set[int] = set()
             for item in item_rows:
+                artifact_schema_version = (
+                    item.get("candidate_artifact_schema_version")
+                    if isinstance(item, dict)
+                    else None
+                )
+                expected_reference_keys = (
+                    _REPAIR_CANDIDATE_REFERENCE_KEYS_BY_VERSION.get(
+                        artifact_schema_version
+                    )
+                    if isinstance(artifact_schema_version, int)
+                    and not isinstance(artifact_schema_version, bool)
+                    else None
+                )
                 _repair_candidate_require(
                     isinstance(item, dict)
-                    and set(item) == _REPAIR_CANDIDATE_REFERENCE_KEYS
+                    and expected_reference_keys is not None
+                    and set(item) == expected_reference_keys
                     and _nonnegative_int(item.get("candidate_index"))
                     and item["candidate_index"] not in seen
                     and _repair_candidate_reference_path_matches(
                         candidate_dir, item.get("candidate_artifact_path")
                     )
-                    and item.get("candidate_artifact_schema_version")
+                    and artifact_schema_version
                     in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
+                    and (
+                        artifact_schema_version
+                        != _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+                        or (
+                            item.get("candidate_origin") in _REPAIR_CANDIDATE_ORIGINS
+                            and isinstance(item.get("focused_public_case_failed"), bool)
+                            and _nonnegative_int(item.get("public_failed_case_count"))
+                            and _nonnegative_int(item.get("public_validation_score"))
+                            and _nonnegative_int(
+                                item.get("regressed_public_case_count")
+                            )
+                        )
+                    )
                     and all(
                         isinstance(item.get(field), str)
                         and _SHA256_HEX_PATTERN.fullmatch(item[field]) is not None
@@ -1347,6 +1414,7 @@ def _repair_candidate_event_references(
                     f"Candidate reference is malformed at protocol event {event_index}.",
                 )
                 seen.add(item["candidate_index"])
+                event_schema_versions.add(cast(int, artifact_schema_version))
                 references.append(
                     {
                         "kind": "validated",
@@ -1360,6 +1428,7 @@ def _repair_candidate_event_references(
                         "artifact_schema_version": item[
                             "candidate_artifact_schema_version"
                         ],
+                        "candidate_origin": item.get("candidate_origin"),
                         "record_sha256": item["candidate_artifact_record_sha256"],
                     }
                 )
@@ -1368,10 +1437,44 @@ def _repair_candidate_event_references(
                 "repair_candidate_artifact_event_reference_mismatch",
                 f"Selected candidate has no reference at protocol event {event_index}.",
             )
+            _repair_candidate_require(
+                len(event_schema_versions) == 1,
+                "repair_candidate_artifact_schema_invalid",
+                f"Repair attempt mixes candidate artifact schemas at event {event_index}.",
+            )
+            event_schema_version = next(iter(event_schema_versions))
+            if event_schema_version == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION:
+                _repair_candidate_require(
+                    isinstance(event.get("clean_room_fallback_requested"), bool)
+                    and _nonnegative_int(event.get("ordinary_candidate_count"))
+                    and _nonnegative_int(event.get("clean_room_candidate_count"))
+                    and event.get("selected_candidate_origin")
+                    in _REPAIR_CANDIDATE_ORIGINS
+                    and _nonnegative_int(event.get("public_validation_score"))
+                    and _nonnegative_int(event.get("best_public_validation_score"))
+                    and isinstance(
+                        event.get("best_failed_public_case_labels_before_attempt"),
+                        list,
+                    )
+                    and (
+                        event.get("focused_public_case_label") is None
+                        or (
+                            isinstance(event.get("focused_public_case_label"), str)
+                            and re.fullmatch(
+                                r"(?:source|negative)_\d+",
+                                cast(str, event["focused_public_case_label"]),
+                            )
+                            is not None
+                        )
+                    ),
+                    "repair_candidate_artifact_event_reference_mismatch",
+                    f"Repair portfolio provenance is malformed at event {event_index}.",
+                )
         elif (
             event_name == "post_deployment_tool_repair_attempt_failed"
             and event.get("stage") == "candidate_normalization_and_validation"
         ):
+            artifact_schema_version = event.get("candidate_artifact_schema_version")
             _repair_candidate_require(
                 isinstance(event.get("request_id"), str)
                 and event["request_id"]
@@ -1384,8 +1487,14 @@ def _repair_candidate_event_references(
                 and _repair_candidate_reference_path_matches(
                     candidate_dir, event.get("candidate_artifact_path")
                 )
-                and event.get("candidate_artifact_schema_version")
+                and isinstance(artifact_schema_version, int)
+                and not isinstance(artifact_schema_version, bool)
+                and artifact_schema_version
                 in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
+                and (
+                    artifact_schema_version != _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+                    or event.get("candidate_origin") in _REPAIR_CANDIDATE_ORIGINS
+                )
                 and isinstance(event.get("candidate_artifact_record_sha256"), str)
                 and _SHA256_HEX_PATTERN.fullmatch(
                     event["candidate_artifact_record_sha256"]
@@ -1405,6 +1514,7 @@ def _repair_candidate_event_references(
                     "artifact_schema_version": event[
                         "candidate_artifact_schema_version"
                     ],
+                    "candidate_origin": event.get("candidate_origin"),
                     "error_type": event["error_type"],
                     "record_sha256": event["candidate_artifact_record_sha256"],
                 }
@@ -1440,6 +1550,27 @@ _REPAIR_BEST_STATE_ACTIVATION_FIELDS = frozenset(
 )
 
 
+def _repair_public_case_labels(errors: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+    """Return ordered unique model-visible public case labels."""
+
+    labels: list[str] = []
+    for error in errors:
+        match = _REPAIR_PUBLIC_CASE_LABEL_PATTERN.match(error)
+        if match and match.group(1) not in labels:
+            labels.append(match.group(1))
+    return tuple(labels)
+
+
+def _repair_public_validation_score(errors: list[str] | tuple[str, ...]) -> int:
+    """Recompute the controller's public-only validation distance."""
+
+    return sum(
+        _validation_error_distance(error)
+        for error in errors
+        if _REPAIR_PUBLIC_CASE_LABEL_PATTERN.match(error)
+    )
+
+
 def _repair_candidate_source_identity(
     row: dict[str, Any],
 ) -> tuple[int, str, int, str, str, str]:
@@ -1461,9 +1592,27 @@ def _verified_repair_best_state_chains(
     """Authenticate each repair attempt against the preceding best candidate."""
 
     attempted_by_event: dict[int, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+    all_rows_by_attempt: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    seen_candidate_identities: set[tuple[str, int, int]] = set()
+    reference_items_by_record_hash: dict[str, dict[str, Any]] = {}
     for reference in references:
+        row = row_by_hash[cast(str, reference["record_sha256"])]
+        request_id = cast(str, reference["request_id"])
+        attempt = cast(int, reference["attempt"])
+        candidate_index = cast(int, reference["candidate_index"])
+        candidate_identity = (request_id, attempt, candidate_index)
+        _repair_candidate_require(
+            candidate_identity not in seen_candidate_identities,
+            "repair_candidate_artifact_event_reference_mismatch",
+            f"Repair candidate identity is duplicated: {candidate_identity!r}.",
+        )
+        seen_candidate_identities.add(candidate_identity)
+        all_rows_by_attempt.setdefault((request_id, attempt), []).append(row)
         if reference["kind"] != "validated":
             continue
+        reference_items_by_record_hash[cast(str, reference["record_sha256"])] = cast(
+            dict[str, Any], reference["item"]
+        )
         event_index = cast(int, reference["event_index"])
         event = cast(dict[str, Any], reference["event"])
         prior = attempted_by_event.get(event_index)
@@ -1487,7 +1636,7 @@ def _verified_repair_best_state_chains(
         )
 
     source_state_cache: dict[
-        tuple[int, str, int, str, str, str], tuple[str, tuple[str, ...], int]
+        tuple[int, str, int, str, str, str], tuple[str, tuple[str, ...], int, bool]
     ] = {}
     for request_id, attempted_events in attempts_by_request.items():
         referenced_schema_versions = {
@@ -1501,26 +1650,31 @@ def _verified_repair_best_state_chains(
             f"Repair request {request_id!r} mixes candidate artifact schemas.",
         )
         schema_version = next(iter(referenced_schema_versions))
-        chain_enabled = (
-            schema_version == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+        chain_enabled = schema_version in {
+            _REPAIR_CANDIDATE_ARTIFACT_BEST_STATE_SCHEMA_VERSION,
+            _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION,
+        } or any(
+            bool(_REPAIR_BEST_STATE_ACTIVATION_FIELDS.intersection(event))
             or any(
-                bool(_REPAIR_BEST_STATE_ACTIVATION_FIELDS.intersection(event))
-                or any(
-                    row.get("disposition") == "validator_rejected_duplicate_of_best"
-                    for row in event_rows
-                )
-                for _, event, event_rows in attempted_events
+                row.get("disposition") == "validator_rejected_duplicate_of_best"
+                for row in event_rows
             )
+            for _, event, event_rows in attempted_events
         )
         if not chain_enabled:
             # Candidate journals written before best-state evidence was introduced
             # remain verifiable under their original exact schema.
             continue
 
+        request_attempt_rows = [
+            row
+            for _, event, _ in attempted_events
+            for row in all_rows_by_attempt.get(
+                (request_id, cast(int, event["attempt"])), []
+            )
+        ]
         identities = {
-            _repair_candidate_source_identity(row)
-            for _, _, event_rows in attempted_events
-            for row in event_rows
+            _repair_candidate_source_identity(row) for row in request_attempt_rows
         }
         _repair_candidate_require(
             len(identities) == 1,
@@ -1532,7 +1686,9 @@ def _verified_repair_best_state_chains(
             source_state_cache[identity] = _verified_repair_source_state(
                 candidate_dir, identity
             )
-        best_code_hash, best_frontier, best_score = source_state_cache[identity]
+        best_code_hash, best_frontier, best_score, best_accepted = source_state_cache[
+            identity
+        ]
         prior_attempt = 0
 
         for event_index, event, event_rows in attempted_events:
@@ -1553,6 +1709,142 @@ def _verified_repair_best_state_chains(
                 f"Repair request {request_id!r} does not carry the authenticated "
                 f"best candidate into attempt {attempt}.",
             )
+            if schema_version == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION:
+                attempt_rows = all_rows_by_attempt.get((request_id, attempt), [])
+                ordinary_rows = [
+                    row
+                    for row in attempt_rows
+                    if row.get("candidate_origin") == "ordinary"
+                ]
+                clean_room_rows = [
+                    row
+                    for row in attempt_rows
+                    if row.get("candidate_origin") == "clean_room"
+                ]
+                ordinary_count = event.get("ordinary_candidate_count")
+                clean_room_count = event.get("clean_room_candidate_count")
+                fallback_requested = event.get("clean_room_fallback_requested")
+                _repair_candidate_require(
+                    _nonnegative_int(ordinary_count)
+                    and _nonnegative_int(clean_room_count)
+                    and ordinary_count == len(ordinary_rows)
+                    and clean_room_count == len(clean_room_rows)
+                    and len(attempt_rows) == ordinary_count + clean_room_count
+                    and sorted(
+                        cast(int, row["candidate_index"]) for row in ordinary_rows
+                    )
+                    == list(range(cast(int, ordinary_count)))
+                    and sorted(
+                        cast(int, row["candidate_index"]) for row in clean_room_rows
+                    )
+                    == list(
+                        range(
+                            cast(int, ordinary_count),
+                            cast(int, ordinary_count) + cast(int, clean_room_count),
+                        )
+                    )
+                    and [cast(int, row["candidate_index"]) for row in event_rows]
+                    == sorted(cast(int, row["candidate_index"]) for row in event_rows)
+                    and (
+                        fallback_requested is True
+                        or (fallback_requested is False and clean_room_count == 0)
+                    )
+                    and (clean_room_count == 0 or fallback_requested is True),
+                    "repair_candidate_artifact_event_reference_mismatch",
+                    f"Repair request {request_id!r} has invalid candidate-origin "
+                    f"coverage at attempt {attempt}.",
+                )
+                if fallback_requested is True:
+                    _repair_candidate_require(
+                        bool(ordinary_rows)
+                        and all(
+                            cast(dict[str, Any], row["validation"]).get("accepted")
+                            is not True
+                            for row in ordinary_rows
+                        ),
+                        "repair_candidate_artifact_event_reference_mismatch",
+                        f"Repair request {request_id!r} used clean-room fallback "
+                        f"before all ordinary candidates were rejected at attempt "
+                        f"{attempt}.",
+                    )
+                best_public_labels = _repair_public_case_labels(best_frontier)
+                expected_focus = best_public_labels[0] if best_public_labels else None
+                _repair_candidate_require(
+                    event.get("focused_public_case_label") == expected_focus,
+                    "repair_candidate_portfolio_selection_mismatch",
+                    f"Repair request {request_id!r} has invalid public focus at "
+                    f"attempt {attempt}.",
+                )
+                best_public_label_set = set(best_public_labels)
+                ranked_candidates: list[
+                    tuple[tuple[bool, int, bool, int, int, int, bool, int], int]
+                ] = []
+                for row in event_rows:
+                    validation = cast(dict[str, Any], row["validation"])
+                    candidate_errors = cast(list[str], validation["sanitized_frontier"])
+                    candidate_public_labels = _repair_public_case_labels(
+                        candidate_errors
+                    )
+                    regressed_public_case_count = len(
+                        set(candidate_public_labels) - best_public_label_set
+                    )
+                    focused_public_case_failed = bool(
+                        expected_focus and expected_focus in candidate_public_labels
+                    )
+                    public_failed_case_count = len(candidate_public_labels)
+                    public_validation_score = _repair_public_validation_score(
+                        candidate_errors
+                    )
+                    candidate_index = cast(int, row["candidate_index"])
+                    evaluated = cast(dict[str, Any], row["evaluated_candidate"])
+                    accepted = cast(bool, validation["accepted"])
+                    validation_score = cast(int, validation["failure_score"])
+                    if accepted:
+                        public_validation_score = 0
+                    duplicate = bool(
+                        not accepted
+                        and evaluated.get("code_sha256") == best_code_hash
+                        and tuple(candidate_errors) == best_frontier
+                    )
+                    reference_item = reference_items_by_record_hash[
+                        cast(str, row["record_sha256"])
+                    ]
+                    _repair_candidate_require(
+                        reference_item.get("regressed_public_case_count")
+                        == regressed_public_case_count
+                        and reference_item.get("focused_public_case_failed")
+                        is focused_public_case_failed
+                        and reference_item.get("public_failed_case_count")
+                        == public_failed_case_count
+                        and reference_item.get("public_validation_score")
+                        == public_validation_score,
+                        "repair_candidate_portfolio_selection_mismatch",
+                        f"Repair request {request_id!r} has invalid public ranking "
+                        f"evidence for candidate {candidate_index} at attempt "
+                        f"{attempt}.",
+                    )
+                    ranked_candidates.append(
+                        (
+                            (
+                                not accepted,
+                                regressed_public_case_count,
+                                focused_public_case_failed,
+                                public_failed_case_count,
+                                public_validation_score,
+                                validation_score,
+                                duplicate,
+                                candidate_index,
+                            ),
+                            candidate_index,
+                        )
+                    )
+                expected_selected_index = min(ranked_candidates)[1]
+                _repair_candidate_require(
+                    event.get("selected_candidate_index") == expected_selected_index,
+                    "repair_candidate_portfolio_selection_mismatch",
+                    f"Repair request {request_id!r} selected a non-minimal "
+                    f"candidate at attempt {attempt}.",
+                )
             selected_index = cast(int, event["selected_candidate_index"])
             selected_rows = [
                 row for row in event_rows if row["candidate_index"] == selected_index
@@ -1577,12 +1869,63 @@ def _verified_repair_best_state_chains(
                 and selected_code_hash == best_code_hash
                 and selected_frontier == best_frontier
             )
-            improved_expected = bool(selected_accepted or selected_score < best_score)
-            retained_expected = bool(
-                not selected_accepted
-                and selected_score == best_score
-                and not duplicate_expected
-            )
+            if schema_version == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION:
+                selected_public_labels = _repair_public_case_labels(selected_frontier)
+                selected_public_score = (
+                    0
+                    if selected_accepted
+                    else _repair_public_validation_score(selected_frontier)
+                )
+                selected_regressed_public_count = len(
+                    set(selected_public_labels) - set(best_public_labels)
+                )
+                selected_focused_public_failed = bool(
+                    expected_focus and expected_focus in selected_public_labels
+                )
+                selected_progress_rank = (
+                    not selected_accepted,
+                    selected_regressed_public_count,
+                    selected_focused_public_failed,
+                    len(set(selected_public_labels)),
+                    selected_public_score,
+                    selected_score,
+                )
+                best_public_score = _repair_public_validation_score(best_frontier)
+                best_progress_rank = (
+                    not best_accepted,
+                    0,
+                    bool(expected_focus),
+                    len(set(best_public_labels)),
+                    best_public_score,
+                    best_score,
+                )
+                improved_expected = bool(
+                    selected_accepted or selected_progress_rank < best_progress_rank
+                )
+                retained_expected = bool(
+                    not selected_accepted
+                    and selected_progress_rank == best_progress_rank
+                    and not duplicate_expected
+                )
+                _repair_candidate_require(
+                    event.get("selected_candidate_origin")
+                    == selected.get("candidate_origin")
+                    and event.get("public_validation_score") == selected_public_score
+                    and event.get("best_failed_public_case_labels_before_attempt")
+                    == list(best_public_labels),
+                    "repair_candidate_portfolio_selection_mismatch",
+                    f"Repair request {request_id!r} has invalid selected public "
+                    f"evidence at attempt {attempt}.",
+                )
+            else:
+                improved_expected = bool(
+                    selected_accepted or selected_score < best_score
+                )
+                retained_expected = bool(
+                    not selected_accepted
+                    and selected_score == best_score
+                    and not duplicate_expected
+                )
             advances_best = improved_expected or retained_expected
             expected_next_seed = (
                 "selected_candidate" if advances_best else "best_previous_candidate"
@@ -1606,8 +1949,14 @@ def _verified_repair_best_state_chains(
                 best_code_hash = selected_code_hash
                 best_frontier = selected_frontier
                 best_score = selected_score
+                best_accepted = selected_accepted
             _repair_candidate_require(
-                event.get("best_validation_score") == best_score,
+                event.get("best_validation_score") == best_score
+                and (
+                    schema_version != _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+                    or event.get("best_public_validation_score")
+                    == _repair_public_validation_score(best_frontier)
+                ),
                 "repair_candidate_artifact_event_reference_mismatch",
                 f"Repair request {request_id!r} has an invalid post-attempt best "
                 f"score at attempt {attempt}.",
@@ -1665,14 +2014,20 @@ def _verified_repair_candidate_artifacts(
 
     row_by_hash: dict[str, dict[str, Any]] = {}
     for row_index, row in enumerate(rows):
+        schema_version = row.get("schema_version")
+        expected_record_keys = (
+            _REPAIR_CANDIDATE_RECORD_KEYS_BY_VERSION.get(schema_version)
+            if isinstance(schema_version, int) and not isinstance(schema_version, bool)
+            else None
+        )
         _repair_candidate_require(
-            set(row) == _REPAIR_CANDIDATE_RECORD_KEYS,
+            expected_record_keys is not None and set(row) == expected_record_keys,
             "repair_candidate_artifact_schema_invalid",
             f"Repair candidate row {row_index} does not have the exact schema.",
         )
         record_sha256 = row.get("record_sha256")
         _repair_candidate_require(
-            row.get("schema_version") in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
+            schema_version in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
             and row.get("event") == "post_deployment_tool_repair_candidate_recorded"
             and isinstance(row.get("request_id"), str)
             and bool(row["request_id"])
@@ -1695,6 +2050,10 @@ def _verified_repair_candidate_artifacts(
             and isinstance(row.get("selected_for_attempt"), bool)
             and row.get("future_tasks_only") is True
             and row.get("triggering_task_replayed") is False
+            and (
+                schema_version != _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+                or row.get("candidate_origin") in _REPAIR_CANDIDATE_ORIGINS
+            )
             and row.get("evidence_policy")
             == {
                 "frontier": "generator_visible_sanitized_labels_only",
@@ -1861,6 +2220,10 @@ def _verified_repair_candidate_artifacts(
             and all(
                 row.get(field) == reference.get(field)
                 for field in ("request_id", "tool_name", "attempt", "candidate_index")
+            )
+            and (
+                row.get("schema_version") != _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+                or row.get("candidate_origin") == reference.get("candidate_origin")
             ),
             "repair_candidate_artifact_event_reference_mismatch",
             f"Candidate identity disagrees at event {reference['event_index']}.",
@@ -1961,6 +2324,10 @@ def _verified_repair_candidate_artifacts(
 
     _verified_repair_best_state_chains(candidate_dir, row_by_hash, references)
 
+    schema_versions = sorted({cast(int, row["schema_version"]) for row in rows})
+    current_schema_only = bool(rows) and schema_versions == [
+        _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+    ]
     return {
         "status": "pass",
         "path": str(artifact_path),
@@ -1969,6 +2336,9 @@ def _verified_repair_candidate_artifacts(
         "referenced_record_count": len(references),
         "artifact_sha256": hashlib.sha256(artifact_bytes).hexdigest(),
         "canonical_records_sha256": _canonical_json_sha256(rows),
+        "schema_versions": schema_versions,
+        "candidate_origin_authenticated": current_schema_only,
+        "portfolio_selection_authenticated": current_schema_only,
     }
 
 
@@ -2107,7 +2477,9 @@ def _paired_lifecycle_evidence_rows(
         )
 
     paired: list[dict[str, Any]] = []
-    for selection, feedback in zip(selection_rows, feedback_rows, strict=True):
+    # Cardinality was checked above, so ordinary zip remains fail-closed while
+    # retaining compatibility with the legacy Python 3.9 lifecycle fixtures.
+    for selection, feedback in zip(selection_rows, feedback_rows):
         scenario = str(selection.get("scenario") or "")
         if not scenario or str(feedback.get("scenario") or "") != scenario:
             raise ValueError(
@@ -3206,37 +3578,16 @@ def _derive_lifecycle_repair_obligations(
             family_stats["called"] += int(tool_name in called)
             family_stats["failed"] += int(tool_name in failed)
             family_stats["contract_failed"] += int(tool_name in contract_failed)
-            attempted = set(selection_values["generated_tools_attempted"])
-            all_attempted = called | attempted | failed
-            control_outcome = feedback.get("control_outcome")
-            candidate_outcome = feedback.get("candidate_outcome")
-            outcome_delta = feedback.get("outcome_delta")
-            attributable_route_observation = bool(
-                tool_name in called
-                and all_attempted == {tool_name}
-                and feedback.get("source_task_id_redacted") is True
-                and feedback.get("control_source") == "same_run_fresh"
-                and feedback.get("control_outcome_source") == "audited_outcome"
-                and feedback.get("candidate_outcome_source") == "audited_outcome"
-                and selection.get("exception_type") is None
-                and isinstance(control_outcome, (int, float))
-                and not isinstance(control_outcome, bool)
-                and isinstance(candidate_outcome, (int, float))
-                and not isinstance(candidate_outcome, bool)
-                and isinstance(outcome_delta, (int, float))
-                and not isinstance(outcome_delta, bool)
-                and math.isfinite(float(control_outcome))
-                and math.isfinite(float(candidate_outcome))
-                and math.isfinite(float(outcome_delta))
-                and float(outcome_delta)
-                == float(candidate_outcome) - float(control_outcome)
+            attributable_route_delta = _strict_attributable_route_delta(
+                paired,
+                tool_name=tool_name,
             )
-            if attributable_route_observation:
+            if attributable_route_delta is not None:
                 family_stats["sole_harmful"] += int(
-                    float(outcome_delta) <= LIFECYCLE_ROUTE_HARM_DELTA
+                    attributable_route_delta <= LIFECYCLE_ROUTE_HARM_DELTA
                 )
                 family_stats["sole_helpful"] += int(
-                    float(outcome_delta) >= LIFECYCLE_ROUTE_HELP_DELTA
+                    attributable_route_delta >= LIFECYCLE_ROUTE_HELP_DELTA
                 )
 
     obligations: list[dict[str, Any]] = []
@@ -3314,6 +3665,301 @@ def _derive_lifecycle_repair_obligations(
                     }
                 )
     return tuple(obligations)
+
+
+def _strict_attributable_route_delta(
+    paired: dict[str, Any],
+    *,
+    tool_name: str,
+) -> float | None:
+    """Return a route delta only at the runtime's strict attribution boundary."""
+
+    feedback = paired["feedback"]
+    selection = paired["selection"]
+    selection_values = paired["selection_values"]
+    called = set(selection_values["generated_tools_called"])
+    attempted = set(selection_values["generated_tools_attempted"])
+    failed = set(selection_values["generated_tools_failed"])
+    all_attempted = called | attempted | failed
+    control_outcome = feedback.get("control_outcome")
+    candidate_outcome = feedback.get("candidate_outcome")
+    outcome_delta = feedback.get("outcome_delta")
+    if not (
+        tool_name in called
+        and all_attempted == {tool_name}
+        and feedback.get("source_task_id_redacted") is True
+        and feedback.get("control_source") == "same_run_fresh"
+        and feedback.get("control_outcome_source") == "audited_outcome"
+        and feedback.get("candidate_outcome_source") == "audited_outcome"
+        and "exception_type" in selection
+        and selection["exception_type"] is None
+        and isinstance(control_outcome, (int, float))
+        and not isinstance(control_outcome, bool)
+        and isinstance(candidate_outcome, (int, float))
+        and not isinstance(candidate_outcome, bool)
+        and isinstance(outcome_delta, (int, float))
+        and not isinstance(outcome_delta, bool)
+        and math.isfinite(float(control_outcome))
+        and math.isfinite(float(candidate_outcome))
+        and math.isfinite(float(outcome_delta))
+        and float(outcome_delta) == float(candidate_outcome) - float(control_outcome)
+    ):
+        return None
+    return float(outcome_delta)
+
+
+def _derived_attributable_harm_retirements(
+    paired_rows: tuple[dict[str, Any], ...],
+) -> dict[tuple[str, int], dict[str, Any]]:
+    """Derive the exact point where strictly attributable harm requires retirement."""
+
+    family_stats_by_tool: dict[tuple[str, int], dict[str, dict[str, int]]] = {}
+    expected: dict[tuple[str, int], dict[str, Any]] = {}
+    for row_number, paired in enumerate(paired_rows, start=1):
+        feedback = paired["feedback"]
+        completed_count = feedback.get("completed_count")
+        family = _public_lifecycle_family(feedback)
+        observed_keys = {
+            (tool_name, paired["versions"][tool_name])
+            for tool_name in paired["observed_tools"]
+        }
+        for key in sorted(observed_keys):
+            existing = expected.get(key)
+            if existing is not None and row_number > existing["trigger_row_number"]:
+                existing["observed_after_trigger"].append(paired["scenario"])
+            tool_name, _version = key
+            family_stats = family_stats_by_tool.setdefault(key, {}).setdefault(
+                family,
+                {
+                    "attributable_harmful_call_count": 0,
+                    "attributable_helpful_call_count": 0,
+                },
+            )
+            delta = _strict_attributable_route_delta(
+                paired,
+                tool_name=tool_name,
+            )
+            if delta is None:
+                continue
+            family_stats["attributable_harmful_call_count"] += int(
+                delta <= LIFECYCLE_ROUTE_HARM_DELTA
+            )
+            family_stats["attributable_helpful_call_count"] += int(
+                delta >= LIFECYCLE_ROUTE_HELP_DELTA
+            )
+
+        for key in sorted(observed_keys):
+            if key in expected:
+                continue
+            tool_family_stats = family_stats_by_tool[key]
+            qualifying_families = sorted(
+                family_name
+                for family_name, counts in tool_family_stats.items()
+                if counts["attributable_harmful_call_count"]
+                >= LIFECYCLE_ROUTE_HARMFUL_CALL_THRESHOLD
+                and counts["attributable_harmful_call_count"]
+                > counts["attributable_helpful_call_count"]
+            )
+            total_helpful = sum(
+                counts["attributable_helpful_call_count"]
+                for counts in tool_family_stats.values()
+            )
+            if not qualifying_families or total_helpful:
+                continue
+            task_context_label = feedback.get("task_context_label")
+            if (
+                isinstance(completed_count, bool)
+                or not isinstance(completed_count, int)
+                or completed_count != row_number
+                or not isinstance(task_context_label, str)
+                or not task_context_label.strip()
+            ):
+                # This cannot be a runtime-produced public retirement boundary.
+                # Leave it to the ordinary route-suppression obligation; any
+                # forged retirement event will then be rejected as unexpected.
+                continue
+            tool_name, version = key
+            action = {
+                "tool_name": tool_name,
+                "decision": "parked",
+                "reason": LIFECYCLE_GLOBAL_RETIREMENT_REASON,
+                "scenario": task_context_label.strip(),
+                "source_tool_version": version,
+            }
+            expected[key] = {
+                "action": action,
+                "trigger_completed_count": completed_count,
+                "trigger_row_number": row_number,
+                "qualifying_families": qualifying_families,
+                "family_evidence": {
+                    family_name: dict(counts)
+                    for family_name, counts in sorted(tool_family_stats.items())
+                },
+                "observed_after_trigger": [],
+            }
+    return expected
+
+
+def _verify_attributable_harm_retirements(
+    candidate_dir: Path,
+    registry_dir: Path,
+    *,
+    paired_rows: tuple[dict[str, Any], ...],
+) -> tuple[set[tuple[str, int]], dict[str, int]]:
+    """Verify repeated-harm retirement from raw evidence through terminal state."""
+
+    expected = _derived_attributable_harm_retirements(paired_rows)
+    ordered_expected = sorted(
+        expected.items(),
+        key=lambda item: (
+            item[1]["trigger_completed_count"],
+            item[0][0],
+            item[0][1],
+        ),
+    )
+    expected_actions = [details["action"] for _key, details in ordered_expected]
+    action_journal = _read_jsonl_objects(
+        candidate_dir / "self_evolution_tool_lifecycle.jsonl"
+    )
+    recorded_actions = [
+        action
+        for action in action_journal
+        if action.get("reason") == LIFECYCLE_GLOBAL_RETIREMENT_REASON
+    ]
+    if recorded_actions != expected_actions:
+        raise ValueError(
+            "Repeated-harm global-retirement journal disagrees with independently "
+            "derived strictly attributable evidence."
+        )
+
+    expected_sidecar_actions = [
+        (details["trigger_row_number"], details["action"])
+        for _key, details in ordered_expected
+    ]
+    recorded_sidecar_actions: list[tuple[int, dict[str, Any]]] = []
+    for row_number, paired in enumerate(paired_rows, start=1):
+        immediate_actions = paired["feedback"].get("immediate_actions", [])
+        if not isinstance(immediate_actions, list) or any(
+            not isinstance(action, dict) for action in immediate_actions
+        ):
+            raise ValueError(
+                "Lifecycle feedback has malformed immediate-action evidence."
+            )
+        recorded_sidecar_actions.extend(
+            (row_number, action)
+            for action in immediate_actions
+            if action.get("reason") == LIFECYCLE_GLOBAL_RETIREMENT_REASON
+        )
+    if recorded_sidecar_actions != expected_sidecar_actions:
+        raise ValueError(
+            "Repeated-harm global retirement is not bound to its exact triggering "
+            "task feedback row."
+        )
+
+    registry = _read_json(registry_dir / "registry_manifest.json")
+    registry_tools = registry.get("tools")
+    if not isinstance(registry_tools, dict):
+        raise ValueError("Final registry manifest has no tool mapping.")
+    lifecycle_path = registry_dir / "tool_lifecycle.json"
+    lifecycle_rows: dict[str, Any] = {}
+    if expected:
+        if not lifecycle_path.is_file():
+            raise ValueError(
+                "Repeated-harm global retirement has no durable lifecycle state."
+            )
+        lifecycle_payload = _read_json(lifecycle_path)
+        raw_rows = lifecycle_payload.get("tool_lifecycle")
+        if not isinstance(raw_rows, dict):
+            raise ValueError(
+                "Repeated-harm global retirement has malformed durable lifecycle state."
+            )
+        lifecycle_rows = raw_rows
+
+    verified: set[tuple[str, int]] = set()
+    for key, details in ordered_expected:
+        tool_name, version = key
+        if details["observed_after_trigger"]:
+            raise ValueError(
+                "A globally retired generated tool remained visible or callable "
+                f"after retirement: {tool_name}:v{version}."
+            )
+        entry = registry_tools.get(tool_name)
+        exact_retired_source = bool(
+            isinstance(entry, dict)
+            and entry.get("version") == version
+            and entry.get("retired") is True
+        )
+        if not exact_retired_source:
+            # A newer, independently repaired version may validly supersede the
+            # retired source.  It must close the obligation through the ordinary
+            # acknowledged-repair path below, never through this retirement path.
+            if (
+                not isinstance(entry, dict)
+                or isinstance(entry.get("version"), bool)
+                or not isinstance(entry.get("version"), int)
+                or entry["version"] <= version
+            ):
+                raise ValueError(
+                    "Repeated-harm global-retirement action disagrees with the "
+                    f"terminal registry state: {tool_name}:v{version}."
+                )
+            continue
+
+        lifecycle_row = lifecycle_rows.get(tool_name)
+        if not (
+            isinstance(lifecycle_row, dict)
+            and lifecycle_row.get("tool_version") == version
+            and lifecycle_row.get("decision") == "parked"
+            and lifecycle_row.get("decision_reason") == "retired_this_run"
+            and lifecycle_row.get("repair_kind") is None
+            and lifecycle_row.get("routing_disposition") == "quarantined"
+        ):
+            raise ValueError(
+                "Repeated-harm global retirement has no exact terminal lifecycle "
+                f"state: {tool_name}:v{version}."
+            )
+        family_evidence = lifecycle_row.get("family_evidence")
+        expected_family_evidence = details["family_evidence"]
+        if not isinstance(family_evidence, dict) or set(family_evidence) != set(
+            expected_family_evidence
+        ):
+            raise ValueError(
+                "Repeated-harm retirement family evidence disagrees with raw "
+                f"paired rows: {tool_name}:v{version}."
+            )
+        for family, expected_counts in expected_family_evidence.items():
+            recorded_counts = family_evidence.get(family)
+            if not isinstance(recorded_counts, dict) or any(
+                recorded_counts.get(field) != expected_count
+                for field, expected_count in expected_counts.items()
+            ):
+                raise ValueError(
+                    "Repeated-harm retirement counts disagree with raw paired "
+                    f"rows: {tool_name}:v{version}:{family}."
+                )
+        route_families = {
+            str(item)
+            for item in (lifecycle_row.get("route_repair_families") or [])
+            if isinstance(item, str)
+        }
+        reason_codes = lifecycle_row.get("route_repair_reason_codes")
+        if any(
+            family not in route_families
+            or not isinstance(reason_codes, dict)
+            or "repeated_sole_tool_family_regression"
+            not in (reason_codes.get(family) or [])
+            for family in details["qualifying_families"]
+        ):
+            raise ValueError(
+                "Repeated-harm global retirement lacks its exact durable routing "
+                f"evidence: {tool_name}:v{version}."
+            )
+        verified.add(key)
+
+    return verified, {
+        "derived_global_retirement_count": len(expected),
+        "verified_global_retirement_count": len(verified),
+    }
 
 
 def _optional_lifecycle_metric(value: Any, *, label: str) -> float | None:
@@ -3530,6 +4176,14 @@ def _verify_lifecycle_closed(
         candidate_dir,
         trajectory_evidence=trajectory_evidence,
     )
+    (
+        verified_global_retirements,
+        global_retirement_report,
+    ) = _verify_attributable_harm_retirements(
+        candidate_dir,
+        registry_dir,
+        paired_rows=paired_rows,
+    )
     requests = _read_jsonl_objects(
         candidate_dir / "self_evolution_tool_repair_requests.jsonl"
     )
@@ -3742,7 +4396,11 @@ def _verify_lifecycle_closed(
                 in terminal_statuses
                 for request in requests
             )
-            if route_applied or superseded_by_terminal_repair:
+            globally_retired = (
+                obligation["tool_name"],
+                obligation["source_tool_version"],
+            ) in verified_global_retirements
+            if route_applied or superseded_by_terminal_repair or globally_retired:
                 verified_route_repair_count += 1
                 continue
             missing_obligations.append(
@@ -3876,6 +4534,7 @@ def _verify_lifecycle_closed(
         "derived_repair_obligation_count": len(obligations),
         "verified_promoted_canary_count": len(verified_promoted_canaries),
         "verified_route_repair_count": verified_route_repair_count,
+        **global_retirement_report,
         "pending_repair_request_count": 0,
         "open_canary_count": 0,
         "open_repair_transaction_count": 0,

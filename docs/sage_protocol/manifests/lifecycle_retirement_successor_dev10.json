@@ -1,0 +1,113 @@
+{
+  "manifest_type": "development_diagnostic_lifecycle_retirement_successor_dev10",
+  "lifecycle_evidence_mode": "seeded_historical_v1_bounded_repair_retirement_and_successor_birth",
+  "scenario_order_sha256": "b59acee1559e254551ffe783acdaf351b45c4b6977b4a4bb990229afe733cf0e",
+  "strategy": "Development-only ordered cohort proving that a public-contract failure causes bounded same-tool repair attempts, terminal retirement when none validates, and prospective birth, validation, and use of the predeclared narrower successor. This is not a publication sample or unseen test set.",
+  "preserved_working_tool_provenance": {
+    "claim_boundary": "two historically successful generated tools preserved on overlapping reminder routes and a disjoint transfer cohort",
+    "source_artifact": "artifacts/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action_registry/registry_manifest.json",
+    "source_registry_sha256": "5fe8323c69cb17b3c0e45f3ccf2bc3708583ab9d01a48e5ca2d4b5082686d653",
+    "tools": {
+      "relative_day_time_to_timestamp": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab",
+        "public_spec_sha256": "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95",
+        "source_entry_sha256": "34a186250638fe21c62dde6baef1af34381f9ce0d867e1e41f97d84362edbd0b"
+      },
+      "prepare_reminder_creation_args": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292",
+        "public_spec_sha256": "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765",
+        "source_entry_sha256": "68ed674b51cd5b434417be9f5c727b8c65d2dd7b032c78bee5a4567be33179a9"
+      }
+    }
+  },
+  "working_path_evidence": {
+    "artifact": "docs/sage_protocol/fixtures/paper_rep01_working_path_evidence.json",
+    "sha256": "840dcfeacd00dadea8e2ea54676326b51f12457af66317eef3e30ef5837d8a3f"
+  },
+  "predeclared_gates": {
+    "source_v1_failure_bounded_repair_terminal_retirement": {
+      "source_tool_name": "prepare_safe_action_or_abstain",
+      "source_tool_version": 1,
+      "trigger_role": "repair_trigger",
+      "trigger_outcome_less_than": 1.0,
+      "repair_kind": "implementation",
+      "trigger_reason_code": "deterministic_public_contract_failure",
+      "bounded_repair_attempt_count": 7,
+      "terminal_acknowledgement_status": "rejected",
+      "terminal_retirement_reason": "bounded_repair_failed_validation"
+    },
+    "exact_validated_successor_set": {
+      "tools": {
+        "assess_contact_removal_readiness": {
+          "canonical_key": "validation:assess_contact_removal_readiness",
+          "version": 1,
+          "role": "successor_confirmation",
+          "minimum_visible_and_called": 6,
+          "minimum_exact_successes": 5,
+          "minimum_success_flips": 1
+        }
+      },
+      "exact_new_validation_successor_set": true
+    },
+    "working_generated_overlap_visible_called_exact_failure_free": {
+      "role": "working_generated_overlap",
+      "expected_tool_paths": {
+        "add_reminder_content_and_week_delta_and_time": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+        "add_reminder_content_and_weekday_delta_and_time": ["next_weekday_time_to_timestamp", "prepare_reminder_creation_args"]
+      },
+      "preserved_tools_exercised_across_cohort": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+      "successor_contracts": {"next_weekday_time_to_timestamp": "canonicalizer:next_weekday_time_to_timestamp"},
+      "minimum": 2,
+      "total": 2
+    },
+    "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {"role": "unrelated_native_preservation", "minimum": 1, "total": 1},
+    "working_generated_entries_unchanged": {"required": true},
+    "overall_exact_outcomes": {"minimum": 8, "total": 10}
+  },
+  "validation_roles": {
+    "repair_trigger": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information"
+    ],
+    "successor_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"
+    ],
+    "contact_repair_confirmation": [
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
+      "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"
+    ],
+    "working_generated_overlap": [
+      "add_reminder_content_and_week_delta_and_time",
+      "add_reminder_content_and_weekday_delta_and_time"
+    ],
+    "unrelated_native_preservation": [
+      "search_phone_number_with_name"
+    ]
+  },
+  "splits": {
+    "full_benchmark": [
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_description_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_arg_type_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled"},
+      {"name": "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"},
+      {"name": "add_reminder_content_and_week_delta_and_time"},
+      {"name": "add_reminder_content_and_weekday_delta_and_time"},
+      {"name": "search_phone_number_with_name"}
+    ]
+  }
+}

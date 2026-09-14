@@ -26,6 +26,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
 from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.orchestration.online_birth import (
+    TERMINAL_RETIREMENT_TOMBSTONE_FILENAME,
     GeneratedToolFactory,
     OnlineBirthController,
 )
@@ -95,6 +96,23 @@ def _selection_log_rows(output_directory: Path) -> list[dict[str, object]]:
         if isinstance(row, dict):
             rows.append(row)
     return rows
+
+
+def _sole_attributable_generated_tool(
+    *,
+    called_tools: list[str],
+    attempted_tools: list[str],
+    failed_tools: list[str],
+    called_tool_versions: dict[str, int],
+) -> list[str]:
+    """Return one tool only when no second generated attempt can confound it."""
+
+    all_attempts = set((*called_tools, *attempted_tools, *failed_tools))
+    observed_calls = list(dict.fromkeys((*called_tools, *failed_tools)))
+    if len(all_attempts) != 1 or len(observed_calls) != 1:
+        return []
+    tool_name = observed_calls[0]
+    return [tool_name] if tool_name in called_tool_versions else []
 
 
 def _conversation_generated_tool_attempts(
@@ -235,7 +253,11 @@ def _snapshot_registry_checkpoint(
     )
     copied: list[str] = []
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    for filename in ("registry_manifest.json", "tool_lifecycle.json"):
+    for filename in (
+        "registry_manifest.json",
+        "tool_lifecycle.json",
+        TERMINAL_RETIREMENT_TOMBSTONE_FILENAME,
+    ):
         source = registry_dir / filename
         if source.exists():
             shutil.copy2(source, checkpoint_dir / filename)
@@ -919,6 +941,10 @@ def run_sage_with_registry(
                 require_fresh_control=config.require_fresh_reflection_control,
                 fresh_control_channel=config.reflection_control_channel,
             )
+        if birth_controller is not None and reflection_controller is not None:
+            reflection_controller.reconcile_active_repaired_canaries(
+                birth_controller.canary_state_by_tool
+            )
         if birth_controller is not None and birth_controller.pending_repair_requests:
             try:
                 completed_task_count = int(
@@ -1382,11 +1408,11 @@ def run_sage_with_registry(
                     if isinstance(raw_called_versions, dict)
                     else {}
                 )
-                attributable_tools = (
-                    canary_called_tools
-                    if len(canary_called_tools) == 1
-                    and canary_called_tools[0] in called_tool_versions
-                    else []
+                attributable_tools = _sole_attributable_generated_tool(
+                    called_tools=generated_called,
+                    attempted_tools=generated_attempted,
+                    failed_tools=generated_failed,
+                    called_tool_versions=called_tool_versions,
                 )
                 birth_controller.record_canary_result(
                     called_tools=canary_called_tools,

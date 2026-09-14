@@ -1,8 +1,10 @@
+import ast
 import json
 from pathlib import Path
 from typing import cast
 
-from sage_ts.campaign.artifacts import append_event, read_jsonl
+import sage_ts.orchestration.online_birth as online_birth_module
+from sage_ts.campaign.artifacts import EVENT_TYPES, append_event, read_jsonl
 from sage_ts.orchestration.online_birth import (
     GeneratedToolFactory,
     OnlineBirthController,
@@ -22,10 +24,18 @@ POST_DEPLOYMENT_LIFECYCLE_EVENTS = (
     "post_deployment_tool_repair_acknowledged",
     "post_deployment_tool_repair_acknowledgement_failed",
     "post_deployment_tool_repair_transaction_recovered",
+    "validation_contract_restore_failed_entry_retired",
+    "terminal_retirement_tombstone_reconciled",
     "post_deployment_tool_canary_observed",
     "post_deployment_tool_canary_out_of_family_call_ignored",
+    "post_deployment_tool_canary_recovery_rejected",
     "post_deployment_tool_canary_promoted",
     "post_deployment_tool_canary_retired",
+    "post_deployment_public_contract_binding_invalid",
+    "post_deployment_metadata_code_change_discarded",
+    "tool_birth_suppressed_terminal_retirement",
+    "tool_birth_validation_contract_binding_failed",
+    "tool_repair_clean_room_failed",
 )
 
 
@@ -127,3 +137,20 @@ def test_online_birth_post_deployment_events_append_without_hook_failures(
     assert not any(
         row.get("event") == "campaign_event_hook_failed" for row in run_events
     )
+
+
+def test_all_literal_online_birth_events_are_sealed_campaign_events() -> None:
+    source_path = Path(cast(str, online_birth_module.__file__))
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    literal_events = {
+        cast(str, node.args[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "_event"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    }
+
+    assert literal_events <= EVENT_TYPES

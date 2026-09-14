@@ -17,7 +17,8 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 
 .PHONY: \
 	compile lint test-core test lifecycle-mechanics package \
-	paper-online paper-frozen lifecycle-dev10 lifecycle-dev30 lifecycle-transfer-dev30 sample full \
+	paper-online paper-frozen lifecycle-dev10 lifecycle-dev30 lifecycle-transfer-dev30 \
+	lifecycle-successor-dev10 lifecycle-successor-transfer-dev30 sample full \
 	prepare-paper-rerun verify-publication verify-sample verify-campaign verify-environment verify-inputs verify-freeze \
 	analyze render-paper \
 	require-run require-sample-report require-campaign-manifest require-analysis-output \
@@ -106,6 +107,20 @@ lifecycle-dev30:
 lifecycle-transfer-dev30:
 	@test -n "$(SOURCE_DEV10_RUN)" || \
 		(echo "Set SOURCE_DEV10_RUN to the exact passing dev10 run root." >&2; exit 2)
+	LIFECYCLE_TRANSFER_SOURCE_RUN="$(SOURCE_DEV10_RUN)" \
+		bash scripts/run_native_action_4omini_ab.sh dev30 $(PORT) development-transfer development-diagnostic
+
+# Generalized lifecycle proof: the bounded source-v1 repair fails terminally,
+# the source is retired, and an exact public-family successor is born and used.
+lifecycle-successor-dev10:
+	SAGE_BENCHMARK_MANIFEST="docs/sage_protocol/manifests/lifecycle_retirement_successor_dev10.json" \
+		bash scripts/run_native_action_4omini_ab.sh dev10 $(PORT) development-only development-diagnostic
+
+# Frozen, disjoint transfer check for the exact successor registry above.
+lifecycle-successor-transfer-dev30:
+	@test -n "$(SOURCE_DEV10_RUN)" || \
+		(echo "Set SOURCE_DEV10_RUN to the exact passing successor dev10 run root." >&2; exit 2)
+	SAGE_BENCHMARK_MANIFEST="docs/sage_protocol/manifests/lifecycle_retirement_successor_transfer_dev30.json" \
 	LIFECYCLE_TRANSFER_SOURCE_RUN="$(SOURCE_DEV10_RUN)" \
 		bash scripts/run_native_action_4omini_ab.sh dev30 $(PORT) development-transfer development-diagnostic
 

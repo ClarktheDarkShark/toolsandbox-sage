@@ -112,6 +112,18 @@ HELPER_TRIGGERS: dict[str, tuple[str, ...]] = {
         "insufficient_information_clarification",
         "generic_multi_tool_composition",
     ),
+    "assess_contact_removal_readiness": (
+        "insufficient_information_clarification",
+        "contact_message_search_disambiguation",
+    ),
+    "assess_message_recipient_readiness": (
+        "insufficient_information_clarification",
+        "contact_message_search_disambiguation",
+    ),
+    "assess_temporal_request_readiness": (
+        "insufficient_information_clarification",
+        "temporal_reminder_date_canonicalization",
+    ),
     "extract_contact_field_from_search_result": (
         "contact_message_search_disambiguation",
     ),
@@ -145,6 +157,15 @@ OPPORTUNITY_HELPERS: dict[str, tuple[str, ...]] = {
         "select_message_counterparty_for_contact_update",
     ),
     "validation:prepare_safe_action_or_abstain": ("prepare_safe_action_or_abstain",),
+    "validation:assess_contact_removal_readiness": (
+        "assess_contact_removal_readiness",
+    ),
+    "validation:assess_message_recipient_readiness": (
+        "assess_message_recipient_readiness",
+    ),
+    "validation:assess_temporal_request_readiness": (
+        "assess_temporal_request_readiness",
+    ),
     "derived_value:extract_contact_field_from_search_result": (
         "extract_contact_field_from_search_result",
     ),
@@ -493,8 +514,60 @@ def expected_helper_fit(
     ):
         helpers.append("plan_send_message_contact_lookup")
     if "insufficient_information" in name:
-        helpers.append("prepare_safe_action_or_abstain")
+        helper_name, _canonical_key = _insufficient_readiness_helper(name)
+        helpers.append(helper_name)
     return helpers
+
+
+def _insufficient_readiness_helper(name: str) -> tuple[str, str]:
+    """Map semantic task-family wording to a narrow readiness helper."""
+
+    if "send_message" in name or "message_recipient" in name:
+        return (
+            "assess_message_recipient_readiness",
+            "validation:assess_message_recipient_readiness",
+        )
+    contact_context = any(
+        token in name for token in ("contact", "phone_number", "relationship")
+    )
+    contact_removal = contact_context and bool(
+        re.search(r"(?:^|_)(?:remove|delete|removal|deletion)(?:_|$)", name)
+    )
+    if contact_removal:
+        return (
+            "assess_contact_removal_readiness",
+            "validation:assess_contact_removal_readiness",
+        )
+    # The narrow successor has no validated contact-update contract. Keep update
+    # and modification insufficiency on the general guard unless a separate,
+    # explicitly matched helper is introduced.
+    if contact_context and bool(
+        re.search(r"(?:^|_)(?:modify|update|modification)(?:_|$)", name)
+    ):
+        return (
+            "prepare_safe_action_or_abstain",
+            "validation:prepare_safe_action_or_abstain",
+        )
+    if any(
+        token in name
+        for token in (
+            "reminder",
+            "relative_time",
+            "recency",
+            "yesterday",
+            "today",
+            "tomorrow",
+            "holiday",
+        )
+    ):
+        return (
+            "assess_temporal_request_readiness",
+            "validation:assess_temporal_request_readiness",
+        )
+    return (
+        "prepare_safe_action_or_abstain",
+        "validation:prepare_safe_action_or_abstain",
+    )
 
 
 def expected_birth_opportunities(
@@ -506,7 +579,8 @@ def expected_birth_opportunities(
     name = scenario_name.lower()
     category_set = {category.upper() for category in categories or ()}
     if "INSUFFICIENT_INFORMATION" in category_set or "insufficient_information" in name:
-        return ["validation:prepare_safe_action_or_abstain"]
+        _helper_name, canonical_key = _insufficient_readiness_helper(name)
+        return [canonical_key]
 
     opportunities: list[str] = []
     if "recency" in name and "CANONICALIZATION" in category_set:

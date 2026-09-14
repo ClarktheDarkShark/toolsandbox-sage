@@ -11,6 +11,23 @@ must cause a bounded action: repair the tool and validate a new version, narrow
 its route, or retire it. The action applies only to later tasks. SAGE never
 replays or rescores the task that produced the evidence.
 
+Within that attribution boundary, a confirmed failing implementation cannot
+remain active with only a `needs_repair` label. The repair queue must resolve to
+either a fully validated prospective candidate or a durable terminal retirement
+of the affected tool name and canonical contract. A failure confined to one
+public semantic route is resolved at the route boundary when the same tool has
+independent helpful evidence elsewhere. That is a routing repair, not an
+assertion that the implementation is globally defective.
+
+For outcome-based harm attribution, “strictly attributable” means that both
+arms have fresh audited outcomes for the same task, the task has a public
+semantic-family context, no runtime exception occurred, and the candidate
+attempted or called exactly one generated tool. Two harmful observations under
+that boundary can suppress the affected family route. They cause global
+retirement only when the tool has no strictly attributable helpful observation
+in any family. A task with co-called generated tools cannot satisfy this test,
+so its loss remains diagnostic rather than being assigned to an arbitrary tool.
+
 Whole-task outcome is an alarm, not by itself proof that every generated tool
 called on that task is defective. Rewriting a tool from that signal alone would
 misattribute failures caused by the actor, another tool, or the final answer.
@@ -23,8 +40,9 @@ suppressed immediately. If no trustworthy public family is available, SAGE
 parks the tool globally because it cannot apply a narrower safe boundary.
 Three explicit execution failures trigger repair even when they occur across
 different public task families. At run end, one or two remaining explicit tool
-failures enter the same terminal queue so the affected version is retired
-rather than silently surviving because no third observation occurred.
+failures enter the same terminal queue so the affected version is resolved by
+validated repair or retirement rather than silently surviving because no third
+observation occurred.
 
 ## Mechanical decisions
 
@@ -33,7 +51,9 @@ rather than silently surviving because no third observation occurred.
 | A deployed implementation fails its public, task-independent contract | Quarantine that version; attempt bounded regeneration and full validation; retire it if no candidate passes. |
 | A generated tool repeatedly fails during execution | Treat it as an implementation failure and use the same repair-or-retire path. |
 | A generated helper returns a valid action plan, but the actor does not execute the required downstream native action | Suppress that exact public-family route immediately. Do not regenerate the helper from this actor-follow-through signal. Park globally only when no trustworthy public family is available. |
-| Calls are repeatedly harmful only in a semantic task family | Suppress that family route while retaining independently helpful routes. |
+| Strictly attributable calls are repeatedly harmful in one semantic task family, but the tool is independently helpful elsewhere | Suppress that family route while retaining the independently helpful routes. |
+| Strictly attributable calls are repeatedly harmful and the tool has no attributable helpful use | Retire the tool globally rather than leaving a harmful implementation active. |
+| A low-outcome task contains multiple generated calls or otherwise lacks strict attribution | Record a diagnostic alarm. Do not rewrite or retire a particular implementation from that task-level result alone. |
 | A tool is routed repeatedly but never selected | Repair its public schema/description, revalidate it, and canary the new version; retire it if adoption does not occur. |
 | The generated-tool executor explicitly reports a tool failure, or the generated output itself violates its deterministic safety contract | Count only that tool-attributable evidence and use implementation repair-or-retire; retire immediately when required by safety policy. A downstream actor-follow-through failure, generic actor, user, evaluator, or framework exception is not proof that generated code failed. |
 | A repaired version is deployed | Limit it to a prospective canary. Promotion requires at least three audited, same-family observations where the current version was the sole generated tool called, at least two exact outcomes, no audited regression, and at least one success flip against the fresh matched control. Retire on a contract/tool-runtime failure or after eight eligible family tasks without adequate evidence. |
@@ -56,18 +76,19 @@ matched policy-wrapper-without-generated-tools control, not the untouched
 upstream ToolSandbox actor. Protocol and per-arm manifests record this runtime
 identity, and strict verification rejects either arm if it drifts.
 
-Generation prompts use synthetic contract examples. The public examples cover
-each declared decision branch: missing capability, named-recipient dependency,
-missing target, ambiguous target, read-only target exemption, and safe
-continuation. They are task-independent developer-authored contract cases, not
-benchmark answers. The separate cases labeled held-out are internal validation
-and model-selection data, not an unseen test set. Their values and expected
-outputs are removed before prompt construction, and the exact prompt is audited
-immediately before model inference. Repair queues are reduced to public
-operational counts and task-independent reason codes; recursive guards reject
-scenario/task identifiers, expected or reference answers, target state,
-evaluator traces, outcome values, and success-flip values at persistence,
-request-construction, and prompt boundaries.
+Generation prompts use synthetic contract examples. Across the validation
+helper contracts, applicable public branches include missing capability,
+named-recipient dependency, missing target, ambiguous target, read-only target
+exemption, and safe continuation; a narrow successor receives only the branches
+declared by its own domain contract. These are task-independent
+developer-authored cases, not benchmark answers. The separate cases labeled
+held-out are internal validation and model-selection data, not an unseen test
+set. Their values and expected outputs are removed before prompt construction,
+and the exact prompt is audited immediately before model inference. Repair
+queues are reduced to public operational counts and task-independent reason
+codes; recursive guards reject scenario/task identifiers, expected or reference
+answers, target state, evaluator traces, outcome values, and success-flip values
+at persistence, request-construction, and prompt boundaries.
 
 For structured validation helpers, bounded repair uses compact public
 counterexample-guided synthesis. Each ordinary attempt first traces the current
@@ -78,16 +99,17 @@ until it passes; the prompt also lists already-passing public cases as regressio
 guards. Only then does focus advance to the next public failure. Both stages receive the
 same minimal executable specification, current code, public input/output
 contract, public cases, and public validation frontier. Held-out and blind
-checks appear only as value-free invariant labels. The plan must order
-normalization, inferred public prerequisites, missing-capability checks,
-read-only versus mutating classification, target checks, and ambiguity checks
-before code is authored. Later attempts use the best validation frontier
-observed so far. If both code and frontier repeat, the same bounded lifecycle
-attempt immediately adds one independently model-authored clean-room candidate:
-it omits the rejected code and synthesizes from the public contract in one call.
-The controller evaluates both candidates and keeps the stronger result. This
-avoids stranding a stagnation signal on the final iteration and does not relax
-or change the full acceptance validator.
+checks appear only as value-free invariant labels. When those operations are
+present in the selected public contract, the plan must order normalization,
+inferred public prerequisites, missing-capability checks, read-only versus
+mutating classification, target checks, and ambiguity checks before code is
+authored. Later attempts use the best validation frontier observed so far. When
+all ordinary candidates in an attempt are rejected, that
+same bounded lifecycle attempt immediately adds one independently model-authored
+clean-room candidate: it omits the rejected code and synthesizes from the public
+contract in one call. The controller evaluates the complete portfolio and keeps
+the strongest result. This avoids depending on a later iteration for a diverse
+candidate and does not relax or change the full acceptance validator.
 
 Every returned repair candidate is persisted before any lifecycle action in the
 append-only `post_deployment_repair_candidates.jsonl` journal. Each record binds
@@ -99,6 +121,21 @@ benchmark task identifiers, outcomes, expected answers, target state, and
 evaluator traces are prohibited. Rejected candidates therefore remain available
 to audit why repair converged or failed, while evaluator-private information
 remains outside generation and lifecycle evidence.
+
+Candidate-journal schema v3 also binds each candidate's origin as `ordinary` or
+`clean_room`. Its sealed attempt reference records the first unresolved public
+case and the public-only rank components used to choose the portfolio winner.
+The strict verifier independently recomputes those components, candidate-origin
+counts, and the complete winner ordering from the hash-bound candidate rows.
+Candidates are ordered by acceptance, newly regressed public cases, failure of
+the focused public case, total failed public cases, public validation distance,
+full validation distance, exact duplication of the current best, and finally
+candidate index. Clean-room provenance is valid only after every ordinary
+candidate in that attempt was rejected; a false fallback flag requires a zero
+clean-room count.
+Schemas v1 and v2 remain readable for historical reports under their original
+exact fields, but only v3 establishes authenticated origin and portfolio-choice
+evidence.
 
 If a rejected repair repeats both the current best executable hash and its
 sanitized validation frontier, the lifecycle records repair stagnation, keeps
@@ -114,42 +151,79 @@ inferred only when that public schema identifies it unambiguously; otherwise it
 remains opaque. ToolSandbox's private alias map is used only after selection to
 dispatch the chosen visible name, never to choose, filter, or force a tool.
 
-## Contact-dependency use case
+## Contact-removal use case
 
 `prepare_safe_action_or_abstain` is the historical motivating failure. Its
-public contract already required the tool to distinguish a missing search
-capability from a missing target identifier. The historical implementation
-returned a fixed missing-search answer. A runtime semantic normalizer then
-rewrote some incorrect decisions before the actor observed them, concealing the
-generated tool's failure and falsely attributing framework-authored behavior to
-the tool. Validation-helper output is now preserved exactly; the independent
-pre-promotion validator, not runtime rewriting, is responsible for rejecting
-bad semantics.
+broad public contract covered several unrelated action families and required it
+to distinguish a missing capability from a missing target. The historical
+implementation instead returned a largely fixed missing-search answer. A
+runtime semantic normalizer then rewrote some incorrect decisions before the
+actor observed them, concealing the generated implementation's behavior and
+attributing framework-authored corrections to the tool. Validation-helper
+output is now preserved exactly. The independent validator, rather than runtime
+rewriting, decides whether generated semantics are acceptable.
 
-During disclosed development, the public missing-target example was aligned to
-name `target_identifier` explicitly, as the existing raw semantic gate already
-required. This is a developer-authored consistency repair to the synthetic
-contract, not benchmark feedback or a benchmark-specific answer.
+The ordered 10-task development diagnostic exercises this prospective causal
+sequence:
 
-The current validation gate checks raw semantic behavior,
-including held-out and negative-applicability cases. That historical candidate
-is now rejected before deployment. A deterministic prospective lifecycle test
-also loads the historical accepted version, detects its public-contract
-failure, quarantines version 1, validates version 2, and evaluates version 2
-only on later matching-family observations. Hidden expected values and the
-triggering task identifier are asserted absent from generation prompts, repair
-feedback, and logs.
+1. Load the historical broad helper as active version 1 and expose a later
+   public contact-removal failure that its synthetic contract deterministically
+   reproduces. This public-contract violation is direct implementation evidence;
+   it does not rely on the benchmark answer or a whole-task score.
+2. Quarantine version 1 and make exactly seven bounded repair attempts. Ordinary
+   and, when eligible, clean-room candidates receive only the public executable
+   contract, model-visible synthetic examples, and sanitized public failure
+   frontier. No task identifier, benchmark answer, target state, evaluator
+   trace, outcome value, or hidden expected value enters a repair prompt.
+3. If no candidate passes the unchanged full validator, record the terminal
+   repair acknowledgement as rejected and retire the broad source. Persist a
+   tombstone for both its name and canonical contract before updating the
+   registry. The tombstone prevents the same failed product from being
+   reactivated or reborn after a restart.
+4. On a later contact-removal observation, generate the independently specified
+   narrower successor `assess_contact_removal_readiness`. This is a new
+   canonical tool, not version 2 of the retired broad helper and not a rewrite
+   from the triggering benchmark task. Its public contract applies only to
+   contact removals. It consumes the visible request, action, target, visible
+   match count, and two host-grounded Boolean facts indicating whether contact
+   lookup and contact removal are present in the routed native inventory.
+5. Validate the successor before registry activation. Public examples cover
+   missing lookup, missing removal, missing target, ambiguous matches, stable
+   identifiers, and safe continuation. Held-out cases and blind metamorphic
+   checks remain outside the generation prompt. The blind checks independently
+   withhold each declared capability, combine capability loss with a blank
+   target to verify decision precedence, and vary visible-match count to verify
+   ambiguity handling. The generated helper must return the raw six-field
+   decision contract and must never search, select, remove, or invent a record.
+6. Activate only a fully validated successor and assess it prospectively on the
+   six later contact-removal tasks in the 10-task diagnostic. The predeclared
+   gate requires it to be visible and called on all six, achieve at least five
+   exact outcomes, produce at least one success flip against the fresh matched
+   control, and never run beside the retired broad source.
 
-This distinction matters: closing the validator defect is a pre-deployment
-repair. The seeded historical-version test demonstrates the post-deployment
-actuator without pretending that a newly generated invalid tool passed the
-strengthened validator.
+The two availability Booleans are reconciled by the host from the routed native
+schemas immediately before execution. The actor may supply the request evidence
+needed by the helper, but it cannot claim that an absent native capability is
+available or hide one that is present. This reconciliation uses only the public
+tool inventory; it adds no task label or evaluator information.
 
-The contact-lookup and relative-time ordering rules used in this prospective
-repair are developer-authored meta-repair guidance derived from the public
-contract during disclosed development. This use case tests whether SAGE detects,
-repairs or retires, validates, canaries, and promotes correctly; it is not
-evidence that SAGE autonomously discovered those two semantic rules.
+The exact registry produced by a passing 10-task diagnostic is then frozen and
+transferred into a disjoint 30-task development cohort. Generation and lifecycle
+mutation are disabled for that transfer. The verifier requires the same active
+successor and retired-source tombstone, a byte-identical registry inventory,
+successful successor use on at least eight disjoint contact-removal
+cases, preserved execution of two pinned working reminder-tool paths, and exact
+non-regression on two unrelated native-only tasks. This is scoped transfer and
+no-harm evidence for the predeclared paths, not proof that no task or tool can
+ever regress.
+
+During disclosed development, the synthetic public contract and repair guidance
+were made internally consistent with the validator, including the explicit
+`target_identifier` fact, removal-before-lookup requirement order, and
+capability-before-target decision order. These are developer-authored,
+task-independent safety rules. The use case tests whether SAGE can actuate a
+public-evidence repair-or-retire lifecycle and validate a narrower successor; it
+is not evidence that SAGE autonomously discovered those semantic rules.
 
 ## Validation ladder and claim boundary
 
@@ -167,20 +241,26 @@ when present; the tracked fixture keeps clean-clone verification hermetic.
    execution mechanics.
 3. Transfer the complete content-addressed registry from the passing 10-task
    run into the disjoint 30-task cohort with generation and repair disabled.
-   Require the exact promoted tool to generalize and the registry to remain
+   Require the exact validated successor to generalize and the registry to remain
    byte-identical. The preservation check is deliberately narrow and follows
    the tool paths observed in the pinned successful paper run: the day-offset
    reminder calls `relative_day_time_to_timestamp` and
    `prepare_reminder_creation_args`; the weekday reminder calls the validated
    `next_weekday_time_to_timestamp` successor and
    `prepare_reminder_creation_args`. Both preserved entries must be exercised
-   across the cohort and remain failure-free. Their immutable code, spec,
-   validation, and provenance identities must be unchanged at every checkpoint;
-   only usage counters may advance. Two unrelated native-only tasks must remain
-   exact with no negative outcome delta. This demonstrates those working paths
-   plus the disjoint cohort; it is not a universal no-harm claim. An independently
-   seeded 30-task repair run is a separate repair-process replication and cannot
-   substitute for this transfer check.
+   across the cohort and remain failure-free. The installed registry inventory
+   must be byte-identical to the source snapshot before the run and remain
+   byte-identical through final verification. Two unrelated native-only tasks
+   must remain exact with no negative outcome delta. This demonstrates those
+   working paths plus the disjoint cohort; it is not a universal no-harm claim.
+   An independently seeded 30-task repair run is a separate repair-process
+   replication and cannot substitute for this transfer check.
+
+Steps 1–3 are disclosed development diagnostics. They establish mechanism,
+prompt secrecy, scoped transfer, and scoped non-regression, but they are not
+publication outcome samples. The publication boundary begins only after the
+accepted code and inputs are frozen for step 4.
+
 4. Freeze the code, then run a fresh-control, no-cache 1,032-task validation.
 5. Apply the content-addressed schema-v4 adaptive technical-readiness gate. The
    audited-v9 SAGE mean over all 1,032 tasks must be strictly greater than

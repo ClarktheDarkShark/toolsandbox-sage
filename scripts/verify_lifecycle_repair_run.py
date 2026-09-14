@@ -23,7 +23,10 @@ from sage_ts.adapters.sage_run_adapter import (
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
 from sage_ts.generation.complete_tools import native_action_tool_enabled
-from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
+from sage_ts.orchestration.online_birth import (
+    TERMINAL_RETIREMENT_TOMBSTONE_FILENAME,
+    prohibited_repair_payload_paths,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.registry.validation_contracts import (
@@ -39,6 +42,22 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution from scripts/
 
 LIFECYCLE_USE_CASE_TOOL = "prepare_safe_action_or_abstain"
 TRANSFER_MANIFEST_TYPE = "development_diagnostic_lifecycle_repair_transfer_dev30"
+RETIRE_REPLACE_DEV10_MANIFEST_TYPE = (
+    "development_diagnostic_lifecycle_retirement_successor_dev10"
+)
+RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE = (
+    "development_diagnostic_lifecycle_retirement_successor_transfer_dev30"
+)
+TRANSFER_MANIFEST_TYPES = frozenset(
+    {TRANSFER_MANIFEST_TYPE, RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE}
+)
+RETIRE_REPLACE_EVIDENCE_MODE = (
+    "seeded_historical_v1_bounded_repair_retirement_and_successor_birth"
+)
+CONTACT_READINESS_SUCCESSOR = "assess_contact_removal_readiness"
+CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY = (
+    "validation:assess_contact_removal_readiness"
+)
 LIFECYCLE_FAULT_FIXTURE_SHA256 = (
     "7677756340ccde07c5edb7b43003f68b5f363611d2cd935afdc7363e3bc33e8a"
 )
@@ -413,6 +432,153 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
             "overall_exact_outcomes": {"minimum": 25, "total": 30},
         },
     },
+    RETIRE_REPLACE_DEV10_MANIFEST_TYPE: {
+        "order": DEV10_ORDER,
+        "order_sha256": "b59acee1559e254551ffe783acdaf351b45c4b6977b4a4bb990229afe733cf0e",
+        "roles": {
+            "repair_trigger": DEV10_ORDER[:1],
+            "successor_confirmation": DEV10_ORDER[1:7],
+            "contact_repair_confirmation": DEV10_ORDER[1:7],
+            "working_generated_overlap": DEV10_ORDER[7:9],
+            "unrelated_native_preservation": DEV10_ORDER[9:],
+        },
+        "safe_role": "successor_confirmation",
+        "contact_role": "contact_repair_confirmation",
+        "safe_visible_called_minimum": 6,
+        "safe_exact_minimum": 5,
+        "contact_exact_no_remove_minimum": 5,
+        "working_overlap_minimum": 2,
+        "working_overlap_expected_tool_paths": DEV10_WORKING_TOOL_PATHS,
+        "unrelated_preservation_minimum": 1,
+        "overall_exact_minimum": 8,
+        "retirement_successor_transition": {
+            "source_tool_name": LIFECYCLE_USE_CASE_TOOL,
+            "source_tool_version": 1,
+            "trigger_role": "repair_trigger",
+            "repair_kind": "implementation",
+            "trigger_reason_code": "deterministic_public_contract_failure",
+            "bounded_repair_attempt_count": 7,
+            "terminal_acknowledgement_status": "rejected",
+            "terminal_retirement_reason": "bounded_repair_failed_validation",
+            "successors": {
+                CONTACT_READINESS_SUCCESSOR: {
+                    "canonical_key": CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY,
+                    "version": 1,
+                    "role": "successor_confirmation",
+                    "minimum_visible_and_called": 6,
+                    "minimum_exact_successes": 5,
+                    "minimum_success_flips": 1,
+                }
+            },
+            "exact_new_validation_successor_set": True,
+        },
+        "predeclared_gates": {
+            "source_v1_failure_bounded_repair_terminal_retirement": {
+                "source_tool_name": LIFECYCLE_USE_CASE_TOOL,
+                "source_tool_version": 1,
+                "trigger_role": "repair_trigger",
+                "trigger_outcome_less_than": 1.0,
+                "repair_kind": "implementation",
+                "trigger_reason_code": "deterministic_public_contract_failure",
+                "bounded_repair_attempt_count": 7,
+                "terminal_acknowledgement_status": "rejected",
+                "terminal_retirement_reason": "bounded_repair_failed_validation",
+            },
+            "exact_validated_successor_set": {
+                "tools": {
+                    CONTACT_READINESS_SUCCESSOR: {
+                        "canonical_key": CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY,
+                        "version": 1,
+                        "role": "successor_confirmation",
+                        "minimum_visible_and_called": 6,
+                        "minimum_exact_successes": 5,
+                        "minimum_success_flips": 1,
+                    }
+                },
+                "exact_new_validation_successor_set": True,
+            },
+            "working_generated_overlap_visible_called_exact_failure_free": (
+                _working_overlap_gate_contract(
+                    role="working_generated_overlap",
+                    expected_paths=DEV10_WORKING_TOOL_PATHS,
+                )
+            ),
+            "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
+                "role": "unrelated_native_preservation",
+                "minimum": 1,
+                "total": 1,
+            },
+            "working_generated_entries_unchanged": {"required": True},
+            "overall_exact_outcomes": {"minimum": 8, "total": 10},
+        },
+    },
+    RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE: {
+        "order": DEV30_ORDER,
+        "order_sha256": "4ab88c1b5c110b0681eb64763f8ca7870fba8b23271a980edf02d40a8424c39f",
+        "roles": {
+            "successor_confirmation": DEV30_ORDER[:9],
+            "contact_repair_confirmation": DEV30_ORDER[:9],
+            "working_generated_overlap": DEV30_ORDER[26:28],
+            "unrelated_native_preservation": DEV30_ORDER[28:],
+        },
+        "safe_role": "successor_confirmation",
+        "contact_role": "contact_repair_confirmation",
+        "safe_visible_called_minimum": 8,
+        "safe_exact_minimum": 8,
+        "contact_exact_no_remove_minimum": 8,
+        "working_overlap_minimum": 2,
+        "working_overlap_expected_tool_paths": DEV30_WORKING_TOOL_PATHS,
+        "unrelated_preservation_minimum": 2,
+        "overall_exact_minimum": 12,
+        "source_manifest_type": RETIRE_REPLACE_DEV10_MANIFEST_TYPE,
+        "retirement_successor_transition": {
+            "source_tool_name": LIFECYCLE_USE_CASE_TOOL,
+            "source_tool_version": 1,
+            "successors": {
+                CONTACT_READINESS_SUCCESSOR: {
+                    "canonical_key": CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY,
+                    "version": 1,
+                    "role": "successor_confirmation",
+                    "minimum_visible_and_called": 8,
+                    "minimum_exact_successes": 8,
+                    "minimum_success_flips": 1,
+                }
+            },
+            "exact_new_validation_successor_set": True,
+        },
+        "predeclared_gates": {
+            "exact_retired_source_and_promoted_successor_registry_transfer": {
+                "required": True
+            },
+            "registry_unchanged_after_transfer": {"required": True},
+            "exact_validated_successor_set": {
+                "tools": {
+                    CONTACT_READINESS_SUCCESSOR: {
+                        "canonical_key": CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY,
+                        "version": 1,
+                        "role": "successor_confirmation",
+                        "minimum_visible_and_called": 8,
+                        "minimum_exact_successes": 8,
+                        "minimum_success_flips": 1,
+                    }
+                },
+                "exact_new_validation_successor_set": True,
+            },
+            "working_generated_overlap_visible_called_exact_failure_free": (
+                _working_overlap_gate_contract(
+                    role="working_generated_overlap",
+                    expected_paths=DEV30_WORKING_TOOL_PATHS,
+                )
+            ),
+            "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
+                "role": "unrelated_native_preservation",
+                "minimum": 2,
+                "total": 2,
+            },
+            "working_generated_entries_unchanged": {"required": True},
+            "overall_exact_outcomes": {"minimum": 12, "total": 30},
+        },
+    },
 }
 
 
@@ -615,6 +781,12 @@ def _role_names(manifest: dict[str, Any], role: str) -> tuple[str, ...]:
 def _selection_has_tool(row: dict[str, Any], field: str, tool_name: str) -> bool:
     values = row.get(field)
     return isinstance(values, list) and tool_name in values
+
+
+def _selection_has_any_tool(
+    row: dict[str, Any], field: str, tool_names: tuple[str, ...]
+) -> bool:
+    return any(_selection_has_tool(row, field, name) for name in tool_names)
 
 
 def _canonical_json_sha256(value: Any) -> str:
@@ -2452,23 +2624,29 @@ def _inventory_sha256(inventory: list[dict[str, Any]]) -> str:
     ).hexdigest()
 
 
-def _target_tool_identity(registry_dir: Path) -> dict[str, Any] | None:
+def _target_tool_identity(
+    registry_dir: Path,
+    *,
+    tool_name: str = LIFECYCLE_USE_CASE_TOOL,
+    expected_retired: bool = False,
+    minimum_version: int = 2,
+) -> dict[str, Any] | None:
     manifest_path = registry_dir / "registry_manifest.json"
     if not manifest_path.is_file():
         return None
     manifest = _load_json(manifest_path)
     tools = manifest.get("tools") if isinstance(manifest, dict) else None
-    entry = tools.get(LIFECYCLE_USE_CASE_TOOL) if isinstance(tools, dict) else None
+    entry = tools.get(tool_name) if isinstance(tools, dict) else None
     tool = entry.get("tool") if isinstance(entry, dict) else None
     spec = tool.get("spec") if isinstance(tool, dict) else None
     code = tool.get("code") if isinstance(tool, dict) else None
     stored_hash = entry.get("code_hash") if isinstance(entry, dict) else None
     if (
         not isinstance(entry, dict)
-        or entry.get("retired") is not False
+        or entry.get("retired") is not expected_retired
         or not isinstance(entry.get("version"), int)
         or isinstance(entry.get("version"), bool)
-        or int(entry["version"]) < 2
+        or int(entry["version"]) < minimum_version
         or not isinstance(spec, dict)
         or not isinstance(code, str)
         or not isinstance(stored_hash, str)
@@ -2476,9 +2654,9 @@ def _target_tool_identity(registry_dir: Path) -> dict[str, Any] | None:
     ):
         return None
     return {
-        "tool_name": LIFECYCLE_USE_CASE_TOOL,
+        "tool_name": tool_name,
         "version": entry["version"],
-        "retired": False,
+        "retired": expected_retired,
         "code_hash": stored_hash,
         "public_spec_sha256": hashlib.sha256(
             json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -2488,10 +2666,12 @@ def _target_tool_identity(registry_dir: Path) -> dict[str, Any] | None:
 
 def _target_validation_contract_identity(
     registry_dir: Path,
+    *,
+    tool_name: str = LIFECYCLE_USE_CASE_TOOL,
 ) -> dict[str, Any] | None:
     store = RegistryStore(registry_dir)
     try:
-        entry = store.get(LIFECYCLE_USE_CASE_TOOL)
+        entry = store.get(tool_name)
     except (KeyError, TypeError, ValueError):
         return None
     if entry is None:
@@ -2715,6 +2895,763 @@ def _seeded_validation_contract_reasons(
     return list(dict.fromkeys(reasons))
 
 
+def _legacy_same_name_transition_report(
+    *,
+    run_root: Path,
+    candidate_dir: Path,
+    registry_dir: Path,
+    protocol: dict[str, Any],
+    protocol_events: list[dict[str, Any]],
+    repair_requests: list[dict[str, Any]],
+    acknowledgements: list[dict[str, Any]],
+    feedback_rows: list[dict[str, Any]],
+    candidate_by_name: dict[str, dict[str, Any]],
+    control_by_name: dict[str, dict[str, Any]],
+    safe_names: tuple[str, ...],
+    spec: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    """Retain strict verification of the original same-name-v2 protocol."""
+
+    reasons: list[str] = []
+    use_case_requests = [
+        row
+        for row in repair_requests
+        if row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
+        and row.get("source_tool_version") == 1
+        and row.get("repair_kind") == "implementation"
+    ]
+    if len(use_case_requests) != 1:
+        reasons.append("historical_v1_repair_request_count_mismatch")
+    use_case_request = use_case_requests[0] if len(use_case_requests) == 1 else {}
+    use_case_request_id = str(use_case_request.get("request_id") or "")
+    if "deterministic_public_contract_failure" not in (
+        use_case_request.get("trigger_reason_codes") or []
+    ):
+        reasons.append("historical_v1_repair_reason_not_deterministic_contract_failure")
+    use_case_acks = [
+        row
+        for row in acknowledgements
+        if str(row.get("request_id") or "") == use_case_request_id
+    ]
+    use_case_ack_statuses = [str(row.get("status") or "") for row in use_case_acks]
+    if "canary_pending" not in use_case_ack_statuses:
+        reasons.append("historical_v1_replacement_not_accepted_for_canary")
+    if not use_case_ack_statuses or use_case_ack_statuses[-1] != "promoted":
+        reasons.append("historical_v1_replacement_not_promoted")
+
+    triggering_completed_count = int(
+        use_case_request.get("trigger_completed_count") or 0
+    )
+    trigger_rows = [
+        row
+        for row in feedback_rows
+        if int(row.get("completed_count") or 0) == triggering_completed_count
+        and str(row.get("scenario") or "") in safe_names
+        and use_case_request_id in (row.get("post_deployment_repair_request_ids") or [])
+    ]
+    trigger_row = trigger_rows[0] if len(trigger_rows) == 1 else {}
+    trigger_scenario = str(trigger_row.get("scenario") or "")
+    trigger_versions = trigger_row.get("generated_tool_versions")
+    trigger_outcome = (
+        _outcome(candidate_by_name[trigger_scenario])
+        if trigger_scenario in candidate_by_name
+        else None
+    )
+    trigger_proves_v1_failure = bool(
+        len(trigger_rows) == 1
+        and trigger_scenario == safe_names[0]
+        and isinstance(trigger_versions, dict)
+        and trigger_versions.get(LIFECYCLE_USE_CASE_TOOL) == 1
+        and LIFECYCLE_USE_CASE_TOOL in (trigger_row.get("generated_tools_called") or [])
+        and LIFECYCLE_USE_CASE_TOOL
+        in (trigger_row.get("generated_tool_contract_failures") or [])
+        and trigger_outcome is not None
+        and trigger_outcome < 1.0
+    )
+    if not trigger_proves_v1_failure:
+        reasons.append("historical_v1_trigger_did_not_prove_observed_failure")
+
+    future_v2_rows: list[dict[str, Any]] = []
+    for row in feedback_rows:
+        versions = row.get("generated_tool_versions")
+        if (
+            int(row.get("completed_count") or 0) > triggering_completed_count
+            and str(row.get("scenario") or "") in safe_names
+            and isinstance(versions, dict)
+            and versions.get(LIFECYCLE_USE_CASE_TOOL) == 2
+            and LIFECYCLE_USE_CASE_TOOL in (row.get("generated_tools_called") or [])
+        ):
+            future_v2_rows.append(row)
+    expected_future_v2_call_count = len(safe_names) - 1
+    if len(future_v2_rows) != expected_future_v2_call_count:
+        reasons.append("future_v2_safe_task_call_coverage_mismatch")
+    future_v2_exact_successes = sum(
+        str(row.get("scenario") or "") in candidate_by_name
+        and _exact_targeted_abstention(
+            candidate_by_name[str(row.get("scenario") or "")]
+        )
+        for row in future_v2_rows
+    )
+    if future_v2_exact_successes < int(spec["future_v2_exact_minimum"]):
+        reasons.append("future_v2_exact_success_gate_failed")
+    future_v2_success_flips = sum(
+        str(row.get("scenario") or "") in candidate_by_name
+        and str(row.get("scenario") or "") in control_by_name
+        and _exact_targeted_abstention(
+            candidate_by_name[str(row.get("scenario") or "")]
+        )
+        and not _exact_outcome(control_by_name[str(row.get("scenario") or "")])
+        for row in future_v2_rows
+    )
+    if future_v2_success_flips < int(spec["future_v2_success_flip_minimum"]):
+        reasons.append("future_v2_affirmative_success_flip_missing")
+
+    final_validation_contract = _target_validation_contract_identity(registry_dir)
+    if final_validation_contract is None:
+        reasons.append("promoted_v2_validation_contract_binding_invalid")
+    repair_acceptance_candidates = [
+        row
+        for row in protocol_events
+        if row.get("event") == "post_deployment_tool_repair_accepted"
+        and (
+            row.get("request_id") == use_case_request_id
+            or (
+                row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
+                and row.get("source_tool_version") == 1
+            )
+        )
+    ]
+    repair_acceptance_events = [
+        row
+        for row in repair_acceptance_candidates
+        if row.get("request_id") == use_case_request_id
+        and row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
+        and row.get("source_tool_version") == 1
+        and row.get("new_tool_version") == 2
+        and isinstance(final_validation_contract, dict)
+        and row.get("validation_contract_hash")
+        == final_validation_contract.get("contract_hash")
+        and row.get("triggering_task_replayed") is False
+        and row.get("mode") == protocol.get("mode")
+        and _event_path_matches(run_root, row.get("run_root"), run_root)
+        and _event_path_matches(run_root, row.get("run_dir"), candidate_dir)
+    ]
+    repair_acceptance_binding_mismatches = len(repair_acceptance_candidates) - len(
+        repair_acceptance_events
+    )
+    if not repair_acceptance_events:
+        reasons.append("postdeployment_v2_acceptance_event_missing")
+    elif len(repair_acceptance_events) > 1:
+        reasons.append("postdeployment_v2_acceptance_event_not_unique")
+    if repair_acceptance_binding_mismatches:
+        reasons.append("postdeployment_v2_acceptance_event_binding_mismatch")
+
+    registry = _load_json(registry_dir / "registry_manifest.json")
+    final_entry = (
+        registry.get("tools", {}).get(LIFECYCLE_USE_CASE_TOOL)
+        if isinstance(registry, dict) and isinstance(registry.get("tools"), dict)
+        else None
+    )
+    if not isinstance(final_entry, dict) or any(
+        (final_entry.get("version") != 2, final_entry.get("retired") is not False)
+    ):
+        reasons.append("promoted_repaired_version_not_active_in_final_registry")
+
+    return (
+        {
+            "use_case_tool": LIFECYCLE_USE_CASE_TOOL,
+            "use_case_request_id": use_case_request_id or None,
+            "use_case_repair_reason_codes": list(
+                use_case_request.get("trigger_reason_codes") or []
+            ),
+            "use_case_acknowledgement_statuses": use_case_ack_statuses,
+            "historical_v1_trigger_scenario": trigger_scenario or None,
+            "historical_v1_trigger_outcome": trigger_outcome,
+            "historical_v1_observed_failure_proved": trigger_proves_v1_failure,
+            "repaired_version_future_call_count": len(future_v2_rows),
+            "repaired_version_future_exact_success_count": future_v2_exact_successes,
+            "repaired_version_future_success_flip_count": future_v2_success_flips,
+            "repair_acceptance_event_count": len(repair_acceptance_events),
+            "repair_acceptance_event_binding_mismatch_count": (
+                repair_acceptance_binding_mismatches
+            ),
+            "promoted_v2_validation_contract": final_validation_contract,
+        },
+        list(dict.fromkeys(reasons)),
+    )
+
+
+def _retirement_successor_transition_report(
+    *,
+    run_root: Path,
+    candidate_dir: Path,
+    registry_dir: Path,
+    protocol: dict[str, Any],
+    protocol_events: list[dict[str, Any]],
+    repair_requests: list[dict[str, Any]],
+    acknowledgements: list[dict[str, Any]],
+    feedback_rows: list[dict[str, Any]],
+    selection_by_name: dict[str, dict[str, Any]],
+    trajectory_by_name: dict[str, dict[str, tuple[str, ...]]],
+    candidate_by_name: dict[str, dict[str, Any]],
+    control_by_name: dict[str, dict[str, Any]],
+    roles: dict[str, tuple[str, ...]],
+    transition: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    """Authenticate bounded retirement followed by new validated successors.
+
+    The transition is predeclared by the cohort specification.  This verifier
+    does not infer a convenient replacement after seeing a run, and it does not
+    inspect hidden evaluator values or replay the task that raised the alarm.
+    """
+
+    reasons: list[str] = []
+    source_tool_name = str(transition["source_tool_name"])
+    source_tool_version = int(transition["source_tool_version"])
+    repair_kind = str(transition["repair_kind"])
+    trigger_reason_code = str(transition["trigger_reason_code"])
+    bounded_attempt_count = int(transition["bounded_repair_attempt_count"])
+    terminal_status = str(transition["terminal_acknowledgement_status"])
+    terminal_reason = str(transition["terminal_retirement_reason"])
+    successor_specs = transition.get("successors")
+    if not isinstance(successor_specs, dict) or not successor_specs:
+        raise ValueError("Retirement-successor transition has no successors.")
+    successor_names = tuple(sorted(str(name) for name in successor_specs))
+    source_contract = PINNED_LIFECYCLE_V1_CONTRACTS.get(source_tool_name, {})
+    source_canonical_key = str(source_contract.get("canonical_key") or "")
+    if not source_canonical_key:
+        reasons.append("source_v1_canonical_key_not_pinned")
+
+    indexed_candidate_events = [
+        (index, row)
+        for index, row in enumerate(protocol_events)
+        if row.get("mode") == protocol.get("mode")
+        and _event_path_matches(run_root, row.get("run_root"), run_root)
+        and _event_path_matches(run_root, row.get("run_dir"), candidate_dir)
+    ]
+
+    trigger_role = str(transition["trigger_role"])
+    trigger_names = tuple(roles.get(trigger_role, ()))
+    if len(trigger_names) != 1:
+        reasons.append("retirement_successor_trigger_role_not_singleton")
+    trigger_name = trigger_names[0] if len(trigger_names) == 1 else ""
+
+    source_requests = [
+        row
+        for row in repair_requests
+        if row.get("tool_name") == source_tool_name
+        and row.get("source_tool_version") == source_tool_version
+        and row.get("repair_kind") == repair_kind
+    ]
+    if len(source_requests) != 1:
+        reasons.append("source_v1_repair_request_count_mismatch")
+    source_request = source_requests[0] if len(source_requests) == 1 else {}
+    request_id = str(source_request.get("request_id") or "")
+    if trigger_reason_code not in (source_request.get("trigger_reason_codes") or []):
+        reasons.append("source_v1_repair_reason_mismatch")
+
+    source_acks = [
+        row
+        for row in acknowledgements
+        if str(row.get("request_id") or "") == request_id
+    ]
+    source_ack_statuses = [str(row.get("status") or "") for row in source_acks]
+    if source_ack_statuses != [terminal_status]:
+        reasons.append("source_v1_terminal_acknowledgement_mismatch")
+
+    triggering_completed_count = int(source_request.get("trigger_completed_count") or 0)
+    terminal_acknowledgement_proved = bool(
+        len(source_acks) == 1
+        and source_acks[0].get("tool_name") == source_tool_name
+        and source_acks[0].get("new_version") == source_tool_version
+        and source_acks[0].get("status") == terminal_status
+        and source_acks[0].get("acknowledged_after_completed_count")
+        == triggering_completed_count
+        and source_acks[0].get("eligible_from_completed_count")
+        == triggering_completed_count + 1
+        and source_acks[0].get("future_tasks_only") is True
+        and source_acks[0].get("triggering_task_replay_allowed") is False
+    )
+    if not terminal_acknowledgement_proved:
+        reasons.append("source_v1_terminal_acknowledgement_evidence_mismatch")
+    trigger_rows = [
+        row
+        for row in feedback_rows
+        if int(row.get("completed_count") or 0) == triggering_completed_count
+        and str(row.get("scenario") or "") == trigger_name
+        and request_id in (row.get("post_deployment_repair_request_ids") or [])
+    ]
+    trigger_row = trigger_rows[0] if len(trigger_rows) == 1 else {}
+    trigger_versions = trigger_row.get("generated_tool_versions")
+    trigger_outcome = (
+        _outcome(candidate_by_name[trigger_name])
+        if trigger_name in candidate_by_name
+        else None
+    )
+    trigger_proved_failure = bool(
+        len(trigger_rows) == 1
+        and isinstance(trigger_versions, dict)
+        and trigger_versions.get(source_tool_name) == source_tool_version
+        and source_tool_name in (trigger_row.get("generated_tools_called") or [])
+        and source_tool_name
+        in (trigger_row.get("generated_tool_contract_failures") or [])
+        and trigger_outcome is not None
+        and trigger_outcome < 1.0
+    )
+    if not trigger_proved_failure:
+        reasons.append("source_v1_trigger_did_not_prove_observed_failure")
+
+    source_failure_event_indices = [
+        index
+        for index, row in indexed_candidate_events
+        if row.get("event") == "post_deployment_public_contract_failure"
+        and row.get("tool_name") == source_tool_name
+        and row.get("tool_version") == source_tool_version
+        and row.get("canonical_key") == source_canonical_key
+        and row.get("raw_hidden_case_values_logged") is False
+    ]
+    queued_event_indices = [
+        index
+        for index, row in indexed_candidate_events
+        if row.get("event") == "post_deployment_tool_repair_queued"
+        and row.get("request_id") == request_id
+        and row.get("tool_name") == source_tool_name
+        and row.get("repair_kind") == repair_kind
+        and row.get("source_tool_version") == source_tool_version
+        and row.get("eligible_from_completed_count") == triggering_completed_count + 1
+        and row.get("future_tasks_only") is True
+    ]
+    if len(source_failure_event_indices) != 1:
+        reasons.append("source_v1_public_contract_failure_event_mismatch")
+    if len(queued_event_indices) != 1:
+        reasons.append("source_v1_repair_queued_event_mismatch")
+
+    indexed_attempt_events = [
+        (index, row)
+        for index, row in indexed_candidate_events
+        if row.get("event") == "post_deployment_tool_repair_attempted"
+        and row.get("request_id") == request_id
+        and row.get("tool_name") == source_tool_name
+    ]
+    attempt_events = [row for _, row in indexed_attempt_events]
+    attempt_event_indices = [index for index, _ in indexed_attempt_events]
+    observed_attempts = [row.get("attempt") for row in attempt_events]
+    expected_attempts = list(range(1, bounded_attempt_count + 1))
+    bounded_repair_proved = bool(
+        observed_attempts == expected_attempts
+        and all(
+            row.get("accepted") is False
+            and isinstance(row.get("candidate_count"), int)
+            and not isinstance(row.get("candidate_count"), bool)
+            and int(row["candidate_count"]) >= 1
+            for row in attempt_events
+        )
+    )
+    if not bounded_repair_proved:
+        reasons.append("source_v1_bounded_repair_evidence_mismatch")
+
+    indexed_retirement_events = [
+        (index, row)
+        for index, row in indexed_candidate_events
+        if row.get("event") == "post_deployment_tool_repair_retired"
+        and row.get("request_id") == request_id
+        and row.get("tool_name") == source_tool_name
+        and row.get("source_tool_version") == source_tool_version
+        and row.get("status") == terminal_status
+        and row.get("reason") == terminal_reason
+        and row.get("future_tasks_only") is True
+        and row.get("triggering_task_replayed") is False
+        and row.get("entry_retired") is True
+        and row.get("retired_canonical_key") == source_canonical_key
+        and row.get("same_run_rebirth_suppressed") is True
+    ]
+    retirement_events = [row for _, row in indexed_retirement_events]
+    retirement_event_indices = [index for index, _ in indexed_retirement_events]
+    if len(retirement_events) != 1:
+        reasons.append("source_v1_terminal_retirement_event_mismatch")
+
+    source_causal_prefix_proved = bool(
+        len(source_failure_event_indices) == 1
+        and len(queued_event_indices) == 1
+        and bounded_repair_proved
+        and len(attempt_event_indices) == bounded_attempt_count
+        and len(retirement_event_indices) == 1
+        and source_failure_event_indices[0]
+        < queued_event_indices[0]
+        < attempt_event_indices[0]
+        and attempt_event_indices[-1] < retirement_event_indices[0]
+    )
+    if not source_causal_prefix_proved:
+        reasons.append("source_v1_failure_repair_retirement_order_mismatch")
+
+    registry_path = registry_dir / "registry_manifest.json"
+    registry = _load_json(registry_path)
+    registry_tools = registry.get("tools") if isinstance(registry, dict) else None
+    registry_tools = registry_tools if isinstance(registry_tools, dict) else {}
+    source_identity = _registry_entry_identity(
+        registry_tools.get(source_tool_name), expected_name=source_tool_name
+    )
+    source_retired = bool(
+        isinstance(source_identity, dict)
+        and source_identity.get("version") == source_tool_version
+        and source_identity.get("retired") is True
+    )
+    if not source_retired:
+        reasons.append("source_v1_not_retired_in_final_registry")
+
+    tombstone_path = registry_dir / TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+    tombstone_payload: dict[str, Any] = {}
+    try:
+        if not tombstone_path.is_file() or tombstone_path.is_symlink():
+            raise ValueError("missing_or_symlink")
+        loaded_tombstone = _load_json(tombstone_path)
+        canonical_keys = loaded_tombstone.get("canonical_keys")
+        tool_names = loaded_tombstone.get("tool_names")
+        if (
+            loaded_tombstone.get("schema_version") != 1
+            or not isinstance(canonical_keys, list)
+            or not isinstance(tool_names, list)
+            or any(not isinstance(item, str) or not item for item in canonical_keys)
+            or any(not isinstance(item, str) or not item for item in tool_names)
+            or len(canonical_keys) != len(set(canonical_keys))
+            or len(tool_names) != len(set(tool_names))
+        ):
+            raise ValueError("invalid_schema")
+        tombstone_payload = loaded_tombstone
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        reasons.append("terminal_retirement_tombstone_invalid")
+    durable_source_tombstone = bool(
+        source_tool_name in (tombstone_payload.get("tool_names") or [])
+        and source_canonical_key in (tombstone_payload.get("canonical_keys") or [])
+    )
+    if not durable_source_tombstone:
+        reasons.append("source_v1_terminal_retirement_tombstone_missing")
+
+    source_presence_fields = (
+        "generated_tools_visible",
+        "generated_tools_called",
+        "generated_tools_attempted",
+        "generated_tools_failed",
+        "generated_tool_contract_failures",
+    )
+    post_trigger_source_presence: list[str] = []
+    for feedback in feedback_rows:
+        if int(feedback.get("completed_count") or 0) <= triggering_completed_count:
+            continue
+        scenario_name = str(feedback.get("scenario") or "")
+        evidence_sources: tuple[tuple[str, dict[str, Any]], ...] = (
+            ("feedback", feedback),
+            ("selection", selection_by_name.get(scenario_name, {})),
+            ("trajectory", trajectory_by_name.get(scenario_name, {})),
+        )
+        for evidence_label, evidence in evidence_sources:
+            for field in source_presence_fields:
+                if source_tool_name in (evidence.get(field) or []):
+                    post_trigger_source_presence.append(
+                        f"{scenario_name}:{evidence_label}:{field}"
+                    )
+            versions = evidence.get("generated_tool_versions")
+            if isinstance(versions, dict) and source_tool_name in versions:
+                post_trigger_source_presence.append(
+                    f"{scenario_name}:{evidence_label}:generated_tool_versions"
+                )
+    if post_trigger_source_presence:
+        reasons.append("retired_source_present_after_trigger")
+
+    checkpoint_tombstone_mismatches: list[str] = []
+    checkpoint_root = candidate_dir / "registry_checkpoints"
+    for completed_count, scenario_name in enumerate(
+        (str(row.get("scenario") or "") for row in feedback_rows), start=1
+    ):
+        checkpoint_dir = checkpoint_root / (
+            f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario_name)}"
+        )
+        checkpoint_manifest_path = checkpoint_dir / "registry_manifest.json"
+        checkpoint_metadata_path = checkpoint_dir / "checkpoint.json"
+        checkpoint_tombstone_path = (
+            checkpoint_dir / TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+        )
+        try:
+            checkpoint_manifest = _load_json(checkpoint_manifest_path)
+            checkpoint_metadata = _load_json(checkpoint_metadata_path)
+            checkpoint_tools = checkpoint_manifest.get("tools")
+            checkpoint_source = (
+                checkpoint_tools.get(source_tool_name)
+                if isinstance(checkpoint_tools, dict)
+                else None
+            )
+            checkpoint_source_identity = _registry_entry_identity(
+                checkpoint_source, expected_name=source_tool_name
+            )
+            if completed_count <= triggering_completed_count:
+                if not (
+                    isinstance(checkpoint_source_identity, dict)
+                    and checkpoint_source_identity.get("version") == source_tool_version
+                    and checkpoint_source_identity.get("retired") is False
+                ):
+                    raise ValueError("source_not_active_before_retirement")
+                if checkpoint_tombstone_path.exists():
+                    early_tombstone = _load_json(checkpoint_tombstone_path)
+                    if source_tool_name in (early_tombstone.get("tool_names") or []):
+                        raise ValueError("source_tombstoned_before_retirement")
+                    if source_canonical_key in (
+                        early_tombstone.get("canonical_keys") or []
+                    ):
+                        raise ValueError("source_key_tombstoned_before_retirement")
+                continue
+            copied_files = checkpoint_metadata.get("copied_files")
+            if (
+                not checkpoint_tombstone_path.is_file()
+                or checkpoint_tombstone_path.is_symlink()
+                or not isinstance(copied_files, list)
+                or TERMINAL_RETIREMENT_TOMBSTONE_FILENAME not in copied_files
+                or not isinstance(checkpoint_source_identity, dict)
+                or checkpoint_source_identity.get("version") != source_tool_version
+                or checkpoint_source_identity.get("retired") is not True
+            ):
+                raise ValueError("retirement_not_persisted")
+            checkpoint_tombstone = _load_json(checkpoint_tombstone_path)
+            if (
+                checkpoint_tombstone.get("schema_version") != 1
+                or source_tool_name
+                not in (checkpoint_tombstone.get("tool_names") or [])
+                or source_canonical_key
+                not in (checkpoint_tombstone.get("canonical_keys") or [])
+            ):
+                raise ValueError("tombstone_not_persisted")
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            checkpoint_tombstone_mismatches.append(f"{scenario_name}:{exc}")
+    if checkpoint_tombstone_mismatches:
+        reasons.append("terminal_retirement_checkpoint_persistence_mismatch")
+
+    contract_identities = _validation_contract_identities(registry_dir)
+    if contract_identities is None:
+        contract_identities = {}
+        reasons.append("successor_validation_contract_set_invalid")
+    new_validation_names = {
+        tool_name
+        for tool_name, identity in contract_identities.items()
+        if tool_name not in PINNED_LIFECYCLE_V1_CONTRACTS
+        and isinstance(identity.get("canonical_key"), str)
+        and str(identity["canonical_key"]).startswith("validation:")
+    }
+    exact_successor_set = new_validation_names == set(successor_names)
+    if transition.get("exact_new_validation_successor_set") is True and not (
+        exact_successor_set
+    ):
+        reasons.append("exact_new_validation_successor_set_mismatch")
+
+    birth_rows = _read_jsonl(candidate_dir / "tool_birth_events.jsonl")
+    successor_reports: dict[str, Any] = {}
+    for successor_name in successor_names:
+        successor_spec = successor_specs[successor_name]
+        canonical_key = str(successor_spec["canonical_key"])
+        expected_version = int(successor_spec["version"])
+        role = str(successor_spec["role"])
+        role_names = tuple(roles.get(role, ()))
+        entry_payload = registry_tools.get(successor_name)
+        entry_identity = _registry_entry_identity(
+            entry_payload, expected_name=successor_name
+        )
+        contract_identity = contract_identities.get(successor_name)
+        validation = (
+            entry_payload.get("validation") if isinstance(entry_payload, dict) else None
+        )
+        active_and_validated = bool(
+            isinstance(entry_identity, dict)
+            and entry_identity.get("version") == expected_version
+            and entry_identity.get("retired") is False
+            and isinstance(contract_identity, dict)
+            and contract_identity.get("tool_name") == successor_name
+            and contract_identity.get("tool_version") == expected_version
+            and contract_identity.get("canonical_key") == canonical_key
+            and contract_identity.get("tool_code_hash")
+            == entry_identity.get("code_hash")
+            and contract_identity.get("tool_spec_hash")
+            == entry_identity.get("public_spec_sha256")
+            and isinstance(validation, dict)
+            and validation.get("accepted") is True
+            and int(validation.get("held_out_check_count") or 0) >= 1
+            and int(validation.get("negative_applicability_count") or 0) >= 1
+            and validation.get("runtime_smoke_passed") is True
+        )
+        if not active_and_validated:
+            reasons.append(f"successor_not_active_and_validated:{successor_name}")
+
+        matching_births = [
+            row
+            for row in birth_rows
+            if row.get("accepted") is True
+            and row.get("tool_name") == successor_name
+            and row.get("canonical_key") == canonical_key
+            and row.get("source_task_id_redacted") is True
+            and row.get("runtime_smoke_passed") is True
+            and row.get("errors") == []
+        ]
+        if len(matching_births) != 1:
+            reasons.append(f"successor_birth_event_mismatch:{successor_name}")
+
+        successor_validation_event_indices = [
+            index
+            for index, row in indexed_candidate_events
+            if row.get("event") == "validation_passed"
+            and row.get("tool_name") == successor_name
+            and row.get("canonical_key") == canonical_key
+            and row.get("errors") == []
+            and row.get("runtime_smoke_passed") is True
+        ]
+        successor_birth_event_indices = [
+            index
+            for index, row in indexed_candidate_events
+            if row.get("event") == "tool_birth_succeeded"
+            and row.get("tool_name") == successor_name
+            and row.get("canonical_key") == canonical_key
+            and isinstance(row.get("validation_contract_hash"), str)
+        ]
+        successor_registry_event_indices = [
+            index
+            for index, row in indexed_candidate_events
+            if row.get("event") == "registry_saved"
+            and row.get("tool_name") == successor_name
+            and row.get("tool_version") == expected_version
+            and isinstance(row.get("validation_contract_hash"), str)
+        ]
+        successor_causal_order_proved = bool(
+            len(retirement_event_indices) == 1
+            and len(successor_validation_event_indices) == 1
+            and len(successor_birth_event_indices) == 1
+            and len(successor_registry_event_indices) == 1
+            and retirement_event_indices[0]
+            < successor_validation_event_indices[0]
+            < successor_birth_event_indices[0]
+            < successor_registry_event_indices[0]
+        )
+        if not successor_causal_order_proved:
+            reasons.append(f"successor_causal_birth_order_mismatch:{successor_name}")
+
+        eligible_rows: list[dict[str, Any]] = []
+        for feedback in feedback_rows:
+            scenario_name = str(feedback.get("scenario") or "")
+            selection = selection_by_name.get(scenario_name, {})
+            versions = feedback.get("generated_tool_versions")
+            selection_versions = selection.get("generated_tool_versions")
+            if (
+                scenario_name in role_names
+                and int(feedback.get("completed_count") or 0)
+                > triggering_completed_count
+                and isinstance(versions, dict)
+                and versions.get(successor_name) == expected_version
+                and isinstance(selection_versions, dict)
+                and selection_versions.get(successor_name) == expected_version
+                and _selection_has_tool(
+                    feedback, "generated_tools_visible", successor_name
+                )
+                and _selection_has_tool(
+                    feedback, "generated_tools_called", successor_name
+                )
+                and _selection_has_tool(
+                    selection, "generated_tools_visible", successor_name
+                )
+                and _selection_has_tool(
+                    selection, "generated_tools_called", successor_name
+                )
+                and successor_name not in (feedback.get("generated_tools_failed") or [])
+                and successor_name
+                not in (feedback.get("generated_tool_contract_failures") or [])
+            ):
+                eligible_rows.append(feedback)
+
+        visible_and_called_count = len(eligible_rows)
+        exact_success_count = sum(
+            str(row.get("scenario") or "") in candidate_by_name
+            and _exact_targeted_abstention(
+                candidate_by_name[str(row.get("scenario") or "")]
+            )
+            for row in eligible_rows
+        )
+        success_flip_count = sum(
+            str(row.get("scenario") or "") in candidate_by_name
+            and str(row.get("scenario") or "") in control_by_name
+            and _exact_targeted_abstention(
+                candidate_by_name[str(row.get("scenario") or "")]
+            )
+            and not _exact_outcome(control_by_name[str(row.get("scenario") or "")])
+            for row in eligible_rows
+        )
+        if visible_and_called_count < int(successor_spec["minimum_visible_and_called"]):
+            reasons.append(f"successor_call_coverage_gate_failed:{successor_name}")
+        if exact_success_count < int(successor_spec["minimum_exact_successes"]):
+            reasons.append(f"successor_exact_success_gate_failed:{successor_name}")
+        if success_flip_count < int(successor_spec["minimum_success_flips"]):
+            reasons.append(f"successor_success_flip_gate_failed:{successor_name}")
+        if any(
+            int(row.get("completed_count") or 0) <= triggering_completed_count
+            and successor_name in (row.get("generated_tools_called") or [])
+            for row in feedback_rows
+        ):
+            reasons.append(f"successor_used_nonprospectively:{successor_name}")
+        if any(
+            source_tool_name in (row.get("generated_tools_called") or [])
+            for row in eligible_rows
+        ):
+            reasons.append(f"retired_source_called_with_successor:{successor_name}")
+
+        successor_reports[successor_name] = {
+            "canonical_key": canonical_key,
+            "expected_version": expected_version,
+            "role": role,
+            "role_task_count": len(role_names),
+            "birth_event_count": len(matching_births),
+            "validation_protocol_event_indices": successor_validation_event_indices,
+            "birth_protocol_event_indices": successor_birth_event_indices,
+            "registry_protocol_event_indices": successor_registry_event_indices,
+            "causal_birth_order_proved": successor_causal_order_proved,
+            "active_and_validated": active_and_validated,
+            "visible_and_called_count": visible_and_called_count,
+            "exact_success_count": exact_success_count,
+            "success_flip_count": success_flip_count,
+            "registry_identity": entry_identity,
+            "validation_contract": contract_identity,
+        }
+
+    return (
+        {
+            "source_tool_name": source_tool_name,
+            "source_tool_version": source_tool_version,
+            "repair_request_id": request_id or None,
+            "repair_reason_codes": list(
+                source_request.get("trigger_reason_codes") or []
+            ),
+            "acknowledgement_statuses": source_ack_statuses,
+            "terminal_acknowledgement_proved": terminal_acknowledgement_proved,
+            "trigger_scenario": trigger_name or None,
+            "trigger_outcome": trigger_outcome,
+            "trigger_observed_failure_proved": trigger_proved_failure,
+            "bounded_repair_attempt_count": len(attempt_events),
+            "bounded_repair_attempts": observed_attempts,
+            "bounded_repair_failure_proved": bounded_repair_proved,
+            "public_contract_failure_event_indices": source_failure_event_indices,
+            "repair_queued_event_indices": queued_event_indices,
+            "repair_attempt_event_indices": attempt_event_indices,
+            "terminal_retirement_event_count": len(retirement_events),
+            "terminal_retirement_event_indices": retirement_event_indices,
+            "failure_repair_retirement_order_proved": source_causal_prefix_proved,
+            "source_retired": source_retired,
+            "source_registry_identity": source_identity,
+            "source_canonical_key": source_canonical_key,
+            "durable_source_tombstone": durable_source_tombstone,
+            "terminal_retirement_tombstone": tombstone_payload or None,
+            "post_trigger_source_presence": post_trigger_source_presence,
+            "checkpoint_tombstone_mismatches": checkpoint_tombstone_mismatches,
+            "expected_successor_names": list(successor_names),
+            "observed_new_validation_successor_names": sorted(new_validation_names),
+            "exact_successor_set": exact_successor_set,
+            "successors": successor_reports,
+        },
+        list(dict.fromkeys(reasons)),
+    )
+
+
 def _write_report(run_root: Path, report: dict[str, Any]) -> dict[str, Any]:
     (run_root / "lifecycle_repair_validation_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
@@ -2734,7 +3671,16 @@ def _verify_frozen_transfer(
 ) -> dict[str, Any]:
     """Verify the exact promoted dev10 registry on the disjoint dev30 cohort."""
 
-    spec = COHORT_SPECS[TRANSFER_MANIFEST_TYPE]
+    manifest_type = str(benchmark_manifest.get("manifest_type") or "")
+    if manifest_type not in TRANSFER_MANIFEST_TYPES:
+        raise ValueError(f"Unknown lifecycle transfer cohort: {manifest_type!r}")
+    spec = COHORT_SPECS[manifest_type]
+    transition = spec.get("retirement_successor_transition")
+    successor_specs = (
+        transition.get("successors", {}) if isinstance(transition, dict) else {}
+    )
+    successor_names = tuple(sorted(str(name) for name in successor_specs))
+    assessed_tool_names = successor_names or (LIFECYCLE_USE_CASE_TOOL,)
     expected_order = tuple(spec["order"])
     roles = spec["roles"]
     safe_names = tuple(roles[str(spec["safe_role"])])
@@ -2755,11 +3701,12 @@ def _verify_frozen_transfer(
         reasons.append("transfer_protocol_order_pin_mismatch")
     if protocol.get("benchmark_manifest_sha256") != benchmark_sha256:
         reasons.append("transfer_benchmark_bytes_do_not_match_protocol")
-    if protocol.get("manifest_type") != TRANSFER_MANIFEST_TYPE:
+    if protocol.get("manifest_type") != manifest_type:
         reasons.append("transfer_protocol_manifest_type_mismatch")
-    if (
-        benchmark_manifest.get("lifecycle_evidence_mode")
-        != "frozen_promoted_registry_transfer"
+    if benchmark_manifest.get("lifecycle_evidence_mode") != (
+        "frozen_retired_source_and_successor_registry_transfer"
+        if isinstance(transition, dict)
+        else "frozen_promoted_registry_transfer"
     ):
         reasons.append("transfer_lifecycle_evidence_mode_mismatch")
     if benchmark_manifest.get("predeclared_gates") != spec["predeclared_gates"]:
@@ -2891,10 +3838,11 @@ def _verify_frozen_transfer(
         if source_run_root == run_root.resolve():
             reasons.append("transfer_source_is_destination")
         source_report = verify(source_run_root, 10)
-        if (
-            source_report.get("status") != "pass"
-            or source_report.get("manifest_type")
-            != "development_diagnostic_lifecycle_repair_dev10"
+        if source_report.get("status") != "pass" or source_report.get(
+            "manifest_type"
+        ) != spec.get(
+            "source_manifest_type",
+            "development_diagnostic_lifecycle_repair_dev10",
         ):
             reasons.append("transfer_source_dev10_not_passing")
         source_protocol_path = source_run_root / "protocol_manifest.json"
@@ -2913,20 +3861,63 @@ def _verify_frozen_transfer(
         )
         source_inventory = _registry_inventory(source_registry_dir)
         source_inventory_hash = _inventory_sha256(source_inventory)
-        source_identity = _target_tool_identity(source_registry_dir)
-        source_contract_identity = _target_validation_contract_identity(
-            source_registry_dir
-        )
+        if isinstance(transition, dict):
+            source_identity = _target_tool_identity(
+                source_registry_dir,
+                tool_name=str(transition["source_tool_name"]),
+                expected_retired=True,
+                minimum_version=int(transition["source_tool_version"]),
+            )
+            source_contract_identity = None
+            successor_identities = {
+                tool_name: _target_tool_identity(
+                    source_registry_dir,
+                    tool_name=tool_name,
+                    expected_retired=False,
+                    minimum_version=int(successor_specs[tool_name]["version"]),
+                )
+                for tool_name in successor_names
+            }
+            successor_contract_identities = {
+                tool_name: _target_validation_contract_identity(
+                    source_registry_dir,
+                    tool_name=tool_name,
+                )
+                for tool_name in successor_names
+            }
+        else:
+            source_identity = _target_tool_identity(source_registry_dir)
+            source_contract_identity = _target_validation_contract_identity(
+                source_registry_dir
+            )
+            successor_identities = {}
+            successor_contract_identities = {}
         source_contract_identities = _validation_contract_identities(
             source_registry_dir
         )
-        if source_contract_identity is None or source_contract_identities is None:
+        if (
+            source_contract_identities is None
+            or (
+                isinstance(transition, dict)
+                and (
+                    source_identity is None
+                    or any(
+                        identity is None for identity in successor_identities.values()
+                    )
+                    or any(
+                        identity is None
+                        for identity in successor_contract_identities.values()
+                    )
+                )
+            )
+            or (not isinstance(transition, dict) and source_contract_identity is None)
+        ):
             reasons.append("transfer_source_validation_contract_binding_invalid")
         if any(
             item.get("kind") not in {"directory", "file"} for item in source_inventory
         ):
             reasons.append("transfer_source_registry_contains_nonregular_object")
-        expected_provenance = {
+        expected_provenance: dict[str, Any] = {
             "mode": "frozen_promoted_registry_transfer",
             "source_run_root": str(source_run_root),
             "source_protocol_path": str(source_protocol_path),
@@ -2946,10 +3937,23 @@ def _verify_frozen_transfer(
                 )
             ),
             "installed_registry_inventory_sha256": source_inventory_hash,
-            "target_tool": source_identity,
-            "target_validation_contract": source_contract_identity,
             "validation_contract_bindings": source_contract_identities,
         }
+        if isinstance(transition, dict):
+            expected_provenance.update(
+                {
+                    "source_tool": source_identity,
+                    "successor_tools": successor_identities,
+                    "successor_validation_contracts": (successor_contract_identities),
+                }
+            )
+        else:
+            expected_provenance.update(
+                {
+                    "target_tool": source_identity,
+                    "target_validation_contract": source_contract_identity,
+                }
+            )
         if provenance != expected_provenance:
             reasons.append("transfer_registry_provenance_mismatch")
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
@@ -2999,18 +4003,71 @@ def _verify_frozen_transfer(
     final_inventory = _registry_inventory(registry_dir)
     if final_inventory != initial_inventory:
         reasons.append("transfer_registry_mutated_during_confirmation")
-    target_identity = _target_tool_identity(registry_dir)
-    if target_identity is None or target_identity != provenance.get("target_tool"):
-        reasons.append("transfer_target_tool_identity_mismatch")
-    target_contract_identity = _target_validation_contract_identity(registry_dir)
     contract_identities = _validation_contract_identities(registry_dir)
-    if (
-        target_contract_identity is None
-        or target_contract_identity != provenance.get("target_validation_contract")
-        or contract_identities is None
-        or contract_identities != provenance.get("validation_contract_bindings")
-    ):
-        reasons.append("transfer_validation_contract_binding_mismatch")
+    if isinstance(transition, dict):
+        source_tool_name = str(transition["source_tool_name"])
+        target_identity = _target_tool_identity(
+            registry_dir,
+            tool_name=source_tool_name,
+            expected_retired=True,
+            minimum_version=int(transition["source_tool_version"]),
+        )
+        target_contract_identity = None
+        final_successor_identities = {
+            tool_name: _target_tool_identity(
+                registry_dir,
+                tool_name=tool_name,
+                expected_retired=False,
+                minimum_version=int(successor_specs[tool_name]["version"]),
+            )
+            for tool_name in successor_names
+        }
+        final_successor_contracts = {
+            tool_name: _target_validation_contract_identity(
+                registry_dir,
+                tool_name=tool_name,
+            )
+            for tool_name in successor_names
+        }
+        if (
+            target_identity != provenance.get("source_tool")
+            or target_identity is None
+            or target_identity.get("version") != int(transition["source_tool_version"])
+            or final_successor_identities != provenance.get("successor_tools")
+            or any(
+                identity is None
+                or identity.get("version") != int(successor_specs[name]["version"])
+                for name, identity in final_successor_identities.items()
+            )
+        ):
+            reasons.append("transfer_retired_source_or_successor_identity_mismatch")
+        if (
+            final_successor_contracts
+            != provenance.get("successor_validation_contracts")
+            or any(
+                not isinstance(identity, dict)
+                or identity.get("canonical_key")
+                != successor_specs[name]["canonical_key"]
+                for name, identity in final_successor_contracts.items()
+            )
+            or contract_identities is None
+            or contract_identities != provenance.get("validation_contract_bindings")
+        ):
+            reasons.append("transfer_validation_contract_binding_mismatch")
+    else:
+        target_identity = _target_tool_identity(registry_dir)
+        target_contract_identity = _target_validation_contract_identity(registry_dir)
+        final_successor_identities = {}
+        final_successor_contracts = {}
+        if target_identity is None or target_identity != provenance.get("target_tool"):
+            reasons.append("transfer_target_tool_identity_mismatch")
+        if (
+            target_contract_identity is None
+            or target_contract_identity != provenance.get("target_validation_contract")
+            or contract_identities is None
+            or contract_identities != provenance.get("validation_contract_bindings")
+        ):
+            reasons.append("transfer_validation_contract_binding_mismatch")
     registry_manifest_path = registry_dir / "registry_manifest.json"
     if (
         not registry_manifest_path.is_file()
@@ -3099,34 +4156,60 @@ def _verify_frozen_transfer(
             protocol_events=[],
         )
         reasons.extend(f"transfer_{reason}" for reason in actor_followthrough_reasons)
-    target_version = (
-        target_identity.get("version") if isinstance(target_identity, dict) else None
+    target_versions = (
+        {
+            name: identity.get("version")
+            for name, identity in final_successor_identities.items()
+            if isinstance(identity, dict)
+        }
+        if isinstance(transition, dict)
+        else {
+            LIFECYCLE_USE_CASE_TOOL: (
+                target_identity.get("version")
+                if isinstance(target_identity, dict)
+                else None
+            )
+        }
     )
     visible_called_names = [
         name
         for name in safe_names
         if name in selection_by_name
-        and _selection_has_tool(
-            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            selection_by_name[name], "generated_tools_visible", assessed_tool_names
         )
-        and _selection_has_tool(
-            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            selection_by_name[name], "generated_tools_called", assessed_tool_names
         )
         and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
-        and selection_by_name[name]["generated_tool_versions"].get(
-            LIFECYCLE_USE_CASE_TOOL
+        and any(
+            selection_by_name[name]["generated_tool_versions"].get(tool_name)
+            == target_versions.get(tool_name)
+            for tool_name in assessed_tool_names
         )
-        == target_version
     ]
-    if len(visible_called_names) != 26:
-        reasons.append("transfer_helper_not_visible_called_at_exact_version_26_of_26")
+    if len(visible_called_names) < int(spec["safe_visible_called_minimum"]):
+        reasons.append(
+            "transfer_successor_not_visible_called_at_required_version"
+            if isinstance(transition, dict)
+            else "transfer_helper_not_visible_called_at_exact_version_26_of_26"
+        )
+    if isinstance(transition, dict) and any(
+        _selection_has_tool(
+            selection_by_name.get(name, {}),
+            "generated_tools_called",
+            str(transition["source_tool_name"]),
+        )
+        for name in safe_names
+    ):
+        reasons.append("transfer_retired_source_was_called")
     exact_safe_names = [
         name
         for name in safe_names
         if name in candidate_by_name
         and _exact_targeted_abstention(candidate_by_name[name])
     ]
-    if len(exact_safe_names) < 21:
+    if len(exact_safe_names) < int(spec["safe_exact_minimum"]):
         reasons.append("transfer_safe_exact_outcome_gate_failed")
     contact_exact_names = [
         name
@@ -3135,7 +4218,7 @@ def _verify_frozen_transfer(
         and _exact_targeted_abstention(candidate_by_name[name])
         and not _forbidden_remove_contact(candidate_by_name[name])
     ]
-    if len(contact_exact_names) < 8:
+    if len(contact_exact_names) < int(spec["contact_exact_no_remove_minimum"]):
         reasons.append("transfer_contact_exact_without_remove_gate_failed")
     success_flip_names = [
         name
@@ -3145,7 +4228,15 @@ def _verify_frozen_transfer(
         and _exact_targeted_abstention(candidate_by_name[name])
         and not _exact_outcome(control_by_name[name])
     ]
-    if not success_flip_names:
+    minimum_success_flips = (
+        min(
+            int(successor_specs[name].get("minimum_success_flips") or 0)
+            for name in successor_names
+        )
+        if successor_names
+        else 1
+    )
+    if len(success_flip_names) < minimum_success_flips:
         reasons.append("transfer_fresh_control_success_flip_missing")
     side_effect_failure_rows = _read_jsonl(
         candidate_dir / "side_effect_preservation_report.jsonl"
@@ -3206,7 +4297,7 @@ def _verify_frozen_transfer(
             and not _selection_has_tool(
                 selection_by_name[name], "generated_tools_called", tool
             )
-            for tool in FIXTURE_TOOL_NAMES
+            for tool in (*FIXTURE_TOOL_NAMES, *successor_names)
         )
     ]
     if len(unrelated_preservation_pass_names) < int(
@@ -3236,7 +4327,7 @@ def _verify_frozen_transfer(
     else:
         reasons.append("transfer_working_tool_integrity_unverifiable")
     overall_exact = sum(_exact_outcome(row) for row in candidate_rows)
-    if overall_exact < 25:
+    if overall_exact < int(spec["overall_exact_minimum"]):
         reasons.append("transfer_overall_exact_outcome_gate_failed")
 
     report = {
@@ -3244,8 +4335,12 @@ def _verify_frozen_transfer(
         "run_root": str(run_root),
         "development_only": True,
         "publication_eligible": False,
-        "manifest_type": TRANSFER_MANIFEST_TYPE,
-        "lifecycle_evidence_mode": "frozen_promoted_registry_transfer",
+        "manifest_type": manifest_type,
+        "lifecycle_evidence_mode": (
+            "frozen_retired_source_and_successor_registry_transfer"
+            if isinstance(transition, dict)
+            else "frozen_promoted_registry_transfer"
+        ),
         "expected_tasks": 30,
         "source_dev10_run_root": str(source_run_root) if source_run_root else None,
         "source_dev10_status": source_report.get("status"),
@@ -3254,7 +4349,16 @@ def _verify_frozen_transfer(
         ),
         "registry_inventory_sha256": _inventory_sha256(final_inventory),
         "registry_unchanged": final_inventory == initial_inventory,
-        "target_tool": target_identity,
+        "target_tool": target_identity if not isinstance(transition, dict) else None,
+        "retired_source_tool": (
+            target_identity if isinstance(transition, dict) else None
+        ),
+        "successor_tools": (
+            final_successor_identities if isinstance(transition, dict) else None
+        ),
+        "successor_validation_contracts": (
+            final_successor_contracts if isinstance(transition, dict) else None
+        ),
         "preserved_working_tool_provenance": source_report.get(
             "preserved_working_tool_provenance"
         ),
@@ -3306,7 +4410,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         )
     benchmark_manifest = _load_json(benchmark_manifest_path)
     manifest_type = str(benchmark_manifest.get("manifest_type") or "")
-    if manifest_type == TRANSFER_MANIFEST_TYPE:
+    if manifest_type in TRANSFER_MANIFEST_TYPES:
         return _verify_frozen_transfer(
             run_root=run_root,
             protocol=protocol,
@@ -3340,10 +4444,12 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         reasons.append("benchmark_scenario_order_pin_mismatch")
     if protocol.get("scenario_order_sha256") != expected_order_sha256:
         reasons.append("protocol_scenario_order_pin_mismatch")
-    if (
-        benchmark_manifest.get("lifecycle_evidence_mode")
-        != "seeded_historical_v1_postdeployment_repair"
-    ):
+    expected_evidence_mode = (
+        RETIRE_REPLACE_EVIDENCE_MODE
+        if spec.get("retirement_successor_transition") is not None
+        else "seeded_historical_v1_postdeployment_repair"
+    )
+    if benchmark_manifest.get("lifecycle_evidence_mode") != expected_evidence_mode:
         reasons.append("lifecycle_evidence_mode_mismatch")
     if benchmark_manifest.get("predeclared_gates") != spec["predeclared_gates"]:
         reasons.append("predeclared_gate_contract_mismatch")
@@ -3567,6 +4673,13 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         )
         reasons.extend(actor_followthrough_reasons)
 
+    transition = spec.get("retirement_successor_transition")
+    successor_tool_names = (
+        tuple(sorted(str(name) for name in transition.get("successors", {})))
+        if isinstance(transition, dict)
+        else ()
+    )
+    assessed_tool_names = successor_tool_names or (LIFECYCLE_USE_CASE_TOOL,)
     safe_names = tuple(expected_roles[str(spec["safe_role"])])
     contact_names = tuple(expected_roles[str(spec["contact_role"])])
     working_overlap_names = tuple(expected_roles["working_generated_overlap"])
@@ -3578,17 +4691,17 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         for name in safe_names
         if name in selection_by_name
         and name in feedback_by_name
-        and _selection_has_tool(
-            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            selection_by_name[name], "generated_tools_visible", assessed_tool_names
         )
-        and _selection_has_tool(
-            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            selection_by_name[name], "generated_tools_called", assessed_tool_names
         )
-        and _selection_has_tool(
-            feedback_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            feedback_by_name[name], "generated_tools_visible", assessed_tool_names
         )
-        and _selection_has_tool(
-            feedback_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        and _selection_has_any_tool(
+            feedback_by_name[name], "generated_tools_called", assessed_tool_names
         )
     ]
     if len(safe_visible_called_names) < int(spec["safe_visible_called_minimum"]):
@@ -3673,7 +4786,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             and not _selection_has_tool(
                 feedback_by_name[name], "generated_tools_called", tool
             )
-            for tool in FIXTURE_TOOL_NAMES
+            for tool in (*FIXTURE_TOOL_NAMES, *successor_tool_names)
         )
     ]
     if len(unrelated_preservation_pass_names) < int(
@@ -3802,154 +4915,49 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
     if lifecycle["active_repairs_without_promotion"]:
         reasons.append("active_repair_without_exact_promoted_acknowledgement")
 
-    use_case_requests = [
-        row
-        for row in repair_requests
-        if row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
-        and row.get("source_tool_version") == 1
-        and row.get("repair_kind") == "implementation"
-    ]
-    if len(use_case_requests) != 1:
-        reasons.append("historical_v1_repair_request_count_mismatch")
-    use_case_request = use_case_requests[0] if len(use_case_requests) == 1 else {}
-    use_case_request_id = str(use_case_request.get("request_id") or "")
-    if "deterministic_public_contract_failure" not in (
-        use_case_request.get("trigger_reason_codes") or []
-    ):
-        reasons.append("historical_v1_repair_reason_not_deterministic_contract_failure")
-    use_case_acks = [
-        row
-        for row in acknowledgements
-        if str(row.get("request_id") or "") == use_case_request_id
-    ]
-    use_case_ack_statuses = [str(row.get("status") or "") for row in use_case_acks]
-    if "canary_pending" not in use_case_ack_statuses:
-        reasons.append("historical_v1_replacement_not_accepted_for_canary")
-    if not use_case_ack_statuses or use_case_ack_statuses[-1] != "promoted":
-        reasons.append("historical_v1_replacement_not_promoted")
-
-    triggering_completed_count = int(
-        use_case_request.get("trigger_completed_count") or 0
-    )
-    trigger_rows = [
-        row
-        for row in feedback_rows
-        if int(row.get("completed_count") or 0) == triggering_completed_count
-        and str(row.get("scenario") or "") in safe_names
-        and use_case_request_id in (row.get("post_deployment_repair_request_ids") or [])
-    ]
-    trigger_row = trigger_rows[0] if len(trigger_rows) == 1 else {}
-    trigger_scenario = str(trigger_row.get("scenario") or "")
-    trigger_versions = trigger_row.get("generated_tool_versions")
-    trigger_outcome = (
-        _outcome(candidate_by_name[trigger_scenario])
-        if trigger_scenario in candidate_by_name
-        else None
-    )
-    trigger_proves_v1_failure = bool(
-        len(trigger_rows) == 1
-        and trigger_scenario == safe_names[0]
-        and isinstance(trigger_versions, dict)
-        and trigger_versions.get(LIFECYCLE_USE_CASE_TOOL) == 1
-        and LIFECYCLE_USE_CASE_TOOL in (trigger_row.get("generated_tools_called") or [])
-        and LIFECYCLE_USE_CASE_TOOL
-        in (trigger_row.get("generated_tool_contract_failures") or [])
-        and trigger_outcome is not None
-        and trigger_outcome < 1.0
-    )
-    if not trigger_proves_v1_failure:
-        reasons.append("historical_v1_trigger_did_not_prove_observed_failure")
-
-    future_v2_rows: list[dict[str, Any]] = []
-    for row in feedback_rows:
-        versions = row.get("generated_tool_versions")
-        if (
-            int(row.get("completed_count") or 0) > triggering_completed_count
-            and str(row.get("scenario") or "") in safe_names
-            and isinstance(versions, dict)
-            and versions.get(LIFECYCLE_USE_CASE_TOOL) == 2
-            and LIFECYCLE_USE_CASE_TOOL in (row.get("generated_tools_called") or [])
-        ):
-            future_v2_rows.append(row)
-    expected_future_v2_call_count = len(safe_names) - 1
-    if len(future_v2_rows) != expected_future_v2_call_count:
-        reasons.append("future_v2_safe_task_call_coverage_mismatch")
-    future_v2_exact_successes = sum(
-        str(row.get("scenario") or "") in candidate_by_name
-        and _exact_targeted_abstention(
-            candidate_by_name[str(row.get("scenario") or "")]
-        )
-        for row in future_v2_rows
-    )
-    if future_v2_exact_successes < int(spec["future_v2_exact_minimum"]):
-        reasons.append("future_v2_exact_success_gate_failed")
-    future_v2_success_flips = sum(
-        str(row.get("scenario") or "") in candidate_by_name
-        and str(row.get("scenario") or "") in control_by_name
-        and _exact_targeted_abstention(
-            candidate_by_name[str(row.get("scenario") or "")]
-        )
-        and not _exact_outcome(control_by_name[str(row.get("scenario") or "")])
-        for row in future_v2_rows
-    )
-    if future_v2_success_flips < int(spec["future_v2_success_flip_minimum"]):
-        reasons.append("future_v2_affirmative_success_flip_missing")
-
-    final_validation_contract = _target_validation_contract_identity(registry_dir)
-    if final_validation_contract is None:
-        reasons.append("promoted_v2_validation_contract_binding_invalid")
-    repair_acceptance_candidates = [
-        row
-        for row in protocol_events
-        if row.get("event") == "post_deployment_tool_repair_accepted"
-        and (
-            row.get("request_id") == use_case_request_id
-            or (
-                row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
-                and row.get("source_tool_version") == 1
-            )
-        )
-    ]
-    repair_acceptance_events = [
-        row
-        for row in repair_acceptance_candidates
-        if row.get("request_id") == use_case_request_id
-        and row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
-        and row.get("source_tool_version") == 1
-        and row.get("new_tool_version") == 2
-        and isinstance(final_validation_contract, dict)
-        and row.get("validation_contract_hash")
-        == final_validation_contract.get("contract_hash")
-        and row.get("triggering_task_replayed") is False
-        and row.get("mode") == protocol.get("mode")
-        and _event_path_matches(run_root, row.get("run_root"), run_root)
-        and _event_path_matches(run_root, row.get("run_dir"), candidate_dir)
-    ]
-    repair_acceptance_binding_mismatches = len(repair_acceptance_candidates) - len(
-        repair_acceptance_events
-    )
-    if not repair_acceptance_events:
-        reasons.append("postdeployment_v2_acceptance_event_missing")
-    elif len(repair_acceptance_events) > 1:
-        reasons.append("postdeployment_v2_acceptance_event_not_unique")
-    if repair_acceptance_binding_mismatches:
-        reasons.append("postdeployment_v2_acceptance_event_binding_mismatch")
-
     registry_path = registry_dir / "registry_manifest.json"
-    registry = _load_json(registry_path)
     recorded_registry_digest = protocol.get("registry_manifest_digest_after_run")
     observed_registry_digest = hashlib.sha256(registry_path.read_bytes()).hexdigest()
     if recorded_registry_digest != observed_registry_digest:
         reasons.append("final_registry_digest_mismatch")
-    final_entry = (
-        registry.get("tools", {}).get(LIFECYCLE_USE_CASE_TOOL)
-        if isinstance(registry, dict) and isinstance(registry.get("tools"), dict)
-        else None
-    )
-    if not isinstance(final_entry, dict) or any(
-        (final_entry.get("version") != 2, final_entry.get("retired") is not False)
-    ):
-        reasons.append("promoted_repaired_version_not_active_in_final_registry")
+
+    if isinstance(transition, dict):
+        transition_report, transition_reasons = _retirement_successor_transition_report(
+            run_root=run_root,
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            protocol=protocol,
+            protocol_events=protocol_events,
+            repair_requests=repair_requests,
+            acknowledgements=acknowledgements,
+            feedback_rows=feedback_rows,
+            selection_by_name=selection_by_name,
+            trajectory_by_name=trajectory_evidence.get("candidate", {}),
+            candidate_by_name=candidate_by_name,
+            control_by_name=control_by_name,
+            roles={role: tuple(names) for role, names in expected_roles.items()},
+            transition=transition,
+        )
+        legacy_transition_report: dict[str, Any] = {}
+    else:
+        legacy_transition_report, transition_reasons = (
+            _legacy_same_name_transition_report(
+                run_root=run_root,
+                candidate_dir=candidate_dir,
+                registry_dir=registry_dir,
+                protocol=protocol,
+                protocol_events=protocol_events,
+                repair_requests=repair_requests,
+                acknowledgements=acknowledgements,
+                feedback_rows=feedback_rows,
+                candidate_by_name=candidate_by_name,
+                control_by_name=control_by_name,
+                safe_names=safe_names,
+                spec=spec,
+            )
+        )
+        transition_report = {}
+    reasons.extend(transition_reasons)
 
     report = {
         "status": "pass" if not reasons else "fail",
@@ -3957,7 +4965,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "development_only": True,
         "publication_eligible": False,
         "manifest_type": manifest_type,
-        "lifecycle_evidence_mode": ("seeded_historical_v1_postdeployment_repair"),
+        "lifecycle_evidence_mode": expected_evidence_mode,
         "expected_tasks": expected_tasks,
         "scenario_order_sha256": expected_order_sha256,
         "parallel_arm_execution": parallel_execution,
@@ -4002,25 +5010,10 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "working_path_source_evidence": working_path_source_evidence,
         "preserved_working_tool_integrity": working_tool_preservation,
         "historical_fault_fixture_sha256": LIFECYCLE_FAULT_FIXTURE_SHA256,
-        "use_case_tool": LIFECYCLE_USE_CASE_TOOL,
-        "use_case_request_id": use_case_request_id or None,
-        "use_case_repair_reason_codes": list(
-            use_case_request.get("trigger_reason_codes") or []
-        ),
-        "use_case_acknowledgement_statuses": use_case_ack_statuses,
-        "historical_v1_trigger_scenario": trigger_scenario or None,
-        "historical_v1_trigger_outcome": trigger_outcome,
-        "historical_v1_observed_failure_proved": trigger_proves_v1_failure,
-        "repaired_version_future_call_count": len(future_v2_rows),
-        "repaired_version_future_exact_success_count": future_v2_exact_successes,
-        "repaired_version_future_success_flip_count": future_v2_success_flips,
-        "repair_acceptance_event_count": len(repair_acceptance_events),
-        "repair_acceptance_event_binding_mismatch_count": (
-            repair_acceptance_binding_mismatches
-        ),
+        **legacy_transition_report,
+        "retirement_successor_transition": transition_report or None,
         "repair_acceptance_event_source": protocol_event_journal,
         "repair_candidate_artifacts": repair_candidate_artifacts,
-        "promoted_v2_validation_contract": final_validation_contract,
         "repair_request_count": len(repair_requests),
         "repair_request_prohibited_paths": repair_request_prohibited_paths,
         "repair_acknowledgement_count": len(acknowledgements),

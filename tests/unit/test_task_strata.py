@@ -93,13 +93,22 @@ def test_contact_id_update_tasks_match_update_planner() -> None:
     )
 
 
-def test_insufficient_information_tasks_match_safe_abstain_planner() -> None:
+def test_contact_insufficient_information_matches_contact_readiness() -> None:
     scenario = "remove_contact_by_phone_no_search_contacts_insufficient_information"
 
-    assert "prepare_safe_action_or_abstain" in expected_helper_fit(scenario)
-    assert "validation:prepare_safe_action_or_abstain" in (
+    assert expected_helper_fit(scenario) == ["assess_contact_removal_readiness"]
+    assert "validation:assess_contact_removal_readiness" in (
         expected_birth_opportunities(scenario)
     )
+
+
+def test_contact_delete_insufficiency_matches_removal_readiness_only() -> None:
+    scenario = "delete_contact_by_phone_insufficient_information"
+
+    assert expected_helper_fit(scenario) == ["assess_contact_removal_readiness"]
+    assert expected_birth_opportunities(scenario) == [
+        "validation:assess_contact_removal_readiness"
+    ]
 
 
 def test_contact_lookup_tasks_match_lookup_query_helpers() -> None:
@@ -216,8 +225,39 @@ def test_weekday_reminder_births_timestamp_helper_not_final_arg_helper() -> None
     )
 
 
-def test_message_helpers_do_not_fit_insufficient_information_tasks() -> None:
-    scenario = "modify_contact_with_message_recency_insufficient_information"
+def test_contact_update_insufficiency_uses_general_abstention_fallback() -> None:
+    scenarios = (
+        "modify_contact_with_message_recency_insufficient_information",
+        "update_contact_relationship_insufficient_information",
+    )
+
+    for scenario in scenarios:
+        assert expected_helper_fit(scenario) == ["prepare_safe_action_or_abstain"]
+        assert expected_birth_opportunities(scenario) == [
+            "validation:prepare_safe_action_or_abstain"
+        ]
+
+
+def test_message_send_insufficiency_matches_recipient_readiness() -> None:
+    scenario = "send_message_with_contact_content_insufficient_information"
+
+    assert expected_helper_fit(scenario) == ["assess_message_recipient_readiness"]
+    assert expected_birth_opportunities(scenario) == [
+        "validation:assess_message_recipient_readiness"
+    ]
+
+
+def test_temporal_insufficiency_matches_temporal_readiness() -> None:
+    scenario = "remove_reminder_with_recency_latest_insufficient_information"
+
+    assert expected_helper_fit(scenario) == ["assess_temporal_request_readiness"]
+    assert expected_birth_opportunities(scenario) == [
+        "validation:assess_temporal_request_readiness"
+    ]
+
+
+def test_unmatched_insufficiency_preserves_omnibus_fallback() -> None:
+    scenario = "find_current_location_insufficient_information"
 
     assert expected_helper_fit(scenario) == ["prepare_safe_action_or_abstain"]
     assert expected_birth_opportunities(scenario) == [

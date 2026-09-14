@@ -11,6 +11,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
     _address_answer_extraction_observation,
     _broad_location_search_argument_observation,
     _contact_lookup_query_planner_observation,
+    _contact_removal_readiness_observation,
     _device_status_lookup_observation,
     _distance_answer_extraction_observation,
     _external_service_answer_extraction_observation,
@@ -42,7 +43,13 @@ from sage_ts.generation.tool_generator import (
     public_input_contract_from_example_inputs,
     public_output_contract_from_example_outputs,
 )
-from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
 from sage_ts.orchestration.online_birth import _model_visible_generation_examples
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 
@@ -780,6 +787,22 @@ def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None
     assert "return {}" not in clean_room_request.user
     assert '"focused_public_failure"' in clean_room_request.user
 
+    completer.requests.clear()
+    generator.repair_candidates(
+        request,
+        rejected,
+        (*errors, "repair_independent_clean_room_candidate"),
+    )
+    assert len(completer.requests) == 1
+    independent_request = completer.requests[0]
+    assert "independent clean-room replacement" in independent_request.user
+    assert '"repair_mode": "independent_clean_room"' in independent_request.user
+    assert '"current_candidate": null' in independent_request.user
+    assert rejected.code not in independent_request.user
+    assert "no code-specific plan or prior implementation is supplied" in (
+        independent_request.user
+    )
+
 
 @pytest.mark.parametrize(
     ("code_suffix", "errors", "prohibited_token"),
@@ -877,6 +900,137 @@ def test_validation_helper_repair_restates_public_semantic_exceptions_last() -> 
         "every read-only exception must be tested before any generic "
         "blank-target guard."
     )
+
+
+def test_contact_removal_readiness_repair_restates_public_prerequisite_last() -> None:
+    observation = _contact_removal_readiness_observation("public_contract_probe")
+    model_visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    request = ToolGenerationRequest(
+        scenario_name="post_deployment_repair(kind=implementation;family=contact)",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in model_visible_examples
+        ),
+        suggested_tool_name="assess_contact_removal_readiness",
+    )
+
+    directive = _model_authored_final_repair_directive(
+        request,
+        ("source_0_raw_should_abstain:False!=True",),
+    )
+
+    assert "PUBLIC CONTACT-REMOVAL-READINESS RULE" in directive
+    assert "host-grounded booleans" in directive
+    assert "Every case requires contact_removal followed by contact_lookup" in directive
+    assert directive.index("PUBLIC CONTACT-REMOVAL-READINESS RULE") > (
+        directive.index("FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE")
+    )
+
+
+def test_contact_removal_readiness_public_contract_is_validator_consistent() -> None:
+    observation = _contact_removal_readiness_observation("public_contract_probe")
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="assess_contact_removal_readiness",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description="Assess contact removal readiness and safe abstention.",
+            inputs=(
+                ToolInput("user_request", "str", "Visible request."),
+                ToolInput("requested_action", "str", "Contact removal action."),
+                ToolInput("target_identifier", "str", "Visible target."),
+                ToolInput("contact_lookup_available", "bool", "Routed lookup."),
+                ToolInput("contact_removal_available", "bool", "Routed removal."),
+                ToolInput("visible_records_count", "int", "Visible matches."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "required_original_tools": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=(
+                "unresolved contact removal",
+                "missing contact removal capability",
+            ),
+            negative_triggers=("contact update", "resolved safe contact removal"),
+            preserves_side_effect_tools=(
+                "search_contacts",
+                "remove_contact",
+            ),
+            required_original_tool_calls=(
+                "search_contacts",
+                "remove_contact",
+            ),
+            abstain_behavior=(
+                "Abstain when a removal target or required capability is missing."
+            ),
+            generalization_rationale=(
+                "The same target, capability, and ambiguity checks apply across "
+                "contact-removal requests."
+            ),
+            estimated_step_compression=3,
+            cross_task_applicability_count=2,
+            applicable_task_families=("contact_removal",),
+            reason_tool_is_decisive=(
+                "It distinguishes safe continuation from evidence-grounded "
+                "abstention before a contact removal."
+            ),
+            shortfall_cluster_evidence=(
+                "repeated unsafe contact-removal readiness failures",
+            ),
+            known_failure_mechanisms_addressed=(
+                "unresolved target without contact lookup",
+                "missing contact removal capability",
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Repeated public contact removals fail when lookup or removal "
+                    "capabilities are absent."
+                ),
+                signals=(
+                    "missing_contact_lookup_capability",
+                    "unresolved_contact_removal_target",
+                ),
+            ),
+        ),
+        code=(
+            "def assess_contact_removal_readiness(user_request: str, requested_action: str, target_identifier: str, contact_lookup_available: bool, contact_removal_available: bool, visible_records_count: int) -> dict:\n"
+            "    target = str(target_identifier).strip()\n"
+            "    required = ['contact_removal', 'contact_lookup']\n"
+            "    availability = {'contact_removal': bool(contact_removal_available), 'contact_lookup': bool(contact_lookup_available)}\n"
+            "    missing = [item for item in required if not availability[item]]\n"
+            "    if missing:\n"
+            "        recommendation = 'I need ' + ' and '.join(item.replace('_', ' ') for item in missing) + ' before I can safely complete this contact removal.'\n"
+            "        return {'should_abstain': True, 'missing_information': missing, 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': recommendation, 'abstain_reason': 'missing_required_original_tool'}\n"
+            "    if not target:\n"
+            "        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A contact target is required before I can safely complete that removal.', 'abstain_reason': 'missing_target_identifier'}\n"
+            "    if visible_records_count > 1:\n"
+            "        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The contact target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}\n"
+            "    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}\n"
+        ),
+    )
+
+    validation = validate_generated_tool(
+        tool,
+        examples=observation.validation_examples,
+    )
+
+    assert validation.accepted, validation.errors
 
 
 def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:

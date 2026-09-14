@@ -354,6 +354,478 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
     )
 
 
+def _contact_removal_readiness_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    """Describe the independent successor for unsafe contact removals."""
+
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="validation:assess_contact_removal_readiness",
+        observation=(
+            "Repeated contact-removal failures need a reusable side-effect-free "
+            "helper named assess_contact_removal_readiness. Inputs must be "
+            "user_request: str, requested_action: str, target_identifier: str, "
+            "contact_lookup_available: bool, contact_removal_available: bool, and "
+            "visible_records_count: int. The availability booleans are grounded "
+            "from the routed native inventory by the host, not guessed by the "
+            "actor. Return exactly should_abstain, missing_information, "
+            "required_original_tools, safe_next_action, "
+            "final_answer_recommendation, and abstain_reason. This helper applies "
+            "to contact removals before contact-record resolution, so every case "
+            "requires contact_removal followed by contact_lookup. The target is an "
+            "unresolved user-facing locator such as a name or phone number, never "
+            "an already-resolved database record id. Missing capabilities take "
+            "priority over target checks. Then abstain for a blank target or "
+            "multiple visible matches; otherwise continue with the routed original "
+            "tools. Never "
+            "search, remove, select, or guess a record. Preserve search_contacts "
+            "and remove_contact, use broad contact-removal readiness triggers, and "
+            "exclude contact updates, messaging, reminders, and already-completed "
+            "actions."
+        ),
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Remove the contact with phone +15550100.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "+15550100",
+                    "contact_lookup_available": False,
+                    "contact_removal_available": True,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["contact_lookup"],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I need contact lookup before I can safely complete this "
+                        "contact removal."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the contact named Jordan Kim.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "Jordan Kim",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": True,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Resolve and remove contact +15550101.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "+15550101",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": True,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the uniquely resolved named contact.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "Taylor Lee",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": True,
+                    "visible_records_count": 1,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove a contact once removal is available.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": False,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["contact_removal"],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I need contact removal before I can safely complete this "
+                        "contact removal."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove that contact.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": True,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["target_identifier"],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "A contact target is required before I can safely "
+                        "complete that removal."
+                    ),
+                    "abstain_reason": "missing_target_identifier",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the matching contact.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "Alex Morgan",
+                    "contact_lookup_available": True,
+                    "contact_removal_available": True,
+                    "visible_records_count": 2,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["ambiguous_target"],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "The contact target is ambiguous because multiple "
+                        "matches are visible."
+                    ),
+                    "abstain_reason": "ambiguous_target",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="contact_removal_readiness_birth_enabled",
+        inadequacy_signals=(
+            "missing_contact_lookup_capability",
+            "unresolved_contact_removal_target",
+            "unsafe_contact_removal_guess",
+        ),
+        failed_tool_calls=("search_contacts", "remove_contact"),
+        visible_data_gaps=(
+            "visible removal target and routed capabilities require a deterministic readiness decision",
+        ),
+        planner_failures=("contact_removal_or_precise_abstention",),
+    )
+
+
+def _message_recipient_readiness_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    """Describe a narrow, side-effect-free message-recipient readiness check."""
+
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="validation:assess_message_recipient_readiness",
+        observation=(
+            "Repeated message-send failures need a reusable side-effect-free helper "
+            "named assess_message_recipient_readiness. Inputs must be user_request: "
+            "str, requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, and "
+            "visible_records_count: int. Return exactly should_abstain, "
+            "missing_information, required_original_tools, safe_next_action, "
+            "final_answer_recommendation, and abstain_reason. Normalize scalar or "
+            "list capability inputs. A direct phone number is a usable message "
+            "recipient. A name or relationship label must first be resolved through "
+            "the semantic contact_lookup capability; if it is unavailable, append "
+            "contact_lookup to the requirements and abstain with a precise "
+            "recipient-resolution explanation. A blank recipient or multiple "
+            "visible matches must abstain. Continue only when message_send and all "
+            "other requirements are available and the recipient is direct or "
+            "uniquely resolved. Never look up a contact or send a message. The spec "
+            "must preserve contact lookup and message-send original tools, with "
+            "general triggers for named-recipient messaging and missing recipient "
+            "resolution and negative triggers for contact edits, reminder/time "
+            "requests, and direct-phone sends that are already ready."
+        ),
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Send a message to Morgan Ellis.",
+                    "requested_action": "message_send",
+                    "target_identifier": "Morgan Ellis",
+                    "required_original_tools": ["message_send"],
+                    "available_original_tools": ["message_send"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["contact_lookup"],
+                    "required_original_tools": ["message_send", "contact_lookup"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I cannot resolve that named recipient to a phone number "
+                        "because contact lookup is unavailable."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send the note to +12025550147.",
+                    "requested_action": "send_message_with_phone_number",
+                    "target_identifier": "+12025550147",
+                    "required_original_tools": ["send_message_with_phone_number"],
+                    "available_original_tools": ["send_message_with_phone_number"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["message_send"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send the update to Taylor Kim.",
+                    "requested_action": "message_send",
+                    "target_identifier": "Taylor Kim",
+                    "required_original_tools": ["message_send", "contact_lookup"],
+                    "available_original_tools": ["message_send", "contact_lookup"],
+                    "visible_records_count": 1,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["message_send", "contact_lookup"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Send the update.",
+                    "requested_action": "message_send",
+                    "target_identifier": "",
+                    "required_original_tools": ["message_send"],
+                    "available_original_tools": ["message_send"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["target_identifier"],
+                    "required_original_tools": ["message_send"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "A target phone number or contact name is required before "
+                        "I can safely send the message."
+                    ),
+                    "abstain_reason": "missing_target_identifier",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="message_recipient_readiness_birth_enabled",
+        inadequacy_signals=(
+            "missing_recipient_lookup_capability",
+            "unresolved_named_message_recipient",
+            "unsafe_message_recipient_guess",
+        ),
+        failed_tool_calls=(
+            "search_contacts",
+            "send_message_with_phone_number",
+        ),
+        visible_data_gaps=(
+            "visible recipient and capabilities require a deterministic readiness decision",
+        ),
+        planner_failures=("message_send_or_precise_abstention",),
+    )
+
+
+def _temporal_request_readiness_observation(
+    scenario_name: str,
+) -> CapabilityObservation:
+    """Describe a narrow, side-effect-free temporal readiness check."""
+
+    return CapabilityObservation(
+        scenario_name=scenario_name,
+        canonical_key="validation:assess_temporal_request_readiness",
+        observation=(
+            "Repeated relative-time failures need a reusable side-effect-free helper "
+            "named assess_temporal_request_readiness. Inputs must be user_request: "
+            "str, requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, and "
+            "visible_records_count: int. Return exactly should_abstain, "
+            "missing_information, required_original_tools, safe_next_action, "
+            "final_answer_recommendation, and abstain_reason. Normalize scalar or "
+            "list capability inputs. Requests anchored by relative expressions such "
+            "as yesterday, today, tomorrow, upcoming, later, or next require the "
+            "semantic current_time capability unless the user supplied an explicit "
+            "absolute date. If current_time is unavailable, append it to the "
+            "requirements and abstain with a precise request for current date/time "
+            "or an absolute date. A blank target is valid for a read-only temporal "
+            "search and must not cause abstention. Continue when the temporal anchor "
+            "and every other required capability are available. Never invent a "
+            "timestamp, read the clock, search, or perform a side effect. The spec "
+            "must preserve current-time, message-search, reminder-search, and "
+            "reminder-action original tools, with general relative-time triggers "
+            "and negative triggers for absolute-date and non-temporal requests."
+        ),
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        validation_examples=(
+            ToolExample(
+                {
+                    "user_request": "Which reminder was due yesterday?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["reminder_lookup"],
+                    "available_original_tools": ["reminder_lookup"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["current_time"],
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I need the current date and time, or an explicit date, to "
+                        "resolve the relative time in that request."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Which reminder is due tomorrow?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "available_original_tools": ["reminder_lookup", "current_time"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["reminder_lookup", "current_time"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Which message arrived today?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["message_lookup", "current_time"],
+                    "available_original_tools": ["message_lookup", "current_time"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["message_lookup", "current_time"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                held_out=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Which reminder is due on 2030-06-14?",
+                    "requested_action": "absolute_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": ["reminder_lookup"],
+                    "available_original_tools": ["reminder_lookup"],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["reminder_lookup"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+                negative_applicability=True,
+            ),
+        ),
+        generation_allowed=True,
+        reason="temporal_request_readiness_birth_enabled",
+        inadequacy_signals=(
+            "missing_current_time_prerequisite",
+            "unresolved_relative_time_anchor",
+            "unsafe_timestamp_guess",
+        ),
+        failed_tool_calls=(
+            "get_current_timestamp",
+            "search_messages",
+            "search_reminder",
+            "add_reminder",
+            "modify_reminder",
+            "remove_reminder",
+        ),
+        visible_data_gaps=(
+            "visible temporal language and capabilities require a deterministic readiness decision",
+        ),
+        planner_failures=("temporal_continue_or_precise_abstention",),
+    )
+
+
 def _device_status_lookup_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
@@ -5214,24 +5686,21 @@ def _visible_task_signals(
         )
     )
     add("direct_contact_action", direct_scalar_action)
+    remove_contact_readiness_gap = "requested_remove_contact" in signals and (
+        "remove_contact" not in tools
+        or ("search_contacts" not in tools and _has_phone_like_value(text))
+    )
+    modify_contact_readiness_gap = "modify_contact" in signals and (
+        "modify_contact" not in tools
+        or ("search_contacts" not in tools and not ("id " in text or "person" in text))
+    )
     add(
-        "safe_abstain_needed",
-        "requested_remove_contact" in signals
-        and (
-            "remove_contact" not in tools
-            or ("search_contacts" not in tools and _has_phone_like_value(text))
-        ),
+        "contact_action_readiness_gap",
+        remove_contact_readiness_gap or modify_contact_readiness_gap,
     )
     add(
         "safe_abstain_needed",
-        "modify_contact" in signals
-        and (
-            "modify_contact" not in tools
-            or (
-                "search_contacts" not in tools
-                and not ("id " in text or "person" in text)
-            )
-        ),
+        remove_contact_readiness_gap or modify_contact_readiness_gap,
     )
 
     add(
@@ -5288,12 +5757,13 @@ def _visible_task_signals(
         and "send_message" in signals
         and not _has_phone_like_value(text),
     )
-    add(
-        "safe_abstain_needed",
+    message_recipient_readiness_gap = (
         "send_message" in signals
         and "search_contacts" not in tools
-        and not _has_phone_like_value(text),
+        and not _has_phone_like_value(text)
     )
+    add("message_recipient_readiness_gap", message_recipient_readiness_gap)
+    add("safe_abstain_needed", message_recipient_readiness_gap)
     message_search_followup_possible = (
         "search_messages" in tools
         and _has_any(text, ("find", "look for", "search"))
@@ -5325,13 +5795,28 @@ def _visible_task_signals(
         and message_counterparty_target
         and contact_change_intent,
     )
-    add(
-        "insufficient_information",
+    message_interaction_language = _has_any(
+        text,
+        (
+            "message",
+            "text",
+            "sent",
+            "asked",
+            "wrote",
+            "spoke",
+            "talked",
+            "contacted",
+        ),
+    )
+    missing_message_derived_contact_target = (
         "search_messages" not in tools
         and message_counterparty_text
+        and message_interaction_language
         and bool(tools & {"modify_contact", "remove_contact", "search_contacts"})
-        and _has_any(text, ("update", "modify", "change", "remove", "delete")),
+        and _has_any(text, ("update", "modify", "change", "remove", "delete"))
     )
+    add("insufficient_information", missing_message_derived_contact_target)
+    add("contact_action_readiness_gap", missing_message_derived_contact_target)
 
     request_mentions_reminder = _has_any(text, ("reminder", "remind", "todo", "to-do"))
     reminder_creation_request = _has_any(
@@ -5519,6 +6004,7 @@ def _visible_task_signals(
         "missing_current_time_prerequisite",
         relative_anchor_requires_current_time,
     )
+    add("temporal_request_readiness_gap", relative_anchor_requires_current_time)
     add("safe_abstain_needed", relative_anchor_requires_current_time)
     add(
         "upcoming_reminder_search",
@@ -5648,6 +6134,10 @@ def _visible_task_signals(
     )
     add(
         "insufficient_information",
+        "calendar_distance" in signals and "get_current_timestamp" not in tools,
+    )
+    add(
+        "temporal_request_readiness_gap",
         "calendar_distance" in signals and "get_current_timestamp" not in tools,
     )
     add(
@@ -5848,6 +6338,50 @@ def _sanitize_visible_observation_text(text: str) -> str:
     return sanitized
 
 
+def _readiness_observation_for_visible_signals(
+    scenario_name: str,
+    signals: set[str],
+) -> tuple[CapabilityObservation, str, str]:
+    """Select the narrowest readiness contract supported by visible semantics."""
+
+    if "temporal_request_readiness_gap" in signals:
+        return (
+            _temporal_request_readiness_observation(scenario_name),
+            "temporal_readiness",
+            "missing_temporal_prerequisite",
+        )
+    if "message_recipient_readiness_gap" in signals:
+        return (
+            _message_recipient_readiness_observation(scenario_name),
+            "message_recipient_readiness",
+            "unresolved_message_recipient",
+        )
+    if "contact_action_readiness_gap" in signals:
+        if "requested_remove_contact" in signals:
+            return (
+                _contact_removal_readiness_observation(scenario_name),
+                "contact_removal_readiness",
+                "unresolved_contact_removal_target",
+            )
+        # The retired broad helper must not be recreated for a different contact
+        # workflow.  Until a separately validated update-specific successor is
+        # observed, preserve native behavior and record the gap without birth.
+        return (
+            replace(
+                _safe_action_or_abstain_observation(scenario_name),
+                generation_allowed=False,
+                reason="contact_update_readiness_successor_not_yet_validated",
+            ),
+            "contact_update_readiness",
+            "unresolved_contact_update_target",
+        )
+    return (
+        _safe_action_or_abstain_observation(scenario_name),
+        "safe_abstain",
+        "insufficient_information_guard",
+    )
+
+
 def classify_visible_task_observations(
     scenario_name: str,
     scenario: Scenario,
@@ -5868,11 +6402,10 @@ def classify_visible_task_observations(
         )
 
     if "insufficient_information" in signals or "safe_abstain_needed" in signals:
-        add(
-            _safe_action_or_abstain_observation(scenario_name),
-            "safe_abstain",
-            "insufficient_information_guard",
+        readiness_observation, task_family_key, readiness_reason = (
+            _readiness_observation_for_visible_signals(scenario_name, signals)
         )
+        add(readiness_observation, task_family_key, readiness_reason)
         if "insufficient_information" in signals:
             return tuple(observations)
     if "device_status_read" in signals:

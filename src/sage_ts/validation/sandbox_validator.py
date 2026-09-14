@@ -575,7 +575,32 @@ def _raw_abstention_projection(value: Any) -> tuple[Any, ...] | None:
     )
 
 
+def _boolean_capability_inputs(tool: GeneratedTool) -> dict[str, tuple[str, ...]]:
+    """Return host-owned ``*_available`` booleans by semantic capability.
+
+    Validation-helper interfaces may express routed capability availability either
+    through the legacy ``available_original_tools`` container or through narrower
+    host-grounded Boolean fields.  Keep the mapping schema-derived so hidden
+    validation never infers a capability from benchmark content or example values.
+    """
+
+    fields_by_capability: dict[str, list[str]] = {}
+    for item in tool.spec.inputs:
+        name = str(item.name or "").strip()
+        annotation = str(item.annotation or "").strip().lower().replace("typing.", "")
+        if annotation != "bool" or not name.endswith("_available"):
+            continue
+        capability = _canonical_semantic_label(name[: -len("_available")])
+        if not capability:
+            continue
+        fields_by_capability.setdefault(capability, []).append(name)
+    return {
+        capability: tuple(fields) for capability, fields in fields_by_capability.items()
+    }
+
+
 def _validate_blind_abstention_properties(
+    tool: GeneratedTool,
     function: Any,
     examples: tuple[ToolExample, ...],
 ) -> tuple[str, ...]:
@@ -586,6 +611,7 @@ def _validate_blind_abstention_properties(
     """
 
     errors: list[str] = []
+    boolean_inputs = _boolean_capability_inputs(tool)
     for index, example in enumerate(examples):
         if not isinstance(example.expected, dict):
             continue
@@ -639,6 +665,55 @@ def _validate_blind_abstention_properties(
         target = str(inputs.get("target_identifier") or "").strip()
         action = inputs.get("requested_action")
         for capability_index, capability in enumerate(required_items):
+            boolean_fields = boolean_inputs.get(capability, ())
+            if boolean_fields:
+                boolean_variant = dict(inputs)
+                for field_name in boolean_fields:
+                    boolean_variant[field_name] = False
+                try:
+                    boolean_actual = function(**boolean_variant)
+                except Exception as exc:
+                    errors.append(
+                        f"blind_property_{index}_missing_capability_"
+                        f"{capability_index}_boolean_error:{type(exc).__name__}"
+                    )
+                else:
+                    errors.extend(
+                        _blind_abstention_result_errors(
+                            f"blind_property_{index}_missing_capability_"
+                            f"{capability_index}_boolean",
+                            boolean_actual,
+                            required_fact=capability,
+                            expected_reason="missing_required_original_tool",
+                            require_original_tool_fact=True,
+                        )
+                    )
+
+                # Boolean availability is host-owned just like the legacy list.
+                # A missing target must not mask an unavailable required capability.
+                if target and _action_requires_target(action):
+                    combined_boolean_variant = dict(boolean_variant)
+                    combined_boolean_variant["target_identifier"] = ""
+                    try:
+                        combined_boolean_actual = function(**combined_boolean_variant)
+                    except Exception as exc:
+                        errors.append(
+                            f"blind_property_{index}_missing_capability_"
+                            f"{capability_index}_boolean_and_target_error:"
+                            f"{type(exc).__name__}"
+                        )
+                    else:
+                        errors.extend(
+                            _blind_abstention_result_errors(
+                                f"blind_property_{index}_missing_capability_"
+                                f"{capability_index}_boolean_and_target",
+                                combined_boolean_actual,
+                                required_fact=capability,
+                                expected_reason="missing_required_original_tool",
+                                require_original_tool_fact=True,
+                            )
+                        )
+
             reduced_available = [
                 item
                 for item in available_values
@@ -1262,7 +1337,9 @@ def validate_generated_tool(
             errors.append(f"{label}_non_json_serializable_output")
 
     if tool.spec.family is ToolFamily.VALIDATION_ABSTENTION_HELPER:
-        errors.extend(_validate_blind_abstention_properties(schema.function, examples))
+        errors.extend(
+            _validate_blind_abstention_properties(tool, schema.function, examples)
+        )
 
     runtime_smoke_passed, runtime_error = _runtime_smoke(
         tool,

@@ -32,6 +32,33 @@ HIDDEN_EXPECTED_VALUE = "private_capability_DO_NOT_DISCLOSE_4217"
 HIDDEN_NEGATIVE_VALUE = "private_negative_DO_NOT_DISCLOSE_8842"
 
 
+def test_public_repair_rank_uses_only_sanitized_numbered_public_cases() -> None:
+    validation = ValidationResult(
+        False,
+        (
+            "source_0_native_action_count:0!=1:expected=remove_contact:{'id': 'x'}",
+            "negative_2_raw_should_abstain:False!=True",
+            "source_prior_raw_should_abstain",
+            "held_out_0_mismatch:private-value",
+            "blind_property_0_private-invariant",
+        ),
+    )
+
+    public_errors = online_birth._public_validation_errors(validation)  # noqa: SLF001
+
+    assert public_errors == (
+        "source_0_native_action_count:0!=1",
+        "negative_2_raw_should_abstain:False!=True",
+    )
+    assert online_birth._public_validation_case_labels(validation) == (  # noqa: SLF001
+        "source_0",
+        "negative_2",
+    )
+    assert online_birth._public_validation_failure_score(  # noqa: SLF001
+        validation
+    ) == sum(online_birth._validation_error_distance(item) for item in public_errors)
+
+
 def _canonical_json_hash(payload: Any) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -464,18 +491,21 @@ def test_bounded_repair_reseeds_from_best_partial_and_keeps_trigger(
     assert trigger_error in second_errors
     assert trigger_error in third_errors
     assert set(prior_errors).issubset(first_errors)
-    assert set(prior_errors).isdisjoint(second_errors)
+    assert set(prior_errors).issubset(second_errors)
     assert set(prior_errors).isdisjoint(third_errors)
-    assert set(candidate_a_errors).issubset(second_errors)
     assert set(candidate_a_errors).issubset(third_errors)
+    assert set(candidate_a_errors).isdisjoint(second_errors)
     assert set(candidate_b_errors).isdisjoint(second_errors)
     assert set(candidate_b_errors).isdisjoint(third_errors)
     assert first_errors[-1] == "repair_strategy:1"
-    assert second_errors[-1] == "repair_strategy:2"
-    assert third_errors[-1] == "repair_strategy:3"
+    assert second_errors[-1] == (
+        online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL
+    )
+    assert "repair_strategy:1" in second_errors
+    assert third_errors[-1] == "repair_strategy:2"
     assert [tool.code for tool in generator.seed_tools] == [
         _faulty_tool().code,
-        candidate_a.code,
+        _faulty_tool().code,
         candidate_a.code,
     ]
     repair_events = [
@@ -484,13 +514,13 @@ def test_bounded_repair_reseeds_from_best_partial_and_keeps_trigger(
         if event == "post_deployment_tool_repair_attempted"
     ]
     assert repair_events[0]["next_seed_source"] == "selected_candidate"
-    assert repair_events[1]["next_seed_source"] == "best_previous_candidate"
-    assert (
-        repair_events[1]["best_validation_score"] < repair_events[1]["validation_score"]
-    )
+    assert repair_events[0]["clean_room_fallback_requested"] is True
+    assert repair_events[0]["ordinary_candidate_count"] == 1
+    assert repair_events[0]["clean_room_candidate_count"] == 1
+    assert repair_events[1]["next_seed_source"] == "selected_candidate"
 
 
-def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
+def test_rejected_repair_immediately_adds_independent_clean_room_candidate(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -499,7 +529,7 @@ def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
     candidate_a = replace(_faulty_tool(), code=_faulty_tool().code + "# candidate_a\n")
     generator = SequencedRepairGenerator(
         store=store,
-        candidates=(candidate_a, candidate_a, _repaired_tool()),
+        candidates=(candidate_a, _repaired_tool()),
     )
     events: list[tuple[str, dict[str, Any]]] = []
     controller = _controller(tmp_path, generator, events=events)
@@ -534,16 +564,15 @@ def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
     assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
     assert [tool.code for tool in generator.seed_tools] == [
         _faulty_tool().code,
-        candidate_a.code,
-        candidate_a.code,
+        _faulty_tool().code,
     ]
     assert (
         online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
         not in (generator.error_inputs[1])
     )
     assert (
-        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
-        in (generator.error_inputs[2])
+        online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL
+        in generator.error_inputs[1]
     )
 
     repair_events = [
@@ -551,25 +580,141 @@ def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
         for event, payload in events
         if event == "post_deployment_tool_repair_attempted"
     ]
-    fallback_event = repair_events[1]
+    fallback_event = repair_events[0]
     assert fallback_event["clean_room_fallback_requested"] is True
     assert fallback_event["clean_room_candidate_count"] == 1
     assert fallback_event["duplicate_of_best"] is False
     assert fallback_event["retained_equal_score"] is False
     assert fallback_event["next_seed_source"] == "selected_candidate"
     assert fallback_event["best_candidate_code_hash_before_attempt"] == code_hash(
-        candidate_a.code
+        _faulty_tool().code
     )
-    assert fallback_event["best_error_labels_before_attempt"] == list(candidate_errors)
+    assert fallback_event["best_error_labels_before_attempt"] == list(prior_errors)
     assert fallback_event["stagnation_feedback_label"] is None
     artifact_rows = _repair_candidate_rows(controller)
     assert [row["disposition"] for row in artifact_rows] == [
-        "validator_rejected_selected_for_next_seed",
-        "validator_rejected_duplicate_of_best",
+        "validator_rejected",
         "validator_accepted_selected",
     ]
-    assert artifact_rows[1]["selected_for_attempt"] is False
-    assert artifact_rows[2]["selected_for_attempt"] is True
+    assert [row["candidate_origin"] for row in artifact_rows] == [
+        "ordinary",
+        "clean_room",
+    ]
+    assert artifact_rows[0]["selected_for_attempt"] is False
+    assert artifact_rows[1]["selected_for_attempt"] is True
+
+
+def test_terminal_repair_retirement_blocks_same_key_jit_rebirth(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_faulty_tool())
+    events: list[tuple[str, dict[str, Any]]] = []
+    controller = _controller(tmp_path, generator, events=events)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    rejected = ValidationResult(False, ("source_0_raw_should_abstain",))
+    monkeypatch.setattr(online_birth, "CANDIDATE_REPAIR_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: rejected,
+    )
+    monkeypatch.setattr(
+        controller,
+        "_gate_and_validate",
+        lambda *_args, **_kwargs: (None, None, rejected),
+    )
+
+    assert controller.process_pending_repairs(completed_count=8) == ()
+
+    canonical_key = _observation().canonical_key
+    entry = store.get(TOOL_NAME)
+    assert entry is not None and entry.retired
+    assert canonical_key in controller.generated_keys
+    retirement = next(
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_retired"
+    )
+    assert retirement["retired_canonical_key"] == canonical_key
+    assert retirement["same_run_rebirth_suppressed"] is True
+
+    jit_generation_requests: list[ToolGenerationRequest] = []
+
+    def record_jit_generation(request: ToolGenerationRequest) -> GeneratedTool:
+        jit_generation_requests.append(request)
+        return _repaired_tool()
+
+    monkeypatch.setattr(generator, "generate", record_jit_generation)
+    controller.recurrence_threshold = 1
+    future_observation = replace(
+        _observation(),
+        scenario_name="future-visible-task",
+        task_context_label="visible_task_context(family=future_record_safety)",
+    )
+
+    assert controller.observe(future_observation) is None
+    assert jit_generation_requests == []
+
+    restarted = _controller(tmp_path, generator)
+    restarted.recurrence_threshold = 1
+    assert canonical_key in restarted.terminal_retired_canonical_keys
+    assert TOOL_NAME in restarted.terminal_retired_tool_names
+    assert restarted.observe(future_observation) is None
+    assert jit_generation_requests == []
+
+
+def test_failed_terminal_acknowledgement_never_reactivates_retired_source(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_faulty_tool())
+    controller = _controller(tmp_path, generator)
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    rejected = ValidationResult(False, ("source_0_raw_should_abstain",))
+    monkeypatch.setattr(online_birth, "CANDIDATE_REPAIR_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: rejected,
+    )
+    monkeypatch.setattr(
+        controller,
+        "_gate_and_validate",
+        lambda *_args, **_kwargs: (None, None, rejected),
+    )
+
+    def fail_acknowledgement(*_args: object) -> dict[str, object]:
+        raise RuntimeError("simulated acknowledgement failure")
+
+    assert (
+        controller.process_pending_repairs(
+            completed_count=8,
+            acknowledge=fail_acknowledgement,
+        )
+        == ()
+    )
+    first_repair_call_count = generator.repair_calls
+    assert controller.pending_repair_requests
+    assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
+
+    acknowledgements: list[tuple[str, int, str, str]] = []
+    assert (
+        controller.process_pending_repairs(
+            completed_count=9,
+            acknowledge=lambda *args: acknowledgements.append(args) or {},
+        )
+        == ()
+    )
+    assert generator.repair_calls == first_repair_call_count
+    assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
+    assert controller.pending_repair_requests == []
+    assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
 
 
 def test_repair_portfolio_prefers_novel_equal_score_over_duplicate(
@@ -621,8 +766,87 @@ def test_repair_portfolio_prefers_novel_equal_score_over_duplicate(
     assert [row["disposition"] for row in artifact_rows] == [
         "validator_rejected_duplicate_of_best",
         "validator_rejected_selected_for_next_seed",
+        "validator_rejected_duplicate_of_best",
+        "validator_rejected",
     ]
-    assert [row["selected_for_attempt"] for row in artifact_rows] == [False, True]
+    assert [row["candidate_origin"] for row in artifact_rows] == [
+        "ordinary",
+        "ordinary",
+        "clean_room",
+        "clean_room",
+    ]
+    assert [row["selected_for_attempt"] for row in artifact_rows] == [
+        False,
+        True,
+        False,
+        False,
+    ]
+
+
+def test_repair_portfolio_prioritizes_public_focus_over_hidden_score(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    fixes_focus = replace(_faulty_tool(), code=_faulty_tool().code + "# fixes_focus\n")
+    low_hidden_score = replace(
+        _faulty_tool(), code=_faulty_tool().code + "# low_hidden_score\n"
+    )
+    generator = PortfolioRepairGenerator(
+        store=store,
+        candidates=(fixes_focus, low_hidden_score),
+    )
+    events: list[tuple[str, dict[str, Any]]] = []
+    controller = _controller(tmp_path, generator, events=events)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    prior_errors = (
+        "source_0_raw_should_abstain",
+        "source_1_raw_should_abstain",
+    )
+    focused_candidate_errors = (
+        "source_1_raw_should_abstain",
+        *(f"blind_property_{index}_invariant" for index in range(12)),
+    )
+    low_hidden_score_errors = ("source_0_raw_should_abstain",)
+    monkeypatch.setattr(online_birth, "CANDIDATE_REPAIR_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: ValidationResult(False, prior_errors),
+    )
+
+    def gate_and_validate(
+        tool: GeneratedTool,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> tuple[None, None, ValidationResult]:
+        errors = (
+            focused_candidate_errors
+            if "# fixes_focus" in tool.code
+            else low_hidden_score_errors
+        )
+        return None, None, ValidationResult(False, errors)
+
+    monkeypatch.setattr(controller, "_gate_and_validate", gate_and_validate)
+
+    assert controller.process_pending_repairs(completed_count=8) == ()
+    repair_event = next(
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_attempted"
+    )
+    assert repair_event["focused_public_case_label"] == "source_0"
+    assert repair_event["selected_candidate_index"] == 0
+    assert (
+        repair_event["validation_score"]
+        > (repair_event["candidate_validations"][1]["validation_score"])
+    )
+    selected = repair_event["candidate_validations"][0]
+    assert selected["focused_public_case_failed"] is False
+    assert selected["regressed_public_case_count"] == 0
+    assert repair_event["next_seed_source"] == "selected_candidate"
 
 
 def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
@@ -737,7 +961,7 @@ def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
         assert event_validation["candidate_artifact_path"] == str(
             controller.repair_candidate_artifact_path
         )
-        assert event_validation["candidate_artifact_schema_version"] == 2
+        assert event_validation["candidate_artifact_schema_version"] == 3
         assert event_validation["candidate_artifact_record_sha256"] == (
             observed_record_hash
         )
@@ -1340,6 +1564,32 @@ def test_pending_request_and_canary_state_survive_controller_restart(
     assert third.canary_state_by_tool[TOOL_NAME]["request_id"] == "repair-request-1"
 
 
+def test_restart_preserves_actor_routed_family_distinct_from_observation_family(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    observation = replace(_observation(), task_family_key="safe_abstain")
+    first = _controller(
+        tmp_path,
+        DeterministicRepairGenerator(store=store, candidate=_repaired_tool()),
+        observation=observation,
+    )
+    assert first.queue_post_deployment_repair_requests(
+        [_repair_request(target_task_family="contact")],
+        visible_task_family="contact",
+    ) == ("repair-request-1",)
+
+    resumed = _controller(
+        tmp_path,
+        DeterministicRepairGenerator(store=store, candidate=_repaired_tool()),
+        observation=observation,
+    )
+    assert resumed.pending_repair_requests[0]["target_task_family"] == "contact"
+    assert resumed.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
+    assert resumed.canary_state_by_tool[TOOL_NAME]["target_task_family"] == "contact"
+
+
 def test_contract_audit_flags_faulty_abstention_helper_without_hidden_values(
     tmp_path: Path,
 ) -> None:
@@ -1396,7 +1646,7 @@ def test_missing_contract_binding_retires_and_never_calls_repair_model(
         for event, payload in events
         if event == "post_deployment_tool_repair_retired"
     )
-    assert rejection["reason"].startswith("public_contract_binding_invalid:")
+    assert rejection["reason"] == "source_tool_already_terminally_retired"
 
 
 def test_controller_startup_retires_unbound_preloaded_entry(tmp_path: Path) -> None:
@@ -1721,6 +1971,11 @@ def test_repaired_canary_contract_failure_is_retired_immediately(
     assert decisions[0]["status"] == "rolled_back"
     assert decisions[0]["contract_failure_count"] == 1
     assert store.get(TOOL_NAME).retired is True  # type: ignore[union-attr]
+    tombstones = json.loads(
+        (store.root / online_birth.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME).read_text()
+    )
+    assert TOOL_NAME in tombstones["tool_names"]
+    assert _observation().canonical_key in tombstones["canonical_keys"]
 
 
 def test_repaired_canary_failed_tool_message_retires_without_run_exception(
@@ -1848,6 +2103,49 @@ def test_routed_visible_family_is_preserved_across_repair_and_canary(
         task_family_key="contact",
     )
     assert controller.canary_state_by_tool[TOOL_NAME]["called_count"] == 1
+
+
+def test_cross_family_execution_repair_canary_uses_classified_families(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+    request = _repair_request(
+        target_task_family="cross_family_execution_failure",
+        trigger_reason_codes=["repeated_generated_tool_execution_failure"],
+    )
+    assert controller.queue_post_deployment_repair_requests(
+        [request], visible_task_family="contact"
+    ) == ("repair-request-1",)
+    assert controller.pending_repair_requests[0]["target_task_family"] == (
+        "cross_family_execution_failure"
+    )
+    assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
+
+    decisions: tuple[dict[str, Any], ...] = ()
+    for family, delta, flip in (
+        ("contact", 1.0, True),
+        ("reminder", 0.0, False),
+        ("message", 0.0, False),
+    ):
+        decisions = controller.record_canary_result(
+            called_tools=[TOOL_NAME],
+            called_tool_versions={TOOL_NAME: 2},
+            attributable_tools=[TOOL_NAME],
+            visible_tools=[TOOL_NAME],
+            failed_tools=[],
+            candidate_outcome=1.0,
+            audited_outcome_delta=delta,
+            fresh_control_success_flip=flip,
+            contract_failures=[],
+            exception_type=None,
+            task_family_key=family,
+        )
+
+    assert decisions[0]["status"] == "promoted"
+    assert store.get(TOOL_NAME).retired is False  # type: ignore[union-attr]
 
 
 def test_run_finalization_retires_and_acknowledges_unprocessed_request(
@@ -2253,7 +2551,10 @@ def test_repair_stage_exception_retires_and_terminally_rejects(
     assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
     if failure_stage == "candidate_normalization":
         artifact_rows = _repair_candidate_rows(controller)
-        assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS
+        assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1
+        assert [row["candidate_origin"] for row in artifact_rows].count(
+            "clean_room"
+        ) == 1
         assert all(row["evaluated_candidate"] is None for row in artifact_rows)
         assert all(
             row["disposition"] == "normalization_or_validation_exception"

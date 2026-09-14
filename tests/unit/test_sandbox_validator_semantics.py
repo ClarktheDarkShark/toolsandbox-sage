@@ -57,6 +57,66 @@ def _abstention_tool(code: str) -> GeneratedTool:
     )
 
 
+def _boolean_abstention_tool(code: str) -> GeneratedTool:
+    return GeneratedTool(
+        spec=ToolSpec(
+            tool_name="safe_contact_action_gate",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description=(
+                "Decide whether a contact action has safe visible inputs and routed "
+                "capabilities."
+            ),
+            inputs=(
+                ToolInput("user_request", "str", "Visible user request."),
+                ToolInput("requested_action", "str", "Requested contact action."),
+                ToolInput("target_identifier", "str", "Visible target identifier."),
+                ToolInput(
+                    "contact_lookup_available",
+                    "bool",
+                    "Host-grounded contact lookup availability.",
+                ),
+                ToolInput(
+                    "contact_update_available",
+                    "bool",
+                    "Host-grounded contact update availability.",
+                ),
+                ToolInput(
+                    "contact_removal_available",
+                    "bool",
+                    "Host-grounded contact removal availability.",
+                ),
+                ToolInput("visible_records_count", "int", "Visible record count."),
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "required_original_tools": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "final_answer_recommendation": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+            positive_triggers=("missing contact capability", "contact ambiguity"),
+            negative_triggers=("complete safe contact action",),
+            generalization_rationale=(
+                "Contact actions repeatedly require the same host-grounded capability "
+                "and target checks before execution."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Visible contact actions can be unsafe when a routed capability "
+                    "or unique target is absent."
+                ),
+                signals=("missing_contact_capability", "ambiguous_target"),
+            ),
+        ),
+        code=code,
+    )
+
+
 def _examples() -> tuple[ToolExample, ...]:
     return (
         ToolExample(
@@ -122,6 +182,75 @@ def _examples() -> tuple[ToolExample, ...]:
     )
 
 
+def _boolean_examples() -> tuple[ToolExample, ...]:
+    required = ["contact_lookup", "contact_removal"]
+    return (
+        ToolExample(
+            {
+                "user_request": "Remove the contact matching this phone number.",
+                "requested_action": "contact_removal",
+                "target_identifier": "+15550100",
+                "contact_lookup_available": False,
+                "contact_update_available": False,
+                "contact_removal_available": True,
+                "visible_records_count": 0,
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["contact_lookup"],
+                "required_original_tools": required,
+                "safe_next_action": "ask_user_or_abstain",
+                "final_answer_recommendation": (
+                    "Contact lookup is unavailable, so removal cannot continue."
+                ),
+                "abstain_reason": "missing_required_original_tool",
+            },
+        ),
+        ToolExample(
+            {
+                "user_request": "Remove the uniquely resolved contact.",
+                "requested_action": "contact_removal",
+                "target_identifier": "Taylor Lee",
+                "contact_lookup_available": True,
+                "contact_update_available": False,
+                "contact_removal_available": True,
+                "visible_records_count": 1,
+            },
+            {
+                "should_abstain": False,
+                "missing_information": [],
+                "required_original_tools": required,
+                "safe_next_action": "continue_with_original_tool",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            held_out=True,
+        ),
+        ToolExample(
+            {
+                "user_request": "Remove a contact.",
+                "requested_action": "contact_removal",
+                "target_identifier": "",
+                "contact_lookup_available": True,
+                "contact_update_available": False,
+                "contact_removal_available": True,
+                "visible_records_count": 0,
+            },
+            {
+                "should_abstain": True,
+                "missing_information": ["target_identifier"],
+                "required_original_tools": required,
+                "safe_next_action": "ask_user_or_abstain",
+                "final_answer_recommendation": (
+                    "A contact target is required before removal."
+                ),
+                "abstain_reason": "missing_target_identifier",
+            },
+            negative_applicability=True,
+        ),
+    )
+
+
 _GENERAL_IMPLEMENTATION = """
 def safe_record_action_gate(user_request: str, requested_action: str, target_identifier: str, required_original_tools: list, available_original_tools: list, visible_records_count: int) -> dict:
     required = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools or [])
@@ -133,6 +262,37 @@ def safe_record_action_gate(user_request: str, requested_action: str, target_ide
         return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A target identifier is required.', 'abstain_reason': 'missing_target_identifier'}
     if int(visible_records_count or 0) > 1:
         return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
+    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
+"""
+
+
+_BOOLEAN_GENERAL_IMPLEMENTATION = """
+def safe_contact_action_gate(user_request: str, requested_action: str, target_identifier: str, contact_lookup_available: bool, contact_update_available: bool, contact_removal_available: bool, visible_records_count: int) -> dict:
+    required = ['contact_lookup', 'contact_removal']
+    missing = []
+    if not contact_lookup_available:
+        missing.append('contact_lookup')
+    if not contact_removal_available:
+        missing.append('contact_removal')
+    if missing:
+        return {'should_abstain': True, 'missing_information': missing, 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.', 'abstain_reason': 'missing_required_original_tool'}
+    if not str(target_identifier or '').strip():
+        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A contact target is required before removal.', 'abstain_reason': 'missing_target_identifier'}
+    if int(visible_records_count or 0) > 1:
+        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The contact target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
+    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
+"""
+
+
+_BOOLEAN_PUBLIC_ONLY_IMPLEMENTATION = """
+def safe_contact_action_gate(user_request: str, requested_action: str, target_identifier: str, contact_lookup_available: bool, contact_update_available: bool, contact_removal_available: bool, visible_records_count: int) -> dict:
+    required = ['contact_lookup', 'contact_removal']
+    if not contact_lookup_available and int(visible_records_count or 0) == 0:
+        return {'should_abstain': True, 'missing_information': ['contact_lookup'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Contact lookup is unavailable, so removal cannot continue.', 'abstain_reason': 'missing_required_original_tool'}
+    if not str(target_identifier or '').strip():
+        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'A contact target is required before removal.', 'abstain_reason': 'missing_target_identifier'}
+    if int(visible_records_count or 0) > 1:
+        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The contact target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
     return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
 """
 
@@ -393,6 +553,41 @@ def test_validator_enforces_capability_priority_for_simultaneous_deficits() -> N
     assert not result.accepted
     assert any(
         "_missing_capability_0_and_target_abstain_reason" in error
+        for error in result.errors
+    )
+
+
+def test_validator_accepts_boolean_capability_withholding_contract() -> None:
+    result = validate_generated_tool(
+        _boolean_abstention_tool(_BOOLEAN_GENERAL_IMPLEMENTATION),
+        _boolean_examples(),
+    )
+
+    assert result.accepted, result.errors
+
+
+def test_validator_hidden_withholding_rejects_ignored_boolean_capabilities() -> None:
+    result = validate_generated_tool(
+        _boolean_abstention_tool(_BOOLEAN_PUBLIC_ONLY_IMPLEMENTATION),
+        _boolean_examples(),
+    )
+
+    assert not result.accepted
+    public_errors = tuple(
+        error for error in result.errors if not error.startswith("blind_property_")
+    )
+    assert not public_errors
+    assert any(
+        "blind_property_1_missing_capability_0_boolean_should_abstain" in error
+        for error in result.errors
+    )
+    assert any(
+        "blind_property_1_missing_capability_1_boolean_should_abstain" in error
+        for error in result.errors
+    )
+    assert any(
+        "blind_property_1_missing_capability_0_boolean_and_target_abstain_reason"
+        in error
         for error in result.errors
     )
 

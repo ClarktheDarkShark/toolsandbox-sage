@@ -323,6 +323,35 @@ def _tool_names_execution_facing(openai_tools: object) -> set[str]:
     return {catalog.semantic_name(name) for name in _tool_names(openai_tools)}
 
 
+def _tools_for_openai_request(
+    openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
+) -> Union[Iterable[ChatCompletionToolParam], NotGiven]:
+    """Remove SAGE-only return contracts from the outbound API payload.
+
+    Generated return schemas are useful to the local actor policy and grounding
+    logic, but ``output_schema`` is not part of OpenAI's function-tool request
+    shape.  Strip only that internal metadata at the final request boundary.
+    """
+
+    if openai_tools is NOT_GIVEN:
+        return openai_tools
+    request_tools: list[ChatCompletionToolParam] = []
+    for tool in openai_tools:
+        request_tool = dict(cast(Mapping[str, Any], tool))
+        function = request_tool.get("function")
+        if isinstance(function, Mapping):
+            request_function = dict(function)
+            request_function.pop("output_schema", None)
+            parameters = request_function.get("parameters")
+            if isinstance(parameters, Mapping) and "output_schema" in parameters:
+                request_parameters = dict(parameters)
+                request_parameters.pop("output_schema", None)
+                request_function["parameters"] = request_parameters
+            request_tool["function"] = request_function
+        request_tools.append(cast(ChatCompletionToolParam, request_tool))
+    return request_tools
+
+
 def _tool_input_names_execution_facing(
     openai_tools: object,
     execution_tool_name: str,
@@ -3013,11 +3042,14 @@ def _state_action_planner_tool_names(openai_tools: object) -> set[str]:
     return helpers
 
 
-def _validation_abstention_tool_names(openai_tools: object) -> set[str]:
-    """Return visible helpers whose contract is to abstain from unsafe actions."""
+def _validation_abstention_tool_contracts(
+    openai_tools: object,
+) -> dict[str, Mapping[str, Any]]:
+    """Return visible helpers and the input schemas the host must reconcile."""
+
     if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
+        return {}
+    contracts: dict[str, Mapping[str, Any]] = {}
     for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
         function = tool.get("function", {})
         if not isinstance(function, dict):
@@ -3031,26 +3063,73 @@ def _validation_abstention_tool_names(openai_tools: object) -> set[str]:
         input_names = set(properties) if isinstance(properties, dict) else set()
         if not isinstance(name, str):
             continue
-        has_abstention_inputs = {
+        output_schema: object = function.get("output_schema", {})
+        if not output_schema and isinstance(parameters, dict):
+            output_schema = parameters.get("output_schema", {})
+        output_properties: object = {}
+        if isinstance(output_schema, dict):
+            output_properties = output_schema.get("properties", {})
+        output_names = (
+            set(output_properties) if isinstance(output_properties, dict) else set()
+        )
+        has_legacy_abstention_inputs = {
             "user_request",
             "requested_action",
             "required_original_tools",
             "available_original_tools",
         }.issubset(input_names)
-        is_abstention_helper = name == "prepare_safe_action_or_abstain" or (
-            has_abstention_inputs
+        readiness_boolean_inputs = {
+            input_name
+            for input_name in input_names
+            if input_name.endswith("_available")
+        }
+        has_readiness_evidence_inputs = {
+            "user_request",
+            "requested_action",
+            "target_identifier",
+            "visible_records_count",
+        }.issubset(input_names)
+        has_boolean_readiness_inputs = len(readiness_boolean_inputs) >= 2 and all(
+            isinstance(properties.get(input_name), Mapping)
+            and properties[input_name].get("type") == "boolean"
+            for input_name in readiness_boolean_inputs
+        )
+        has_abstention_outputs = {
+            "should_abstain",
+            "missing_information",
+            "safe_next_action",
+            "abstain_reason",
+        }.issubset(output_names)
+        is_abstention_helper = (
+            (
+                has_legacy_abstention_inputs
+                or (has_readiness_evidence_inputs and has_boolean_readiness_inputs)
+            )
+            and has_abstention_outputs
             and any(
                 token in description
                 for token in (
                     "abstain",
                     "insufficient information",
+                    "readiness",
                     "safe action",
                 )
             )
         )
         if is_abstention_helper:
-            helpers.add(name)
-    return helpers
+            contracts[name] = cast(Mapping[str, Any], properties)
+    return contracts
+
+
+def _validation_abstention_tool_names(openai_tools: object) -> set[str]:
+    """Return visible helpers with a complete safe-abstention contract.
+
+    Recognition is deliberately schema based.  The lifecycle may retire one
+    broad helper and birth narrower successors, so actor adoption must not
+    depend on a historical generated-tool name.
+    """
+
+    return set(_validation_abstention_tool_contracts(openai_tools))
 
 
 def _action_argument_helper_tool_names(openai_tools: object) -> set[str]:
@@ -8938,7 +9017,8 @@ def _safe_abstention_helper_actor_policy_message(
     openai_tools: object,
 ) -> dict[str, str] | None:
     """Bounded policy nudge for visible generated safe-abstention helpers."""
-    helpers = _validation_abstention_tool_names(openai_tools)
+    helper_contracts = _validation_abstention_tool_contracts(openai_tools)
+    helpers = set(helper_contracts)
     if not helpers:
         return None
     helper_list = ", ".join(sorted(helpers))
@@ -8952,6 +9032,23 @@ def _safe_abstention_helper_actor_policy_message(
                 )
             }
         )
+    )
+    has_legacy_inventory_contract = any(
+        "available_original_tools" in properties
+        for properties in helper_contracts.values()
+    )
+    boolean_availability_inputs = sorted(
+        {
+            input_name
+            for properties in helper_contracts.values()
+            for input_name, input_schema in properties.items()
+            if input_name.endswith("_available")
+            and isinstance(input_schema, Mapping)
+            and input_schema.get("type") == "boolean"
+        }
+    )
+    has_target_identifier = any(
+        "target_identifier" in properties for properties in helper_contracts.values()
     )
     called_helpers = [
         name
@@ -8995,40 +9092,73 @@ def _safe_abstention_helper_actor_policy_message(
     for message in cast(Iterable[Mapping[str, Any]], openai_messages):
         if SAFE_ABSTENTION_HELPER_POLICY_SENTINEL in str(message.get("content", "")):
             return None
+    legacy_search_guidance = (
+        "For recency-only searches such as latest, oldest, recent, upcoming, "
+        "later, yesterday, today, or tomorrow without a concrete record name, "
+        "content phrase, or visible record set, call the matching generated "
+        "helper before repeating original searches. "
+        if has_legacy_inventory_contract
+        else ""
+    )
+    legacy_inventory_guidance = (
+        "For a selected legacy helper that declares required_original_tools, "
+        "pass semantic capability labels rather than original side-effect tool "
+        "names: contact_lookup, contact_update, contact_removal, message_lookup, "
+        "message_send, reminder_lookup, reminder_update, reminder_removal, "
+        "reminder_creation, current_time, or location_lookup. Map original "
+        "get_current_timestamp to current_time. Its available_original_tools "
+        "field is host-owned and overwritten from the visible original tools "
+        f"({visible_original_tools or '(none)'}), so do not invent availability "
+        "from the task wording. For a reminder or message search whose meaning "
+        "depends on yesterday, today, tomorrow, upcoming, later, or another "
+        "relative current-time anchor, include current_time in "
+        "required_original_tools. If current_time is absent from the visible "
+        "available_original_tools list, call the matching helper instead of "
+        "inventing a timestamp or manually constructing temporal search bounds. "
+        "If current_time is available, preserve the normal flow: call original "
+        "get_current_timestamp and then the relevant generated recency helper. "
+        "A blank target_identifier is valid for a read-only relative_time_search "
+        "and must not itself cause abstention. "
+        if has_legacy_inventory_contract
+        else ""
+    )
+    boolean_inventory_guidance = (
+        "For a selected helper that declares host-owned Boolean capability "
+        f"fields ({', '.join(boolean_availability_inputs)}), use only the fields "
+        "in that helper's public schema. The host overwrites every such Boolean "
+        "from the routed original-tool inventory before execution, so do not "
+        "infer availability from the task wording and do not add the legacy "
+        "required_original_tools or available_original_tools list fields unless "
+        "that helper explicitly declares them. "
+        if boolean_availability_inputs
+        else ""
+    )
+    target_guidance = (
+        "For target_identifier, pass the user's visible unresolved phone number, "
+        "name, ordinal phrase, or natural-language target when asking a readiness "
+        "helper whether lookup is required. This value is evidence for the "
+        "readiness decision, not a record id: never pass it as an original "
+        "side-effect tool's person_id unless the user supplied a stable id or a "
+        "visible tool/helper resolved it. "
+        if has_target_identifier
+        else ""
+    )
     return {
         "role": "system",
         "content": (
             f"{SAFE_ABSTENTION_HELPER_POLICY_SENTINEL} A generated "
             f"safe-abstention helper is available: {helper_list}. Use it before "
-            "a side-effect action or record search when the request may be missing "
+            "a side-effect action or record search only when its public description "
+            "matches the request and the request may be missing "
             "a required original tool, concrete search criteria, a concrete visible "
-            "target id, or a unique visible target. For recency-only searches such "
-            "as latest, oldest, recent, upcoming, later, yesterday, today, or tomorrow "
-            "without a concrete record name, content phrase, or visible record "
-            "set, call this generated tool before repeating original searches. "
-            "For required_original_tools, pass semantic capability labels rather "
-            "than original side-effect tool names: contact_lookup, "
-            "contact_update, contact_removal, message_lookup, message_send, "
-            "reminder_lookup, reminder_update, reminder_removal, "
-            "reminder_creation, current_time, or location_lookup. Map original "
-            "get_current_timestamp to current_time. For available_original_tools, "
-            "use the same labels corresponding to visible original tools: "
-            f"{visible_original_tools or '(none)'}. For target_identifier, pass "
-            "a concrete id only if that id was supplied by the user or returned "
-            "by a visible tool/helper result; do not treat an arbitrary phone "
-            "number, name, ordinal phrase, or natural-language description as a "
-            "record id unless the target original tool schema accepts that exact "
-            "kind of scalar. If the helper says to abstain or provides a final "
-            "answer recommendation, do not perform the side effect. For a reminder "
-            "or message search whose meaning depends on yesterday, today, tomorrow, "
-            "upcoming, later, or another relative current-time anchor, include current_time "
-            "in required_original_tools. If current_time is absent from the visible "
-            "available_original_tools list, call this helper instead of inventing a "
-            "timestamp or manually constructing temporal search bounds. If "
-            "current_time is available, preserve the normal flow: call original "
-            "get_current_timestamp and then the relevant generated recency helper. "
-            "A blank target_identifier is valid for a read-only "
-            "relative_time_search and must not itself cause abstention."
+            "target id, or a unique visible target. "
+            f"{legacy_search_guidance}"
+            "Follow the selected helper's public domain contract and do not invent "
+            "requirements from a different task family. "
+            f"{legacy_inventory_guidance}{boolean_inventory_guidance}"
+            f"{target_guidance}"
+            "If the helper says to abstain or provides a final answer "
+            "recommendation, do not perform the side effect."
         ),
     }
 
@@ -12009,40 +12139,44 @@ def _ground_safe_abstention_available_tools(
     completion: ChatCompletion,
     openai_tools: object,
 ) -> ChatCompletion:
-    """Bind abstention-helper availability to the routed original schemas.
+    """Bind abstention-helper availability fields to routed original schemas.
 
     ``available_original_tools`` describes host state, not a model judgment.  A
-    model can still author the requested action and semantic requirements, but
-    it must not be able to invent a prerequisite tool that is absent from its
-    routed inventory.  This host-owned inventory is independent of task labels
-    and evaluator targets, so reconciliation adds no hidden outcome information.
+    narrowed helper's Boolean ``*_available`` fields have the same ownership.
+    A model can still author the requested action and task evidence, but it must
+    not be able to invent a prerequisite tool that is absent from its routed
+    inventory.  This inventory is independent of task labels and evaluator
+    targets, so reconciliation adds no hidden outcome information.
     """
 
     if openai_tools is NOT_GIVEN:
         return completion
-    helper_names = _validation_abstention_tool_names(openai_tools)
-    if not helper_names:
+    helper_contracts = _validation_abstention_tool_contracts(openai_tools)
+    if not helper_contracts:
         return completion
-    helper_execution_names = {
-        _execution_facing_tool_name(name) for name in helper_names
+    available_capability_set = {
+        _safe_action_capability(name)
+        for name in (
+            _tool_names_execution_facing(openai_tools) & ORIGINAL_TOOLSANDBOX_TOOL_NAMES
+        )
     }
-    available_capabilities = sorted(
-        {
-            _safe_action_capability(name)
-            for name in (
-                _tool_names_execution_facing(openai_tools)
-                & ORIGINAL_TOOLSANDBOX_TOOL_NAMES
-            )
-        }
-    )
+    available_capabilities = sorted(available_capability_set)
+
+    def helper_contract_for_call(name: str) -> Mapping[str, Any] | None:
+        exact_contract = helper_contracts.get(name)
+        if exact_contract is not None:
+            return exact_contract
+        execution_name = _execution_facing_tool_name(name)
+        for helper_name, contract in helper_contracts.items():
+            if _execution_facing_tool_name(helper_name) == execution_name:
+                return contract
+        return None
+
     for choice in completion.choices:
         for tool_call in choice.message.tool_calls or []:
             function = tool_call.function
-            name = str(function.name or "")
-            if (
-                name not in helper_names
-                and _execution_facing_tool_name(name) not in helper_execution_names
-            ):
+            contract = helper_contract_for_call(str(function.name or ""))
+            if contract is None:
                 continue
             try:
                 arguments = json.loads(str(function.arguments or "{}"))
@@ -12050,7 +12184,17 @@ def _ground_safe_abstention_available_tools(
                 continue
             if not isinstance(arguments, dict):
                 continue
-            arguments["available_original_tools"] = available_capabilities
+            if "available_original_tools" in contract:
+                arguments["available_original_tools"] = available_capabilities
+            for input_name, input_schema in contract.items():
+                if not (
+                    input_name.endswith("_available")
+                    and isinstance(input_schema, Mapping)
+                    and input_schema.get("type") == "boolean"
+                ):
+                    continue
+                capability = input_name.removesuffix("_available")
+                arguments[input_name] = capability in available_capability_set
             function.arguments = json.dumps(
                 arguments,
                 ensure_ascii=False,
@@ -12562,12 +12706,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
         tool_name: str,
     ) -> ChatCompletion:
+        request_tools = _tools_for_openai_request(openai_tools)
         with all_logging_disabled():
             response = _with_transient_openai_retries(
                 lambda: self.openai_client.chat.completions.create(
                     model=self.model_name,
                     messages=cast(list[ChatCompletionMessageParam], openai_messages),
-                    tools=openai_tools,
+                    tools=request_tools,
                     tool_choice={"type": "function", "function": {"name": tool_name}},
                     **reasoning_effort_kwargs(self.model_name),
                 )
@@ -12576,7 +12721,7 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
             source="toolsandbox_agent",
             model=self.model_name,
             messages=openai_messages,
-            tools=openai_tools,
+            tools=request_tools,
             response=response,
         )
         return response
@@ -12686,7 +12831,7 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
                 )
             return super(ConfigurableOpenAIAgent, self).model_inference(
                 messages,
-                prompt_openai_tools,
+                _tools_for_openai_request(prompt_openai_tools),
             )
 
         response = _with_transient_openai_retries(

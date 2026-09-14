@@ -109,6 +109,24 @@ def test_online_birth_feedback_result_drops_evaluator_private_payloads() -> None
     }
 
 
+def test_canary_attribution_rejects_a_second_attempted_generated_tool() -> None:
+    assert (
+        sage_run_adapter._sole_attributable_generated_tool(  # noqa: SLF001
+            called_tools=["candidate"],
+            attempted_tools=["candidate", "confounder"],
+            failed_tools=[],
+            called_tool_versions={"candidate": 2},
+        )
+        == []
+    )
+    assert sage_run_adapter._sole_attributable_generated_tool(  # noqa: SLF001
+        called_tools=["candidate"],
+        attempted_tools=["candidate"],
+        failed_tools=[],
+        called_tool_versions={"candidate": 2},
+    ) == ["candidate"]
+
+
 def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -119,6 +137,7 @@ def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
         def __init__(self, **_kwargs: object) -> None:
             self.pending_repair_requests: list[dict[str, object]] = []
             self.pre_scenario_visible_observations: set[str] = set()
+            self.canary_state_by_tool: dict[str, dict[str, object]] = {}
 
         def process_pending_repairs(self, **_kwargs: object) -> tuple[str, ...]:
             return ()
@@ -154,6 +173,12 @@ def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
             return ()
 
     class ReflectionStub:
+        def reconcile_active_repaired_canaries(
+            self, canaries: object
+        ) -> tuple[str, ...]:
+            calls["reconciled_canaries"] = canaries
+            return ()
+
         def assess_scenario(self, **_kwargs: object) -> dict[str, object]:
             return {
                 "candidate_outcome": 1.0,
@@ -258,6 +283,7 @@ def test_runner_wires_routed_family_to_repair_queue_canary_and_finalization(
         ),
     ]
     assert calls["canary_family"] == "contact"
+    assert calls["reconciled_canaries"] == {}
     canary_kwargs = calls["canary_kwargs"]
     assert isinstance(canary_kwargs, dict)
     assert canary_kwargs["audited_outcome_delta"] == 1.0
@@ -312,6 +338,18 @@ def test_snapshot_registry_checkpoint_copies_manifest_and_lifecycle(
         json.dumps({"tool_lifecycle": {}}) + "\n",
         encoding="utf-8",
     )
+    tombstone_filename = sage_run_adapter.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+    (registry_dir / tombstone_filename).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "canonical_keys": ["validation:retired_helper"],
+                "tool_names": ["retired_helper"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     contract_hash = "a" * 64
     (registry_dir / "validation_contract_bindings.json").write_text(
         json.dumps(
@@ -344,6 +382,7 @@ def test_snapshot_registry_checkpoint_copies_manifest_and_lifecycle(
     assert checkpoint.name == "after_0005_find_current_city"
     assert (checkpoint / "registry_manifest.json").exists()
     assert (checkpoint / "tool_lifecycle.json").exists()
+    assert (checkpoint / tombstone_filename).exists()
     assert (checkpoint / "validation_contract_bindings.json").exists()
     assert (checkpoint / "validation_contracts" / f"{contract_hash}.json").exists()
     metadata = json.loads((checkpoint / "checkpoint.json").read_text())
@@ -351,6 +390,7 @@ def test_snapshot_registry_checkpoint_copies_manifest_and_lifecycle(
     assert metadata["scenario"] == "find current city?"
     assert metadata["validation_contract_snapshot_errors"] == []
     assert "validation_contract_bindings.json" in metadata["copied_files"]
+    assert tombstone_filename in metadata["copied_files"]
     assert f"validation_contracts/{contract_hash}.json" in metadata["copied_files"]
 
 

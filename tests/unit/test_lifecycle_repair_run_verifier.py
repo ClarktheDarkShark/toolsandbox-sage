@@ -271,7 +271,7 @@ def _install_duplicate_repair_candidate_artifact(
         row["source_tool_code_sha256"],
         row["source_tool_spec_sha256"],
     )
-    _, source_frontier, source_score = (
+    _, source_frontier, source_score, _ = (
         verify_lifecycle_repair_run._strict_run_verifier._verified_repair_source_state(
             candidate_dir, identity
         )
@@ -326,6 +326,154 @@ def _install_duplicate_repair_candidate_artifact(
         }
     )
     return row, events
+
+
+def _install_v3_repair_portfolio(
+    run_root: Path,
+    candidate_dir: Path,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Install a rejected ordinary candidate and accepted clean-room candidate."""
+
+    ordinary, events = _install_duplicate_repair_candidate_artifact(
+        run_root, candidate_dir
+    )
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    event = events[0]
+    references = event["candidate_validations"]
+    assert isinstance(references, list)
+    ordinary_reference = references[0]
+    assert isinstance(ordinary_reference, dict)
+
+    ordinary["schema_version"] = 3
+    ordinary["candidate_origin"] = "ordinary"
+    ordinary["selected_for_attempt"] = False
+    ordinary_payload = {
+        key: value for key, value in ordinary.items() if key != "record_sha256"
+    }
+    ordinary["record_sha256"] = canonical_hash(ordinary_payload)
+    ordinary_reference.update(
+        {
+            "candidate_artifact_schema_version": 3,
+            "candidate_artifact_record_sha256": ordinary["record_sha256"],
+            "candidate_origin": "ordinary",
+        }
+    )
+
+    best_errors = event["best_error_labels_before_attempt"]
+    assert isinstance(best_errors, list)
+    best_public_labels = (
+        verify_lifecycle_repair_run._strict_run_verifier._repair_public_case_labels(
+            best_errors
+        )
+    )
+    focused_public_case_label = best_public_labels[0] if best_public_labels else None
+
+    def add_rank_fields(reference: dict[str, object], errors: list[str]) -> None:
+        public_labels = (
+            verify_lifecycle_repair_run._strict_run_verifier._repair_public_case_labels(
+                errors
+            )
+        )
+        reference.update(
+            {
+                "regressed_public_case_count": len(
+                    set(public_labels) - set(best_public_labels)
+                ),
+                "focused_public_case_failed": bool(
+                    focused_public_case_label
+                    and focused_public_case_label in public_labels
+                ),
+                "public_failed_case_count": len(public_labels),
+                "public_validation_score": (
+                    verify_lifecycle_repair_run._strict_run_verifier._repair_public_validation_score(
+                        errors
+                    )
+                ),
+            }
+        )
+
+    ordinary_errors = ordinary_reference["errors"]
+    assert isinstance(ordinary_errors, list)
+    add_rank_fields(ordinary_reference, ordinary_errors)
+
+    clean_room = json.loads(json.dumps(ordinary))
+    clean_room["candidate_index"] = 1
+    clean_room["candidate_origin"] = "clean_room"
+    clean_room["selected_for_attempt"] = True
+    clean_room["disposition"] = "validator_accepted_selected"
+    for evidence_key in ("generator_candidate", "evaluated_candidate"):
+        evidence = clean_room[evidence_key]
+        assert isinstance(evidence, dict)
+        tool = evidence["tool"]
+        assert isinstance(tool, dict)
+        tool["code"] = str(tool["code"]) + "\n# accepted clean-room candidate\n"
+        evidence["code_sha256"] = hashlib.sha256(
+            str(tool["code"]).encode("utf-8")
+        ).hexdigest()
+        evidence["tool_payload_sha256"] = canonical_hash(tool)
+    clean_validation = clean_room["validation"]
+    assert isinstance(clean_validation, dict)
+    clean_validation.update(
+        {
+            "accepted": True,
+            "failure_score": 0,
+            "sanitized_frontier": [],
+            "sanitized_frontier_count": 0,
+            "runtime_smoke_passed": True,
+        }
+    )
+    clean_payload = {
+        key: value for key, value in clean_room.items() if key != "record_sha256"
+    }
+    clean_room["record_sha256"] = canonical_hash(clean_payload)
+    clean_evidence = clean_room["evaluated_candidate"]
+    assert isinstance(clean_evidence, dict)
+    clean_reference: dict[str, object] = {
+        "candidate_index": 1,
+        "candidate_code_hash": clean_evidence["code_sha256"],
+        "accepted": True,
+        "validation_score": 0,
+        "error_frontier_count": 0,
+        "errors": [],
+        "candidate_artifact_path": str(
+            candidate_dir / "post_deployment_repair_candidates.jsonl"
+        ),
+        "candidate_artifact_schema_version": 3,
+        "candidate_artifact_record_sha256": clean_room["record_sha256"],
+        "candidate_origin": "clean_room",
+    }
+    add_rank_fields(clean_reference, [])
+    references.append(clean_reference)
+
+    event.update(
+        {
+            "candidate_count": 2,
+            "ordinary_candidate_count": 1,
+            "clean_room_candidate_count": 1,
+            "clean_room_fallback_requested": True,
+            "focused_public_case_label": focused_public_case_label,
+            "selected_candidate_index": 1,
+            "selected_candidate_origin": "clean_room",
+            "selected_candidate_code_hash": clean_evidence["code_sha256"],
+            "accepted": True,
+            "validation_score": 0,
+            "public_validation_score": 0,
+            "best_validation_score": 0,
+            "best_public_validation_score": 0,
+            "best_failed_public_case_labels_before_attempt": list(best_public_labels),
+            "improved_best": True,
+            "retained_equal_score": False,
+            "duplicate_of_best": False,
+            "stagnation_feedback_label": None,
+            "next_seed_source": "selected_candidate",
+            "error_labels": [],
+        }
+    )
+    rows = [ordinary, clean_room]
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", rows)
+    return rows, events
 
 
 def _install_repair_best_state_chain(
@@ -503,7 +651,12 @@ def _rehash_chain_candidate(
     row["record_sha256"] = canonical_hash(payload)
     references = event["candidate_validations"]
     assert isinstance(references, list)
-    reference = references[0]
+    reference = next(
+        item
+        for item in references
+        if isinstance(item, dict)
+        and item.get("candidate_index") == row.get("candidate_index")
+    )
     assert isinstance(reference, dict)
     reference["candidate_artifact_record_sha256"] = row["record_sha256"]
     _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", rows)
@@ -1953,6 +2106,221 @@ def test_development_verifier_authenticates_repair_candidate_artifact(
     assert report["repair_candidate_artifacts"]["referenced_record_count"] == 1
 
 
+def test_v3_verifier_authenticates_clean_room_portfolio_and_selection(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+
+    result = verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+        candidate_dir,
+        events,
+    )
+
+    assert result["status"] == "pass"
+    assert result["record_count"] == 2
+    assert result["schema_versions"] == [3]
+    assert result["candidate_origin_authenticated"] is True
+    assert result["portfolio_selection_authenticated"] is True
+
+
+def test_v3_verifier_recomputes_portfolio_winner(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    rows, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+    event = events[0]
+    ordinary = rows[0]
+    clean_room = rows[1]
+    ordinary["selected_for_attempt"] = True
+    clean_room["selected_for_attempt"] = False
+    clean_room["disposition"] = "validator_accepted_not_selected"
+    _rehash_chain_candidate(candidate_dir, rows, event, 0)
+    _rehash_chain_candidate(candidate_dir, rows, event, 1)
+    ordinary_evidence = ordinary["evaluated_candidate"]
+    ordinary_validation = ordinary["validation"]
+    assert isinstance(ordinary_evidence, dict)
+    assert isinstance(ordinary_validation, dict)
+    event.update(
+        {
+            "selected_candidate_index": 0,
+            "selected_candidate_origin": "ordinary",
+            "selected_candidate_code_hash": ordinary_evidence["code_sha256"],
+            "accepted": False,
+            "validation_score": ordinary_validation["failure_score"],
+            "public_validation_score": (
+                verify_lifecycle_repair_run._strict_run_verifier._repair_public_validation_score(
+                    ordinary_validation["sanitized_frontier"]
+                )
+            ),
+            "best_validation_score": ordinary_validation["failure_score"],
+            "best_public_validation_score": (
+                verify_lifecycle_repair_run._strict_run_verifier._repair_public_validation_score(
+                    ordinary_validation["sanitized_frontier"]
+                )
+            ),
+            "improved_best": False,
+            "retained_equal_score": False,
+            "duplicate_of_best": True,
+            "stagnation_feedback_label": "repair_stagnation_duplicate_candidate",
+            "next_seed_source": "best_previous_candidate",
+            "error_labels": ordinary_validation["sanitized_frontier"],
+        }
+    )
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == "repair_candidate_portfolio_selection_mismatch"
+
+
+def test_v3_verifier_rejects_candidate_origin_reference_mismatch(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+    references = events[0]["candidate_validations"]
+    assert isinstance(references, list)
+    references[1]["candidate_origin"] = "ordinary"
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+def test_v3_verifier_rejects_candidate_origin_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+    events[0]["clean_room_candidate_count"] = 0
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+def test_v3_verifier_rejects_clean_room_after_accepted_ordinary_candidate(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    rows, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+    event = events[0]
+    ordinary = rows[0]
+    ordinary["disposition"] = "validator_accepted_not_selected"
+    ordinary_validation = ordinary["validation"]
+    assert isinstance(ordinary_validation, dict)
+    ordinary_validation.update(
+        {
+            "accepted": True,
+            "failure_score": 0,
+            "sanitized_frontier": [],
+            "sanitized_frontier_count": 0,
+            "runtime_smoke_passed": True,
+        }
+    )
+    references = event["candidate_validations"]
+    assert isinstance(references, list)
+    ordinary_reference = references[0]
+    assert isinstance(ordinary_reference, dict)
+    ordinary_reference.update(
+        {
+            "accepted": True,
+            "validation_score": 0,
+            "error_frontier_count": 0,
+            "errors": [],
+            "regressed_public_case_count": 0,
+            "focused_public_case_failed": False,
+            "public_failed_case_count": 0,
+            "public_validation_score": 0,
+        }
+    )
+    _rehash_chain_candidate(candidate_dir, rows, event, 0)
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+def test_v3_verifier_recomputes_public_rank_fields(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_v3_repair_portfolio(run_root, candidate_dir)
+    references = events[0]["candidate_validations"]
+    assert isinstance(references, list)
+    clean_room_reference = references[1]
+    assert isinstance(clean_room_reference, dict)
+    clean_room_reference["public_failed_case_count"] = 1
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == "repair_candidate_portfolio_selection_mismatch"
+
+
+def test_v2_candidate_artifact_remains_compatible_with_best_state_verification(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    rows, events = _install_repair_best_state_chain(
+        run_root,
+        candidate_dir,
+        ({"attempt": 1, "code_suffix": "\n# v2 compatible\n", "score_delta": -1},),
+    )
+    row = rows[0]
+    event = events[0]
+    row["schema_version"] = 2
+    references = event["candidate_validations"]
+    assert isinstance(references, list)
+    references[0]["candidate_artifact_schema_version"] = 2
+    _rehash_chain_candidate(candidate_dir, rows, event, 0)
+
+    result = verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+        candidate_dir,
+        events,
+    )
+
+    assert result["status"] == "pass"
+    assert result["schema_versions"] == [2]
+    assert result["candidate_origin_authenticated"] is False
+    assert result["portfolio_selection_authenticated"] is False
+
+
 def test_current_candidate_schema_cannot_downgrade_away_best_state_chain(
     tmp_path: Path,
 ) -> None:
@@ -3086,3 +3454,417 @@ def test_coherent_manifest_reordering_cannot_change_the_frozen_cohort(
 
     assert "benchmark_scenario_order_mismatch" in report["reasons"]
     assert "protocol_scenario_order_pin_mismatch" in report["reasons"]
+
+
+@pytest.mark.parametrize(
+    ("manifest_name", "split_name", "manifest_type"),
+    (
+        (
+            "lifecycle_retirement_successor_dev10.json",
+            "full_benchmark",
+            verify_lifecycle_repair_run.RETIRE_REPLACE_DEV10_MANIFEST_TYPE,
+        ),
+        (
+            "lifecycle_retirement_successor_transfer_dev30.json",
+            "transfer_30",
+            verify_lifecycle_repair_run.RETIRE_REPLACE_TRANSFER_MANIFEST_TYPE,
+        ),
+    ),
+)
+def test_retirement_successor_manifest_order_hash_uses_runtime_formula(
+    manifest_name: str,
+    split_name: str,
+    manifest_type: str,
+) -> None:
+    manifest_path = (
+        REPOSITORY_ROOT / "docs" / "sage_protocol" / "manifests" / manifest_name
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    names = tuple(run_sage_protocol.load_split_names(manifest_path, split_name))
+    runtime_hash = hashlib.sha256(("\n".join(names) + "\n").encode("utf-8")).hexdigest()
+    cohort_spec = verify_lifecycle_repair_run.COHORT_SPECS[manifest_type]
+
+    assert manifest["manifest_type"] == manifest_type
+    assert tuple(cohort_spec["order"]) == names
+    assert manifest["scenario_order_sha256"] == runtime_hash
+    assert cohort_spec["order_sha256"] == runtime_hash
+    assert verify_lifecycle_repair_run._order_sha256(names) == runtime_hash
+
+
+def _retirement_transition_fixture(
+    tmp_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    run_root = tmp_path / "run"
+    candidate_dir = run_root / "candidate"
+    registry_dir = run_root / "registry"
+    candidate_dir.mkdir(parents=True)
+    registry_dir.mkdir(parents=True)
+    source_name = verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    successor_name = verify_lifecycle_repair_run.CONTACT_READINESS_SUCCESSOR
+    source_key = verify_lifecycle_repair_run.PINNED_LIFECYCLE_V1_CONTRACTS[source_name][
+        "canonical_key"
+    ]
+    successor_key = (
+        verify_lifecycle_repair_run.CONTACT_READINESS_SUCCESSOR_CANONICAL_KEY
+    )
+
+    def entry(name: str, *, retired: bool) -> dict[str, Any]:
+        code = f"def {name}():\n    return {{}}\n"
+        return {
+            "version": 1,
+            "retired": retired,
+            "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+            "tool": {"spec": {"tool_name": name}, "code": code},
+            "validation": {
+                "accepted": True,
+                "errors": [],
+                "source_example_count": 2,
+                "held_out_check_count": 1,
+                "negative_applicability_count": 1,
+                "runtime_smoke_passed": True,
+            },
+        }
+
+    retired_source = entry(source_name, retired=True)
+    active_source = entry(source_name, retired=False)
+    successor = entry(successor_name, retired=False)
+    _write_json(
+        registry_dir / "registry_manifest.json",
+        {"tools": {source_name: retired_source, successor_name: successor}},
+    )
+    tombstone = {
+        "schema_version": 1,
+        "canonical_keys": [source_key],
+        "tool_names": [source_name],
+        "last_reason": "bounded_repair_failed_validation",
+    }
+    _write_json(
+        registry_dir
+        / verify_lifecycle_repair_run.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME,
+        tombstone,
+    )
+
+    trigger_name = "trigger_insufficient_information"
+    successor_task = "successor_insufficient_information"
+    for completed_count, scenario_name in enumerate(
+        (trigger_name, successor_task), start=1
+    ):
+        checkpoint_dir = (
+            candidate_dir
+            / "registry_checkpoints"
+            / (
+                f"after_{completed_count:04d}_"
+                f"{verify_lifecycle_repair_run._safe_checkpoint_name(scenario_name)}"
+            )
+        )
+        checkpoint_tools = {
+            source_name: active_source if completed_count == 1 else retired_source,
+            **({successor_name: successor} if completed_count > 1 else {}),
+        }
+        _write_json(
+            checkpoint_dir / "registry_manifest.json", {"tools": checkpoint_tools}
+        )
+        copied_files = ["registry_manifest.json"]
+        if completed_count > 1:
+            _write_json(
+                checkpoint_dir
+                / verify_lifecycle_repair_run.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME,
+                tombstone,
+            )
+            copied_files.append(
+                verify_lifecycle_repair_run.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+            )
+        _write_json(checkpoint_dir / "checkpoint.json", {"copied_files": copied_files})
+
+    request_id = "source-v1-after-1"
+    event_common = {
+        "mode": "test_mode",
+        "run_root": str(run_root),
+        "run_dir": str(candidate_dir),
+    }
+    protocol_events: list[dict[str, Any]] = [
+        {
+            **event_common,
+            "event": "post_deployment_public_contract_failure",
+            "tool_name": source_name,
+            "tool_version": 1,
+            "canonical_key": source_key,
+            "raw_hidden_case_values_logged": False,
+        },
+        {
+            **event_common,
+            "event": "post_deployment_tool_repair_queued",
+            "request_id": request_id,
+            "tool_name": source_name,
+            "repair_kind": "implementation",
+            "source_tool_version": 1,
+            "eligible_from_completed_count": 2,
+            "future_tasks_only": True,
+        },
+        *[
+            {
+                **event_common,
+                "event": "post_deployment_tool_repair_attempted",
+                "request_id": request_id,
+                "tool_name": source_name,
+                "attempt": attempt,
+                "accepted": False,
+                "candidate_count": 1,
+            }
+            for attempt in (1, 2)
+        ],
+        {
+            **event_common,
+            "event": "post_deployment_tool_repair_retired",
+            "request_id": request_id,
+            "tool_name": source_name,
+            "source_tool_version": 1,
+            "status": "rejected",
+            "reason": "bounded_repair_failed_validation",
+            "future_tasks_only": True,
+            "triggering_task_replayed": False,
+            "entry_retired": True,
+            "retired_canonical_key": source_key,
+            "same_run_rebirth_suppressed": True,
+        },
+        {
+            **event_common,
+            "event": "validation_passed",
+            "tool_name": successor_name,
+            "canonical_key": successor_key,
+            "errors": [],
+            "runtime_smoke_passed": True,
+        },
+        {
+            **event_common,
+            "event": "tool_birth_succeeded",
+            "tool_name": successor_name,
+            "canonical_key": successor_key,
+            "validation_contract_hash": "a" * 64,
+        },
+        {
+            **event_common,
+            "event": "registry_saved",
+            "tool_name": successor_name,
+            "tool_version": 1,
+            "validation_contract_hash": "a" * 64,
+        },
+    ]
+    _write_jsonl(
+        candidate_dir / "tool_birth_events.jsonl",
+        [
+            {
+                "accepted": True,
+                "tool_name": successor_name,
+                "canonical_key": successor_key,
+                "source_task_id_redacted": True,
+                "runtime_smoke_passed": True,
+                "errors": [],
+            }
+        ],
+    )
+    trigger_evidence = {
+        "scenario": trigger_name,
+        "completed_count": 1,
+        "generated_tools_visible": [source_name],
+        "generated_tools_called": [source_name],
+        "generated_tools_attempted": [source_name],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [source_name],
+        "generated_tool_versions": {source_name: 1},
+        "post_deployment_repair_request_ids": [request_id],
+    }
+    successor_evidence = {
+        "scenario": successor_task,
+        "completed_count": 2,
+        "generated_tools_visible": [successor_name],
+        "generated_tools_called": [successor_name],
+        "generated_tools_attempted": [successor_name],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {successor_name: 1},
+        "post_deployment_repair_request_ids": [],
+    }
+    successor_identity = verify_lifecycle_repair_run._registry_entry_identity(
+        successor, expected_name=successor_name
+    )
+    assert successor_identity is not None
+    contract_identities = {
+        successor_name: {
+            "tool_name": successor_name,
+            "tool_version": 1,
+            "canonical_key": successor_key,
+            "tool_code_hash": successor_identity["code_hash"],
+            "tool_spec_hash": successor_identity["public_spec_sha256"],
+        }
+    }
+    kwargs = {
+        "run_root": run_root,
+        "candidate_dir": candidate_dir,
+        "registry_dir": registry_dir,
+        "protocol": {"mode": "test_mode"},
+        "protocol_events": protocol_events,
+        "repair_requests": [
+            {
+                "request_id": request_id,
+                "tool_name": source_name,
+                "source_tool_version": 1,
+                "repair_kind": "implementation",
+                "trigger_reason_codes": ["deterministic_public_contract_failure"],
+                "trigger_completed_count": 1,
+            }
+        ],
+        "acknowledgements": [
+            {
+                "request_id": request_id,
+                "tool_name": source_name,
+                "new_version": 1,
+                "status": "rejected",
+                "acknowledged_after_completed_count": 1,
+                "eligible_from_completed_count": 2,
+                "future_tasks_only": True,
+                "triggering_task_replay_allowed": False,
+            }
+        ],
+        "feedback_rows": [trigger_evidence, successor_evidence],
+        "selection_by_name": {
+            trigger_name: dict(trigger_evidence),
+            successor_task: dict(successor_evidence),
+        },
+        "trajectory_by_name": {
+            trigger_name: {
+                key: tuple(trigger_evidence[key])
+                for key in (
+                    "generated_tools_visible",
+                    "generated_tools_called",
+                    "generated_tools_attempted",
+                    "generated_tools_failed",
+                )
+            },
+            successor_task: {
+                key: tuple(successor_evidence[key])
+                for key in (
+                    "generated_tools_visible",
+                    "generated_tools_called",
+                    "generated_tools_attempted",
+                    "generated_tools_failed",
+                )
+            },
+        },
+        "candidate_by_name": {
+            trigger_name: _result_row(trigger_name, 0.0),
+            successor_task: _result_row(successor_task, 1.0),
+        },
+        "control_by_name": {
+            trigger_name: _result_row(trigger_name, 0.0),
+            successor_task: _result_row(successor_task, 0.0),
+        },
+        "roles": {"repair_trigger": (trigger_name,), "successor": (successor_task,)},
+        "transition": {
+            "source_tool_name": source_name,
+            "source_tool_version": 1,
+            "trigger_role": "repair_trigger",
+            "repair_kind": "implementation",
+            "trigger_reason_code": "deterministic_public_contract_failure",
+            "bounded_repair_attempt_count": 2,
+            "terminal_acknowledgement_status": "rejected",
+            "terminal_retirement_reason": "bounded_repair_failed_validation",
+            "successors": {
+                successor_name: {
+                    "canonical_key": successor_key,
+                    "version": 1,
+                    "role": "successor",
+                    "minimum_visible_and_called": 1,
+                    "minimum_exact_successes": 1,
+                    "minimum_success_flips": 1,
+                }
+            },
+            "exact_new_validation_successor_set": True,
+        },
+    }
+    return kwargs, contract_identities
+
+
+def test_retirement_transition_proves_order_and_durable_suppression(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    kwargs, contract_identities = _retirement_transition_fixture(tmp_path)
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "_validation_contract_identities",
+        lambda _registry_dir: contract_identities,
+    )
+
+    report, reasons = (
+        verify_lifecycle_repair_run._retirement_successor_transition_report(**kwargs)
+    )
+
+    assert reasons == []
+    assert report["failure_repair_retirement_order_proved"] is True
+    assert report["durable_source_tombstone"] is True
+    successor = report["successors"][
+        verify_lifecycle_repair_run.CONTACT_READINESS_SUCCESSOR
+    ]
+    assert successor["causal_birth_order_proved"] is True
+
+
+def test_retirement_transition_rejects_successor_birth_before_retirement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    kwargs, contract_identities = _retirement_transition_fixture(tmp_path)
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "_validation_contract_identities",
+        lambda _registry_dir: contract_identities,
+    )
+    events = kwargs["protocol_events"]
+    successor_events = events[5:]
+    kwargs["protocol_events"] = [*events[:1], *successor_events, *events[1:5]]
+
+    _, reasons = verify_lifecycle_repair_run._retirement_successor_transition_report(
+        **kwargs
+    )
+
+    assert any(
+        reason.startswith("successor_causal_birth_order_mismatch:")
+        for reason in reasons
+    )
+
+
+def test_retirement_transition_rejects_missing_tombstone_and_later_source_use(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    kwargs, contract_identities = _retirement_transition_fixture(tmp_path)
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "_validation_contract_identities",
+        lambda _registry_dir: contract_identities,
+    )
+    tombstone_path = (
+        kwargs["registry_dir"]
+        / verify_lifecycle_repair_run.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+    )
+    tombstone_path.unlink()
+    successor_task = kwargs["roles"]["successor"][0]
+    checkpoint_tombstone = (
+        kwargs["candidate_dir"]
+        / "registry_checkpoints"
+        / (
+            "after_0002_"
+            f"{verify_lifecycle_repair_run._safe_checkpoint_name(successor_task)}"
+        )
+        / verify_lifecycle_repair_run.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME
+    )
+    checkpoint_tombstone.unlink()
+    kwargs["trajectory_by_name"][successor_task]["generated_tools_called"] = (
+        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+    )
+
+    _, reasons = verify_lifecycle_repair_run._retirement_successor_transition_report(
+        **kwargs
+    )
+
+    assert "terminal_retirement_tombstone_invalid" in reasons
+    assert "source_v1_terminal_retirement_tombstone_missing" in reasons
+    assert "terminal_retirement_checkpoint_persistence_mismatch" in reasons
+    assert "retired_source_present_after_trigger" in reasons

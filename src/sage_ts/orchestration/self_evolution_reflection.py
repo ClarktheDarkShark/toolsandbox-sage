@@ -25,6 +25,7 @@ from sage_ts.evaluation.control_baseline_cache import (
     compatibility_context,
 )
 from sage_ts.orchestration.checkpoints import append_jsonl
+from sage_ts.orchestration.online_birth import terminally_retire_generated_tool
 from sage_ts.registry.store import RegistryStore
 from tool_sandbox.common.scenario import Scenario
 
@@ -437,6 +438,35 @@ class SelfEvolutionReflectionController:
         requests = tuple(self.pending_repair_requests)
         self.pending_repair_requests.clear()
         return requests
+
+    def reconcile_active_repaired_canaries(
+        self,
+        canary_state_by_tool: dict[str, dict[str, Any]],
+    ) -> tuple[str, ...]:
+        """Align hydrated reflection state with restart-verified active canaries."""
+
+        reconciled: list[str] = []
+        for tool_name, state in sorted(canary_state_by_tool.items()):
+            version = state.get("tool_version")
+            entry = self.store.get(tool_name)
+            if (
+                not isinstance(version, int)
+                or isinstance(version, bool)
+                or version < 1
+                or entry is None
+                or entry.retired
+                or entry.version != version
+                or not entry.birth_scenario.startswith("post_deployment_repair:")
+            ):
+                continue
+            stats = self.tool_stats.get(tool_name)
+            if stats is None or stats.tool_version != version:
+                self.tool_stats[tool_name] = ToolLifecycleStats(tool_version=version)
+                reconciled.append(tool_name)
+            self.retired_this_run.discard(tool_name)
+        if reconciled:
+            self._write_current_state()
+        return tuple(reconciled)
 
     def acknowledge_repair(
         self,
@@ -1316,6 +1346,11 @@ class SelfEvolutionReflectionController:
             "immediate_actions": immediate_actions,
         }
         self._record_feedback_row(task_feedback)
+        task_feedback["immediate_actions"].extend(
+            self._retire_tools_with_only_attributable_harm(
+                scenario_name=lifecycle_context,
+            )
+        )
         emitted_repair_requests = self._emit_post_deployment_repair_requests()
         task_feedback["post_deployment_repair_request_ids"] = [
             request["request_id"] for request in emitted_repair_requests
@@ -1358,7 +1393,11 @@ class SelfEvolutionReflectionController:
         *,
         source_tool_version: int | None = None,
     ) -> dict[str, Any]:
-        self.store.retire(tool_name)
+        terminally_retire_generated_tool(
+            self.store,
+            tool_name,
+            reason=reason,
+        )
         self.retired_this_run.add(tool_name)
         action = {
             "tool_name": tool_name,
@@ -1449,6 +1488,53 @@ class SelfEvolutionReflectionController:
                         source_tool_version=generated_tool_versions.get(tool_name),
                     )
                 )
+        return actions
+
+    def _retire_tools_with_only_attributable_harm(
+        self,
+        *,
+        scenario_name: str,
+    ) -> list[dict[str, Any]]:
+        """Retire a tool only after repeated, strictly attributable harm.
+
+        Whole-task loss alone cannot identify a broken generated tool. This
+        transition therefore uses the existing strict attribution boundary:
+        fresh audited outcomes, one generated tool attempted, a public semantic
+        family, and repeated harmful calls. A tool with any attributable helpful
+        use is preserved and its harmful family is route-suppressed instead.
+        """
+
+        actions: list[dict[str, Any]] = []
+        for tool_name, stats in sorted(self.tool_stats.items()):
+            if tool_name in self.retired_this_run:
+                continue
+            entry = self.store.get(tool_name)
+            if entry is None or entry.retired:
+                continue
+            route_repair_families = self._active_route_repair_families(stats)
+            if not route_repair_families:
+                continue
+            repeated_attributable_harm = any(
+                stats.family_stats[family].attributable_harmful_call_count
+                >= self.min_route_repair_harmful_calls
+                for family in route_repair_families
+            )
+            if not repeated_attributable_harm:
+                continue
+            attributable_helpful_calls = sum(
+                family_stats.attributable_helpful_call_count
+                for family_stats in stats.family_stats.values()
+            )
+            if attributable_helpful_calls:
+                continue
+            actions.append(
+                self._retire_tool(
+                    tool_name,
+                    "repeated_attributable_harm_without_helpful_route",
+                    scenario_name,
+                    source_tool_version=stats.tool_version,
+                )
+            )
         return actions
 
     def _implementation_repair_evidence(

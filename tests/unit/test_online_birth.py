@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import sage_ts.orchestration.online_birth as online_birth
 from sage_ts.adequacy.inadequacy_classifier import (
     _latest_record_selection_observation,
@@ -83,6 +85,35 @@ def test_decomposed_recency_tools_route_only_to_matching_visible_signals() -> No
     assert online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[
         "derived_value:prepare_past_reminder_recency_search_args"
     ] == ("past_reminder_recency_search",)
+
+
+def test_narrow_readiness_successors_route_to_dedicated_gaps() -> None:
+    expected_routing = {
+        "validation:assess_contact_removal_readiness": (
+            "contact_action_readiness_gap",
+            "contact_action_readiness",
+        ),
+        "validation:assess_message_recipient_readiness": (
+            "message_recipient_readiness_gap",
+            "message_recipient_readiness",
+        ),
+        "validation:assess_temporal_request_readiness": (
+            "temporal_request_readiness_gap",
+            "temporal_readiness",
+        ),
+    }
+
+    assert "validation:assess_contact_removal_readiness" not in (
+        FIRST_OBSERVATION_BIRTH_KEYS
+    )
+    assert {
+        "validation:assess_message_recipient_readiness",
+        "validation:assess_temporal_request_readiness",
+    }.issubset(FIRST_OBSERVATION_BIRTH_KEYS)
+    assert {
+        key: online_birth.VISIBLE_ROUTING_FAMILIES_BY_KEY[key]
+        for key in expected_routing
+    } == expected_routing
 
 
 def test_scenario_like_labels_are_detected_by_shape_not_task_prefix() -> None:
@@ -851,6 +882,28 @@ class FakeStagedRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
 
 
 @dataclass
+class FakeRejectedVariantThenCleanRoomGenerator(FakeRecordSelectorGenerator):
+    repair_calls: int = 0
+    repair_error_inputs: tuple[tuple[str, ...], ...] = ()
+
+    def repair(
+        self,
+        request: ToolGenerationRequest,
+        rejected_tool: GeneratedTool,
+        errors: tuple[str, ...],
+    ) -> GeneratedTool:
+        self.repair_calls += 1
+        self.repair_error_inputs += (errors,)
+        if online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL in errors:
+            self.invalid_attempts = 0
+            return self.generate(request)
+        return replace(
+            rejected_tool,
+            code=rejected_tool.code + "# distinct_rejected_variant\n",
+        )
+
+
+@dataclass
 class FakeContactLookupGenerator:
     calls: int = 0
 
@@ -1040,7 +1093,7 @@ def test_visible_context_oldest_message_with_send_tool_is_read_only() -> None:
     assert "safe_abstain_needed" not in signals
 
 
-def test_relative_time_search_without_clock_births_safe_abstention_helper() -> None:
+def test_relative_time_search_without_clock_births_temporal_readiness_helper() -> None:
     context = ExecutionContext(tool_allow_list=["search_reminder", "end_conversation"])
     context.add_to_database(
         DatabaseNamespace.SANDBOX,
@@ -1059,8 +1112,100 @@ def test_relative_time_search_without_clock_births_safe_abstention_helper() -> N
     )
     keys = {observation.canonical_key for observation in observations}
 
-    assert "validation:prepare_safe_action_or_abstain" in keys
+    assert "validation:assess_temporal_request_readiness" in keys
+    assert "validation:prepare_safe_action_or_abstain" not in keys
     assert "derived_value:resolve_search_window_or_bounds" in keys
+
+
+def test_contact_action_gap_births_contact_readiness_from_visible_signals() -> None:
+    request = "Remove the contact with phone number +12025550112."
+    signals = _visible_task_signals(request, ("remove_contact", "end_conversation"))
+    assert "contact_action_readiness_gap" in signals
+
+    context = ExecutionContext(tool_allow_list=["remove_contact", "end_conversation"])
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": request,
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "opaque_scenario_name",
+        Scenario(starting_context=context),
+    )
+    keys = {observation.canonical_key for observation in observations}
+
+    assert "validation:assess_contact_removal_readiness" in keys
+    assert "validation:prepare_safe_action_or_abstain" not in keys
+
+
+def test_complete_contact_action_has_no_readiness_gap() -> None:
+    signals = _visible_task_signals(
+        "Remove the contact with phone number +12025550112.",
+        ("search_contacts", "remove_contact", "end_conversation"),
+    )
+
+    assert "contact_action_readiness_gap" not in signals
+    assert "safe_abstain_needed" not in signals
+
+
+def test_named_message_gap_births_recipient_readiness_from_visible_signals() -> None:
+    request = "Send a message to Morgan Ellis saying hello."
+    signals = _visible_task_signals(
+        request,
+        ("send_message_with_phone_number", "end_conversation"),
+    )
+    assert "message_recipient_readiness_gap" in signals
+
+    context = ExecutionContext(
+        tool_allow_list=["send_message_with_phone_number", "end_conversation"]
+    )
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": request,
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "opaque_scenario_name",
+        Scenario(starting_context=context),
+    )
+    keys = {observation.canonical_key for observation in observations}
+
+    assert "validation:assess_message_recipient_readiness" in keys
+    assert "validation:prepare_safe_action_or_abstain" not in keys
+
+
+def test_unmatched_visible_insufficiency_preserves_omnibus_fallback() -> None:
+    context = ExecutionContext(tool_allow_list=["end_conversation"])
+    context.add_to_database(
+        DatabaseNamespace.SANDBOX,
+        [
+            {
+                "sender": RoleType.USER,
+                "recipient": RoleType.AGENT,
+                "content": "There is insufficient information to complete this request.",
+            }
+        ],
+    )
+
+    observations = classify_visible_task_observations(
+        "opaque_scenario_name",
+        Scenario(starting_context=context),
+    )
+    keys = {observation.canonical_key for observation in observations}
+
+    assert keys == {"validation:prepare_safe_action_or_abstain"}
 
 
 def test_standalone_later_without_clock_births_safe_abstention_helper() -> None:
@@ -1071,6 +1216,7 @@ def test_standalone_later_without_clock_births_safe_abstention_helper() -> None:
 
     assert "recency_search" in signals
     assert "missing_current_time_prerequisite" in signals
+    assert "temporal_request_readiness_gap" in signals
     assert "safe_abstain_needed" in signals
 
 
@@ -1082,6 +1228,7 @@ def test_relative_time_search_with_clock_preserves_recency_birth() -> None:
 
     assert "recency_search" in signals
     assert "missing_current_time_prerequisite" not in signals
+    assert "temporal_request_readiness_gap" not in signals
     assert "safe_abstain_needed" not in signals
 
 
@@ -1096,6 +1243,7 @@ def test_visible_context_explicit_text_request_still_marks_send_intent() -> None
 
     assert "send_message" in signals
     assert "named_message_recipient" in signals
+    assert "message_recipient_readiness_gap" not in signals
 
 
 def test_visible_context_vague_message_search_marks_followup_possible() -> None:
@@ -1141,6 +1289,88 @@ def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:
         for line in (tmp_path / "tool_birth_events.jsonl").read_text().splitlines()
     ]
     assert [event["accepted"] for event in birth_events] == [False, True]
+
+
+def test_existing_broader_helper_suppression_is_rechecked_on_later_observation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observation = _latest_record_observation()
+    generator = FakeRecordSelectorGenerator()
+    controller = OnlineBirthController(
+        store=RegistryStore(tmp_path / "registry"),
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+    )
+    broader_active = True
+
+    def current_broader_helper(_canonical_key: str, _store: RegistryStore):
+        return "retained_broader_helper" if broader_active else None
+
+    monkeypatch.setattr(online_birth, "existing_broader_helper", current_broader_helper)
+
+    assert controller.observe(observation) is None
+    assert generator.calls == 0
+    assert observation.canonical_key not in controller.generated_keys
+
+    broader_active = False
+    assert controller.observe(observation) == _RECORD_SELECTOR_TOOL_NAME
+    assert generator.calls == 1
+
+
+def test_live_birth_contract_binding_failure_is_terminal_across_restart(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeRecordSelectorGenerator()
+    emitted: list[tuple[str, dict[str, object]]] = []
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path / "first",
+        recurrence_threshold=1,
+        event_hook=lambda event, payload: emitted.append((event, payload)),
+    )
+
+    def fail_contract_binding(*_args, **_kwargs):
+        raise OSError("simulated contract binding failure")
+
+    monkeypatch.setattr(
+        controller, "_persist_validation_contract", fail_contract_binding
+    )
+
+    assert controller.observe(observation) is None
+    entry = store.get(_RECORD_SELECTOR_TOOL_NAME)
+    assert entry is not None and entry.retired
+    tombstones = json.loads(
+        (store.root / online_birth.TERMINAL_RETIREMENT_TOMBSTONE_FILENAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert observation.canonical_key in tombstones["canonical_keys"]
+    assert _RECORD_SELECTOR_TOOL_NAME in tombstones["tool_names"]
+    failure = next(
+        payload
+        for event, payload in emitted
+        if event == "tool_birth_validation_contract_binding_failed"
+    )
+    assert failure["entry_was_active"] is True
+    assert failure["entry_retired"] is True
+    assert failure["retired_canonical_key"] == observation.canonical_key
+    assert failure["same_run_rebirth_suppressed"] is True
+
+    restarted_generator = FakeRecordSelectorGenerator()
+    restarted = OnlineBirthController(
+        store=store,
+        generator=restarted_generator,
+        output_dir=tmp_path / "restarted",
+        recurrence_threshold=1,
+    )
+    assert restarted.observe(observation) is None
+    assert restarted_generator.calls == 0
 
 
 def test_birth_rejects_model_tool_name_outside_public_request(tmp_path: Path) -> None:
@@ -1532,20 +1762,90 @@ def test_candidate_repair_can_build_on_flat_intermediate_candidate(
 
     controller.observe(observation)
 
-    assert generator.repair_calls == 2
+    assert generator.repair_calls == 3
     substantive_errors = [
-        {error for error in errors if not error.startswith("repair_strategy:")}
+        {
+            error
+            for error in errors
+            if not error.startswith("repair_strategy:")
+            and error != online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL
+        }
         for errors in generator.repair_error_inputs
     ]
-    assert substantive_errors[0].issubset(substantive_errors[1])
+    assert substantive_errors[0] == substantive_errors[1]
+    assert substantive_errors[0].issubset(substantive_errors[2])
     assert [
         next(error for error in errors if error.startswith("repair_strategy:"))
         for errors in generator.repair_error_inputs
-    ] == ["repair_strategy:1", "repair_strategy:2"]
+    ] == ["repair_strategy:1", "repair_strategy:1", "repair_strategy:2"]
+    assert (
+        online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL
+        in generator.repair_error_inputs[1]
+    )
     assert store.get(_RECORD_SELECTOR_TOOL_NAME) is not None
     birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
     assert birth_event["accepted"] is True
     assert birth_event["repair_attempt_count"] == 2
+
+
+def test_candidate_repair_uses_clean_room_after_distinct_rejected_variant(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SAGE_V2_EXPERIMENT_FEATURES", "candidate_repair")
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    generator = FakeRejectedVariantThenCleanRoomGenerator(invalid_attempts=1)
+    controller = OnlineBirthController(
+        store=store,
+        generator=generator,
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+        failure_memory_path=None,
+    )
+
+    controller.observe(observation)
+
+    assert generator.repair_calls == 2
+    ordinary_errors, clean_room_errors = generator.repair_error_inputs
+    assert (
+        online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL
+        not in ordinary_errors
+    )
+    assert (
+        online_birth.REPAIR_INDEPENDENT_CLEAN_ROOM_CANDIDATE_LABEL in clean_room_errors
+    )
+    assert (
+        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+        not in clean_room_errors
+    )
+    entry = store.get(_RECORD_SELECTOR_TOOL_NAME)
+    assert entry is not None and not entry.retired
+    birth_event = json.loads((tmp_path / "tool_birth_events.jsonl").read_text())
+    repair_event = birth_event["repair_history"][0]
+    assert repair_event["clean_room_fallback_requested"] is True
+    assert repair_event["clean_room_candidate_count"] == 1
+    assert repair_event["selected_candidate_origin"] == "clean_room"
+    assert repair_event["repair_candidate_validations"] == [
+        {
+            "candidate_index": 0,
+            "accepted": False,
+            "validation_score": repair_event["repair_candidate_validations"][0][
+                "validation_score"
+            ],
+            "candidate_origin": "ordinary",
+            "duplicate_of_best": False,
+            "errors": repair_event["repair_candidate_validations"][0]["errors"],
+        },
+        {
+            "candidate_index": 1,
+            "accepted": True,
+            "validation_score": 0,
+            "candidate_origin": "clean_room",
+            "duplicate_of_best": False,
+            "errors": [],
+        },
+    ]
 
 
 def test_recency_action_contract_is_decomposed_to_reminder_actions() -> None:

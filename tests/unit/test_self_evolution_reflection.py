@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 from queue import Queue
 
@@ -11,6 +12,7 @@ from sage_ts.evaluation.control_baseline_cache import (
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolSpec
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
+    ToolLifecycleStats,
     _online_feedback_outcome,
     _online_feedback_outcome_with_source,
 )
@@ -384,12 +386,14 @@ def test_reflection_reports_outcome_only_shortfall_without_repairing_co_called_t
     assert last_feedback["post_deployment_repair_request_ids"] == []
 
 
-def test_reflection_keeps_relative_regression_as_route_repair(
+def test_reflection_retires_repeatedly_harmful_tool_without_helpful_route(
     tmp_path: Path,
 ) -> None:
     scenario_names = tuple(f"route_case_{index}" for index in range(2))
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("generic_routed_helper"))
     controller = SelfEvolutionReflectionController(
-        store=RegistryStore(tmp_path / "registry"),
+        store=store,
         output_dir=tmp_path / "run",
         agent="gpt-4o-mini",
         user="gpt-4o-mini",
@@ -431,9 +435,10 @@ def test_reflection_keeps_relative_regression_as_route_repair(
     lifecycle = json.loads(
         (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
     )["tool_lifecycle"]["generic_routed_helper"]
-    assert lifecycle["decision"] == "needs_route_repair"
-    assert lifecycle["repair_kind"] == "routing"
-    assert lifecycle["routing_disposition"] == "family_suppression_active"
+    assert lifecycle["decision"] == "parked"
+    assert lifecycle["decision_reason"] == "retired_this_run"
+    assert lifecycle["repair_kind"] is None
+    assert lifecycle["routing_disposition"] == "quarantined"
     assert lifecycle["route_repair_families"] == ["lookup"]
     assert (
         lifecycle["family_evidence"]["lookup"]["attributable_harmful_call_count"] == 2
@@ -441,6 +446,127 @@ def test_reflection_keeps_relative_regression_as_route_repair(
     assert lifecycle["implementation_repair_families"] == []
     assert controller.drain_pending_repair_requests() == ()
     assert not controller.repair_request_path.exists()
+    assert store.get("generic_routed_helper").retired is True  # type: ignore[union-attr]
+    actions = [
+        json.loads(line)
+        for line in (tmp_path / "run" / "self_evolution_tool_lifecycle.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert actions[-1]["decision"] == "parked"
+    assert actions[-1]["reason"] == ("repeated_attributable_harm_without_helpful_route")
+
+
+def test_reflection_preserves_helpful_tool_and_repairs_only_harmful_route(
+    tmp_path: Path,
+) -> None:
+    scenario_names = ("helpful_case", "harmful_case_one", "harmful_case_two")
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("mixed_routed_helper"))
+    controller = SelfEvolutionReflectionController(
+        store=store,
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+        fresh_control_rows={
+            "helpful_case": {
+                "name": "helpful_case",
+                "similarity": 0.0,
+                "outcome_similarity": 0.0,
+            },
+            "harmful_case_one": {
+                "name": "harmful_case_one",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            },
+            "harmful_case_two": {
+                "name": "harmful_case_two",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+            },
+        },
+        require_fresh_control=True,
+        pulse_interval=1,
+        min_outcome_diagnostic_calls=2,
+    )
+
+    for scenario_name, family, outcome in (
+        ("helpful_case", "working_family", 1.0),
+        ("harmful_case_one", "harmful_family", 0.0),
+        ("harmful_case_two", "harmful_family", 0.0),
+    ):
+        controller.assess_scenario(
+            scenario_name=scenario_name,
+            baseline_scenario=_scenario(),
+            result={"similarity": outcome, "outcome_similarity": outcome},
+            selection_record={
+                "generated_tools_visible": ["mixed_routed_helper"],
+                "generated_tools_called": ["mixed_routed_helper"],
+                "generated_tools_attempted": ["mixed_routed_helper"],
+                "generated_tools_failed": [],
+            },
+            side_effect_failures=[],
+            task_context_label=f"visible_task_context(family={family})",
+            task_family_key=family,
+        )
+
+    lifecycle = json.loads(
+        (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"]["mixed_routed_helper"]
+    assert lifecycle["decision"] == "retain_with_route_repair"
+    assert lifecycle["route_repair_families"] == ["harmful_family"]
+    assert store.get("mixed_routed_helper").retired is False  # type: ignore[union-attr]
+
+
+def test_restart_reconciles_reflection_state_to_active_repaired_canary(
+    tmp_path: Path,
+) -> None:
+    tool_name = "repaired_canary_helper"
+    store = RegistryStore(tmp_path / "registry")
+    original = _accepted_registry_tool(tool_name)
+    store.put(original)
+    store.put(
+        replace(
+            original,
+            birth_scenario="post_deployment_repair:implementation",
+        )
+    )
+    entry = store.get(tool_name)
+    assert entry is not None and entry.version == 2 and not entry.retired
+    controller = SelfEvolutionReflectionController(
+        store=store,
+        output_dir=tmp_path / "run",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        base_tool_policy=UPSTREAM_POLICY,
+        manifest_path=tmp_path / "manifest.json",
+        control_cache=None,
+    )
+    controller.tool_stats[tool_name] = ToolLifecycleStats(
+        tool_version=1,
+        called_count=7,
+        contract_failure_count=2,
+    )
+    controller.retired_this_run.add(tool_name)
+
+    reconciled = controller.reconcile_active_repaired_canaries(
+        {tool_name: {"tool_version": 2}}
+    )
+
+    assert reconciled == (tool_name,)
+    stats = controller.tool_stats[tool_name]
+    assert stats.tool_version == 2
+    assert stats.called_count == 0
+    assert stats.contract_failure_count == 0
+    assert tool_name not in controller.retired_this_run
+    lifecycle = json.loads(
+        (store.root / "tool_lifecycle.json").read_text(encoding="utf-8")
+    )["tool_lifecycle"][tool_name]
+    assert lifecycle["tool_version"] == 2
+    assert lifecycle["decision"] not in {"parked", "needs_implementation_repair"}
 
 
 def test_reflection_does_not_route_repair_co_called_outcome_regressions(

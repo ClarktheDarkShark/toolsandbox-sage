@@ -2223,6 +2223,195 @@ def test_lifecycle_verifier_requires_applied_attributable_route_repair(
     assert report["verified_route_repair_count"] == 1
 
 
+def _attributable_harm_retirement_artifacts(
+    tmp_path: Path,
+) -> tuple[Path, Path, dict[str, Any]]:
+    candidate_dir, registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        request=False,
+        acknowledgement_status=None,
+        retired=True,
+    )
+    context = "visible_task_context(family=public_route_family)"
+    retirement_action = {
+        "tool_name": "helper",
+        "decision": "parked",
+        "reason": "repeated_attributable_harm_without_helpful_route",
+        "scenario": context,
+        "source_tool_version": 2,
+    }
+    feedback_rows: list[dict[str, Any]] = []
+    selection_rows: list[dict[str, Any]] = []
+    for index in (1, 2):
+        scenario = f"strict_harm_case_{index}"
+        common = {
+            "scenario": scenario,
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": ["helper"],
+            "generated_tools_attempted": ["helper"],
+            "generated_tools_failed": [],
+            "generated_tool_contract_failures": [],
+            "generated_tool_versions": {"helper": 2},
+            "exception_type": None,
+        }
+        selection_rows.append(dict(common))
+        feedback_rows.append(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "completed_count": index,
+                "task_context_label": context,
+                "task_family_key": "public_route_family",
+                "source_task_id_redacted": True,
+                "control_source": "same_run_fresh",
+                "control_outcome": 1.0,
+                "control_outcome_source": "audited_outcome",
+                "candidate_outcome": 0.0,
+                "candidate_outcome_source": "audited_outcome",
+                "outcome_delta": -1.0,
+                "candidate_success_flip": False,
+                "immediate_actions": [retirement_action] if index == 2 else [],
+            }
+        )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_tool_lifecycle.jsonl").write_text(
+        json.dumps(retirement_action) + "\n",
+        encoding="utf-8",
+    )
+    _write_json(
+        registry_dir / "tool_lifecycle.json",
+        {
+            "artifact_type": "self_evolution_tool_lifecycle",
+            "tool_lifecycle": {
+                "helper": {
+                    "tool_version": 2,
+                    "decision": "parked",
+                    "decision_reason": "retired_this_run",
+                    "repair_kind": None,
+                    "routing_disposition": "quarantined",
+                    "route_repair_families": ["public_route_family"],
+                    "route_repair_reason_codes": {
+                        "public_route_family": ["repeated_sole_tool_family_regression"]
+                    },
+                    "family_evidence": {
+                        "public_route_family": {
+                            "attributable_harmful_call_count": 2,
+                            "attributable_helpful_call_count": 0,
+                        }
+                    },
+                }
+            },
+        },
+    )
+    return candidate_dir, registry_dir, retirement_action
+
+
+def test_lifecycle_verifier_accepts_exact_strictly_attributable_global_retirement(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir, _action = _attributable_harm_retirement_artifacts(
+        tmp_path
+    )
+
+    report = publication_verifier._verify_lifecycle_closed(
+        candidate_dir,
+        registry_dir,
+    )
+
+    assert report["derived_repair_obligation_count"] == 1
+    assert report["derived_global_retirement_count"] == 1
+    assert report["verified_global_retirement_count"] == 1
+    assert report["verified_route_repair_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("corruption", "error"),
+    [
+        ("journal_version", "journal disagrees"),
+        ("missing_sidecar_action", "exact triggering task feedback row"),
+        ("family_count", "counts disagree"),
+        ("registry_active", "terminal registry state"),
+        ("co_called", "journal disagrees"),
+        ("helpful_route", "journal disagrees"),
+    ],
+)
+def test_lifecycle_verifier_rejects_unproved_global_retirement(
+    tmp_path: Path,
+    corruption: str,
+    error: str,
+) -> None:
+    candidate_dir, registry_dir, action = _attributable_harm_retirement_artifacts(
+        tmp_path
+    )
+    if corruption == "journal_version":
+        action["source_tool_version"] = 1
+        (candidate_dir / "self_evolution_tool_lifecycle.jsonl").write_text(
+            json.dumps(action) + "\n",
+            encoding="utf-8",
+        )
+    elif corruption == "missing_sidecar_action":
+        feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+        rows = [json.loads(line) for line in feedback_path.read_text().splitlines()]
+        rows[-1]["immediate_actions"] = []
+        feedback_path.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows),
+            encoding="utf-8",
+        )
+    elif corruption == "family_count":
+        lifecycle_path = registry_dir / "tool_lifecycle.json"
+        lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+        lifecycle["tool_lifecycle"]["helper"]["family_evidence"]["public_route_family"][
+            "attributable_harmful_call_count"
+        ] = 1
+        _write_json(lifecycle_path, lifecycle)
+    elif corruption == "registry_active":
+        _write_json(
+            registry_dir / "registry_manifest.json",
+            {"tools": {"helper": {"version": 2, "retired": False}}},
+        )
+    elif corruption == "co_called":
+        for filename in (
+            "scenario_tool_selection.jsonl",
+            "self_evolution_task_feedback.jsonl",
+        ):
+            path = candidate_dir / filename
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            for row in rows:
+                row["generated_tools_visible"].append("other_helper")
+                row["generated_tools_called"].append("other_helper")
+                row["generated_tools_attempted"].append("other_helper")
+                row["generated_tool_versions"]["other_helper"] = 1
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+    else:
+        feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+        rows = [json.loads(line) for line in feedback_path.read_text().splitlines()]
+        rows[0].update(
+            {
+                "control_outcome": 0.0,
+                "candidate_outcome": 1.0,
+                "outcome_delta": 1.0,
+                "candidate_success_flip": True,
+            }
+        )
+        feedback_path.write_text(
+            "".join(json.dumps(row) + "\n" for row in rows),
+            encoding="utf-8",
+        )
+
+    with pytest.raises(ValueError, match=error):
+        publication_verifier._verify_lifecycle_closed(candidate_dir, registry_dir)
+
+
 def test_lifecycle_verifier_requires_metadata_repair_after_nonadoption_threshold(
     tmp_path: Path,
 ) -> None:

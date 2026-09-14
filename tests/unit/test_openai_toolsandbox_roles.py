@@ -1172,6 +1172,15 @@ def test_relative_time_search_routes_to_abstention_without_clock() -> None:
                     "visible_records_count": {"type": "integer"},
                 },
             },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
         },
     }
     window_helper = {
@@ -1204,6 +1213,93 @@ def test_relative_time_search_routes_to_abstention_without_clock() -> None:
     )
 
 
+def test_abstention_helper_discovery_is_schema_based_not_name_based() -> None:
+    successor = {
+        "type": "function",
+        "function": {
+            "name": "custom_contact_readiness_guard",
+            "description": "Assess contact readiness and abstain when unsafe.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "required_original_tools": {"type": "array"},
+                    "available_original_tools": {"type": "array"},
+                },
+            },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+        },
+    }
+    historical_name_without_contract = {
+        "type": "function",
+        "function": {
+            "name": "prepare_safe_action_or_abstain",
+            "description": "Unrelated incomplete helper.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+
+    assert toolsandbox_roles._validation_abstention_tool_names([successor]) == {
+        "custom_contact_readiness_guard"
+    }
+    assert not toolsandbox_roles._validation_abstention_tool_names(
+        [historical_name_without_contract]
+    )
+
+    boolean_successor = {
+        "type": "function",
+        "function": {
+            "name": "assess_contact_removal_readiness",
+            "description": "Assess contact removal readiness and abstain when unsafe.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "target_identifier": {"type": "string"},
+                    "visible_records_count": {"type": "integer"},
+                    "contact_lookup_available": {"type": "boolean"},
+                    "contact_removal_available": {"type": "boolean"},
+                },
+            },
+            "output_schema": successor["function"]["output_schema"],
+        },
+    }
+
+    assert toolsandbox_roles._validation_abstention_tool_names([boolean_successor]) == {
+        "assess_contact_removal_readiness"
+    }
+
+    wrong_boolean_type = json.loads(json.dumps(boolean_successor))
+    wrong_boolean_type["function"]["parameters"]["properties"][
+        "contact_lookup_available"
+    ] = {"type": "string"}
+    assert not toolsandbox_roles._validation_abstention_tool_names([wrong_boolean_type])
+
+    single_capability = json.loads(json.dumps(boolean_successor))
+    del single_capability["function"]["parameters"]["properties"][
+        "contact_lookup_available"
+    ]
+    assert not toolsandbox_roles._validation_abstention_tool_names([single_capability])
+
+    policy = toolsandbox_roles._safe_abstention_helper_actor_policy_message(
+        [{"role": "user", "content": "Remove the contact named Pat."}],
+        [boolean_successor],
+    )
+    assert policy is not None
+    assert "host-owned Boolean capability fields" in policy["content"]
+    assert "do not add the legacy required_original_tools" in policy["content"]
+
+
 def test_relative_time_search_treats_standalone_later_as_clock_dependent() -> None:
     safe_helper = {
         "type": "function",
@@ -1219,6 +1315,15 @@ def test_relative_time_search_treats_standalone_later_as_clock_dependent() -> No
                     "required_original_tools": {"type": "array"},
                     "available_original_tools": {"type": "array"},
                     "visible_records_count": {"type": "integer"},
+                },
+            },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
                 },
             },
         },
@@ -1251,6 +1356,15 @@ def test_safe_abstention_call_uses_host_grounded_available_inventory() -> None:
                         "requested_action": {"type": "string"},
                         "required_original_tools": {"type": "array"},
                         "available_original_tools": {"type": "array"},
+                    },
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "should_abstain": {"type": "boolean"},
+                        "missing_information": {"type": "array"},
+                        "safe_next_action": {"type": "string"},
+                        "abstain_reason": {"type": "string"},
                     },
                 },
             },
@@ -1344,6 +1458,134 @@ def test_safe_abstention_call_uses_host_grounded_available_inventory() -> None:
     ]
 
 
+def test_contact_readiness_booleans_are_host_grounded_from_native_inventory() -> None:
+    helper = {
+        "type": "function",
+        "function": {
+            "name": "custom_contact_readiness_guard",
+            "description": "Assess contact action readiness and abstain when unsafe.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"type": "string"},
+                    "requested_action": {"type": "string"},
+                    "target_identifier": {"type": "string"},
+                    "visible_records_count": {"type": "integer"},
+                    "contact_lookup_available": {"type": "boolean"},
+                    "contact_update_available": {"type": "boolean"},
+                    "contact_removal_available": {"type": "boolean"},
+                },
+            },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+        },
+    }
+    tools = [
+        helper,
+        {"type": "function", "function": {"name": "search_contacts"}},
+        {"type": "function", "function": {"name": "remove_contact"}},
+    ]
+    completion = toolsandbox_roles.ChatCompletion.model_validate(
+        {
+            "id": "grounded-contact-readiness",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_helper",
+                                "type": "function",
+                                "function": {
+                                    "name": "custom_contact_readiness_guard",
+                                    "arguments": json.dumps(
+                                        {
+                                            "user_request": "Remove Pat.",
+                                            "requested_action": "contact_removal",
+                                            "target_identifier": "Pat",
+                                            "visible_records_count": 0,
+                                            # Lookup is omitted, update is spoofed
+                                            # true, and routed removal is spoofed
+                                            # false. The host must replace all three.
+                                            "contact_update_available": True,
+                                            "contact_removal_available": False,
+                                        }
+                                    ),
+                                },
+                            },
+                            {
+                                "id": "call_native",
+                                "type": "function",
+                                "function": {
+                                    "name": "remove_contact",
+                                    "arguments": json.dumps(
+                                        {"person_id": "visible-id"}
+                                    ),
+                                },
+                            },
+                        ],
+                    },
+                }
+            ],
+            "created": 0,
+            "model": "gpt-4o-mini",
+            "object": "chat.completion",
+        }
+    )
+
+    grounded = toolsandbox_roles._ground_safe_abstention_available_tools(
+        completion,
+        tools,
+    )
+    helper_arguments = json.loads(
+        grounded.choices[0].message.tool_calls[0].function.arguments
+    )
+    native_arguments = json.loads(
+        grounded.choices[0].message.tool_calls[1].function.arguments
+    )
+
+    assert helper_arguments["contact_lookup_available"] is True
+    assert helper_arguments["contact_update_available"] is False
+    assert helper_arguments["contact_removal_available"] is True
+    assert "available_original_tools" not in helper_arguments
+    assert helper_arguments["target_identifier"] == "Pat"
+    assert native_arguments == {"person_id": "visible-id"}
+
+    only_update_tools = [
+        helper,
+        {"type": "function", "function": {"name": "modify_contact"}},
+    ]
+    grounded.choices[0].message.tool_calls[0].function.arguments = json.dumps(
+        {
+            **helper_arguments,
+            "contact_lookup_available": True,
+            "contact_update_available": False,
+            "contact_removal_available": True,
+        }
+    )
+    grounded_again = toolsandbox_roles._ground_safe_abstention_available_tools(
+        grounded,
+        only_update_tools,
+    )
+    grounded_again_arguments = json.loads(
+        grounded_again.choices[0].message.tool_calls[0].function.arguments
+    )
+
+    assert grounded_again_arguments["contact_lookup_available"] is False
+    assert grounded_again_arguments["contact_update_available"] is True
+    assert grounded_again_arguments["contact_removal_available"] is False
+
+
 def test_safe_abstention_inventory_grounding_uses_visible_scrambled_schemas() -> None:
     tools = [
         {
@@ -1361,6 +1603,15 @@ def test_safe_abstention_inventory_grounding_uses_visible_scrambled_schemas() ->
                         "requested_action": {"type": "string"},
                         "required_original_tools": {"type": "array"},
                         "available_original_tools": {"type": "array"},
+                    },
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "should_abstain": {"type": "boolean"},
+                        "missing_information": {"type": "array"},
+                        "safe_next_action": {"type": "string"},
+                        "abstain_reason": {"type": "string"},
                     },
                 },
             },
@@ -1431,6 +1682,15 @@ def test_relative_time_search_with_clock_preserves_clock_then_window_flow() -> N
                     "target_identifier": {"type": "string"},
                     "required_original_tools": {"type": "array"},
                     "available_original_tools": {"type": "array"},
+                },
+            },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
                 },
             },
         },
