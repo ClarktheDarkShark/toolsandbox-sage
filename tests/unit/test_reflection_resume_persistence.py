@@ -315,6 +315,9 @@ def test_full_resume_copies_durable_feedback_and_state(tmp_path: Path) -> None:
     destination.mkdir()
     expected = {
         "self_evolution_task_feedback.jsonl": '{"event":"saved"}\n',
+        "post_deployment_repair_candidates.jsonl": (
+            '{"event":"post_deployment_tool_repair_candidate_recorded"}\n'
+        ),
         "post_deployment_repair_state.json": '{"repair":"saved"}\n',
         "self_evolution_reflection_state.json": '{"reflection":"saved"}\n',
     }
@@ -325,6 +328,38 @@ def test_full_resume_copies_durable_feedback_and_state(tmp_path: Path) -> None:
 
     for name, content in expected.items():
         assert (destination / name).read_text(encoding="utf-8") == content
+
+
+def test_partial_resume_filters_repair_candidates_by_completed_count(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    candidate_rows = [
+        {
+            "event": "post_deployment_tool_repair_candidate_recorded",
+            "record_sha256": str(completed_count) * 64,
+            "generated_after_completed_count": completed_count,
+        }
+        for completed_count in (1, 2, 3)
+    ]
+    _write_jsonl(
+        source / "post_deployment_repair_candidates.jsonl",
+        candidate_rows,
+    )
+
+    _copy_resume_artifacts(source, destination, completed_limit=2)
+
+    copied = [
+        json.loads(line)
+        for line in (destination / "post_deployment_repair_candidates.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    assert [row["generated_after_completed_count"] for row in copied] == [1, 2]
 
 
 def test_reflection_restart_fails_closed_on_malformed_feedback(tmp_path: Path) -> None:

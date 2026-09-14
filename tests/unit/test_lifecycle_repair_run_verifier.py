@@ -127,6 +127,114 @@ def _rewrite_protocol_event_journal(
     return journal_path
 
 
+def _install_repair_candidate_artifact(
+    run_root: Path,
+    candidate_dir: Path,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    """Install one exact candidate row and its sealed attempt reference."""
+
+    checkpoint = next((candidate_dir / "registry_checkpoints").glob("after_0001_*"))
+    bindings = json.loads(
+        (checkpoint / "validation_contract_bindings.json").read_text(encoding="utf-8")
+    )["bindings"]
+    tool_name = verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    source = bindings[tool_name]["1"]
+    registry = json.loads(
+        (run_root / "registry" / "registry_manifest.json").read_text(encoding="utf-8")
+    )
+    tool = verify_lifecycle_repair_run._strict_run_verifier.GeneratedTool.from_json(
+        registry["tools"][tool_name]["tool"]
+    ).to_json()
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    evidence = {
+        "tool": tool,
+        "code_sha256": hashlib.sha256(tool["code"].encode("utf-8")).hexdigest(),
+        "spec_sha256": canonical_hash(tool["spec"]),
+        "tool_payload_sha256": canonical_hash(tool),
+    }
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "event": "post_deployment_tool_repair_candidate_recorded",
+        "request_id": "repair-request-1",
+        "tool_name": tool_name,
+        "source_tool_version": 1,
+        "repair_kind": "implementation",
+        "generated_after_completed_count": 1,
+        "attempt": 1,
+        "candidate_index": 0,
+        "source_validation_contract_hash": source["contract_hash"],
+        "source_tool_code_sha256": source["tool_code_hash"],
+        "source_tool_spec_sha256": source["tool_spec_hash"],
+        "generator_candidate": evidence,
+        "evaluated_candidate": evidence,
+        "validation": {
+            "available": True,
+            "accepted": True,
+            "failure_score": 0,
+            "source_example_count": 1,
+            "held_out_check_count": 1,
+            "negative_applicability_count": 1,
+            "runtime_smoke_passed": True,
+            "sanitized_frontier": [],
+            "sanitized_frontier_count": 0,
+            "raw_validation_errors_persisted": False,
+        },
+        "selected_for_attempt": True,
+        "disposition": "validator_accepted_selected",
+        "failure_stage": None,
+        "failure_type": None,
+        "future_tasks_only": True,
+        "triggering_task_replayed": False,
+        "evidence_policy": {
+            "frontier": "generator_visible_sanitized_labels_only",
+            "raw_validation_values_logged": False,
+            "private_benchmark_fields_logged": False,
+        },
+    }
+    row = {**payload, "record_sha256": canonical_hash(payload)}
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", [row])
+    attempt_event: dict[str, object] = {
+        "event": "post_deployment_tool_repair_attempted",
+        "request_id": "repair-request-1",
+        "tool_name": tool_name,
+        "attempt": 1,
+        "candidate_count": 1,
+        "selected_candidate_index": 0,
+        "selected_candidate_code_hash": evidence["code_sha256"],
+        "accepted": True,
+        "validation_score": 0,
+        "error_labels": [],
+        "candidate_validations": [
+            {
+                "candidate_index": 0,
+                "candidate_code_hash": evidence["code_sha256"],
+                "accepted": True,
+                "validation_score": 0,
+                "error_frontier_count": 0,
+                "errors": [],
+                "candidate_artifact_path": str(
+                    candidate_dir / "post_deployment_repair_candidates.jsonl"
+                ),
+                "candidate_artifact_schema_version": 1,
+                "candidate_artifact_record_sha256": row["record_sha256"],
+            }
+        ],
+    }
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    prior_events = [
+        json.loads(line)
+        for line in journal_path.read_text(encoding="utf-8").splitlines()
+    ]
+    events = [attempt_event, *prior_events]
+    _rewrite_protocol_event_journal(run_root, events)
+    return row, events
+
+
 def _write_synthetic_trajectory(
     run_dir: Path,
     *,
@@ -1556,6 +1664,72 @@ def test_development_verifier_reads_sealed_protocol_event_journal(
         "sealed_protocol_event_journal"
     )
     assert report["repair_acceptance_event_source"]["sealed"] is True
+
+
+def test_development_verifier_authenticates_repair_candidate_artifact(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _install_repair_candidate_artifact(run_root, candidate_dir)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "pass", report["reasons"]
+    assert report["repair_candidate_artifacts"]["record_count"] == 1
+    assert report["repair_candidate_artifacts"]["referenced_record_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("corruption", "reason"),
+    [
+        ("missing", "repair_candidate_artifact_missing"),
+        ("extra", "repair_candidate_artifact_extra_rows"),
+        ("tampered", "repair_candidate_artifact_tampered"),
+        ("event_reference", "repair_candidate_artifact_event_reference_mismatch"),
+        (
+            "source_lineage",
+            "repair_candidate_artifact_source_lineage_mismatch",
+        ),
+    ],
+)
+def test_development_verifier_rejects_repair_candidate_corruption(
+    tmp_path: Path,
+    corruption: str,
+    reason: str,
+) -> None:
+    search_root, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    row, events = _install_repair_candidate_artifact(run_root, candidate_dir)
+    artifact_path = candidate_dir / "post_deployment_repair_candidates.jsonl"
+    if corruption == "missing":
+        artifact_path.unlink()
+    elif corruption == "extra":
+        _write_jsonl(artifact_path, [row, row])
+    elif corruption == "tampered":
+        row["evaluated_candidate"]["tool"]["code"] += "\n# tampered"
+        _write_jsonl(artifact_path, [row])
+    elif corruption == "event_reference":
+        events[0]["candidate_validations"][0]["candidate_artifact_record_sha256"] = (
+            "0" * 64
+        )
+        _rewrite_protocol_event_journal(run_root, events)
+    elif corruption == "source_lineage":
+        row["source_tool_code_sha256"] = "0" * 64
+        payload = {key: value for key, value in row.items() if key != "record_sha256"}
+        row["record_sha256"] = (
+            verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256(
+                payload
+            )
+        )
+        events[0]["candidate_validations"][0]["candidate_artifact_record_sha256"] = row[
+            "record_sha256"
+        ]
+        _write_jsonl(artifact_path, [row])
+        _rewrite_protocol_event_journal(run_root, events)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert reason in report["reasons"]
 
 
 def test_development_verifier_rejects_tampered_protocol_event_journal(

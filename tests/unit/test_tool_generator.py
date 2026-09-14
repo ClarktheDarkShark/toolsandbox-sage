@@ -33,8 +33,11 @@ from sage_ts.generation.tool_generator import (
     _model_authored_contract_rules,
     _model_authored_final_repair_directive,
     _model_authored_generation_prompt,
+    _model_authored_repair_prompt,
+    _model_authored_validation_helper_repair_analysis_prompt,
     _normalize_model_authored_tool,
     _validated_validation_helper_contract_analysis,
+    _validated_validation_helper_repair_analysis,
     public_input_contract_from_example_inputs,
     public_output_contract_from_example_outputs,
 )
@@ -573,7 +576,7 @@ def test_repair_analysis_is_memoized_only_within_generator_instance(
     assert completer.calls == calls_before_repair_analysis + 2
 
 
-def test_validation_abstention_repair_final_directive() -> None:
+def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None:
     hidden_task = "private_held_out_task_DO_NOT_DISCLOSE_9107"
     hidden_answer = "private_held_out_answer_DO_NOT_DISCLOSE_2841"
     examples = (
@@ -636,6 +639,12 @@ def test_validation_abstention_repair_final_directive() -> None:
             }
             for item in model_visible_examples
         ),
+        public_input_contract=public_input_contract_from_example_inputs(
+            tuple(item.inputs for item in examples)
+        ),
+        public_output_contract=public_output_contract_from_example_outputs(
+            tuple(item.expected for item in examples)
+        ),
         suggested_tool_name="decide_safe_action",
     )
     spec = ToolSpec(
@@ -684,7 +693,9 @@ def test_validation_abstention_repair_final_directive() -> None:
 
         def complete(self, chat_request: ChatRequest) -> str:
             self.requests.append(chat_request)
-            if "analyze public deterministic-helper" in chat_request.system:
+            if "trace rejected deterministic validation helpers" in (
+                chat_request.system.lower()
+            ):
                 return json.dumps(
                     {
                         "algorithm_steps": [
@@ -701,21 +712,23 @@ def test_validation_abstention_repair_final_directive() -> None:
                         "target_exceptions": ["read-only lookup"],
                         "case_coverage": {},
                         "invariants": ["return exactly six keys"],
+                        "first_incorrect_branches": {
+                            "source_0": "fixed result ignores public input"
+                        },
+                        "regression_guards": ["preserve public passing cases"],
                     }
                 )
-            return json.dumps(
-                {
-                    "candidates": [
-                        rejected.to_json(),
-                    ]
-                }
-            )
+            return json.dumps(rejected.to_json())
 
     completer = CapturingCompleter()
     generator = ToolGenerator(completer=completer)
     errors = (
-        "held_out_0_raw_should_abstain",
-        "blind_property_0_missing_capability_0_final_recommendation_fact",
+        f"held_out_0_raw_should_abstain:{hidden_task}",
+        (
+            "blind_property_0_missing_capability_0_final_recommendation_fact:"
+            + hidden_answer
+        ),
+        "source_0_raw_should_abstain:False!=True",
     )
 
     repaired = generator.repair_candidates(request, rejected, errors)
@@ -724,18 +737,20 @@ def test_validation_abstention_repair_final_directive() -> None:
     assert len(completer.requests) == 2
     analysis_prompt = completer.requests[0].user
     prompt = completer.requests[1].user
-    directive = _model_authored_final_repair_directive(request, errors)
-    assert prompt.endswith(directive)
-    assert '"candidate_count": 1' in prompt
-    assert "candidates array with exactly 1 independently authored" in directive
-    assert "capability normalization" in analysis_prompt
-    assert "read-only versus mutating" in analysis_prompt
-    assert "exactly these six keys" in directive
-    assert "names every missing capability" in directive
-    assert "explicitly says target identifier" in directive
-    assert "explicitly names ambiguity or multiple matches" in directive
-    step_positions = [directive.index(f"STEP {index}:") for index in range(1, 7)]
-    assert step_positions == sorted(step_positions)
+    assert prompt.startswith("Repair one rejected pure deterministic validation helper")
+    assert "top-level keys spec and code_lines" in prompt
+    assert "Synthesize one reusable deterministic Python tool" not in prompt
+    assert "FINAL BINDING VALIDATION-ABSTENTION" not in prompt
+    assert '"current_candidate"' in prompt
+    assert '"case_label": "source_0"' in prompt
+    assert '"validator_feedback"' in prompt
+    assert "source_0_raw_should_abstain:False!=True" in prompt
+    assert "held_out_0_raw_should_abstain" in prompt
+    assert "blind_property_0_missing_capability_0_final_recommendation_fact" in prompt
+    assert "Trace the current pure validation helper" in analysis_prompt
+    assert rejected.code.splitlines()[0] in analysis_prompt
+    assert "CODE-SPECIFIC DECISION PLAN" in prompt
+    assert len(prompt) < 12_000
     assert len(request.validation_examples) == 1
     assert hidden_task not in analysis_prompt + prompt
     assert hidden_answer not in analysis_prompt + prompt
@@ -833,6 +848,89 @@ def test_validation_helper_repair_restates_public_semantic_exceptions_last() -> 
     )
 
 
+def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
+    observation = _safe_action_or_abstain_observation("public_contract_probe")
+    visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    input_contract = public_input_contract_from_example_inputs(
+        tuple(item.inputs for item in observation.validation_examples)
+    )
+    output_contract = public_output_contract_from_example_outputs(
+        tuple(item.expected for item in observation.validation_examples)
+    )
+    request = ToolGenerationRequest(
+        scenario_name="post_deployment_repair(kind=implementation;family=safety)",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in visible_examples
+        ),
+        public_input_contract=input_contract,
+        public_output_contract=output_contract,
+        suggested_tool_name="prepare_safe_action_or_abstain",
+    )
+    rejected = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="prepare_safe_action_or_abstain",
+            family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+            description="Decide whether visible prerequisites permit safe action.",
+            inputs=tuple(
+                ToolInput(item.name, item.annotation, f"Visible {item.name}.")
+                for item in input_contract
+            ),
+            output_annotation="dict",
+            output_schema={
+                "type": "object",
+                "properties": {
+                    item.name: {"type": list(item.schema_types)[0]}
+                    for item in output_contract
+                },
+            },
+        ),
+        code=(
+            "def prepare_safe_action_or_abstain(user_request: str, "
+            "requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, "
+            "visible_records_count: int) -> dict:\n"
+            "    return {}\n"
+        ),
+    )
+    hidden_value = "PRIVATE_VALIDATOR_VALUE_DO_NOT_DISCLOSE"
+    errors = (
+        "source_0_raw_final_recommendation_missing_facts:contact_lookup",
+        f"held_out_1_mismatch:{hidden_value}",
+        f"blind_property_4_missing_capability_0:{hidden_value}",
+        "repair_strategy:4",
+    )
+
+    prompt = _model_authored_repair_prompt(request, rejected, errors)
+    analysis_prompt = _model_authored_validation_helper_repair_analysis_prompt(
+        request,
+        rejected,
+        errors,
+    )
+
+    for case_label in ("source_0", "negative_0", "source_1", "negative_1"):
+        assert f'"case_label": "{case_label}"' in prompt
+    assert '"case_label": "held_out_' not in prompt
+    assert hidden_value not in prompt + analysis_prompt
+    assert "held_out_1_mismatch" in prompt
+    assert "blind_property_4_missing_capability_0" in prompt
+    assert '"repair_strategy": 4' in prompt
+    assert "requires both message_send and contact_lookup" in prompt
+    assert "blank target_identifier is valid" in prompt
+    assert "Synthesize one reusable deterministic Python tool" not in prompt
+    assert "Previous candidate JSON" not in prompt
+    assert len(prompt) < 16_000
+
+
 def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:
     valid = {
         "algorithm_steps": ["normalize", "infer", "validate"],
@@ -859,6 +957,33 @@ def test_validation_helper_contract_analysis_requires_a_structured_plan() -> Non
     malformed = {**valid, "target_exceptions": "read-only search"}
     with pytest.raises(ValueError, match="target_exceptions"):
         _validated_validation_helper_contract_analysis(json.dumps(malformed))
+
+
+def test_validation_helper_repair_analysis_requires_code_specific_diagnosis() -> None:
+    valid = {
+        "algorithm_steps": ["normalize", "infer", "validate"],
+        "capability_aliases": {},
+        "inferred_prerequisites": {"message_send": ["contact_lookup"]},
+        "read_only_actions": ["search"],
+        "mutating_actions": ["send"],
+        "target_exceptions": ["read-only search"],
+        "case_coverage": {"source_0": "missing capability branch"},
+        "invariants": ["do not guess"],
+        "first_incorrect_branches": {"source_0": "fixed return"},
+        "regression_guards": ["preserve the read-only exception"],
+    }
+
+    assert (
+        json.loads(_validated_validation_helper_repair_analysis(json.dumps(valid)))
+        == valid
+    )
+    for missing in ("first_incorrect_branches", "regression_guards"):
+        with pytest.raises(ValueError, match=missing):
+            _validated_validation_helper_repair_analysis(
+                json.dumps(
+                    {key: value for key, value in valid.items() if key != missing}
+                )
+            )
 
 
 def test_generation_request_includes_reusable_name_hint() -> None:

@@ -39,9 +39,13 @@ from sage_ts.evaluation.outcome_score import (
     outcome_evaluator_manifest as outcome_evaluator_manifest,
 )
 from sage_ts.generation.complete_tools import native_action_tool_enabled
+from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
-from sage_ts.registry.validation_contracts import ValidationContractBindingStore
+from sage_ts.registry.validation_contracts import (
+    VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+    ValidationContractBindingStore,
+)
 from sage_ts.validation.sandbox_validator import validate_generated_tool
 from tool_sandbox.cli.utils import resolve_scenarios
 from tool_sandbox.common.evaluation import Milestone, Minefield
@@ -869,6 +873,741 @@ _LIFECYCLE_SELECTION_FIELDS = (
     "generated_tool_contract_failures",
 )
 _SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+_REPAIR_CANDIDATE_ARTIFACT_FILENAME = "post_deployment_repair_candidates.jsonl"
+_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION = 1
+_REPAIR_CANDIDATE_RECORD_KEYS = {
+    "schema_version",
+    "event",
+    "request_id",
+    "tool_name",
+    "source_tool_version",
+    "repair_kind",
+    "generated_after_completed_count",
+    "attempt",
+    "candidate_index",
+    "source_validation_contract_hash",
+    "source_tool_code_sha256",
+    "source_tool_spec_sha256",
+    "generator_candidate",
+    "evaluated_candidate",
+    "validation",
+    "selected_for_attempt",
+    "disposition",
+    "failure_stage",
+    "failure_type",
+    "future_tasks_only",
+    "triggering_task_replayed",
+    "evidence_policy",
+    "record_sha256",
+}
+_REPAIR_CANDIDATE_VALIDATION_KEYS = {
+    "available",
+    "accepted",
+    "failure_score",
+    "source_example_count",
+    "held_out_check_count",
+    "negative_applicability_count",
+    "runtime_smoke_passed",
+    "sanitized_frontier",
+    "sanitized_frontier_count",
+    "raw_validation_errors_persisted",
+}
+_REPAIR_CANDIDATE_REFERENCE_KEYS = {
+    "candidate_index",
+    "candidate_code_hash",
+    "accepted",
+    "validation_score",
+    "error_frontier_count",
+    "errors",
+    "candidate_artifact_path",
+    "candidate_artifact_schema_version",
+    "candidate_artifact_record_sha256",
+}
+
+
+class _RepairCandidateArtifactVerificationError(ValueError):
+    """Carry a stable strict-verifier reason for candidate-evidence failures."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+def _repair_candidate_require(condition: Any, reason: str, message: str) -> None:
+    if not condition:
+        raise _RepairCandidateArtifactVerificationError(reason, message)
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    try:
+        encoded = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise _RepairCandidateArtifactVerificationError(
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate evidence is not canonical JSON: {exc}",
+        ) from exc
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _strict_json_object(line: str, *, line_number: int, path: Path) -> dict[str, Any]:
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            _repair_candidate_require(
+                key not in value,
+                "repair_candidate_artifact_schema_invalid",
+                f"Duplicate JSON key {key!r} at repair-candidate line {line_number}.",
+            )
+            value[key] = item
+        return value
+
+    def reject_nonfinite(value: str) -> Any:
+        raise _RepairCandidateArtifactVerificationError(
+            "repair_candidate_artifact_schema_invalid",
+            f"Non-finite value {value!r} at repair-candidate line {line_number}.",
+        )
+
+    try:
+        row = json.loads(
+            line,
+            object_pairs_hook=unique_object,
+            parse_constant=reject_nonfinite,
+        )
+    except json.JSONDecodeError as exc:
+        raise _RepairCandidateArtifactVerificationError(
+            "repair_candidate_artifact_schema_invalid",
+            f"Invalid JSON at repair-candidate line {line_number}: {path}: {exc}.",
+        ) from exc
+    _repair_candidate_require(
+        isinstance(row, dict),
+        "repair_candidate_artifact_schema_invalid",
+        f"Repair-candidate line {line_number} is not an object: {path}.",
+    )
+    return cast(dict[str, Any], row)
+
+
+def _nonnegative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _verify_repair_candidate_tool_evidence(
+    evidence: Any,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    _repair_candidate_require(
+        isinstance(evidence, dict)
+        and set(evidence)
+        == {"tool", "code_sha256", "spec_sha256", "tool_payload_sha256"},
+        "repair_candidate_artifact_schema_invalid",
+        f"Repair candidate {label} does not have the exact evidence schema.",
+    )
+    tool = evidence.get("tool")
+    _repair_candidate_require(
+        isinstance(tool, dict) and set(tool) == {"spec", "code"},
+        "repair_candidate_artifact_schema_invalid",
+        f"Repair candidate {label} does not contain an exact tool payload.",
+    )
+    spec = tool.get("spec")
+    code = tool.get("code")
+    _repair_candidate_require(
+        isinstance(spec, dict) and isinstance(code, str),
+        "repair_candidate_artifact_schema_invalid",
+        f"Repair candidate {label} has malformed tool spec or code.",
+    )
+    try:
+        canonical_tool = GeneratedTool.from_json(tool).to_json()
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _RepairCandidateArtifactVerificationError(
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate {label} cannot be decoded: {exc}.",
+        ) from exc
+    _repair_candidate_require(
+        canonical_tool == tool,
+        "repair_candidate_artifact_schema_invalid",
+        f"Repair candidate {label} is not the canonical generated-tool schema.",
+    )
+    expected_hashes = {
+        "code_sha256": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+        "spec_sha256": _canonical_json_sha256(spec),
+        "tool_payload_sha256": _canonical_json_sha256(tool),
+    }
+    for field, expected in expected_hashes.items():
+        _repair_candidate_require(
+            evidence.get(field) == expected,
+            "repair_candidate_artifact_tampered",
+            f"Repair candidate {label} {field} does not match its payload.",
+        )
+    return cast(dict[str, Any], evidence)
+
+
+def _repair_candidate_reference_path_matches(
+    candidate_dir: Path,
+    value: Any,
+) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    expected = candidate_dir / _REPAIR_CANDIDATE_ARTIFACT_FILENAME
+    allowed = {str(expected)}
+    for root in (REPO_ROOT, Path.cwd()):
+        try:
+            allowed.add(str(expected.resolve().relative_to(root.resolve())))
+        except ValueError:
+            pass
+    if value not in allowed:
+        return False
+    declared = Path(value)
+    candidates = (
+        (declared,)
+        if declared.is_absolute()
+        else (REPO_ROOT / declared, Path.cwd() / declared)
+    )
+    if any(path.is_symlink() for path in candidates):
+        return False
+    return any(path.resolve() == expected.resolve() for path in candidates)
+
+
+def _verified_repair_source_bindings(
+    candidate_dir: Path,
+    rows: list[dict[str, Any]],
+) -> None:
+    """Bind each source identity to its exact after-N sealed checkpoint."""
+
+    checked: set[tuple[int, str, int, str, str, str]] = set()
+    for row in rows:
+        identity = (
+            row["generated_after_completed_count"],
+            row["tool_name"],
+            row["source_tool_version"],
+            row["source_validation_contract_hash"],
+            row["source_tool_code_sha256"],
+            row["source_tool_spec_sha256"],
+        )
+        if identity in checked:
+            continue
+        checked.add(identity)
+        completed, tool_name, version, contract_hash, code_sha256, spec_sha256 = (
+            identity
+        )
+        checkpoint_matches = list(
+            (candidate_dir / "registry_checkpoints").glob(f"after_{completed:04d}_*")
+        )
+        _repair_candidate_require(
+            len(checkpoint_matches) == 1
+            and checkpoint_matches[0].is_dir()
+            and not checkpoint_matches[0].is_symlink(),
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate has no unique sealed after-{completed} checkpoint.",
+        )
+        checkpoint_dir = checkpoint_matches[0]
+        index_path = checkpoint_dir / "validation_contract_bindings.json"
+        _repair_candidate_require(
+            index_path.is_file() and not index_path.is_symlink(),
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate source binding index is missing after task {completed}.",
+        )
+        index = _strict_json_object(
+            index_path.read_text(encoding="utf-8"), line_number=1, path=index_path
+        )
+        bindings = index.get("bindings")
+        _repair_candidate_require(
+            set(index) == {"schema_version", "bindings"}
+            and index.get("schema_version")
+            == VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION
+            and isinstance(bindings, dict),
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate source binding index is malformed after task {completed}.",
+        )
+        bindings_dict = cast(dict[str, Any], bindings)
+        versions = bindings_dict.get(tool_name)
+        metadata = versions.get(str(version)) if isinstance(versions, dict) else None
+        expected_metadata = {
+            "tool_version": version,
+            "tool_code_hash": code_sha256,
+            "tool_spec_hash": spec_sha256,
+            "contract_hash": contract_hash,
+        }
+        _repair_candidate_require(
+            isinstance(metadata, dict)
+            and set(metadata)
+            == {
+                "tool_version",
+                "tool_code_hash",
+                "tool_spec_hash",
+                "canonical_key",
+                "contract_hash",
+            }
+            and all(
+                metadata.get(key) == value for key, value in expected_metadata.items()
+            )
+            and isinstance(metadata.get("canonical_key"), str)
+            and bool(metadata["canonical_key"]),
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate source binding disagrees for {tool_name}:v{version}.",
+        )
+        metadata_dict = cast(dict[str, Any], metadata)
+        blob_path = checkpoint_dir / "validation_contracts" / f"{contract_hash}.json"
+        _repair_candidate_require(
+            blob_path.is_file()
+            and not blob_path.is_symlink()
+            and blob_path.resolve().parent
+            == (checkpoint_dir / "validation_contracts").resolve(),
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate source contract blob is missing for {tool_name}:v{version}.",
+        )
+        blob = _strict_json_object(
+            blob_path.read_text(encoding="utf-8"), line_number=1, path=blob_path
+        )
+        _repair_candidate_require(
+            set(blob)
+            == {
+                "schema_version",
+                "tool_name",
+                "tool_version",
+                "tool_code_hash",
+                "tool_spec_hash",
+                "canonical_key",
+                "contract",
+            }
+            and blob.get("schema_version") == VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION
+            and blob.get("tool_name") == tool_name
+            and blob.get("tool_version") == version
+            and blob.get("tool_code_hash") == code_sha256
+            and blob.get("tool_spec_hash") == spec_sha256
+            and blob.get("canonical_key") == metadata_dict["canonical_key"]
+            and isinstance(blob.get("contract"), dict)
+            and _canonical_json_sha256(blob) == contract_hash,
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair candidate source contract blob disagrees for {tool_name}:v{version}.",
+        )
+
+
+def _repair_candidate_event_references(
+    candidate_dir: Path,
+    protocol_events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> list[dict[str, Any]]:
+    references: list[dict[str, Any]] = []
+    artifact_fields = {
+        "candidate_artifact_path",
+        "candidate_artifact_schema_version",
+        "candidate_artifact_record_sha256",
+    }
+    for event_index, event in enumerate(protocol_events):
+        _repair_candidate_require(
+            isinstance(event, dict),
+            "repair_candidate_artifact_event_reference_mismatch",
+            f"Protocol event {event_index} is not an object.",
+        )
+        event_name = event.get("event")
+        if event_name == "post_deployment_tool_repair_attempted":
+            items = event.get("candidate_validations")
+            _repair_candidate_require(
+                isinstance(items, list)
+                and _positive_int(event.get("candidate_count"))
+                and event["candidate_count"] == len(items)
+                and isinstance(event.get("request_id"), str)
+                and event["request_id"]
+                and isinstance(event.get("tool_name"), str)
+                and event["tool_name"]
+                and _positive_int(event.get("attempt"))
+                and _nonnegative_int(event.get("selected_candidate_index")),
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair-attempt candidate coverage is malformed at event {event_index}.",
+            )
+            item_rows = cast(list[Any], items)
+            seen: set[int] = set()
+            for item in item_rows:
+                _repair_candidate_require(
+                    isinstance(item, dict)
+                    and set(item) == _REPAIR_CANDIDATE_REFERENCE_KEYS
+                    and _nonnegative_int(item.get("candidate_index"))
+                    and item["candidate_index"] not in seen
+                    and _repair_candidate_reference_path_matches(
+                        candidate_dir, item.get("candidate_artifact_path")
+                    )
+                    and item.get("candidate_artifact_schema_version") == 1
+                    and all(
+                        isinstance(item.get(field), str)
+                        and _SHA256_HEX_PATTERN.fullmatch(item[field]) is not None
+                        for field in (
+                            "candidate_artifact_record_sha256",
+                            "candidate_code_hash",
+                        )
+                    )
+                    and isinstance(item.get("accepted"), bool)
+                    and _nonnegative_int(item.get("validation_score"))
+                    and _nonnegative_int(item.get("error_frontier_count"))
+                    and isinstance(item.get("errors"), list)
+                    and item["error_frontier_count"] == len(item["errors"]),
+                    "repair_candidate_artifact_event_reference_mismatch",
+                    f"Candidate reference is malformed at protocol event {event_index}.",
+                )
+                seen.add(item["candidate_index"])
+                references.append(
+                    {
+                        "kind": "validated",
+                        "event_index": event_index,
+                        "event": event,
+                        "item": item,
+                        "request_id": event["request_id"],
+                        "tool_name": event["tool_name"],
+                        "attempt": event["attempt"],
+                        "candidate_index": item["candidate_index"],
+                        "record_sha256": item["candidate_artifact_record_sha256"],
+                    }
+                )
+            _repair_candidate_require(
+                event["selected_candidate_index"] in seen,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Selected candidate has no reference at protocol event {event_index}.",
+            )
+        elif (
+            event_name == "post_deployment_tool_repair_attempt_failed"
+            and event.get("stage") == "candidate_normalization_and_validation"
+        ):
+            _repair_candidate_require(
+                isinstance(event.get("request_id"), str)
+                and event["request_id"]
+                and isinstance(event.get("tool_name"), str)
+                and event["tool_name"]
+                and _positive_int(event.get("attempt"))
+                and _nonnegative_int(event.get("candidate_index"))
+                and isinstance(event.get("error_type"), str)
+                and event["error_type"]
+                and _repair_candidate_reference_path_matches(
+                    candidate_dir, event.get("candidate_artifact_path")
+                )
+                and event.get("candidate_artifact_schema_version") == 1
+                and isinstance(event.get("candidate_artifact_record_sha256"), str)
+                and _SHA256_HEX_PATTERN.fullmatch(
+                    event["candidate_artifact_record_sha256"]
+                )
+                is not None,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Failed-candidate reference is malformed at event {event_index}.",
+            )
+            references.append(
+                {
+                    "kind": "exception",
+                    "event_index": event_index,
+                    "request_id": event["request_id"],
+                    "tool_name": event["tool_name"],
+                    "attempt": event["attempt"],
+                    "candidate_index": event["candidate_index"],
+                    "error_type": event["error_type"],
+                    "record_sha256": event["candidate_artifact_record_sha256"],
+                }
+            )
+        else:
+            _repair_candidate_require(
+                not artifact_fields.intersection(event),
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Candidate reference appears on unsupported event {event_index}.",
+            )
+    return references
+
+
+def _verified_repair_candidate_artifacts(
+    candidate_dir: Path,
+    protocol_events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> dict[str, Any]:
+    """Verify exact repair candidates and their sealed 1:1 event references."""
+
+    artifact_path = candidate_dir / _REPAIR_CANDIDATE_ARTIFACT_FILENAME
+    _repair_candidate_require(
+        candidate_dir.is_dir()
+        and not candidate_dir.is_symlink()
+        and artifact_path.resolve().parent == candidate_dir.resolve()
+        and not artifact_path.is_symlink()
+        and (not artifact_path.exists() or artifact_path.is_file()),
+        "repair_candidate_artifact_path_invalid",
+        f"Repair candidate artifact path is not fixed and safe: {artifact_path}.",
+    )
+    references = _repair_candidate_event_references(candidate_dir, protocol_events)
+    _repair_candidate_require(
+        not references or artifact_path.is_file(),
+        "repair_candidate_artifact_missing",
+        f"Protocol events reference missing repair candidate artifact {artifact_path}.",
+    )
+
+    rows: list[dict[str, Any]] = []
+    artifact_bytes = b""
+    if artifact_path.is_file():
+        try:
+            artifact_bytes = artifact_path.read_bytes()
+            text = artifact_bytes.decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise _RepairCandidateArtifactVerificationError(
+                "repair_candidate_artifact_schema_invalid",
+                f"Cannot read repair candidate artifact {artifact_path}: {exc}.",
+            ) from exc
+        _repair_candidate_require(
+            not artifact_bytes or artifact_bytes.endswith(b"\n"),
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate artifact is not append-complete: {artifact_path}.",
+        )
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            _repair_candidate_require(
+                bool(line.strip()),
+                "repair_candidate_artifact_schema_invalid",
+                f"Blank repair-candidate row at line {line_number}: {artifact_path}.",
+            )
+            rows.append(
+                _strict_json_object(line, line_number=line_number, path=artifact_path)
+            )
+
+    row_by_hash: dict[str, dict[str, Any]] = {}
+    for row_index, row in enumerate(rows):
+        _repair_candidate_require(
+            set(row) == _REPAIR_CANDIDATE_RECORD_KEYS,
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate row {row_index} does not have the exact schema.",
+        )
+        record_sha256 = row.get("record_sha256")
+        _repair_candidate_require(
+            row.get("schema_version") == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+            and row.get("event") == "post_deployment_tool_repair_candidate_recorded"
+            and isinstance(row.get("request_id"), str)
+            and bool(row["request_id"])
+            and isinstance(row.get("tool_name"), str)
+            and bool(row["tool_name"])
+            and _positive_int(row.get("source_tool_version"))
+            and row.get("repair_kind") in {"implementation", "metadata"}
+            and _nonnegative_int(row.get("generated_after_completed_count"))
+            and _positive_int(row.get("attempt"))
+            and _nonnegative_int(row.get("candidate_index"))
+            and all(
+                isinstance(row.get(field), str)
+                and _SHA256_HEX_PATTERN.fullmatch(row[field]) is not None
+                for field in (
+                    "source_validation_contract_hash",
+                    "source_tool_code_sha256",
+                    "source_tool_spec_sha256",
+                )
+            )
+            and isinstance(row.get("selected_for_attempt"), bool)
+            and row.get("future_tasks_only") is True
+            and row.get("triggering_task_replayed") is False
+            and row.get("evidence_policy")
+            == {
+                "frontier": "generator_visible_sanitized_labels_only",
+                "raw_validation_values_logged": False,
+                "private_benchmark_fields_logged": False,
+            }
+            and isinstance(record_sha256, str)
+            and _SHA256_HEX_PATTERN.fullmatch(record_sha256) is not None,
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate row {row_index} has malformed identity fields.",
+        )
+        _verify_repair_candidate_tool_evidence(
+            row.get("generator_candidate"), label=f"row {row_index} generator"
+        )
+        evaluated_raw = row.get("evaluated_candidate")
+        evaluated_evidence = (
+            _verify_repair_candidate_tool_evidence(
+                evaluated_raw, label=f"row {row_index} evaluated"
+            )
+            if evaluated_raw is not None
+            else None
+        )
+        validation = row.get("validation")
+        _repair_candidate_require(
+            isinstance(validation, dict)
+            and set(validation) == _REPAIR_CANDIDATE_VALIDATION_KEYS,
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate row {row_index} has malformed validation evidence.",
+        )
+        validation_dict = cast(dict[str, Any], validation)
+        frontier = validation_dict.get("sanitized_frontier")
+        available = validation_dict.get("available")
+        accepted = validation_dict.get("accepted")
+        _repair_candidate_require(
+            isinstance(available, bool)
+            and isinstance(accepted, bool)
+            and isinstance(frontier, list)
+            and all(isinstance(item, str) and item for item in frontier)
+            and len(frontier) == len(set(frontier))
+            and _nonnegative_int(validation_dict.get("sanitized_frontier_count"))
+            and validation_dict["sanitized_frontier_count"] == len(frontier)
+            and validation_dict.get("raw_validation_errors_persisted") is False
+            and not any(
+                (item.startswith(("held_out_", "blind_property_")) and ":" in item)
+                or "expected=" in item
+                for item in frontier
+            ),
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair candidate row {row_index} has an unsanitized frontier.",
+        )
+        disposition = row.get("disposition")
+        if available:
+            score = validation_dict.get("failure_score")
+            selected_dispositions = {
+                "validator_accepted_selected",
+                "validator_rejected_selected_for_next_seed",
+            }
+            _repair_candidate_require(
+                evaluated_evidence is not None
+                and _nonnegative_int(score)
+                and all(
+                    _nonnegative_int(validation_dict.get(field))
+                    for field in (
+                        "source_example_count",
+                        "held_out_check_count",
+                        "negative_applicability_count",
+                    )
+                )
+                and isinstance(validation_dict.get("runtime_smoke_passed"), bool)
+                and accepted == (score == 0)
+                and row.get("failure_stage") is None
+                and row.get("failure_type") is None
+                and disposition
+                in {
+                    "validator_accepted_selected",
+                    "validator_accepted_not_selected",
+                    "validator_rejected_selected_for_next_seed",
+                    "validator_rejected",
+                }
+                and accepted == disposition.startswith("validator_accepted")
+                and row["selected_for_attempt"]
+                == (disposition in selected_dispositions),
+                "repair_candidate_artifact_schema_invalid",
+                f"Repair candidate row {row_index} has inconsistent validation state.",
+            )
+        else:
+            expected_frontier = [
+                f"{row.get('failure_stage')}:{row.get('failure_type')}"
+            ]
+            _repair_candidate_require(
+                not accepted
+                and validation_dict.get("failure_score") is None
+                and all(
+                    validation_dict.get(field) is None
+                    for field in (
+                        "source_example_count",
+                        "held_out_check_count",
+                        "negative_applicability_count",
+                        "runtime_smoke_passed",
+                    )
+                )
+                and row.get("selected_for_attempt") is False
+                and disposition == "normalization_or_validation_exception"
+                and row.get("failure_stage") == "candidate_normalization_and_validation"
+                and isinstance(row.get("failure_type"), str)
+                and row["failure_type"]
+                and frontier == expected_frontier,
+                "repair_candidate_artifact_schema_invalid",
+                f"Repair candidate row {row_index} has inconsistent failure state.",
+            )
+        _repair_candidate_require(
+            row.get("repair_kind") != "metadata"
+            or evaluated_evidence is None
+            or evaluated_evidence["code_sha256"] == row["source_tool_code_sha256"],
+            "repair_candidate_artifact_tampered",
+            f"Metadata repair candidate row {row_index} changed executable code.",
+        )
+        prohibited_paths = prohibited_repair_payload_paths(row)
+        _repair_candidate_require(
+            not prohibited_paths,
+            "repair_candidate_artifact_prohibited_payload",
+            f"Repair candidate row has private paths: {list(prohibited_paths)!r}.",
+        )
+        payload = {key: value for key, value in row.items() if key != "record_sha256"}
+        _repair_candidate_require(
+            _canonical_json_sha256(payload) == record_sha256,
+            "repair_candidate_artifact_tampered",
+            f"Repair candidate row {row_index} record hash is invalid.",
+        )
+        _repair_candidate_require(
+            record_sha256 not in row_by_hash,
+            "repair_candidate_artifact_extra_rows",
+            f"Repair candidate artifact duplicates record {record_sha256}.",
+        )
+        row_by_hash[cast(str, record_sha256)] = row
+    _verified_repair_source_bindings(candidate_dir, rows)
+    reference_hashes = [str(item["record_sha256"]) for item in references]
+    _repair_candidate_require(
+        len(reference_hashes) == len(set(reference_hashes)),
+        "repair_candidate_artifact_event_reference_mismatch",
+        "Protocol events reference a repair candidate record more than once.",
+    )
+    missing_hashes = [item for item in reference_hashes if item not in row_by_hash]
+    _repair_candidate_require(
+        not missing_hashes,
+        "repair_candidate_artifact_event_reference_mismatch",
+        f"Protocol events reference missing candidate rows: {missing_hashes!r}.",
+    )
+    extra_hashes = [item for item in row_by_hash if item not in set(reference_hashes)]
+    _repair_candidate_require(
+        not extra_hashes,
+        "repair_candidate_artifact_extra_rows",
+        f"Repair candidate rows lack protocol-event references: {extra_hashes!r}.",
+    )
+
+    for reference in references:
+        row = row_by_hash[reference["record_sha256"]]
+        _repair_candidate_require(
+            all(
+                row.get(field) == reference.get(field)
+                for field in ("request_id", "tool_name", "attempt", "candidate_index")
+            ),
+            "repair_candidate_artifact_event_reference_mismatch",
+            f"Candidate identity disagrees at event {reference['event_index']}.",
+        )
+        if reference["kind"] == "exception":
+            _repair_candidate_require(
+                row.get("disposition") == "normalization_or_validation_exception"
+                and row.get("failure_stage") == "candidate_normalization_and_validation"
+                and row.get("failure_type") == reference["error_type"],
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Candidate failure disagrees at event {reference['event_index']}.",
+            )
+            continue
+        event = reference["event"]
+        item = reference["item"]
+        validation = row["validation"]
+        evaluated = row["evaluated_candidate"]
+        selected = row["candidate_index"] == event["selected_candidate_index"]
+        _repair_candidate_require(
+            isinstance(evaluated, dict)
+            and item["candidate_code_hash"] == evaluated["code_sha256"]
+            and item["accepted"] == validation["accepted"]
+            and item["validation_score"] == validation["failure_score"]
+            and item["error_frontier_count"] == validation["sanitized_frontier_count"]
+            and item["errors"] == validation["sanitized_frontier"]
+            and row["selected_for_attempt"] == selected
+            and (
+                not selected
+                or (
+                    event.get("selected_candidate_code_hash")
+                    == evaluated["code_sha256"]
+                    and event.get("accepted") == validation["accepted"]
+                    and event.get("validation_score") == validation["failure_score"]
+                    and event.get("error_labels") == validation["sanitized_frontier"]
+                )
+            ),
+            "repair_candidate_artifact_event_reference_mismatch",
+            f"Candidate validation disagrees at event {reference['event_index']}.",
+        )
+
+    return {
+        "status": "pass",
+        "path": str(artifact_path),
+        "artifact_present": artifact_path.is_file(),
+        "record_count": len(rows),
+        "referenced_record_count": len(references),
+        "artifact_sha256": hashlib.sha256(artifact_bytes).hexdigest(),
+        "canonical_records_sha256": _canonical_json_sha256(rows),
+    }
 
 
 def _verify_metadata_implementation_proof(
@@ -2413,9 +3152,14 @@ def _verify_lifecycle_closed(
     registry_dir: Path,
     *,
     trajectory_evidence: dict[str, dict[str, tuple[str, ...]]] | None = None,
+    protocol_events: list[dict[str, Any]] | tuple[dict[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Require every repair request to have a safe terminal run disposition."""
 
+    repair_candidate_artifacts = _verified_repair_candidate_artifacts(
+        candidate_dir,
+        protocol_events,
+    )
     paired_rows = _paired_lifecycle_evidence_rows(
         candidate_dir,
         trajectory_evidence=trajectory_evidence,
@@ -2774,6 +3518,7 @@ def _verify_lifecycle_closed(
         "open_canary_count": 0,
         "open_repair_transaction_count": 0,
         "active_unresolved_tool_count": 0,
+        "repair_candidate_artifacts": repair_candidate_artifacts,
     }
 
 
@@ -4016,6 +4761,7 @@ def verify_run(
             candidate_dir,
             registry_dir,
             trajectory_evidence=candidate_trajectory_evidence,
+            protocol_events=protocol_events,
         )
         lifecycle_integrity.update(checkpoint_integrity)
         lifecycle_integrity["actor_followthrough_closure"] = (

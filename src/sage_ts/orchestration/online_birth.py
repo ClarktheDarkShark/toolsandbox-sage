@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import re
@@ -105,6 +106,8 @@ POST_DEPLOYMENT_REPAIR_REQUEST_FILENAME = "self_evolution_tool_repair_requests.j
 POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME = (
     "self_evolution_tool_repair_acknowledgements.jsonl"
 )
+POST_DEPLOYMENT_REPAIR_CANDIDATE_FILENAME = "post_deployment_repair_candidates.jsonl"
+POST_DEPLOYMENT_REPAIR_CANDIDATE_SCHEMA_VERSION = 1
 POST_DEPLOYMENT_REPAIR_PUBLIC_EVIDENCE_FIELDS = frozenset(
     {
         "called_count",
@@ -152,6 +155,43 @@ _GENERIC_REPAIR_CONTEXT_PATTERN = re.compile(
     r"family=[a-z0-9_.:-]+\)"
 )
 _SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def _canonical_json_hash(payload: Any) -> str:
+    """Hash one JSON payload independently of presentation formatting."""
+
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _generated_tool_evidence(tool: GeneratedTool) -> dict[str, Any]:
+    """Return an exact tool payload plus independently checkable identities."""
+
+    tool_payload = tool.to_json()
+    spec_payload = tool.spec.to_json()
+    return {
+        "tool": tool_payload,
+        "code_sha256": code_hash(tool.code),
+        "spec_sha256": _canonical_json_hash(spec_payload),
+        "tool_payload_sha256": _canonical_json_hash(tool_payload),
+    }
+
+
+def _append_evidence_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    """Append and sync one integrity-critical evidence record."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(payload, sort_keys=True, allow_nan=False) + "\n"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(line)
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def _metadata_implementation_proof(
@@ -1320,6 +1360,152 @@ class OnlineBirthController:
     @property
     def repair_state_path(self) -> Path:
         return self.output_dir / POST_DEPLOYMENT_REPAIR_STATE_FILENAME
+
+    @property
+    def repair_candidate_artifact_path(self) -> Path:
+        return self.output_dir / POST_DEPLOYMENT_REPAIR_CANDIDATE_FILENAME
+
+    def _persist_repair_candidate_artifact(
+        self,
+        *,
+        request_id: str,
+        tool_name: str,
+        source_tool_version: int,
+        repair_kind: str,
+        completed_count: int,
+        attempt: int,
+        candidate_index: int,
+        validation_contract_hash: str,
+        source_tool_code_sha256: str,
+        source_tool_spec_sha256: str,
+        generator_candidate: GeneratedTool,
+        evaluated_candidate: GeneratedTool | None,
+        validation: ValidationResult | None,
+        validation_score: int | None,
+        selected_for_attempt: bool,
+        disposition: str,
+        failure_stage: str | None = None,
+        failure_type: str | None = None,
+    ) -> dict[str, Any]:
+        """Append exact candidate evidence without validator-private values.
+
+        The generator candidate is preserved separately from the tool actually
+        evaluated because routing normalization can change metadata and a
+        metadata-only repair deliberately restores the deployed source code.
+        Validator errors are never serialized directly: the artifact contains
+        only the same redacted frontier that is eligible to guide another repair.
+        """
+
+        if any(
+            _SHA256_HEX_PATTERN.fullmatch(value) is None
+            for value in (
+                validation_contract_hash,
+                source_tool_code_sha256,
+                source_tool_spec_sha256,
+            )
+        ):
+            raise ValueError(
+                "Repair candidate evidence requires exact source-contract hashes."
+            )
+
+        if validation is None:
+            sanitized_frontier = tuple(
+                item
+                for item in (
+                    f"{failure_stage}:{failure_type}"
+                    if failure_stage and failure_type
+                    else failure_stage
+                    or failure_type
+                    or "candidate_validation_unavailable",
+                )
+                if item
+            )
+        else:
+            sanitized_frontier = _repair_prompt_errors(validation.errors)
+        if any(
+            (item.startswith(("held_out_", "blind_property_")) and ":" in item)
+            or "expected=" in item
+            for item in sanitized_frontier
+        ):
+            raise ValueError(
+                "Repair candidate evidence contains an unsanitized validation frontier."
+            )
+
+        validation_evidence = {
+            "available": validation is not None,
+            "accepted": bool(validation is not None and validation.accepted),
+            "failure_score": validation_score,
+            "source_example_count": (
+                validation.source_example_count if validation is not None else None
+            ),
+            "held_out_check_count": (
+                validation.held_out_check_count if validation is not None else None
+            ),
+            "negative_applicability_count": (
+                validation.negative_applicability_count
+                if validation is not None
+                else None
+            ),
+            "runtime_smoke_passed": (
+                validation.runtime_smoke_passed if validation is not None else None
+            ),
+            "sanitized_frontier": list(sanitized_frontier),
+            "sanitized_frontier_count": len(sanitized_frontier),
+            "raw_validation_errors_persisted": False,
+        }
+        record_payload: dict[str, Any] = {
+            "schema_version": POST_DEPLOYMENT_REPAIR_CANDIDATE_SCHEMA_VERSION,
+            "event": "post_deployment_tool_repair_candidate_recorded",
+            "request_id": request_id,
+            "tool_name": tool_name,
+            "source_tool_version": source_tool_version,
+            "repair_kind": repair_kind,
+            "generated_after_completed_count": completed_count,
+            "attempt": attempt,
+            "candidate_index": candidate_index,
+            "source_validation_contract_hash": validation_contract_hash,
+            "source_tool_code_sha256": source_tool_code_sha256,
+            "source_tool_spec_sha256": source_tool_spec_sha256,
+            "generator_candidate": _generated_tool_evidence(generator_candidate),
+            "evaluated_candidate": (
+                _generated_tool_evidence(evaluated_candidate)
+                if evaluated_candidate is not None
+                else None
+            ),
+            "validation": validation_evidence,
+            "selected_for_attempt": selected_for_attempt,
+            "disposition": disposition,
+            "failure_stage": failure_stage,
+            "failure_type": failure_type,
+            "future_tasks_only": True,
+            "triggering_task_replayed": False,
+            "evidence_policy": {
+                "frontier": "generator_visible_sanitized_labels_only",
+                "raw_validation_values_logged": False,
+                "private_benchmark_fields_logged": False,
+            },
+        }
+        _assert_repair_payload_safe(
+            record_payload,
+            label="post-deployment repair candidate artifact",
+        )
+        record_sha256 = _canonical_json_hash(record_payload)
+        record = {**record_payload, "record_sha256": record_sha256}
+        path = self.repair_candidate_artifact_path
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise ValueError(
+                "Repair candidate evidence path must be a regular non-symlink file."
+            )
+        # Do not catch persistence errors. A repair must never be accepted or
+        # retired without its exact candidate evidence having been durably added.
+        _append_evidence_jsonl(path, record)
+        return {
+            "artifact_path": str(path),
+            "artifact_schema_version": (
+                POST_DEPLOYMENT_REPAIR_CANDIDATE_SCHEMA_VERSION
+            ),
+            "record_sha256": record_sha256,
+        }
 
     @staticmethod
     def _jsonl_rows(path: Path) -> list[dict[str, Any]]:
@@ -2900,9 +3086,17 @@ class OnlineBirthController:
                     )
                     continue
                 candidate_results: list[
-                    tuple[GeneratedTool, ValidationResult, int]
+                    tuple[
+                        int,
+                        GeneratedTool,
+                        GeneratedTool,
+                        ValidationResult,
+                        int,
+                    ]
                 ] = []
                 for candidate_index, raw_candidate in enumerate(candidates):
+                    generator_candidate = raw_candidate
+                    candidate: GeneratedTool | None = None
                     try:
                         if repair_kind == "metadata" and (
                             raw_candidate.code != entry.tool.code
@@ -2956,6 +3150,26 @@ class OnlineBirthController:
                                 expected_tool_name=tool_name,
                             )
                     except Exception as exc:
+                        candidate_artifact = self._persist_repair_candidate_artifact(
+                            request_id=request_id,
+                            tool_name=tool_name,
+                            source_tool_version=entry.version,
+                            repair_kind=repair_kind,
+                            completed_count=completed_count,
+                            attempt=attempt,
+                            candidate_index=candidate_index,
+                            validation_contract_hash=binding.contract_hash,
+                            source_tool_code_sha256=binding.tool_code_hash,
+                            source_tool_spec_sha256=binding.tool_spec_hash,
+                            generator_candidate=generator_candidate,
+                            evaluated_candidate=candidate,
+                            validation=None,
+                            validation_score=None,
+                            selected_for_attempt=False,
+                            disposition="normalization_or_validation_exception",
+                            failure_stage=("candidate_normalization_and_validation"),
+                            failure_type=type(exc).__name__,
+                        )
                         self._event(
                             "post_deployment_tool_repair_attempt_failed",
                             {
@@ -2964,26 +3178,45 @@ class OnlineBirthController:
                                 "attempt": attempt,
                                 "candidate_index": candidate_index,
                                 "stage": "candidate_normalization_and_validation",
-                                "error": f"{type(exc).__name__}:{exc}",
+                                "error_type": type(exc).__name__,
+                                "candidate_artifact_path": candidate_artifact[
+                                    "artifact_path"
+                                ],
+                                "candidate_artifact_schema_version": (
+                                    candidate_artifact["artifact_schema_version"]
+                                ),
+                                "candidate_artifact_record_sha256": (
+                                    candidate_artifact["record_sha256"]
+                                ),
                             },
                         )
                         continue
                     candidate_results.append(
-                        (candidate, validation, _validation_failure_score(validation))
+                        (
+                            candidate_index,
+                            generator_candidate,
+                            candidate,
+                            validation,
+                            _validation_failure_score(validation),
+                        )
                     )
                 if not candidate_results:
                     continue
-                selected_candidate_index = min(
+                selected_result_index = min(
                     range(len(candidate_results)),
                     key=lambda index: (
-                        not candidate_results[index][1].accepted,
-                        candidate_results[index][2],
+                        not candidate_results[index][3].accepted,
+                        candidate_results[index][4],
                         index,
                     ),
                 )
-                candidate, validation, validation_score = candidate_results[
-                    selected_candidate_index
-                ]
+                (
+                    selected_candidate_index,
+                    _selected_generator_candidate,
+                    candidate,
+                    validation,
+                    validation_score,
+                ) = candidate_results[selected_result_index]
                 improved_best = validation.accepted or (
                     validation_score < best_partial_score
                 )
@@ -2994,6 +3227,69 @@ class OnlineBirthController:
                     best_partial_tool = candidate
                     best_partial_validation = validation
                     best_partial_score = validation_score
+                candidate_validation_rows: list[dict[str, Any]] = []
+                for (
+                    result_candidate_index,
+                    generator_candidate,
+                    candidate_tool,
+                    candidate_validation,
+                    candidate_score,
+                ) in candidate_results:
+                    selected_for_attempt = (
+                        result_candidate_index == selected_candidate_index
+                    )
+                    if candidate_validation.accepted:
+                        disposition = (
+                            "validator_accepted_selected"
+                            if selected_for_attempt
+                            else "validator_accepted_not_selected"
+                        )
+                    else:
+                        disposition = (
+                            "validator_rejected_selected_for_next_seed"
+                            if selected_for_attempt
+                            else "validator_rejected"
+                        )
+                    candidate_artifact = self._persist_repair_candidate_artifact(
+                        request_id=request_id,
+                        tool_name=tool_name,
+                        source_tool_version=entry.version,
+                        repair_kind=repair_kind,
+                        completed_count=completed_count,
+                        attempt=attempt,
+                        candidate_index=result_candidate_index,
+                        validation_contract_hash=binding.contract_hash,
+                        source_tool_code_sha256=binding.tool_code_hash,
+                        source_tool_spec_sha256=binding.tool_spec_hash,
+                        generator_candidate=generator_candidate,
+                        evaluated_candidate=candidate_tool,
+                        validation=candidate_validation,
+                        validation_score=candidate_score,
+                        selected_for_attempt=selected_for_attempt,
+                        disposition=disposition,
+                    )
+                    sanitized_errors = _repair_prompt_errors(
+                        candidate_validation.errors
+                    )
+                    candidate_validation_rows.append(
+                        {
+                            "candidate_index": result_candidate_index,
+                            "candidate_code_hash": code_hash(candidate_tool.code),
+                            "accepted": candidate_validation.accepted,
+                            "validation_score": candidate_score,
+                            "error_frontier_count": len(sanitized_errors),
+                            "errors": list(sanitized_errors),
+                            "candidate_artifact_path": candidate_artifact[
+                                "artifact_path"
+                            ],
+                            "candidate_artifact_schema_version": (
+                                candidate_artifact["artifact_schema_version"]
+                            ),
+                            "candidate_artifact_record_sha256": (
+                                candidate_artifact["record_sha256"]
+                            ),
+                        }
+                    )
                 self._event(
                     "post_deployment_tool_repair_attempted",
                     {
@@ -3013,25 +3309,7 @@ class OnlineBirthController:
                             if improved_best or retained_equal_score
                             else "best_previous_candidate"
                         ),
-                        "candidate_validations": [
-                            {
-                                "candidate_index": index,
-                                "candidate_code_hash": code_hash(candidate_tool.code),
-                                "accepted": candidate_validation.accepted,
-                                "validation_score": candidate_score,
-                                "error_frontier_count": len(
-                                    _repair_prompt_errors(candidate_validation.errors)
-                                ),
-                                "errors": list(
-                                    _repair_prompt_errors(candidate_validation.errors)
-                                ),
-                            }
-                            for index, (
-                                candidate_tool,
-                                candidate_validation,
-                                candidate_score,
-                            ) in enumerate(candidate_results)
-                        ],
+                        "candidate_validations": candidate_validation_rows,
                         "implementation_code_preserved": (
                             code_hash(candidate.code) == source_code_hash
                             if repair_kind == "metadata"

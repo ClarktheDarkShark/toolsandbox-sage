@@ -464,9 +464,17 @@ class ToolGenerator:
         """Return independently authored repairs for contract validation."""
 
         prompt = _model_authored_repair_prompt(request, rejected_tool, errors)
-        prompt += self._contract_analysis_suffix(request)
-        prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
-        prompt += _model_authored_final_repair_directive(request, errors)
+        if _request_is_validation_abstention_helper(request):
+            # Validation helpers are pure decision procedures. A compact,
+            # code-specific plan followed by one complete implementation converges
+            # more reliably than concatenating the generic generation prompt, a
+            # contract analysis, the rejected candidate, and a second long final
+            # directive. The unchanged validator remains the acceptance boundary.
+            prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+        else:
+            prompt += self._contract_analysis_suffix(request)
+            prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+            prompt += _model_authored_final_repair_directive(request, errors)
         response = self._complete(
             request,
             ChatRequest(
@@ -529,6 +537,33 @@ class ToolGenerator:
         rejected_tool: GeneratedTool,
         errors: tuple[str, ...],
     ) -> str:
+        if _request_is_validation_abstention_helper(request):
+            analysis_prompt = _model_authored_validation_helper_repair_analysis_prompt(
+                request,
+                rejected_tool,
+                errors,
+            )
+            analysis = self._contract_analyses.get(analysis_prompt)
+            if analysis is None:
+                analysis = self._complete(
+                    request,
+                    ChatRequest(
+                        system=(
+                            "You trace rejected deterministic validation helpers. "
+                            "Return valid JSON only and do not write code."
+                        ),
+                        user=analysis_prompt,
+                        model=self.completer.model,
+                        response_format_json=True,
+                    ),
+                )
+                analysis = _validated_validation_helper_repair_analysis(analysis)
+                self._contract_analyses[analysis_prompt] = analysis
+            return (
+                " CODE-SPECIFIC DECISION PLAN. Apply this separately authored plan "
+                "to the complete replacement implementation. The model-visible "
+                "public cases and interface remain authoritative: " + analysis
+            )
         if not _request_complete_tools_enabled(request):
             return ""
         analysis_prompt = _model_authored_repair_analysis_prompt(
@@ -1559,6 +1594,183 @@ def _model_authored_contract_analysis_prompt(
     )
 
 
+def _model_visible_validation_helper_cases(
+    request: ToolGenerationRequest,
+) -> list[dict[str, object]]:
+    """Return only cases explicitly available to the repair model."""
+
+    cases: list[dict[str, object]] = []
+    source_index = 0
+    negative_index = 0
+    for item in request.validation_examples:
+        if not isinstance(item, dict) or bool(item.get("held_out")):
+            continue
+        inputs = item.get("inputs")
+        expected = item.get("expected")
+        if not isinstance(inputs, dict) or not isinstance(expected, dict):
+            continue
+        negative = bool(item.get("negative_applicability"))
+        if negative:
+            case_label = f"negative_{negative_index}"
+            negative_index += 1
+        else:
+            case_label = f"source_{source_index}"
+            source_index += 1
+        cases.append(
+            {
+                "case_label": case_label,
+                "inputs": inputs,
+                "expected": expected,
+                "negative_applicability": negative,
+            }
+        )
+    return cases
+
+
+def _sanitized_validation_helper_repair_errors(
+    errors: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Keep public feedback concrete and hidden feedback values-free."""
+
+    sanitized: list[str] = []
+    for raw_error in errors:
+        error = str(raw_error).strip()
+        if not error or error.startswith("repair_strategy:"):
+            continue
+        if error.startswith(("held_out_", "blind_property_")):
+            error = error.split(":", 1)[0].split("!=", 1)[0]
+        if error and error not in sanitized:
+            sanitized.append(error)
+    return tuple(sanitized)
+
+
+def _minimal_validation_helper_candidate(
+    tool: GeneratedTool,
+) -> dict[str, object]:
+    """Expose executable shape and code without unrelated registry metadata."""
+
+    return {
+        "spec": {
+            "tool_name": tool.spec.tool_name,
+            "family": str(tool.spec.family),
+            "description": tool.spec.description,
+            "inputs": [item.to_json() for item in tool.spec.inputs],
+            "output_annotation": tool.spec.output_annotation,
+            "output_schema": tool.spec.output_schema,
+        },
+        "code_lines": tool.code.splitlines(),
+    }
+
+
+def _validation_helper_repair_payload(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+    errors: tuple[str, ...],
+    *,
+    strategy_number: int,
+) -> dict[str, object]:
+    """Build the compact public CEGIS payload used by both repair stages."""
+
+    return {
+        "required_tool_name": request.suggested_tool_name
+        or rejected_tool.spec.tool_name,
+        "allowed_families": list(request.allowed_families),
+        "public_input_contract": [
+            item.to_json() for item in request.public_input_contract
+        ],
+        "public_output_contract": [
+            item.to_json() for item in request.public_output_contract
+        ],
+        "public_contract_rules": list(_model_authored_contract_rules(request)),
+        "model_visible_public_cases": _model_visible_validation_helper_cases(request),
+        "validator_feedback": list(_sanitized_validation_helper_repair_errors(errors)),
+        "repair_strategy": strategy_number,
+        "current_candidate": _minimal_validation_helper_candidate(rejected_tool),
+    }
+
+
+def _model_authored_validation_helper_repair_analysis_prompt(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+    errors: tuple[str, ...],
+) -> str:
+    """Ask for a values-safe decision plan before requesting replacement code."""
+
+    strategy_number = next(
+        (
+            int(match.group(1))
+            for error in errors
+            if (match := re.fullmatch(r"repair_strategy:(\d+)", str(error)))
+        ),
+        1,
+    )
+    payload = _validation_helper_repair_payload(
+        request,
+        rejected_tool,
+        errors,
+        strategy_number=strategy_number,
+    )
+    return (
+        "Trace the current pure validation helper against every model-visible "
+        "public case. Identify the first incorrect condition or return for each "
+        "public failure. Treat held-out and blind-property feedback as values-free "
+        "invariant names only; do not guess their hidden values. Derive one ordered "
+        "decision procedure with capability normalization, only contract-supported "
+        "prerequisite inference, missing-capability priority, read-only versus "
+        "mutating classification, target and ambiguity gates, and safe continuation. "
+        "Return a JSON object with keys algorithm_steps, capability_aliases, "
+        "inferred_prerequisites, read_only_actions, mutating_actions, "
+        "target_exceptions, case_coverage, invariants, first_incorrect_branches, "
+        "and regression_guards. The first eight keys must have the same types as "
+        "declared by the public contract-analysis protocol. Do not output Python. "
+        "Do not encode complete example inputs or visible example literals as "
+        "special cases. Public repair payload: " + json.dumps(payload, sort_keys=True)
+    )
+
+
+def _model_authored_validation_helper_repair_prompt(
+    request: ToolGenerationRequest,
+    rejected_tool: GeneratedTool,
+    errors: tuple[str, ...],
+    *,
+    strategy_number: int,
+) -> str:
+    """Return a compact CEGIS code prompt for a pure validation helper."""
+
+    payload = _validation_helper_repair_payload(
+        request,
+        rejected_tool,
+        errors,
+        strategy_number=strategy_number,
+    )
+    return (
+        "Repair one rejected pure deterministic validation helper. Return exactly "
+        "one JSON object with top-level keys spec and code_lines; do not return a "
+        "candidates array. spec must contain tool_name, family, description, inputs, "
+        "output_annotation, and output_schema. code_lines must contain one complete "
+        "Python function whose name and typed signature match the public interface. "
+        "Use no imports, nested functions, side effects, external calls, hidden "
+        "state, try/except, raise, classes, lambdas, or while loops. Treat a nonblank "
+        "string capability container as one item, malformed containers as empty, "
+        "normalize and deduplicate capabilities while preserving first-seen order, "
+        "and append only prerequisites supported by the public contract before "
+        "computing missing capabilities. Missing capabilities have priority over "
+        "target and ambiguity checks. Classify the requested action before applying "
+        "a target rule: a public read-only exception must bypass a generic mutating "
+        "target guard. Every return must contain exactly the public output fields. "
+        "An abstention recommendation must dynamically name every missing fact and "
+        "state that it is missing, unavailable, unresolved, ambiguous, or required; "
+        "a fixed generic sentence is invalid. Preserve branches that still satisfy "
+        "the public cases, but rewrite the whole function when the supplied strategy "
+        "calls for a clean implementation. Generalize predicates across task "
+        "families; never branch on a complete example object or copy a visible "
+        "example literal into code. Hidden and blind cases remain validation-only. "
+        "A separate code-specific decision plan follows this payload and must guide "
+        "the replacement, while the public cases and interface remain authoritative. "
+        "Public repair payload: " + json.dumps(payload, sort_keys=True)
+    )
+
+
 def _model_authored_repair_analysis_prompt(
     request: ToolGenerationRequest,
     rejected_tool: GeneratedTool,
@@ -1658,6 +1870,28 @@ def _validated_validation_helper_contract_analysis(raw_analysis: str) -> str:
                 f"validation helper contract analysis field {field} must be an object"
             )
     return json.dumps(analysis, sort_keys=True)
+
+
+def _validated_validation_helper_repair_analysis(raw_analysis: str) -> str:
+    """Require a code-specific diagnosis in addition to the contract plan."""
+
+    normalized = _validated_validation_helper_contract_analysis(raw_analysis)
+    analysis = json.loads(normalized)
+    code_specific_fields: list[object] = []
+    for field in ("first_incorrect_branches", "regression_guards"):
+        value = analysis.get(field)
+        if not isinstance(value, (list, dict)):
+            raise ValueError(
+                "validation helper repair analysis field "
+                f"{field} must be a list or object"
+            )
+        code_specific_fields.append(value)
+    if not any(code_specific_fields):
+        raise ValueError(
+            "validation helper repair analysis needs a nonempty code-specific "
+            "branch diagnosis or regression guard"
+        )
+    return normalized
 
 
 def _model_authored_final_repair_directive(
@@ -2120,7 +2354,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Return exactly these output keys on every branch: should_abstain, missing_information, required_original_tools, safe_next_action, final_answer_recommendation, and abstain_reason.",
             "Normalize required_original_tools and available_original_tools from concrete ToolSandbox names to semantic capabilities: search_contacts becomes contact_lookup and send_message_with_phone_number becomes message_send.",
             "Normalize get_current_timestamp to the semantic capability current_time.",
-            "For requested_action message_send, send_message, or any send/text/message action, a target_identifier that is not a phone number is a named recipient and requires contact_lookup before message_send.",
+            "For requested_action message_send, send_message, or any send/text/message action, a target_identifier that is not a phone number is a named recipient and requires both message_send and contact_lookup. Preserve the normalized input capability order and append contact_lookup when it is absent before computing missing capabilities.",
             "If a named-recipient message send lacks contact_lookup in available_original_tools, return should_abstain true, include contact_lookup in missing_information, set safe_next_action ask_user_or_abstain, and recommend that the message cannot be sent safely because the recipient cannot be resolved to a phone number.",
             "Never treat message_send alone as sufficient for a named recipient. message_send alone is sufficient only when target_identifier already looks like a concrete phone number.",
             "If required_original_tools or available_original_tools is a string, treat it as one capability value, not as an iterable of characters.",
@@ -2464,6 +2698,13 @@ def _model_authored_repair_prompt(
     errors = tuple(
         error for error in errors if not error.startswith("repair_strategy:")
     )
+    if _request_is_validation_abstention_helper(request):
+        return _model_authored_validation_helper_repair_prompt(
+            request,
+            rejected_tool,
+            errors,
+            strategy_number=strategy_number,
+        )
     strategy_guidance = {
         1: (
             "Trace each failing case through the current control flow and remove the "

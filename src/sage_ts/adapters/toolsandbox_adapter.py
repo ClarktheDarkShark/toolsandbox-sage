@@ -176,6 +176,7 @@ def _copy_resume_artifacts(
         "self_evolution_tool_repair_acknowledgements.jsonl": (
             "acknowledged_after_completed_count"
         ),
+        "post_deployment_repair_candidates.jsonl": ("generated_after_completed_count"),
     }
     durable_lifecycle_journals = {
         "self_evolution_task_feedback.jsonl",

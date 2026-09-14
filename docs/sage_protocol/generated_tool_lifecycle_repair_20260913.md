@@ -65,17 +65,29 @@ scenario/task identifiers, expected or reference answers, target state,
 evaluator traces, outcome values, and success-flip values at persistence,
 request-construction, and prompt boundaries.
 
-For structured validation helpers, repair begins with a separately
-model-authored decision plan built only from the public observation and
-model-visible synthetic cases. The plan must order normalization, inferred
-public prerequisites, missing-capability checks, read-only versus mutating
-classification, target checks, and ambiguity checks before code is authored.
-Each repair attempt emits one complete candidate so the seven bounded model
-calls are separate rather than three correlated functions in one response. The
-first five calls have distinct repair strategies; later calls iteratively use the
-best public validation frontier. The analysis response is schema-checked before
-it can guide repair. Candidate code hashes and error-frontier sizes are logged so
-diversity and convergence can be audited without exposing held-out values.
+For structured validation helpers, each bounded repair attempt uses a compact,
+counterexample-guided two-stage prompt. A separate model call first traces the
+current best implementation against labeled, model-visible synthetic cases and
+returns a schema-checked decision plan. A second call writes one complete
+replacement. Both stages receive the same minimal executable specification,
+current code, public input/output contract, public cases, and public validation
+frontier. Held-out and blind checks appear only as value-free invariant labels.
+The plan must order normalization, inferred public prerequisites,
+missing-capability checks, read-only versus mutating classification, target
+checks, and ambiguity checks before code is authored. Later attempts use the
+best validation frontier observed so far. This replaces the earlier duplicated
+general repair prompt; it does not relax or change the full acceptance validator.
+
+Every returned repair candidate is persisted before any lifecycle action in the
+append-only `post_deployment_repair_candidates.jsonl` journal. Each record binds
+the source contract and implementation, the exact generator-returned candidate,
+the normalized candidate actually evaluated, validation counts, a sanitized
+error frontier, disposition, and content hashes. The record is self-hashed and
+the sealed protocol event journal references it one-to-one. Raw held-out values,
+benchmark task identifiers, outcomes, expected answers, target state, and
+evaluator traces are prohibited. Rejected candidates therefore remain available
+to audit why repair converged or failed, while evaluator-private information
+remains outside generation and lifecycle evidence.
 
 Tool-name scrambling is also an information boundary. Classification, routing,
 and policy selection consume the same actor-visible names, descriptions, and

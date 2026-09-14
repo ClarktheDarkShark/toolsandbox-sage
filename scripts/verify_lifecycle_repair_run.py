@@ -3515,6 +3515,20 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         run_root=run_root,
         protocol=protocol,
     )
+    try:
+        repair_candidate_artifacts = (
+            _strict_run_verifier._verified_repair_candidate_artifacts(
+                candidate_dir,
+                protocol_events,
+            )
+        )
+    except _strict_run_verifier._RepairCandidateArtifactVerificationError as exc:
+        reasons.append(exc.reason)
+        repair_candidate_artifacts = {
+            "status": "fail",
+            "path": str(candidate_dir / "post_deployment_repair_candidates.jsonl"),
+            "error": str(exc),
+        }
     checkpoint_version_binding_count = 0
     actor_followthrough_closure: dict[str, Any] = {
         "derived_obligation_count": 0,
@@ -4005,6 +4019,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             repair_acceptance_binding_mismatches
         ),
         "repair_acceptance_event_source": protocol_event_journal,
+        "repair_candidate_artifacts": repair_candidate_artifacts,
         "promoted_v2_validation_contract": final_validation_contract,
         "repair_request_count": len(repair_requests),
         "repair_request_prohibited_paths": repair_request_prohibited_paths,

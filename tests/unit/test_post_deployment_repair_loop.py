@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
@@ -29,6 +30,24 @@ TOOL_NAME = "prepare_safe_action_or_abstain"
 HIDDEN_TASK_ID = "benchmark_case_DO_NOT_REPLAY_7391"
 HIDDEN_EXPECTED_VALUE = "private_capability_DO_NOT_DISCLOSE_4217"
 HIDDEN_NEGATIVE_VALUE = "private_negative_DO_NOT_DISCLOSE_8842"
+
+
+def _canonical_json_hash(payload: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _repair_candidate_rows(controller: OnlineBirthController) -> list[dict[str, Any]]:
+    return controller._jsonl_rows(  # noqa: SLF001
+        controller.output_dir / online_birth.POST_DEPLOYMENT_REPAIR_CANDIDATE_FILENAME
+    )
 
 
 def _spec() -> ToolSpec:
@@ -533,6 +552,124 @@ def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
     ] == [1, 0, 1]
     assert repair_event["candidate_validations"][1]["accepted"] is True
 
+    artifact_rows = _repair_candidate_rows(controller)
+    assert len(artifact_rows) == 3
+    assert [row["candidate_index"] for row in artifact_rows] == [0, 1, 2]
+    assert [row["disposition"] for row in artifact_rows] == [
+        "validator_rejected",
+        "validator_accepted_selected",
+        "validator_rejected",
+    ]
+    assert [row["selected_for_attempt"] for row in artifact_rows] == [
+        False,
+        True,
+        False,
+    ]
+    for row, source_candidate, event_validation in zip(
+        artifact_rows,
+        (rejected_a, accepted, rejected_b),
+        repair_event["candidate_validations"],
+        strict=True,
+    ):
+        assert row["source_tool_code_sha256"] == code_hash(_faulty_tool().code)
+        assert row["source_tool_spec_sha256"] == _canonical_json_hash(
+            _faulty_tool().spec.to_json()
+        )
+        assert row["generator_candidate"]["tool"] == source_candidate.to_json()
+        assert row["generator_candidate"]["code_sha256"] == code_hash(
+            source_candidate.code
+        )
+        assert row["generator_candidate"]["spec_sha256"] == _canonical_json_hash(
+            source_candidate.spec.to_json()
+        )
+        assert row["generator_candidate"]["tool_payload_sha256"] == (
+            _canonical_json_hash(source_candidate.to_json())
+        )
+        assert row["evaluated_candidate"] is not None
+        evaluated_payload = row["evaluated_candidate"]["tool"]
+        assert row["evaluated_candidate"]["code_sha256"] == code_hash(
+            evaluated_payload["code"]
+        )
+        assert row["evaluated_candidate"]["spec_sha256"] == _canonical_json_hash(
+            evaluated_payload["spec"]
+        )
+        assert row["evaluated_candidate"]["tool_payload_sha256"] == (
+            _canonical_json_hash(evaluated_payload)
+        )
+        record_payload = dict(row)
+        observed_record_hash = record_payload.pop("record_sha256")
+        assert observed_record_hash == _canonical_json_hash(record_payload)
+        assert event_validation["candidate_artifact_path"] == str(
+            controller.repair_candidate_artifact_path
+        )
+        assert event_validation["candidate_artifact_schema_version"] == 1
+        assert event_validation["candidate_artifact_record_sha256"] == (
+            observed_record_hash
+        )
+        assert "errors" not in row["validation"]
+        assert row["validation"]["raw_validation_errors_persisted"] is False
+
+
+def test_candidate_evidence_redacts_hidden_validator_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    rejected = replace(_faulty_tool(), code=_faulty_tool().code + "# rejected\n")
+    accepted = _repaired_tool()
+    generator = SequencedRepairGenerator(
+        store=store,
+        candidates=(rejected, accepted),
+    )
+    controller = _controller(tmp_path, generator)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: ValidationResult(
+            False, ("source_prior_raw_should_abstain",)
+        ),
+    )
+
+    def gate_and_validate(
+        tool: GeneratedTool,
+        _observation: CapabilityObservation,
+        *,
+        expected_tool_name: str | None = None,
+    ) -> tuple[None, None, ValidationResult]:
+        assert expected_tool_name == TOOL_NAME
+        if "# rejected" in tool.code:
+            return (
+                None,
+                None,
+                ValidationResult(
+                    False,
+                    (
+                        f"held_out_0_mismatch:{HIDDEN_EXPECTED_VALUE}",
+                        f"blind_property_0_source_error:{HIDDEN_NEGATIVE_VALUE}",
+                    ),
+                ),
+            )
+        return None, None, ValidationResult(True, (), runtime_smoke_passed=True)
+
+    monkeypatch.setattr(controller, "_gate_and_validate", gate_and_validate)
+
+    assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
+    artifact_rows = _repair_candidate_rows(controller)
+    assert len(artifact_rows) == 2
+    assert artifact_rows[0]["validation"]["sanitized_frontier"] == [
+        "held_out_0_mismatch",
+        "blind_property_0_source_error",
+    ]
+    artifact_text = controller.repair_candidate_artifact_path.read_text(
+        encoding="utf-8"
+    )
+    assert HIDDEN_TASK_ID not in artifact_text
+    assert HIDDEN_EXPECTED_VALUE not in artifact_text
+    assert HIDDEN_NEGATIVE_VALUE not in artifact_text
+
 
 def test_queued_repair_waits_for_future_processing_then_stores_v2_and_acknowledges(
     tmp_path: Path,
@@ -654,6 +791,33 @@ def test_metadata_repair_discards_model_code_and_preserves_source_hash(
     assert discard_event["executable_candidate_code_hash"] == (
         source_entry.stored_code_hash
     )
+    artifact_rows = _repair_candidate_rows(controller)
+    assert len(artifact_rows) == 1
+    artifact = artifact_rows[0]
+    assert artifact["repair_kind"] == "metadata"
+    assert artifact["generator_candidate"]["tool"] == model_candidate.to_json()
+    assert artifact["generator_candidate"]["code_sha256"] == code_hash(
+        model_candidate.code
+    )
+    assert artifact["evaluated_candidate"] is not None
+    assert artifact["evaluated_candidate"]["tool"]["code"] == source_tool.code
+    assert artifact["evaluated_candidate"]["code_sha256"] == (
+        source_entry.stored_code_hash
+    )
+    assert (
+        artifact["generator_candidate"]["code_sha256"]
+        != (artifact["evaluated_candidate"]["code_sha256"])
+    )
+    assert artifact["validation"]["raw_validation_errors_persisted"] is False
+    attempted = next(
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_attempted"
+    )
+    assert (
+        attempted["candidate_validations"][0]["candidate_artifact_record_sha256"]
+        == artifact["record_sha256"]
+    )
 
 
 def test_metadata_repair_rejects_unbound_source_hash(tmp_path: Path) -> None:
@@ -717,7 +881,8 @@ def test_failed_bounded_repair_leaves_known_bad_tool_retired(tmp_path: Path) -> 
     store = RegistryStore(tmp_path / "registry")
     store.put(_accepted_historical_entry(_faulty_tool()))
     generator = DeterministicRepairGenerator(store=store, candidate=_faulty_tool())
-    controller = _controller(tmp_path, generator)
+    events: list[tuple[str, dict[str, Any]]] = []
+    controller = _controller(tmp_path, generator, events=events)
     controller.observations_by_tool_name[TOOL_NAME] = _observation()
     controller.queue_post_deployment_repair_requests([_repair_request()])
     acknowledgements: list[tuple[str, int, str, str]] = []
@@ -741,6 +906,50 @@ def test_failed_bounded_repair_leaves_known_bad_tool_retired(tmp_path: Path) -> 
     assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
     assert controller.pending_repair_requests == []
     assert "repair-request-1" in controller.handled_repair_request_ids
+    artifact_rows = _repair_candidate_rows(controller)
+    assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS
+    assert [row["attempt"] for row in artifact_rows] == list(
+        range(1, online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1)
+    )
+    assert all(
+        row["disposition"].startswith("validator_rejected") for row in artifact_rows
+    )
+    assert len({row["record_sha256"] for row in artifact_rows}) == len(artifact_rows)
+    attempt_events = [
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_attempted"
+    ]
+    assert [
+        event["candidate_validations"][0]["candidate_artifact_record_sha256"]
+        for event in attempt_events
+    ] == [row["record_sha256"] for row in artifact_rows]
+
+
+def test_candidate_evidence_write_failure_aborts_before_repair_activation(
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    generator = DeterministicRepairGenerator(store=store, candidate=_repaired_tool())
+    controller = _controller(tmp_path, generator)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    controller.repair_candidate_artifact_path.mkdir(parents=True)
+
+    with pytest.raises(
+        ValueError,
+        match="regular non-symlink file",
+    ):
+        controller.process_pending_repairs(completed_count=8)
+
+    entry = store.get(TOOL_NAME)
+    assert entry is not None and entry.version == 1 and entry.retired
+    assert [row["request_id"] for row in controller.pending_repair_requests] == [
+        "repair-request-1"
+    ]
+    assert "repair-request-1" not in controller.handled_repair_request_ids
+    assert controller.canary_state_by_tool == {}
 
 
 def test_missing_or_superseded_repair_request_gets_terminal_acknowledgement(
@@ -855,6 +1064,29 @@ def test_generation_and_repair_requests_omit_held_out_and_trigger_task_values(
     assert "success_flip" not in repair_text
     assert "candidate_outcome" not in repair_prompt
     assert "success_flip" not in repair_prompt
+    artifact_text = controller.repair_candidate_artifact_path.read_text(
+        encoding="utf-8"
+    )
+    for private_value in (
+        HIDDEN_TASK_ID,
+        HIDDEN_EXPECTED_VALUE,
+        HIDDEN_NEGATIVE_VALUE,
+        "candidate_outcome",
+        "control_outcome",
+        "outcome_similarity",
+        "success_flip",
+        "expected_answer",
+        "target_state",
+        "evaluator_trace",
+    ):
+        assert private_value not in artifact_text
+    artifact = _repair_candidate_rows(controller)[0]
+    assert artifact["validation"]["raw_validation_errors_persisted"] is False
+    assert artifact["evidence_policy"] == {
+        "frontier": "generator_visible_sanitized_labels_only",
+        "private_benchmark_fields_logged": False,
+        "raw_validation_values_logged": False,
+    }
     assert (
         online_birth.prohibited_repair_payload_paths(
             asdict(generator.requests[0]),
@@ -1880,6 +2112,24 @@ def test_repair_stage_exception_retires_and_terminally_rejects(
     assert controller.canary_state_by_tool == {}
     assert controller.repair_transactions_by_tool == {}
     assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
+    if failure_stage == "candidate_normalization":
+        artifact_rows = _repair_candidate_rows(controller)
+        assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS
+        assert all(row["evaluated_candidate"] is None for row in artifact_rows)
+        assert all(
+            row["disposition"] == "normalization_or_validation_exception"
+            for row in artifact_rows
+        )
+        assert all(
+            row["failure_stage"] == "candidate_normalization_and_validation"
+            and row["failure_type"] == "RuntimeError"
+            for row in artifact_rows
+        )
+        assert "simulated candidate_normalization failure" not in (
+            controller.repair_candidate_artifact_path.read_text(encoding="utf-8")
+        )
+    else:
+        assert not controller.repair_candidate_artifact_path.exists()
 
 
 def test_restart_pops_terminal_pending_canary_and_transaction_state(
