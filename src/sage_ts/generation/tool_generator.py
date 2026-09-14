@@ -471,6 +471,7 @@ class ToolGenerator:
             # contract analysis, the rejected candidate, and a second long final
             # directive. The unchanged validator remains the acceptance boundary.
             prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+            prompt += _model_authored_final_repair_directive(request, errors)
         else:
             prompt += self._contract_analysis_suffix(request)
             prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
@@ -1911,7 +1912,6 @@ def _model_authored_final_repair_directive(
     """Restate structural invariants after verbose model-authored analysis."""
 
     if _request_is_validation_abstention_helper(request):
-        repair_candidate_count = _model_authored_repair_candidate_count(request)
         public_examples = tuple(
             item
             for item in request.validation_examples
@@ -1970,15 +1970,54 @@ def _model_authored_final_repair_directive(
             if relative_time_exception_is_public
             else ""
         )
+        strategy_number = next(
+            (
+                int(match.group(1))
+                for error in errors
+                if (match := re.fullmatch(r"repair_strategy:(\d+)", str(error)))
+            ),
+            1,
+        )
+        strategy_guidance = {
+            1: (
+                "Trace the current code through every public failure, then replace "
+                "the first incorrect condition or return."
+            ),
+            2: (
+                "Discard action-specific missing-tool conditions. Rebuild around "
+                "one generic required-minus-available capability computation and "
+                "return immediately when that result is nonempty."
+            ),
+            3: (
+                "Use a fresh ordered decision table: normalize, infer only public "
+                "prerequisites, compute every missing capability, classify the "
+                "action, check its target, check ambiguity, then continue."
+            ),
+            4: (
+                "Discard the prior branch structure and write the smallest clean "
+                "implementation of the complete public contract."
+            ),
+            5: (
+                "Adversarially audit representation invariance, every withheld "
+                "required capability, blank targets for read-only and mutating "
+                "actions, ambiguity, and the safe-continue path before rewriting."
+            ),
+            6: (
+                "Remove special-case predicates and duplicate branches. Express "
+                "each precedence gate once using normalized semantic values."
+            ),
+            7: (
+                "Author an independent final implementation from the public cases "
+                "and invariants; do not copy a branch that still appears in the "
+                "validator feedback."
+            ),
+        }.get(strategy_number, "Rewrite from the complete public contract.")
         return (
             " FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE. This directive "
             "is authoritative and must be followed after every earlier instruction. "
-            "Return a top-level candidates array with exactly "
-            + str(repair_candidate_count)
-            + " independently authored complete repair objects, each with top-level "
-            "spec and code_lines. Every candidate must implement the full contract; "
-            "vary control flow or normalization structure without weakening any safety "
-            "rule. Keep the public function name and "
+            "Return exactly one complete repair JSON object with top-level spec and "
+            "code_lines, matching the output envelope requested above. Keep the "
+            "public function name and "
             "signature. The function must be pure and must return exactly these six "
             "keys on every branch, with no extra or missing keys: should_abstain, "
             "missing_information, required_original_tools, safe_next_action, "
@@ -1994,8 +2033,10 @@ def _model_authored_final_repair_directive(
             "Treat those public inference rules as exhaustive. Never invent an "
             "unstated prerequisite or infer one from a task id, scenario name, "
             "benchmark label, expected answer, or example-specific literal. STEP 3: "
-            "compute missing capabilities from the complete normalized required list "
-            "against the normalized available list. If any are missing, abstain "
+            "compute missing capabilities generically as every item in the complete "
+            "normalized required list that is absent from the normalized available "
+            "list. Never condition this computation on the requested action, target, "
+            "or one particular capability. If any are missing, abstain "
             "immediately with all missing capabilities in missing_information, the "
             "complete normalized requirements in required_original_tools, "
             "safe_next_action ask_user_or_abstain, abstain_reason "
@@ -2029,6 +2070,11 @@ def _model_authored_final_repair_directive(
             "phone numbers, dates, or other example-specific constants in code. "
             + named_recipient_rule
             + relative_time_rule
+            + "REPAIR STRATEGY "
+            + str(strategy_number)
+            + ": "
+            + strategy_guidance
+            + " "
             + "FINAL CHECK: inferred prerequisites must be inserted before missing "
             "capabilities are computed, and every read-only exception must be tested "
             "before any generic blank-target guard."

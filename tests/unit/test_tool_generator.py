@@ -740,7 +740,10 @@ def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None
     assert prompt.startswith("Repair one rejected pure deterministic validation helper")
     assert "top-level keys spec and code_lines" in prompt
     assert "Synthesize one reusable deterministic Python tool" not in prompt
-    assert "FINAL BINDING VALIDATION-ABSTENTION" not in prompt
+    assert "FINAL BINDING VALIDATION-ABSTENTION" in prompt
+    assert "Return exactly one complete repair JSON object" in prompt
+    assert "REPAIR STRATEGY 1" in prompt
+    assert "generic required-minus-available capability computation" not in prompt
     assert '"current_candidate"' in prompt
     assert '"case_label": "source_0"' in prompt
     assert '"validator_feedback"' in prompt
@@ -756,7 +759,7 @@ def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None
     )
     assert rejected.code.splitlines()[0] in analysis_prompt
     assert "CODE-SPECIFIC DECISION PLAN" in prompt
-    assert len(prompt) < 12_000
+    assert len(prompt) < 20_000
     assert len(request.validation_examples) == 1
     assert hidden_task not in analysis_prompt + prompt
     assert hidden_answer not in analysis_prompt + prompt
@@ -846,6 +849,8 @@ def test_validation_helper_repair_restates_public_semantic_exceptions_last() -> 
 
     assert "PUBLIC NAMED-RECIPIENT RULE" in directive
     assert "PUBLIC RELATIVE-TIME RULE" in directive
+    assert "Return exactly one complete repair JSON object" in directive
+    assert "REPAIR STRATEGY 1" in directive
     assert "PRIVATE_HELD_OUT_SENTINEL" not in directive
     assert "private_capability" not in directive
     assert directive.endswith(
@@ -935,6 +940,10 @@ def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
     assert "Synthesize one reusable deterministic Python tool" not in prompt
     assert "Previous candidate JSON" not in prompt
     assert len(prompt) < 16_000
+
+    final_directive = _model_authored_final_repair_directive(request, errors)
+    assert "REPAIR STRATEGY 4" in final_directive
+    assert "smallest clean implementation" in final_directive
 
 
 def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:
