@@ -9089,6 +9089,47 @@ def _safe_abstention_terminal_tool_free_turn(
     )
 
 
+def _safe_abstention_terminal_completion(
+    openai_messages: object,
+    openai_tools: object,
+    *,
+    model_name: str,
+) -> ChatCompletion | None:
+    """Copy a validated terminal recommendation without later answer drift.
+
+    The content comes exclusively from the visible generated-tool result. The
+    host neither authors task facts nor consults an evaluator; it only preserves
+    the helper's public ``final_answer_recommendation`` while the required routed
+    capability remains absent.
+    """
+
+    unresolved = _unresolved_required_tool_abstention(openai_messages, openai_tools)
+    if unresolved is None:
+        return None
+    _name, payload, _missing_capabilities = unresolved
+    recommendation = str(payload.get("final_answer_recommendation") or "").strip()
+    if not recommendation:
+        return None
+    return ChatCompletion.model_validate(
+        {
+            "id": "sage-safe-abstention-terminal-handoff",
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": recommendation,
+                    },
+                }
+            ],
+            "created": int(time.time()),
+            "model": model_name,
+            "object": "chat.completion",
+        }
+    )
+
+
 def _safe_abstention_helper_actor_policy_message(
     openai_messages: object,
     openai_tools: object,
@@ -12848,6 +12889,13 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
         openai_messages: list[OpenAIMessage],
         openai_tools: Union[Iterable[ChatCompletionToolParam], NotGiven],
     ) -> ChatCompletion:
+        terminal_completion = _safe_abstention_terminal_completion(
+            openai_messages,
+            openai_tools,
+            model_name=self.model_name,
+        )
+        if terminal_completion is not None:
+            return terminal_completion
         prompted_messages = _with_selector_actor_policy(openai_messages, openai_tools)
         completion_tool_free_turn = _helper_answer_completion_tool_free_turn(
             openai_messages,

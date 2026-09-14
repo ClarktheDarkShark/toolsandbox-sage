@@ -33,6 +33,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _relative_time_actor_policy_message,
     _reminder_recency_search_result_actor_policy_message,
     _reminder_recency_workflow_tool_choice,
+    _safe_abstention_terminal_completion,
     _safe_abstention_terminal_tool_free_turn,
     _safe_action_capability,
     _scheduling_timestamp_actor_policy_message,
@@ -1676,6 +1677,30 @@ def test_missing_required_tool_abstention_blocks_substitute_side_effects() -> No
     assert "Treat this as terminal" in policy["content"]
     assert "Do not call any tool" in policy["content"]
     assert recommendation in policy["content"]
+
+    completion = _safe_abstention_terminal_completion(
+        messages,
+        tools,
+        model_name="gpt-4o-mini",
+    )
+    assert completion is not None
+    assert completion.choices[0].message.content == recommendation
+
+    # Even after a simulator push and an intervening nonspecific paraphrase,
+    # the runtime hands off the same visible recommendation instead of letting
+    # the terminal outcome drift.
+    later_messages = [
+        *messages,
+        {"role": "assistant", "content": "I still cannot help with that."},
+        {"role": "user", "content": "Maybe try changing a device setting."},
+    ]
+    agent = object.__new__(toolsandbox_roles.ConfigurableOpenAIAgent)
+    agent.model_name = "gpt-4o-mini"
+    later_completion = agent._model_inference_with_actor_visible_catalog(
+        later_messages,
+        tools,
+    )
+    assert later_completion.choices[0].message.content == recommendation
 
     grounded_completion = toolsandbox_roles.ChatCompletion.model_validate(
         {
