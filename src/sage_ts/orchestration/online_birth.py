@@ -95,7 +95,10 @@ BROADER_HELPER_OVERLAPS = {
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
-CANDIDATE_REPAIR_ATTEMPTS = 7
+# Keep one bounded synthesis slot after a final ordinary attempt can first prove
+# exact candidate/frontier stagnation. That last slot receives the clean-room
+# prompt instead of ending immediately after the stagnation signal is recorded.
+CANDIDATE_REPAIR_ATTEMPTS = 8
 REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL = "repair_stagnation_duplicate_candidate"
 MAX_REJECTIONS_PER_TOOL_KEY = 2
 POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS = 3
