@@ -85,6 +85,51 @@ _ABSTENTION_DECISION_KEYS = (
 )
 _ABSTENTION_DECISION_KEY_SET = frozenset(_ABSTENTION_DECISION_KEYS)
 
+_READ_ONLY_ACTION_TOKENS = frozenset(
+    {
+        "search",
+        "lookup",
+        "find",
+        "list",
+        "listing",
+        "read",
+        "inspect",
+        "inspection",
+        "check",
+    }
+)
+_MUTATING_ACTION_TOKENS = frozenset(
+    {
+        "add",
+        "addition",
+        "archive",
+        "archival",
+        "create",
+        "creation",
+        "delete",
+        "deletion",
+        "message",
+        "modify",
+        "modification",
+        "remove",
+        "removal",
+        "send",
+        "set",
+        "text",
+        "update",
+    }
+)
+_CANONICAL_MUTATING_ACTIONS = frozenset(
+    {
+        "contact_removal",
+        "contact_update",
+        "message_send",
+        "reminder_creation",
+        "reminder_removal",
+        "reminder_update",
+    }
+)
+
 _CAPABILITY_ALIASES = {
     "search_contacts": "contact_lookup",
     "contact_search": "contact_lookup",
@@ -425,24 +470,11 @@ def _structured_abstention_outputs_match(
 
 def _action_requires_target(value: Any) -> bool:
     action = _canonical_semantic_label(value)
-    if any(
-        marker in action
-        for marker in ("search", "lookup", "find", "list", "read", "check")
-    ):
+    action_tokens = frozenset(action.split("_"))
+    if action_tokens & _READ_ONLY_ACTION_TOKENS:
         return False
-    return any(
-        marker in action
-        for marker in (
-            "add",
-            "archive",
-            "create",
-            "delete",
-            "modify",
-            "remove",
-            "send",
-            "set",
-            "update",
-        )
+    return bool(
+        action in _CANONICAL_MUTATING_ACTIONS or action_tokens & _MUTATING_ACTION_TOKENS
     )
 
 

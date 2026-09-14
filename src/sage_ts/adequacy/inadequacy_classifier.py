@@ -178,7 +178,8 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                     "required_original_tools": ["modify_contact"],
                     "safe_next_action": "ask_user_or_abstain",
                     "final_answer_recommendation": (
-                        "I do not have enough information to complete the action."
+                        "A target identifier is required before I can complete "
+                        "the action."
                     ),
                     "abstain_reason": "missing_target_identifier",
                 },

@@ -99,7 +99,7 @@ PRESERVED_WORKING_TOOL_PROVENANCE: dict[str, Any] = {
     },
 }
 PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256 = (
-    "96d4c39f1dce124adbc195481dd5f96add2c05c2759014b4a5d0a444878cfd08"
+    "ccdcf421fcfbc30e19f630eccdac39ed99ee93864b5229c42152fe6cac37a3bf"
 )
 PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
     "prepare_reminder_creation_args": {
@@ -130,10 +130,10 @@ PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
         ),
         "canonical_key": "validation:prepare_safe_action_or_abstain",
         "contract_hash": (
-            "a5343c05a8a7b2435a3be5e2e51750cd579d618eee05bc1b9accae0bc0e212d2"
+            "034fc73d0ab157a7db934c5c87f66c20ff4d2c3e5b1de8b9d14839a1b75ca1a7"
         ),
         "binding_blob_sha256": (
-            "7280df34cf2024f010213cd64e2e158ffabf740e41d7189583d5bcf2eb1e37f2"
+            "cdae64ebfab7200a0385f09c100aa447ab97972235d241fe5ddded61c9160321"
         ),
     },
     "relative_day_time_to_timestamp": {

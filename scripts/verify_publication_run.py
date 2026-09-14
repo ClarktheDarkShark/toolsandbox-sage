@@ -40,7 +40,12 @@ from sage_ts.evaluation.outcome_score import (
 )
 from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.generation.tool_spec import GeneratedTool
-from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
+from sage_ts.orchestration.online_birth import (
+    REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,
+    _repair_prompt_errors,
+    _validation_failure_score,
+    prohibited_repair_payload_paths,
+)
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.validation_contracts import (
     VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
@@ -874,7 +879,14 @@ _LIFECYCLE_SELECTION_FIELDS = (
 )
 _SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
 _REPAIR_CANDIDATE_ARTIFACT_FILENAME = "post_deployment_repair_candidates.jsonl"
-_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION = 1
+_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION = 2
+_REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION = 1
+_REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS = frozenset(
+    {
+        _REPAIR_CANDIDATE_ARTIFACT_LEGACY_SCHEMA_VERSION,
+        _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION,
+    }
+)
 _REPAIR_CANDIDATE_RECORD_KEYS = {
     "schema_version",
     "event",
@@ -1192,6 +1204,87 @@ def _verified_repair_source_bindings(
         )
 
 
+def _verified_repair_source_state(
+    candidate_dir: Path,
+    identity: tuple[int, str, int, str, str, str],
+) -> tuple[str, tuple[str, ...], int]:
+    """Revalidate the exact checkpointed source tool against its bound contract."""
+
+    completed, tool_name, version, contract_hash, code_sha256, spec_sha256 = identity
+    checkpoint_matches = list(
+        (candidate_dir / "registry_checkpoints").glob(f"after_{completed:04d}_*")
+    )
+    _repair_candidate_require(
+        len(checkpoint_matches) == 1
+        and checkpoint_matches[0].is_dir()
+        and not checkpoint_matches[0].is_symlink(),
+        "repair_candidate_artifact_source_lineage_mismatch",
+        f"Repair source state has no unique sealed after-{completed} checkpoint.",
+    )
+    checkpoint_dir = checkpoint_matches[0]
+    manifest_path = checkpoint_dir / "registry_manifest.json"
+    _repair_candidate_require(
+        manifest_path.is_file() and not manifest_path.is_symlink(),
+        "repair_candidate_artifact_source_lineage_mismatch",
+        f"Repair source registry is missing after task {completed}.",
+    )
+    manifest = _strict_json_object(
+        manifest_path.read_text(encoding="utf-8"),
+        line_number=1,
+        path=manifest_path,
+    )
+    tools = manifest.get("tools")
+    entry_payload = tools.get(tool_name) if isinstance(tools, dict) else None
+    _repair_candidate_require(
+        isinstance(tools, dict) and isinstance(entry_payload, dict),
+        "repair_candidate_artifact_source_lineage_mismatch",
+        f"Repair source registry has no exact entry for {tool_name!r}.",
+    )
+    try:
+        entry = RegistryEntry.from_json(cast(dict[str, Any], entry_payload))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _RepairCandidateArtifactVerificationError(
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair source registry entry cannot be decoded for {tool_name!r}: {exc}.",
+        ) from exc
+    actual_code_sha256 = hashlib.sha256(entry.tool.code.encode("utf-8")).hexdigest()
+    actual_spec_sha256 = _canonical_json_sha256(entry.tool.spec.to_json())
+    _repair_candidate_require(
+        entry.tool.spec.tool_name == tool_name
+        and entry.version == version
+        and entry.stored_code_hash == code_sha256
+        and actual_code_sha256 == code_sha256
+        and actual_spec_sha256 == spec_sha256,
+        "repair_candidate_artifact_source_lineage_mismatch",
+        f"Repair source registry identity disagrees for {tool_name}:v{version}.",
+    )
+    binding, binding_error = ValidationContractBindingStore(checkpoint_dir).resolve(
+        entry
+    )
+    _repair_candidate_require(
+        binding is not None
+        and binding_error is None
+        and binding.tool_name == tool_name
+        and binding.tool_version == version
+        and binding.tool_code_hash == code_sha256
+        and binding.tool_spec_hash == spec_sha256
+        and binding.contract_hash == contract_hash,
+        "repair_candidate_artifact_source_lineage_mismatch",
+        f"Repair source contract cannot be resolved for {tool_name}:v{version}: "
+        f"{binding_error}.",
+    )
+    assert binding is not None
+    source_validation = validate_generated_tool(
+        entry.tool,
+        examples=binding.observation.validation_examples,
+    )
+    return (
+        actual_code_sha256,
+        _repair_prompt_errors(source_validation.errors),
+        _validation_failure_score(source_validation),
+    )
+
+
 def _repair_candidate_event_references(
     candidate_dir: Path,
     protocol_events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
@@ -1235,7 +1328,8 @@ def _repair_candidate_event_references(
                     and _repair_candidate_reference_path_matches(
                         candidate_dir, item.get("candidate_artifact_path")
                     )
-                    and item.get("candidate_artifact_schema_version") == 1
+                    and item.get("candidate_artifact_schema_version")
+                    in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
                     and all(
                         isinstance(item.get(field), str)
                         and _SHA256_HEX_PATTERN.fullmatch(item[field]) is not None
@@ -1263,6 +1357,9 @@ def _repair_candidate_event_references(
                         "tool_name": event["tool_name"],
                         "attempt": event["attempt"],
                         "candidate_index": item["candidate_index"],
+                        "artifact_schema_version": item[
+                            "candidate_artifact_schema_version"
+                        ],
                         "record_sha256": item["candidate_artifact_record_sha256"],
                     }
                 )
@@ -1287,7 +1384,8 @@ def _repair_candidate_event_references(
                 and _repair_candidate_reference_path_matches(
                     candidate_dir, event.get("candidate_artifact_path")
                 )
-                and event.get("candidate_artifact_schema_version") == 1
+                and event.get("candidate_artifact_schema_version")
+                in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
                 and isinstance(event.get("candidate_artifact_record_sha256"), str)
                 and _SHA256_HEX_PATTERN.fullmatch(
                     event["candidate_artifact_record_sha256"]
@@ -1304,6 +1402,9 @@ def _repair_candidate_event_references(
                     "tool_name": event["tool_name"],
                     "attempt": event["attempt"],
                     "candidate_index": event["candidate_index"],
+                    "artifact_schema_version": event[
+                        "candidate_artifact_schema_version"
+                    ],
                     "error_type": event["error_type"],
                     "record_sha256": event["candidate_artifact_record_sha256"],
                 }
@@ -1315,6 +1416,202 @@ def _repair_candidate_event_references(
                 f"Candidate reference appears on unsupported event {event_index}.",
             )
     return references
+
+
+_REPAIR_BEST_STATE_EVENT_FIELDS = frozenset(
+    {
+        "best_candidate_code_hash_before_attempt",
+        "best_error_labels_before_attempt",
+        "best_validation_score",
+        "duplicate_of_best",
+        "improved_best",
+        "next_seed_source",
+        "retained_equal_score",
+        "stagnation_feedback_label",
+    }
+)
+_REPAIR_BEST_STATE_ACTIVATION_FIELDS = frozenset(
+    {
+        "best_candidate_code_hash_before_attempt",
+        "best_error_labels_before_attempt",
+        "duplicate_of_best",
+        "stagnation_feedback_label",
+    }
+)
+
+
+def _repair_candidate_source_identity(
+    row: dict[str, Any],
+) -> tuple[int, str, int, str, str, str]:
+    return (
+        cast(int, row["generated_after_completed_count"]),
+        cast(str, row["tool_name"]),
+        cast(int, row["source_tool_version"]),
+        cast(str, row["source_validation_contract_hash"]),
+        cast(str, row["source_tool_code_sha256"]),
+        cast(str, row["source_tool_spec_sha256"]),
+    )
+
+
+def _verified_repair_best_state_chains(
+    candidate_dir: Path,
+    row_by_hash: dict[str, dict[str, Any]],
+    references: list[dict[str, Any]],
+) -> None:
+    """Authenticate each repair attempt against the preceding best candidate."""
+
+    attempted_by_event: dict[int, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+    for reference in references:
+        if reference["kind"] != "validated":
+            continue
+        event_index = cast(int, reference["event_index"])
+        event = cast(dict[str, Any], reference["event"])
+        prior = attempted_by_event.get(event_index)
+        if prior is None:
+            prior = (event, [])
+            attempted_by_event[event_index] = prior
+        else:
+            _repair_candidate_require(
+                prior[0] is event,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair event {event_index} has inconsistent candidate references.",
+            )
+        prior[1].append(row_by_hash[cast(str, reference["record_sha256"])])
+
+    attempts_by_request: dict[
+        str, list[tuple[int, dict[str, Any], list[dict[str, Any]]]]
+    ] = {}
+    for event_index, (event, event_rows) in sorted(attempted_by_event.items()):
+        attempts_by_request.setdefault(cast(str, event["request_id"]), []).append(
+            (event_index, event, event_rows)
+        )
+
+    source_state_cache: dict[
+        tuple[int, str, int, str, str, str], tuple[str, tuple[str, ...], int]
+    ] = {}
+    for request_id, attempted_events in attempts_by_request.items():
+        referenced_schema_versions = {
+            cast(int, row["schema_version"])
+            for _, _, event_rows in attempted_events
+            for row in event_rows
+        }
+        _repair_candidate_require(
+            len(referenced_schema_versions) == 1,
+            "repair_candidate_artifact_schema_invalid",
+            f"Repair request {request_id!r} mixes candidate artifact schemas.",
+        )
+        schema_version = next(iter(referenced_schema_versions))
+        chain_enabled = (
+            schema_version == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+            or any(
+                bool(_REPAIR_BEST_STATE_ACTIVATION_FIELDS.intersection(event))
+                or any(
+                    row.get("disposition") == "validator_rejected_duplicate_of_best"
+                    for row in event_rows
+                )
+                for _, event, event_rows in attempted_events
+            )
+        )
+        if not chain_enabled:
+            # Candidate journals written before best-state evidence was introduced
+            # remain verifiable under their original exact schema.
+            continue
+
+        identities = {
+            _repair_candidate_source_identity(row)
+            for _, _, event_rows in attempted_events
+            for row in event_rows
+        }
+        _repair_candidate_require(
+            len(identities) == 1,
+            "repair_candidate_artifact_source_lineage_mismatch",
+            f"Repair request {request_id!r} crosses source tool identities.",
+        )
+        identity = next(iter(identities))
+        if identity not in source_state_cache:
+            source_state_cache[identity] = _verified_repair_source_state(
+                candidate_dir, identity
+            )
+        best_code_hash, best_frontier, best_score = source_state_cache[identity]
+        prior_attempt = 0
+
+        for event_index, event, event_rows in attempted_events:
+            attempt = cast(int, event["attempt"])
+            _repair_candidate_require(
+                attempt > prior_attempt
+                and set(_REPAIR_BEST_STATE_EVENT_FIELDS).issubset(event),
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair request {request_id!r} has malformed attempt ordering or "
+                f"best-state evidence at event {event_index}.",
+            )
+            prior_attempt = attempt
+            before_frontier = event.get("best_error_labels_before_attempt")
+            _repair_candidate_require(
+                event.get("best_candidate_code_hash_before_attempt") == best_code_hash
+                and before_frontier == list(best_frontier),
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair request {request_id!r} does not carry the authenticated "
+                f"best candidate into attempt {attempt}.",
+            )
+            selected_index = cast(int, event["selected_candidate_index"])
+            selected_rows = [
+                row for row in event_rows if row["candidate_index"] == selected_index
+            ]
+            _repair_candidate_require(
+                len(selected_rows) == 1,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair request {request_id!r} has no unique selected row at "
+                f"attempt {attempt}.",
+            )
+            selected = selected_rows[0]
+            selected_validation = cast(dict[str, Any], selected["validation"])
+            selected_evidence = cast(dict[str, Any], selected["evaluated_candidate"])
+            selected_code_hash = cast(str, selected_evidence["code_sha256"])
+            selected_frontier = tuple(
+                cast(list[str], selected_validation["sanitized_frontier"])
+            )
+            selected_score = cast(int, selected_validation["failure_score"])
+            selected_accepted = cast(bool, selected_validation["accepted"])
+            duplicate_expected = bool(
+                not selected_accepted
+                and selected_code_hash == best_code_hash
+                and selected_frontier == best_frontier
+            )
+            improved_expected = bool(selected_accepted or selected_score < best_score)
+            retained_expected = bool(
+                not selected_accepted
+                and selected_score == best_score
+                and not duplicate_expected
+            )
+            advances_best = improved_expected or retained_expected
+            expected_next_seed = (
+                "selected_candidate" if advances_best else "best_previous_candidate"
+            )
+            _repair_candidate_require(
+                event.get("duplicate_of_best") is duplicate_expected
+                and event.get("stagnation_feedback_label")
+                == (
+                    REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+                    if duplicate_expected
+                    else None
+                )
+                and event.get("improved_best") is improved_expected
+                and event.get("retained_equal_score") is retained_expected
+                and event.get("next_seed_source") == expected_next_seed,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair request {request_id!r} has an invalid best-candidate "
+                f"decision at attempt {attempt}.",
+            )
+            if advances_best:
+                best_code_hash = selected_code_hash
+                best_frontier = selected_frontier
+                best_score = selected_score
+            _repair_candidate_require(
+                event.get("best_validation_score") == best_score,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Repair request {request_id!r} has an invalid post-attempt best "
+                f"score at attempt {attempt}.",
+            )
 
 
 def _verified_repair_candidate_artifacts(
@@ -1375,7 +1672,7 @@ def _verified_repair_candidate_artifacts(
         )
         record_sha256 = row.get("record_sha256")
         _repair_candidate_require(
-            row.get("schema_version") == _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSION
+            row.get("schema_version") in _REPAIR_CANDIDATE_ARTIFACT_SCHEMA_VERSIONS
             and row.get("event") == "post_deployment_tool_repair_candidate_recorded"
             and isinstance(row.get("request_id"), str)
             and bool(row["request_id"])
@@ -1475,11 +1772,15 @@ def _verified_repair_candidate_artifacts(
                     "validator_accepted_selected",
                     "validator_accepted_not_selected",
                     "validator_rejected_selected_for_next_seed",
+                    "validator_rejected_duplicate_of_best",
                     "validator_rejected",
                 }
                 and accepted == disposition.startswith("validator_accepted")
-                and row["selected_for_attempt"]
-                == (disposition in selected_dispositions),
+                and (
+                    disposition == "validator_rejected_duplicate_of_best"
+                    or row["selected_for_attempt"]
+                    == (disposition in selected_dispositions)
+                ),
                 "repair_candidate_artifact_schema_invalid",
                 f"Repair candidate row {row_index} has inconsistent validation state.",
             )
@@ -1556,7 +1857,8 @@ def _verified_repair_candidate_artifacts(
     for reference in references:
         row = row_by_hash[reference["record_sha256"]]
         _repair_candidate_require(
-            all(
+            row.get("schema_version") == reference["artifact_schema_version"]
+            and all(
                 row.get(field) == reference.get(field)
                 for field in ("request_id", "tool_name", "attempt", "candidate_index")
             ),
@@ -1577,6 +1879,64 @@ def _verified_repair_candidate_artifacts(
         validation = row["validation"]
         evaluated = row["evaluated_candidate"]
         selected = row["candidate_index"] == event["selected_candidate_index"]
+        duplicate_disposition = (
+            row.get("disposition") == "validator_rejected_duplicate_of_best"
+        )
+        duplicate_evidence_present = any(
+            field in event
+            for field in (
+                "best_candidate_code_hash_before_attempt",
+                "best_error_labels_before_attempt",
+                "duplicate_of_best",
+                "stagnation_feedback_label",
+            )
+        )
+        if duplicate_disposition or duplicate_evidence_present:
+            best_code_hash = event.get("best_candidate_code_hash_before_attempt")
+            best_frontier = event.get("best_error_labels_before_attempt")
+            duplicate_expected = bool(
+                not validation["accepted"]
+                and isinstance(evaluated, dict)
+                and evaluated.get("code_sha256") == best_code_hash
+                and validation["sanitized_frontier"] == best_frontier
+            )
+            _repair_candidate_require(
+                isinstance(best_code_hash, str)
+                and _SHA256_HEX_PATTERN.fullmatch(best_code_hash) is not None
+                and isinstance(best_frontier, list)
+                and all(isinstance(label, str) and label for label in best_frontier)
+                and len(best_frontier) == len(set(best_frontier))
+                and not any(
+                    (
+                        label.startswith(("held_out_", "blind_property_"))
+                        and ":" in label
+                    )
+                    or "expected=" in label
+                    for label in best_frontier
+                )
+                and duplicate_disposition == duplicate_expected,
+                "repair_candidate_artifact_event_reference_mismatch",
+                f"Candidate duplicate evidence disagrees at event {reference['event_index']}.",
+            )
+            if selected:
+                _repair_candidate_require(
+                    event.get("duplicate_of_best") is duplicate_expected
+                    and event.get("stagnation_feedback_label")
+                    == (
+                        REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+                        if duplicate_expected
+                        else None
+                    )
+                    and (
+                        not duplicate_expected
+                        or (
+                            event.get("next_seed_source") == "best_previous_candidate"
+                            and event.get("retained_equal_score") is False
+                        )
+                    ),
+                    "repair_candidate_artifact_event_reference_mismatch",
+                    f"Selected duplicate disposition disagrees at event {reference['event_index']}.",
+                )
         _repair_candidate_require(
             isinstance(evaluated, dict)
             and item["candidate_code_hash"] == evaluated["code_sha256"]
@@ -1598,6 +1958,8 @@ def _verified_repair_candidate_artifacts(
             "repair_candidate_artifact_event_reference_mismatch",
             f"Candidate validation disagrees at event {reference['event_index']}.",
         )
+
+    _verified_repair_best_state_chains(candidate_dir, row_by_hash, references)
 
     return {
         "status": "pass",

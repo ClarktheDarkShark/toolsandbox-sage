@@ -490,6 +490,140 @@ def test_bounded_repair_reseeds_from_best_partial_and_keeps_trigger(
     )
 
 
+def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_historical_entry(_faulty_tool()))
+    candidate_a = replace(_faulty_tool(), code=_faulty_tool().code + "# candidate_a\n")
+    generator = SequencedRepairGenerator(
+        store=store,
+        candidates=(candidate_a, candidate_a, _repaired_tool()),
+    )
+    events: list[tuple[str, dict[str, Any]]] = []
+    controller = _controller(tmp_path, generator, events=events)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+
+    prior_errors = (
+        "source_prior_raw_should_abstain",
+        "source_prior_raw_missing_information",
+        "source_prior_raw_abstain_reason",
+    )
+    candidate_errors = ("source_current_raw_should_abstain",)
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: ValidationResult(False, prior_errors),
+    )
+
+    def gate_and_validate(
+        tool: GeneratedTool,
+        _observation: CapabilityObservation,
+        *,
+        expected_tool_name: str | None = None,
+    ) -> tuple[None, None, ValidationResult]:
+        assert expected_tool_name == TOOL_NAME
+        if "# candidate_a" in tool.code:
+            return None, None, ValidationResult(False, candidate_errors)
+        return None, None, ValidationResult(True, (), runtime_smoke_passed=True)
+
+    monkeypatch.setattr(controller, "_gate_and_validate", gate_and_validate)
+
+    assert controller.process_pending_repairs(completed_count=8) == (TOOL_NAME,)
+    assert [tool.code for tool in generator.seed_tools] == [
+        _faulty_tool().code,
+        candidate_a.code,
+        candidate_a.code,
+    ]
+    assert (
+        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+        not in (generator.error_inputs[1])
+    )
+    assert (
+        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+        in (generator.error_inputs[2])
+    )
+
+    repair_events = [
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_attempted"
+    ]
+    duplicate_event = repair_events[1]
+    assert duplicate_event["duplicate_of_best"] is True
+    assert duplicate_event["retained_equal_score"] is False
+    assert duplicate_event["next_seed_source"] == "best_previous_candidate"
+    assert duplicate_event["best_candidate_code_hash_before_attempt"] == code_hash(
+        candidate_a.code
+    )
+    assert duplicate_event["best_error_labels_before_attempt"] == list(candidate_errors)
+    assert duplicate_event["stagnation_feedback_label"] == (
+        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+    )
+    artifact_rows = _repair_candidate_rows(controller)
+    assert [row["disposition"] for row in artifact_rows] == [
+        "validator_rejected_selected_for_next_seed",
+        "validator_rejected_duplicate_of_best",
+        "validator_accepted_selected",
+    ]
+    assert artifact_rows[1]["selected_for_attempt"] is True
+
+
+def test_repair_portfolio_prefers_novel_equal_score_over_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = RegistryStore(tmp_path / "registry")
+    duplicate = _faulty_tool()
+    store.put(_accepted_historical_entry(duplicate))
+    novel = replace(duplicate, code=duplicate.code + "# novel_equal_score\n")
+    generator = PortfolioRepairGenerator(
+        store=store,
+        candidates=(duplicate, novel),
+    )
+    events: list[tuple[str, dict[str, Any]]] = []
+    controller = _controller(tmp_path, generator, events=events)
+    controller.observations_by_tool_name[TOOL_NAME] = _observation()
+    controller.queue_post_deployment_repair_requests([_repair_request()])
+    errors = ("source_0_raw_should_abstain",)
+    monkeypatch.setattr(online_birth, "CANDIDATE_REPAIR_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        online_birth,
+        "validate_generated_tool",
+        lambda *_args, **_kwargs: ValidationResult(False, errors),
+    )
+    monkeypatch.setattr(
+        controller,
+        "_gate_and_validate",
+        lambda *_args, **_kwargs: (
+            None,
+            None,
+            ValidationResult(False, errors),
+        ),
+    )
+
+    assert controller.process_pending_repairs(completed_count=8) == ()
+    repair_event = next(
+        payload
+        for event, payload in events
+        if event == "post_deployment_tool_repair_attempted"
+    )
+    assert repair_event["selected_candidate_index"] == 1
+    assert repair_event["selected_candidate_code_hash"] == code_hash(novel.code)
+    assert repair_event["duplicate_of_best"] is False
+    assert repair_event["retained_equal_score"] is True
+    assert repair_event["next_seed_source"] == "selected_candidate"
+    assert repair_event["stagnation_feedback_label"] is None
+    artifact_rows = _repair_candidate_rows(controller)
+    assert [row["disposition"] for row in artifact_rows] == [
+        "validator_rejected_duplicate_of_best",
+        "validator_rejected_selected_for_next_seed",
+    ]
+    assert [row["selected_for_attempt"] for row in artifact_rows] == [False, True]
+
+
 def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -602,7 +736,7 @@ def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
         assert event_validation["candidate_artifact_path"] == str(
             controller.repair_candidate_artifact_path
         )
-        assert event_validation["candidate_artifact_schema_version"] == 1
+        assert event_validation["candidate_artifact_schema_version"] == 2
         assert event_validation["candidate_artifact_record_sha256"] == (
             observed_record_hash
         )

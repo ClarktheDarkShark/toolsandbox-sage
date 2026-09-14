@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -233,6 +234,279 @@ def _install_repair_candidate_artifact(
     events = [attempt_event, *prior_events]
     _rewrite_protocol_event_journal(run_root, events)
     return row, events
+
+
+def _install_duplicate_repair_candidate_artifact(
+    run_root: Path,
+    candidate_dir: Path,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    """Install one rejected candidate that exactly repeats the current best."""
+
+    row, events = _install_repair_candidate_artifact(run_root, candidate_dir)
+    checkpoint = next((candidate_dir / "registry_checkpoints").glob("after_0001_*"))
+    checkpoint_manifest = json.loads(
+        (checkpoint / "registry_manifest.json").read_text(encoding="utf-8")
+    )
+    source_tool = (
+        verify_lifecycle_repair_run._strict_run_verifier.GeneratedTool.from_json(
+            checkpoint_manifest["tools"][row["tool_name"]]["tool"]
+        ).to_json()
+    )
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    source_evidence = {
+        "tool": source_tool,
+        "code_sha256": hashlib.sha256(source_tool["code"].encode("utf-8")).hexdigest(),
+        "spec_sha256": canonical_hash(source_tool["spec"]),
+        "tool_payload_sha256": canonical_hash(source_tool),
+    }
+    row["generator_candidate"] = source_evidence
+    row["evaluated_candidate"] = source_evidence
+    identity = (
+        row["generated_after_completed_count"],
+        row["tool_name"],
+        row["source_tool_version"],
+        row["source_validation_contract_hash"],
+        row["source_tool_code_sha256"],
+        row["source_tool_spec_sha256"],
+    )
+    _, source_frontier, source_score = (
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_source_state(
+            candidate_dir, identity
+        )
+    )
+    frontier = list(source_frontier)
+    validation = row["validation"]
+    evaluated = row["evaluated_candidate"]
+    assert isinstance(validation, dict)
+    assert isinstance(evaluated, dict)
+    validation.update(
+        {
+            "accepted": False,
+            "failure_score": source_score,
+            "sanitized_frontier": frontier,
+            "sanitized_frontier_count": len(frontier),
+        }
+    )
+    row["disposition"] = "validator_rejected_duplicate_of_best"
+    row_payload = {key: value for key, value in row.items() if key != "record_sha256"}
+    row["record_sha256"] = canonical_hash(row_payload)
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", [row])
+
+    event = events[0]
+    candidate_validations = event["candidate_validations"]
+    assert isinstance(candidate_validations, list)
+    candidate_reference = candidate_validations[0]
+    assert isinstance(candidate_reference, dict)
+    candidate_reference.update(
+        {
+            "accepted": False,
+            "candidate_code_hash": source_evidence["code_sha256"],
+            "validation_score": source_score,
+            "error_frontier_count": len(frontier),
+            "errors": frontier,
+            "candidate_artifact_record_sha256": row["record_sha256"],
+        }
+    )
+    event.update(
+        {
+            "accepted": False,
+            "selected_candidate_code_hash": source_evidence["code_sha256"],
+            "validation_score": source_score,
+            "error_labels": frontier,
+            "improved_best": False,
+            "retained_equal_score": False,
+            "next_seed_source": "best_previous_candidate",
+            "best_candidate_code_hash_before_attempt": evaluated["code_sha256"],
+            "best_error_labels_before_attempt": frontier,
+            "best_validation_score": source_score,
+            "duplicate_of_best": True,
+            "stagnation_feedback_label": ("repair_stagnation_duplicate_candidate"),
+        }
+    )
+    return row, events
+
+
+def _install_repair_best_state_chain(
+    run_root: Path,
+    candidate_dir: Path,
+    attempts: tuple[dict[str, Any], ...],
+    *,
+    failed_attempts: tuple[int, ...] = (),
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Install a self-consistent attempted-repair history for chain tests."""
+
+    template, original_events = _install_duplicate_repair_candidate_artifact(
+        run_root, candidate_dir
+    )
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    source_evidence = template["evaluated_candidate"]
+    assert isinstance(source_evidence, dict)
+    source_tool = source_evidence["tool"]
+    assert isinstance(source_tool, dict)
+    source_code_hash = str(source_evidence["code_sha256"])
+    source_frontier = tuple(original_events[0]["best_error_labels_before_attempt"])
+    source_score = int(original_events[0]["best_validation_score"])
+    best_code_hash = source_code_hash
+    best_frontier = source_frontier
+    best_score = source_score
+    rows: list[dict[str, object]] = []
+    attempt_events: list[dict[str, object]] = []
+
+    for spec in attempts:
+        attempt = int(spec["attempt"])
+        suffix = str(spec.get("code_suffix") or "")
+        candidate_tool = json.loads(json.dumps(source_tool))
+        candidate_tool["code"] = str(candidate_tool["code"]) + suffix
+        evidence = {
+            "tool": candidate_tool,
+            "code_sha256": hashlib.sha256(
+                candidate_tool["code"].encode("utf-8")
+            ).hexdigest(),
+            "spec_sha256": canonical_hash(candidate_tool["spec"]),
+            "tool_payload_sha256": canonical_hash(candidate_tool),
+        }
+        frontier = tuple(spec.get("frontier", best_frontier))
+        score = int(spec.get("score", best_score + int(spec.get("score_delta", 0))))
+        accepted = score == 0
+        duplicate = bool(
+            not accepted
+            and evidence["code_sha256"] == best_code_hash
+            and frontier == best_frontier
+        )
+        improved = accepted or score < best_score
+        retained = not accepted and score == best_score and not duplicate
+        advances = improved or retained
+
+        row = json.loads(json.dumps(template))
+        row.update(
+            {
+                "attempt": attempt,
+                "candidate_index": 0,
+                "generator_candidate": evidence,
+                "evaluated_candidate": evidence,
+                "selected_for_attempt": True,
+                "disposition": (
+                    "validator_accepted_selected"
+                    if accepted
+                    else "validator_rejected_duplicate_of_best"
+                    if duplicate
+                    else "validator_rejected_selected_for_next_seed"
+                ),
+            }
+        )
+        validation = row["validation"]
+        assert isinstance(validation, dict)
+        validation.update(
+            {
+                "accepted": accepted,
+                "failure_score": score,
+                "sanitized_frontier": list(frontier),
+                "sanitized_frontier_count": len(frontier),
+            }
+        )
+        row_payload = {
+            key: value for key, value in row.items() if key != "record_sha256"
+        }
+        row["record_sha256"] = canonical_hash(row_payload)
+        rows.append(row)
+
+        if advances:
+            post_score = score
+        else:
+            post_score = best_score
+        attempt_events.append(
+            {
+                "event": "post_deployment_tool_repair_attempted",
+                "request_id": row["request_id"],
+                "tool_name": row["tool_name"],
+                "attempt": attempt,
+                "candidate_count": 1,
+                "selected_candidate_index": 0,
+                "selected_candidate_code_hash": evidence["code_sha256"],
+                "accepted": accepted,
+                "validation_score": score,
+                "best_validation_score": post_score,
+                "improved_best": improved,
+                "retained_equal_score": retained,
+                "best_candidate_code_hash_before_attempt": best_code_hash,
+                "best_error_labels_before_attempt": list(best_frontier),
+                "duplicate_of_best": duplicate,
+                "stagnation_feedback_label": (
+                    "repair_stagnation_duplicate_candidate" if duplicate else None
+                ),
+                "next_seed_source": (
+                    "selected_candidate" if advances else "best_previous_candidate"
+                ),
+                "error_labels": list(frontier),
+                "candidate_validations": [
+                    {
+                        "candidate_index": 0,
+                        "candidate_code_hash": evidence["code_sha256"],
+                        "accepted": accepted,
+                        "validation_score": score,
+                        "error_frontier_count": len(frontier),
+                        "errors": list(frontier),
+                        "candidate_artifact_path": str(
+                            candidate_dir / "post_deployment_repair_candidates.jsonl"
+                        ),
+                        "candidate_artifact_schema_version": 1,
+                        "candidate_artifact_record_sha256": row["record_sha256"],
+                    }
+                ],
+            }
+        )
+        if advances:
+            best_code_hash = str(evidence["code_sha256"])
+            best_frontier = frontier
+            best_score = score
+
+    failed_events = [
+        {
+            "event": "post_deployment_tool_repair_attempt_failed",
+            "request_id": template["request_id"],
+            "tool_name": template["tool_name"],
+            "attempt": attempt,
+            "stage": "candidate_generation",
+            "error": "RuntimeError:synthetic generation failure",
+        }
+        for attempt in failed_attempts
+    ]
+    repair_events = sorted(
+        [*attempt_events, *failed_events], key=lambda event: int(event["attempt"])
+    )
+    prior_events = [
+        event
+        for event in original_events
+        if event.get("event") != "post_deployment_tool_repair_attempted"
+    ]
+    events = [*repair_events, *prior_events]
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", rows)
+    _rewrite_protocol_event_journal(run_root, events)
+    return rows, events
+
+
+def _rehash_chain_candidate(
+    candidate_dir: Path,
+    rows: list[dict[str, object]],
+    event: dict[str, object],
+    row_index: int,
+) -> None:
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    row = rows[row_index]
+    payload = {key: value for key, value in row.items() if key != "record_sha256"}
+    row["record_sha256"] = canonical_hash(payload)
+    references = event["candidate_validations"]
+    assert isinstance(references, list)
+    reference = references[0]
+    assert isinstance(reference, dict)
+    reference["candidate_artifact_record_sha256"] = row["record_sha256"]
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", rows)
 
 
 def _write_synthetic_trajectory(
@@ -1677,6 +1951,237 @@ def test_development_verifier_authenticates_repair_candidate_artifact(
     assert report["status"] == "pass", report["reasons"]
     assert report["repair_candidate_artifacts"]["record_count"] == 1
     assert report["repair_candidate_artifacts"]["referenced_record_count"] == 1
+
+
+def test_current_candidate_schema_cannot_downgrade_away_best_state_chain(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    row, events = _install_repair_candidate_artifact(run_root, candidate_dir)
+    canonical_hash = (
+        verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+    )
+    row["schema_version"] = 2
+    payload = {key: value for key, value in row.items() if key != "record_sha256"}
+    row["record_sha256"] = canonical_hash(payload)
+    _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", [row])
+    reference = events[0]["candidate_validations"][0]
+    assert isinstance(reference, dict)
+    reference["candidate_artifact_schema_version"] = 2
+    reference["candidate_artifact_record_sha256"] = row["record_sha256"]
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir, events
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+def test_strict_verifier_authenticates_duplicate_repair_stagnation(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_duplicate_repair_candidate_artifact(run_root, candidate_dir)
+
+    result = verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+        candidate_dir,
+        events,
+    )
+
+    assert result["status"] == "pass"
+    assert result["record_count"] == 1
+
+
+def test_strict_verifier_rejects_self_consistent_first_frontier_tamper(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    rows, events = _install_repair_best_state_chain(
+        run_root, candidate_dir, ({"attempt": 1},)
+    )
+    event = events[0]
+    forged_frontier = ["source_999_raw_should_abstain"]
+    validation = rows[0]["validation"]
+    assert isinstance(validation, dict)
+    validation["sanitized_frontier"] = forged_frontier
+    validation["sanitized_frontier_count"] = len(forged_frontier)
+    event["best_error_labels_before_attempt"] = forged_frontier
+    event["error_labels"] = forged_frontier
+    references = event["candidate_validations"]
+    assert isinstance(references, list)
+    reference = references[0]
+    assert isinstance(reference, dict)
+    reference["errors"] = forged_frontier
+    reference["error_frontier_count"] = len(forged_frontier)
+    _rehash_chain_candidate(candidate_dir, rows, event, 0)
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir, events
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+@pytest.mark.parametrize("field", ["code", "frontier"])
+def test_strict_verifier_rejects_after_improvement_best_state_tamper(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    rows, events = _install_repair_best_state_chain(
+        run_root,
+        candidate_dir,
+        (
+            {
+                "attempt": 1,
+                "code_suffix": "# improved-a\n",
+                "frontier": ["source_0_raw_should_abstain"],
+                "score_delta": -1,
+            },
+            {
+                "attempt": 2,
+                "code_suffix": "# forged-b\n",
+                "frontier": ["source_1_raw_should_abstain"],
+            },
+        ),
+    )
+    second_event = events[1]
+    second_evidence = rows[1]["evaluated_candidate"]
+    second_validation = rows[1]["validation"]
+    assert isinstance(second_evidence, dict)
+    assert isinstance(second_validation, dict)
+    if field == "code":
+        second_event["best_candidate_code_hash_before_attempt"] = second_evidence[
+            "code_sha256"
+        ]
+    else:
+        second_event["best_error_labels_before_attempt"] = second_validation[
+            "sanitized_frontier"
+        ]
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir, events
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
+
+
+def test_strict_verifier_carries_best_state_after_worse_candidate(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_repair_best_state_chain(
+        run_root,
+        candidate_dir,
+        (
+            {
+                "attempt": 1,
+                "code_suffix": "# worse\n",
+                "frontier": ["source_0_raw_should_abstain"],
+                "score_delta": 1,
+            },
+            {"attempt": 2},
+        ),
+    )
+
+    result = verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+        candidate_dir, events
+    )
+
+    assert result["status"] == "pass"
+    assert events[1]["next_seed_source"] == "best_previous_candidate"
+
+
+def test_strict_verifier_allows_failed_attempt_gap_without_state_change(
+    tmp_path: Path,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _, events = _install_repair_best_state_chain(
+        run_root,
+        candidate_dir,
+        (
+            {
+                "attempt": 1,
+                "code_suffix": "# improved\n",
+                "frontier": ["source_0_raw_should_abstain"],
+                "score_delta": -1,
+            },
+            {
+                "attempt": 3,
+                "code_suffix": "# improved\n",
+                "frontier": ["source_0_raw_should_abstain"],
+            },
+        ),
+        failed_attempts=(2,),
+    )
+
+    result = verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+        candidate_dir, events
+    )
+
+    assert result["status"] == "pass"
+    assert [event["attempt"] for event in events[:3]] == [1, 2, 3]
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    ["best_code_hash", "best_frontier", "feedback_label", "disposition"],
+)
+def test_strict_verifier_rejects_inconsistent_duplicate_repair_stagnation(
+    tmp_path: Path,
+    corruption: str,
+) -> None:
+    _, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    row, events = _install_duplicate_repair_candidate_artifact(run_root, candidate_dir)
+    event = events[0]
+    if corruption == "best_code_hash":
+        event["best_candidate_code_hash_before_attempt"] = "0" * 64
+    elif corruption == "best_frontier":
+        event["best_error_labels_before_attempt"] = ["source_1_raw_should_abstain"]
+    elif corruption == "feedback_label":
+        event["stagnation_feedback_label"] = None
+    else:
+        row["disposition"] = "validator_rejected_selected_for_next_seed"
+        canonical_hash = (
+            verify_lifecycle_repair_run._strict_run_verifier._canonical_json_sha256
+        )
+        row_payload = {
+            key: value for key, value in row.items() if key != "record_sha256"
+        }
+        row["record_sha256"] = canonical_hash(row_payload)
+        candidate_validations = event["candidate_validations"]
+        assert isinstance(candidate_validations, list)
+        candidate_reference = candidate_validations[0]
+        assert isinstance(candidate_reference, dict)
+        candidate_reference["candidate_artifact_record_sha256"] = row["record_sha256"]
+        _write_jsonl(candidate_dir / "post_deployment_repair_candidates.jsonl", [row])
+
+    with pytest.raises(
+        verify_lifecycle_repair_run._strict_run_verifier._RepairCandidateArtifactVerificationError
+    ) as exc_info:
+        verify_lifecycle_repair_run._strict_run_verifier._verified_repair_candidate_artifacts(
+            candidate_dir,
+            events,
+        )
+
+    assert exc_info.value.reason == (
+        "repair_candidate_artifact_event_reference_mismatch"
+    )
 
 
 @pytest.mark.parametrize(

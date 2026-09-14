@@ -96,6 +96,7 @@ BROADER_HELPER_OVERLAPS = {
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
 CANDIDATE_REPAIR_ATTEMPTS = 7
+REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL = "repair_stagnation_duplicate_candidate"
 MAX_REJECTIONS_PER_TOOL_KEY = 2
 POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS = 3
 POST_DEPLOYMENT_CANARY_REQUIRED_EXACT_SUCCESSES = 2
@@ -107,7 +108,7 @@ POST_DEPLOYMENT_REPAIR_ACKNOWLEDGEMENT_FILENAME = (
     "self_evolution_tool_repair_acknowledgements.jsonl"
 )
 POST_DEPLOYMENT_REPAIR_CANDIDATE_FILENAME = "post_deployment_repair_candidates.jsonl"
-POST_DEPLOYMENT_REPAIR_CANDIDATE_SCHEMA_VERSION = 1
+POST_DEPLOYMENT_REPAIR_CANDIDATE_SCHEMA_VERSION = 2
 POST_DEPLOYMENT_REPAIR_PUBLIC_EVIDENCE_FIELDS = frozenset(
     {
         "called_count",
@@ -3057,6 +3058,12 @@ class OnlineBirthController:
                 )
             )
             for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
+                best_candidate_code_hash_before_attempt = code_hash(
+                    best_partial_tool.code
+                )
+                best_error_labels_before_attempt = _repair_prompt_errors(
+                    best_partial_validation.errors
+                )
                 try:
                     candidates_method = getattr(
                         self.generator, "repair_candidates", None
@@ -3092,6 +3099,7 @@ class OnlineBirthController:
                         GeneratedTool,
                         ValidationResult,
                         int,
+                        bool,
                     ]
                 ] = []
                 for candidate_index, raw_candidate in enumerate(candidates):
@@ -3191,6 +3199,13 @@ class OnlineBirthController:
                             },
                         )
                         continue
+                    candidate_frontier = _repair_prompt_errors(validation.errors)
+                    candidate_duplicates_best = bool(
+                        not validation.accepted
+                        and code_hash(candidate.code)
+                        == best_candidate_code_hash_before_attempt
+                        and candidate_frontier == best_error_labels_before_attempt
+                    )
                     candidate_results.append(
                         (
                             candidate_index,
@@ -3198,6 +3213,7 @@ class OnlineBirthController:
                             candidate,
                             validation,
                             _validation_failure_score(validation),
+                            candidate_duplicates_best,
                         )
                     )
                 if not candidate_results:
@@ -3207,6 +3223,7 @@ class OnlineBirthController:
                     key=lambda index: (
                         not candidate_results[index][3].accepted,
                         candidate_results[index][4],
+                        candidate_results[index][5],
                         index,
                     ),
                 )
@@ -3216,12 +3233,15 @@ class OnlineBirthController:
                     candidate,
                     validation,
                     validation_score,
+                    duplicate_of_best,
                 ) = candidate_results[selected_result_index]
                 improved_best = validation.accepted or (
                     validation_score < best_partial_score
                 )
                 retained_equal_score = (
-                    not validation.accepted and validation_score == best_partial_score
+                    not validation.accepted
+                    and validation_score == best_partial_score
+                    and not duplicate_of_best
                 )
                 if improved_best or retained_equal_score:
                     best_partial_tool = candidate
@@ -3234,6 +3254,7 @@ class OnlineBirthController:
                     candidate_tool,
                     candidate_validation,
                     candidate_score,
+                    candidate_duplicates_best,
                 ) in candidate_results:
                     selected_for_attempt = (
                         result_candidate_index == selected_candidate_index
@@ -3244,6 +3265,8 @@ class OnlineBirthController:
                             if selected_for_attempt
                             else "validator_accepted_not_selected"
                         )
+                    elif candidate_duplicates_best:
+                        disposition = "validator_rejected_duplicate_of_best"
                     else:
                         disposition = (
                             "validator_rejected_selected_for_next_seed"
@@ -3304,6 +3327,18 @@ class OnlineBirthController:
                         "best_validation_score": best_partial_score,
                         "improved_best": improved_best,
                         "retained_equal_score": retained_equal_score,
+                        "best_candidate_code_hash_before_attempt": (
+                            best_candidate_code_hash_before_attempt
+                        ),
+                        "best_error_labels_before_attempt": list(
+                            best_error_labels_before_attempt
+                        ),
+                        "duplicate_of_best": duplicate_of_best,
+                        "stagnation_feedback_label": (
+                            REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
+                            if duplicate_of_best
+                            else None
+                        ),
                         "next_seed_source": (
                             "selected_candidate"
                             if improved_best or retained_equal_score
@@ -3332,6 +3367,11 @@ class OnlineBirthController:
                         (
                             *immutable_repair_errors,
                             *_repair_prompt_errors(best_partial_validation.errors),
+                            *(
+                                (REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,)
+                                if duplicate_of_best
+                                else ()
+                            ),
                         )
                     )
                 )

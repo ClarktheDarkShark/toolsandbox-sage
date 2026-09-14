@@ -14,7 +14,11 @@ from sage_ts.generation.tool_spec import (
     ToolSpec,
 )
 from sage_ts.registry.manifest import RegistryEntry
-from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+from sage_ts.validation.sandbox_validator import (
+    ToolExample,
+    _action_requires_target,
+    validate_generated_tool,
+)
 
 
 def _abstention_tool(code: str) -> GeneratedTool:
@@ -388,6 +392,93 @@ def test_relative_time_search_allows_blank_target_after_clock_is_available() -> 
     )
 
     assert result.accepted, result.errors
+
+
+@pytest.mark.parametrize(
+    "action",
+    (
+        "remove_contact",
+        "delete_contact",
+        "modify_contact",
+        "update_contact",
+        "send_message",
+        "send_message_with_phone_number",
+        "message",
+        "remove_reminder",
+        "modify_reminder",
+        "add_reminder",
+        "contact_removal",
+        "reminder_removal",
+        "reminder_creation",
+        "thread_send",
+        "checklist_create",
+        "record_deletion",
+        "contact_creation",
+        "record_modification",
+        "record_archival",
+        "contact_addition",
+    ),
+)
+def test_canonical_mutating_action_aliases_require_targets(action: str) -> None:
+    assert _action_requires_target(action)
+
+
+@pytest.mark.parametrize(
+    "action",
+    (
+        "search_contacts",
+        "search_messages",
+        "search_reminder",
+        "relative_time_search",
+        "contact_lookup",
+        "message_lookup",
+        "reminder_lookup",
+        "current_time",
+        "location_lookup",
+        "asset_validation",
+        "record_inspection",
+        "record_listing",
+    ),
+)
+def test_canonical_read_only_action_aliases_do_not_require_targets(
+    action: str,
+) -> None:
+    assert not _action_requires_target(action)
+
+
+def test_validator_exercises_remove_contact_target_and_ambiguity_properties() -> None:
+    alias_examples = tuple(
+        ToolExample(
+            {
+                **example.inputs,
+                "requested_action": (
+                    "archive_record"
+                    if example.negative_applicability
+                    else "remove_contact"
+                ),
+            },
+            example.expected,
+            held_out=example.held_out,
+            negative_applicability=example.negative_applicability,
+        )
+        for example in _examples()
+    )
+    remove_blind_candidate = _GENERAL_IMPLEMENTATION.replace(
+        "if not str(target_identifier or '').strip():",
+        "if 'archive' in requested_action and not str(target_identifier or '').strip():",
+    ).replace(
+        "if int(visible_records_count or 0) > 1:",
+        "if 'archive' in requested_action and int(visible_records_count or 0) > 1:",
+    )
+
+    result = validate_generated_tool(
+        _abstention_tool(remove_blind_candidate),
+        alias_examples,
+    )
+
+    assert not result.accepted
+    assert any("blind_property_1_missing_target" in error for error in result.errors)
+    assert any("blind_property_1_ambiguous_target" in error for error in result.errors)
 
 
 def test_validator_rejects_raw_decision_repaired_only_by_normalizer() -> None:

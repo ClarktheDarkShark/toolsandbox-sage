@@ -853,6 +853,10 @@ def test_validation_helper_repair_restates_public_semantic_exceptions_last() -> 
     assert "REPAIR STRATEGY 1" in directive
     assert "PRIVATE_HELD_OUT_SENTINEL" not in directive
     assert "private_capability" not in directive
+    assert "may literally say 'send a message'" in directive
+    assert "'message_send' inside the unnormalized raw phrase" in directive
+    assert "all-digit string" in directive
+    assert "append target_identifier to required_original_tools" in directive
     assert directive.endswith(
         "every read-only exception must be tested before any generic "
         "blank-target guard."
@@ -944,6 +948,15 @@ def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
     final_directive = _model_authored_final_repair_directive(request, errors)
     assert "REPAIR STRATEGY 4" in final_directive
     assert "smallest clean implementation" in final_directive
+
+    stagnant_directive = _model_authored_final_repair_directive(
+        request,
+        (*errors, "repair_stagnation_duplicate_candidate"),
+    )
+    assert "REPAIR STAGNATION RULE" in stagnant_directive
+    assert "same executable code and the same sanitized validation frontier" in (
+        stagnant_directive
+    )
 
 
 def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:

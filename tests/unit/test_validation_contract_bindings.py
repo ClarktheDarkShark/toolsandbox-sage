@@ -25,7 +25,7 @@ FIXTURE = (
 )
 TOOL_NAME = "prepare_safe_action_or_abstain"
 PINNED_CONTRACT_HASH = (
-    "a5343c05a8a7b2435a3be5e2e51750cd579d618eee05bc1b9accae0bc0e212d2"
+    "034fc73d0ab157a7db934c5c87f66c20ff4d2c3e5b1de8b9d14839a1b75ca1a7"
 )
 
 

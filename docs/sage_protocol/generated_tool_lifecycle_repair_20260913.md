@@ -89,6 +89,13 @@ evaluator traces are prohibited. Rejected candidates therefore remain available
 to audit why repair converged or failed, while evaluator-private information
 remains outside generation and lifecycle evidence.
 
+If a rejected repair repeats both the current best executable hash and its
+sanitized validation frontier, the lifecycle records repair stagnation, keeps
+the prior best seed, and requests a substantively different next repair. The
+strict verifier replays the frozen source contract and authenticates this best
+candidate state across every repair attempt; it does not trust same-event
+duplicate claims in isolation.
+
 Tool-name scrambling is also an information boundary. Classification, routing,
 and policy selection consume the same actor-visible names, descriptions, and
 parameter schemas that ToolSandbox sends to the model. A native capability is
@@ -103,6 +110,11 @@ public contract already required the tool to distinguish a missing search
 capability from a missing target identifier. The historical implementation
 returned a fixed missing-search answer, and an old validator could normalize
 that wrong raw output before checking it.
+
+During disclosed development, the public missing-target example was aligned to
+name `target_identifier` explicitly, as the existing raw semantic gate already
+required. This is a developer-authored consistency repair to the synthetic
+contract, not benchmark feedback or a benchmark-specific answer.
 
 The current validation gate checks raw semantic behavior before normalization,
 including held-out and negative-applicability cases. That historical candidate

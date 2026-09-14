@@ -1946,9 +1946,15 @@ def _model_authored_final_repair_directive(
             "that a send, text, or message action whose nonblank target is not "
             "already a concrete phone number must add "
             "contact_lookup before missing capabilities are computed. Insert that "
-            "inferred capability into required_original_tools before message_send, "
-            "preserve first-seen order for the remaining capabilities, and abstain "
-            "when contact_lookup is unavailable. "
+            "inferred capability after the existing normalized required_original_tools "
+            "items when it is absent, preserving their first-seen order, and abstain "
+            "when contact_lookup is unavailable. Normalize requested_action into "
+            "separate lowercase word tokens and test for send, text, or message; the "
+            "public input may literally say 'send a message', so never look for the "
+            "canonical string 'message_send' inside the unnormalized raw phrase. A "
+            "target is a concrete phone number only when removing at most one leading "
+            "+ leaves a nonempty all-digit string. Do not treat a person's name as a "
+            "phone number. "
             if named_recipient_prerequisite_is_public
             else ""
         )
@@ -1968,6 +1974,16 @@ def _model_authored_final_repair_directive(
             "blocker for that read-only search. Continue only after every other "
             "public capability, ambiguity, and safety gate also passes. "
             if relative_time_exception_is_public
+            else ""
+        )
+        stagnation_rule = (
+            " REPAIR STAGNATION RULE: the previous model response produced the "
+            "same executable code and the same sanitized validation frontier as "
+            "the current best candidate. Do not repeat or cosmetically reformat "
+            "that implementation. Use the current public cases and invariants to "
+            "replace its failing predicate or decision structure with substantively "
+            "different general logic. "
+            if "repair_stagnation_duplicate_candidate" in errors
             else ""
         )
         strategy_number = next(
@@ -2054,10 +2070,15 @@ def _model_authored_final_repair_directive(
             "visible target_identifier is blank, abstain with target_identifier in "
             "missing_information, abstain_reason missing_target_identifier, and a "
             "dynamic recommendation that explicitly says target identifier. Do not "
+            "append target_identifier to required_original_tools: it is visible "
+            "information, not a tool capability, and this target-only return must "
+            "remain separate from the earlier missing-capability return. Do not "
             "apply this rule to read-only search, lookup, find, list, read, or check "
             "actions when the public contract allows a blank target. STEP 5: only "
             "after capability and missing-target checks, apply the public ambiguity "
-            "rule. If the visible evidence is not unique under that rule, abstain with "
+            "rule. When visible_records_count is greater than one and a mutating "
+            "target is not a stable record identifier, the visible target is not "
+            "unique; abstain with "
             "ambiguous_target in missing_information, abstain_reason ambiguous_target, "
             "and a dynamic recommendation that explicitly names ambiguity or multiple "
             "matches. STEP 6: otherwise continue safely with should_abstain false, "
@@ -2070,6 +2091,7 @@ def _model_authored_final_repair_directive(
             "phone numbers, dates, or other example-specific constants in code. "
             + named_recipient_rule
             + relative_time_rule
+            + stagnation_rule
             + "REPAIR STRATEGY "
             + str(strategy_number)
             + ": "
