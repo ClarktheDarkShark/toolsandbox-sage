@@ -386,6 +386,9 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_protocol.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py' in launcher
+    # The repository commonly lives below "Mobile Documents".  Every
+    # command-substitution invocation must therefore quote the executable path.
+    assert "$($PYTHON_EXECUTABLE" not in launcher
     assert "docs/sage_protocol/publication_validation_thresholds_v4.json" in launcher
     assert launcher.index("scripts/verify_publication_run.py") < launcher.index(
         "scripts/verify_publication_sample.py"

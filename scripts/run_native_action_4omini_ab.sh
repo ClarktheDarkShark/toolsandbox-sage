@@ -286,14 +286,14 @@ elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
     echo "development-transfer requires LIFECYCLE_TRANSFER_SOURCE_RUN." >&2
     exit 1
   fi
-  REGISTRY_TRANSFER_SOURCE_RUN="$($PYTHON_EXECUTABLE -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN")"
+  REGISTRY_TRANSFER_SOURCE_RUN="$("$PYTHON_EXECUTABLE" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN")"
   if [[ ! -f "$REGISTRY_TRANSFER_SOURCE_RUN/protocol_manifest.json" || ! -f "$REGISTRY_TRANSFER_SOURCE_RUN/lifecycle_repair_validation_report.json" ]]; then
     echo "Transfer source must be the exact completed dev10 run root." >&2
     exit 1
   fi
   "$PYTHON_EXECUTABLE" scripts/verify_lifecycle_repair_run.py \
     --search-root "$REGISTRY_TRANSFER_SOURCE_RUN" --expected-tasks 10
-  SOURCE_REGISTRY="$($PYTHON_EXECUTABLE -c 'import json, pathlib, sys; p=pathlib.Path(sys.argv[1]); raw=pathlib.Path(json.loads(p.read_text())["registry_dir"]); print((raw if raw.is_absolute() else pathlib.Path.cwd() / raw).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN/protocol_manifest.json")"
+  SOURCE_REGISTRY="$("$PYTHON_EXECUTABLE" -c 'import json, pathlib, sys; p=pathlib.Path(sys.argv[1]); raw=pathlib.Path(json.loads(p.read_text())["registry_dir"]); print((raw if raw.is_absolute() else pathlib.Path.cwd() / raw).resolve())' "$REGISTRY_TRANSFER_SOURCE_RUN/protocol_manifest.json")"
   if [[ ! -f "$SOURCE_REGISTRY/registry_manifest.json" ]]; then
     echo "Passing dev10 source does not contain its declared final registry." >&2
     exit 1
@@ -327,7 +327,7 @@ elif [[ "$EXECUTION_MODE" == "development-only" ]]; then
     --registry-dir "$REGISTRY_DIR" \
     --fixture "$LIFECYCLE_FAULT_FIXTURE" \
     --receipt "$LIFECYCLE_CONTRACT_RECEIPT"
-  LIFECYCLE_CONTRACT_RECEIPT_SHA256="$($PYTHON_EXECUTABLE -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$LIFECYCLE_CONTRACT_RECEIPT")"
+  LIFECYCLE_CONTRACT_RECEIPT_SHA256="$("$PYTHON_EXECUTABLE" -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$LIFECYCLE_CONTRACT_RECEIPT")"
 elif [[ -e "$REGISTRY_DIR" || -L "$REGISTRY_DIR" ]]; then
   echo "Online publication registry directory must not exist: $REGISTRY_DIR" >&2
   exit 1
