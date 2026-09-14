@@ -1557,7 +1557,7 @@ def _model_authored_contract_analysis_prompt(
             "contract. algorithm_steps must be a nonempty array; "
             "capability_aliases must be an object; inferred_prerequisites, "
             "read_only_actions, mutating_actions, target_exceptions, and invariants "
-            "may be arrays or descriptive objects; case_coverage must be an object. "
+            "and case_coverage may be arrays or descriptive objects. "
             "Required tool name: "
             + str(request.suggested_tool_name or "infer_from_contract")
             + ". Public observation: "
@@ -1722,7 +1722,12 @@ def _model_authored_validation_helper_repair_analysis_prompt(
         "inferred_prerequisites, read_only_actions, mutating_actions, "
         "target_exceptions, case_coverage, invariants, first_incorrect_branches, "
         "and regression_guards. The first eight keys must have the same types as "
-        "declared by the public contract-analysis protocol. Do not output Python. "
+        "the following self-contained schema: algorithm_steps must be a nonempty "
+        "array; capability_aliases must be an object; inferred_prerequisites, "
+        "read_only_actions, mutating_actions, target_exceptions, case_coverage, and "
+        "invariants may be arrays or descriptive objects. first_incorrect_branches "
+        "and regression_guards must each be an array or descriptive object, and at "
+        "least one must be nonempty. Do not output Python. "
         "Do not encode complete example inputs or visible example literals as "
         "special cases. Public repair payload: " + json.dumps(payload, sort_keys=True)
     )
@@ -1864,11 +1869,16 @@ def _validated_validation_helper_contract_analysis(raw_analysis: str) -> str:
                 "validation helper contract analysis field "
                 f"{field} must be a list or object"
             )
-    for field in ("capability_aliases", "case_coverage"):
-        if not isinstance(analysis.get(field), dict):
-            raise ValueError(
-                f"validation helper contract analysis field {field} must be an object"
-            )
+    if not isinstance(analysis.get("capability_aliases"), dict):
+        raise ValueError(
+            "validation helper contract analysis field capability_aliases must be "
+            "an object"
+        )
+    if not isinstance(analysis.get("case_coverage"), (list, dict)):
+        raise ValueError(
+            "validation helper contract analysis field case_coverage must be a "
+            "list or object"
+        )
     return json.dumps(analysis, sort_keys=True)
 
 

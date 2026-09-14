@@ -748,6 +748,12 @@ def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None
     assert "held_out_0_raw_should_abstain" in prompt
     assert "blind_property_0_missing_capability_0_final_recommendation_fact" in prompt
     assert "Trace the current pure validation helper" in analysis_prompt
+    assert "case_coverage, and invariants may be arrays or descriptive objects" in (
+        analysis_prompt
+    )
+    assert "same types as declared by the public contract-analysis protocol" not in (
+        analysis_prompt
+    )
     assert rejected.code.splitlines()[0] in analysis_prompt
     assert "CODE-SPECIFIC DECISION PLAN" in prompt
     assert len(prompt) < 12_000
@@ -958,6 +964,21 @@ def test_validation_helper_contract_analysis_requires_a_structured_plan() -> Non
     with pytest.raises(ValueError, match="target_exceptions"):
         _validated_validation_helper_contract_analysis(json.dumps(malformed))
 
+    list_coverage = {
+        **valid,
+        "case_coverage": [{"case_label": "source_0", "branch": "missing capability"}],
+    }
+    assert (
+        json.loads(
+            _validated_validation_helper_contract_analysis(json.dumps(list_coverage))
+        )
+        == list_coverage
+    )
+
+    malformed_coverage = {**valid, "case_coverage": "source_0 is covered"}
+    with pytest.raises(ValueError, match="case_coverage"):
+        _validated_validation_helper_contract_analysis(json.dumps(malformed_coverage))
+
 
 def test_validation_helper_repair_analysis_requires_code_specific_diagnosis() -> None:
     valid = {
@@ -976,6 +997,16 @@ def test_validation_helper_repair_analysis_requires_code_specific_diagnosis() ->
     assert (
         json.loads(_validated_validation_helper_repair_analysis(json.dumps(valid)))
         == valid
+    )
+    list_coverage = {
+        **valid,
+        "case_coverage": [{"case_label": "source_0", "branch": "missing capability"}],
+    }
+    assert (
+        json.loads(
+            _validated_validation_helper_repair_analysis(json.dumps(list_coverage))
+        )
+        == list_coverage
     )
     for missing in ("first_incorrect_branches", "regression_guards"):
         with pytest.raises(ValueError, match=missing):
