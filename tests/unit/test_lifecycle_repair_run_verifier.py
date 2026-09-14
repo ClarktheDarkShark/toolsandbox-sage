@@ -3623,8 +3623,11 @@ def _retirement_transition_fixture(
             "reason": "bounded_repair_failed_validation",
             "future_tasks_only": True,
             "triggering_task_replayed": False,
+            "entry_was_active": False,
+            "entry_was_retired_before_terminalization": True,
             "entry_retired": True,
             "retired_canonical_key": source_key,
+            "terminal_tombstone_persisted": True,
             "same_run_rebirth_suppressed": True,
         },
         {
@@ -3801,6 +3804,7 @@ def test_retirement_transition_proves_order_and_durable_suppression(
 
     assert reasons == []
     assert report["failure_repair_retirement_order_proved"] is True
+    assert report["terminal_retirement_event_count"] == 1
     assert report["durable_source_tombstone"] is True
     successor = report["successors"][
         verify_lifecycle_repair_run.CONTACT_READINESS_SUCCESSOR
@@ -3829,6 +3833,31 @@ def test_retirement_transition_rejects_successor_birth_before_retirement(
         reason.startswith("successor_causal_birth_order_mismatch:")
         for reason in reasons
     )
+
+
+def test_retirement_transition_reports_invalid_terminal_postcondition(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    kwargs, contract_identities = _retirement_transition_fixture(tmp_path)
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "_validation_contract_identities",
+        lambda _registry_dir: contract_identities,
+    )
+    retirement = next(
+        row
+        for row in kwargs["protocol_events"]
+        if row.get("event") == "post_deployment_tool_repair_retired"
+    )
+    retirement["entry_retired"] = False
+
+    report, reasons = (
+        verify_lifecycle_repair_run._retirement_successor_transition_report(**kwargs)
+    )
+
+    assert report["raw_terminal_retirement_event_count"] == 1
+    assert report["terminal_retirement_event_count"] == 0
+    assert "source_v1_terminal_retirement_postcondition_mismatch" in reasons
 
 
 def test_retirement_transition_rejects_missing_tombstone_and_later_source_use(

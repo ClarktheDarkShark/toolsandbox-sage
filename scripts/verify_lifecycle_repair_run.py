@@ -3250,7 +3250,7 @@ def _retirement_successor_transition_report(
     if not bounded_repair_proved:
         reasons.append("source_v1_bounded_repair_evidence_mismatch")
 
-    indexed_retirement_events = [
+    indexed_raw_retirement_events = [
         (index, row)
         for index, row in indexed_candidate_events
         if row.get("event") == "post_deployment_tool_repair_retired"
@@ -3261,14 +3261,29 @@ def _retirement_successor_transition_report(
         and row.get("reason") == terminal_reason
         and row.get("future_tasks_only") is True
         and row.get("triggering_task_replayed") is False
+    ]
+    indexed_retirement_events = [
+        (index, row)
+        for index, row in indexed_raw_retirement_events
+        if row.get("event") == "post_deployment_tool_repair_retired"
+        and isinstance(row.get("entry_was_active"), bool)
+        and isinstance(row.get("entry_was_retired_before_terminalization"), bool)
+        and (
+            row.get("entry_was_active")
+            != row.get("entry_was_retired_before_terminalization")
+        )
         and row.get("entry_retired") is True
         and row.get("retired_canonical_key") == source_canonical_key
+        and row.get("terminal_tombstone_persisted") is True
         and row.get("same_run_rebirth_suppressed") is True
     ]
+    raw_retirement_event_indices = [index for index, _ in indexed_raw_retirement_events]
     retirement_events = [row for _, row in indexed_retirement_events]
     retirement_event_indices = [index for index, _ in indexed_retirement_events]
-    if len(retirement_events) != 1:
+    if len(indexed_raw_retirement_events) != 1:
         reasons.append("source_v1_terminal_retirement_event_mismatch")
+    elif len(retirement_events) != 1:
+        reasons.append("source_v1_terminal_retirement_postcondition_mismatch")
 
     source_causal_prefix_proved = bool(
         len(source_failure_event_indices) == 1
@@ -3633,6 +3648,8 @@ def _retirement_successor_transition_report(
             "public_contract_failure_event_indices": source_failure_event_indices,
             "repair_queued_event_indices": queued_event_indices,
             "repair_attempt_event_indices": attempt_event_indices,
+            "raw_terminal_retirement_event_count": len(indexed_raw_retirement_events),
+            "raw_terminal_retirement_event_indices": raw_retirement_event_indices,
             "terminal_retirement_event_count": len(retirement_events),
             "terminal_retirement_event_indices": retirement_event_indices,
             "failure_repair_retirement_order_proved": source_causal_prefix_proved,

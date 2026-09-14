@@ -639,7 +639,11 @@ def test_terminal_repair_retirement_blocks_same_key_jit_rebirth(
         for event, payload in events
         if event == "post_deployment_tool_repair_retired"
     )
+    assert retirement["entry_was_active"] is False
+    assert retirement["entry_was_retired_before_terminalization"] is True
+    assert retirement["entry_retired"] is True
     assert retirement["retired_canonical_key"] == canonical_key
+    assert retirement["terminal_tombstone_persisted"] is True
     assert retirement["same_run_rebirth_suppressed"] is True
 
     jit_generation_requests: list[ToolGenerationRequest] = []

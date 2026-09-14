@@ -404,8 +404,8 @@ def _contact_removal_readiness_observation(
                     ],
                     "safe_next_action": "ask_user_or_abstain",
                     "final_answer_recommendation": (
-                        "I need contact lookup before I can safely complete this "
-                        "contact removal."
+                        "I do not have access to search contacts, so I cannot safely "
+                        "remove the contact identified by +15550100."
                     ),
                     "abstain_reason": "missing_required_original_tool",
                 },

@@ -3089,10 +3089,22 @@ def _validation_abstention_tool_contracts(
             "target_identifier",
             "visible_records_count",
         }.issubset(input_names)
-        has_boolean_readiness_inputs = len(readiness_boolean_inputs) >= 2 and all(
-            isinstance(properties.get(input_name), Mapping)
-            and properties[input_name].get("type") == "boolean"
-            for input_name in readiness_boolean_inputs
+        readiness_input_schemas = [
+            properties.get(input_name) for input_name in readiness_boolean_inputs
+        ]
+        has_boolean_readiness_inputs = len(readiness_boolean_inputs) >= 2 and (
+            all(
+                isinstance(input_schema, Mapping)
+                and input_schema.get("type") == "boolean"
+                for input_schema in readiness_input_schemas
+            )
+            # ToolSandbox's ARG_TYPE_SCRAMBLED augmentation removes every
+            # declared type.  The ``*_available`` names and complete readiness
+            # contract still identify host-owned availability fields.
+            or all(
+                isinstance(input_schema, Mapping) and "type" not in input_schema
+                for input_schema in readiness_input_schemas
+            )
         )
         has_abstention_outputs = {
             "should_abstain",
@@ -3100,21 +3112,21 @@ def _validation_abstention_tool_contracts(
             "safe_next_action",
             "abstain_reason",
         }.issubset(output_names)
-        is_abstention_helper = (
-            (
-                has_legacy_abstention_inputs
-                or (has_readiness_evidence_inputs and has_boolean_readiness_inputs)
+        has_readiness_description = any(
+            token in description
+            for token in (
+                "abstain",
+                "insufficient information",
+                "readiness",
+                "safe action",
             )
-            and has_abstention_outputs
-            and any(
-                token in description
-                for token in (
-                    "abstain",
-                    "insufficient information",
-                    "readiness",
-                    "safe action",
-                )
-            )
+        )
+        has_structural_boolean_readiness_contract = (
+            has_readiness_evidence_inputs and has_boolean_readiness_inputs
+        )
+        is_abstention_helper = has_abstention_outputs and (
+            (has_legacy_abstention_inputs and has_readiness_description)
+            or has_structural_boolean_readiness_contract
         )
         if is_abstention_helper:
             contracts[name] = cast(Mapping[str, Any], properties)
@@ -9012,6 +9024,71 @@ def _message_contact_lookup_completion_actor_policy_message(
     }
 
 
+def _unresolved_required_tool_abstention(
+    openai_messages: object,
+    openai_tools: object,
+) -> tuple[str, dict[str, Any], tuple[str, ...]] | None:
+    """Return a helper-confirmed capability absence that still applies."""
+
+    helper_contracts = _validation_abstention_tool_contracts(openai_tools)
+    if not helper_contracts:
+        return None
+    available_capabilities = {
+        _safe_action_capability(name)
+        for name in (
+            _tool_names_execution_facing(openai_tools) & ORIGINAL_TOOLSANDBOX_TOOL_NAMES
+        )
+    }
+    for name in sorted(helper_contracts):
+        payload = _latest_tool_payload_by_name_including_latest(openai_messages, name)
+        reason = re.sub(
+            r"[^a-z0-9]+", "_", str(payload.get("abstain_reason") or "").lower()
+        ).strip("_")
+        if not bool(payload.get("should_abstain")) or reason != (
+            "missing_required_original_tool"
+        ):
+            continue
+        missing_value = payload.get("missing_information")
+        missing_items = (
+            [missing_value]
+            if isinstance(missing_value, str)
+            else list(missing_value)
+            if isinstance(missing_value, (list, tuple, set))
+            else []
+        )
+        required_value = payload.get("required_original_tools")
+        required_items = (
+            [required_value]
+            if isinstance(required_value, str)
+            else list(required_value)
+            if isinstance(required_value, (list, tuple, set))
+            else []
+        )
+        required_capabilities = {
+            _safe_action_capability(str(item)) for item in required_items
+        }
+        missing_capabilities = {
+            _safe_action_capability(str(item)) for item in missing_items
+        }
+        if required_capabilities:
+            missing_capabilities &= required_capabilities
+        unresolved = tuple(sorted(missing_capabilities - available_capabilities))
+        if unresolved:
+            return name, payload, unresolved
+    return None
+
+
+def _safe_abstention_terminal_tool_free_turn(
+    openai_messages: object,
+    openai_tools: object,
+) -> bool:
+    """Keep an unresolved required-tool abstention free of workaround actions."""
+
+    return (
+        _unresolved_required_tool_abstention(openai_messages, openai_tools) is not None
+    )
+
+
 def _safe_abstention_helper_actor_policy_message(
     openai_messages: object,
     openai_tools: object,
@@ -9041,10 +9118,8 @@ def _safe_abstention_helper_actor_policy_message(
         {
             input_name
             for properties in helper_contracts.values()
-            for input_name, input_schema in properties.items()
+            for input_name in properties
             if input_name.endswith("_available")
-            and isinstance(input_schema, Mapping)
-            and input_schema.get("type") == "boolean"
         }
     )
     has_target_identifier = any(
@@ -9055,6 +9130,35 @@ def _safe_abstention_helper_actor_policy_message(
         for name in sorted(helpers)
         if _message_already_called_tool(openai_messages, name)
     ]
+    unresolved_required_tool = _unresolved_required_tool_abstention(
+        openai_messages,
+        openai_tools,
+    )
+    if unresolved_required_tool is not None:
+        name, payload, missing_capabilities = unresolved_required_tool
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages):
+            if SAFE_ABSTENTION_RESULT_POLICY_SENTINEL in str(
+                message.get("content", "")
+            ):
+                return None
+        recommendation = str(payload.get("final_answer_recommendation") or "").strip()
+        return {
+            "role": "system",
+            "content": (
+                f"{SAFE_ABSTENTION_RESULT_POLICY_SENTINEL} The generated "
+                f"safe-abstention helper ({name}) established that the required "
+                f"original capability {', '.join(missing_capabilities)} is not "
+                "present in the routed inventory. Treat this as terminal for the "
+                "current request. Do not call any tool, retry the action or search, "
+                "substitute a different tool, create a placeholder record, guess an "
+                "identifier, or replace the answer with a social closing. The user "
+                "cannot supply a missing tool capability as conversational facts. "
+                "Respond once with the helper's recommendation, preserving its "
+                "visible target and plainly stating that the action cannot safely "
+                "proceed because the required capability is unavailable"
+                + (f": {recommendation}" if recommendation else ".")
+            ),
+        }
     if called_helpers:
         for name in called_helpers:
             payload = _latest_tool_payload_by_name_including_latest(
@@ -12186,12 +12290,8 @@ def _ground_safe_abstention_available_tools(
                 continue
             if "available_original_tools" in contract:
                 arguments["available_original_tools"] = available_capabilities
-            for input_name, input_schema in contract.items():
-                if not (
-                    input_name.endswith("_available")
-                    and isinstance(input_schema, Mapping)
-                    and input_schema.get("type") == "boolean"
-                ):
+            for input_name in contract:
+                if not input_name.endswith("_available"):
                     continue
                 capability = input_name.removesuffix("_available")
                 arguments[input_name] = capability in available_capability_set
@@ -12750,6 +12850,9 @@ class ConfigurableOpenAIAgent(OpenAIAPIAgent):
     ) -> ChatCompletion:
         prompted_messages = _with_selector_actor_policy(openai_messages, openai_tools)
         completion_tool_free_turn = _helper_answer_completion_tool_free_turn(
+            openai_messages,
+            openai_tools,
+        ) or _safe_abstention_terminal_tool_free_turn(
             openai_messages,
             openai_tools,
         )

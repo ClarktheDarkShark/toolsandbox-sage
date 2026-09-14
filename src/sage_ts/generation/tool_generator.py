@@ -2090,6 +2090,9 @@ def _model_authored_final_repair_directive(
             "contact_removal followed by contact_lookup; target_identifier is an "
             "unresolved user-facing name or phone number, never a database record "
             "id. Compute missing capabilities from the corresponding booleans. "
+            "When contact_lookup is missing, the terminal recommendation must "
+            "plainly say that search-contact access is unavailable, that removal "
+            "cannot safely proceed, and include the visible target_identifier. "
             "After the missing-capability branch, a blank target must abstain for "
             "both contact update and contact removal, and more than one visible "
             "record for a non-UUID target must abstain as ambiguous. "
@@ -2618,7 +2621,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Treat contact_lookup_available and contact_removal_available as authoritative host-grounded booleans describing the routed native inventory. Never derive or change them from user_request.",
             "This helper applies only to contact removal before record resolution. Ignore user_request and requested_action when constructing requirements and always set required_original_tools to contact_removal followed by contact_lookup.",
             "Treat target_identifier as an unresolved user-facing name or phone number, never as an already-resolved database record id. Both required capabilities remain required when the target is blank or visible_records_count is nonzero.",
-            "Compute missing capabilities from the two matching availability booleans. Missing capabilities take priority over blank-target and ambiguity checks; a missing contact_lookup must recommend: 'I need contact lookup before I can safely complete this contact removal.'",
+            "Compute missing capabilities from the two matching availability booleans. Missing capabilities take priority over blank-target and ambiguity checks. For a missing contact_lookup, preserve the visible target_identifier and recommend: 'I do not have access to search contacts, so I cannot safely remove the contact identified by <target_identifier>.' Use 'the requested contact' only when target_identifier is blank.",
             "On every abstention set safe_next_action to ask_user_or_abstain. A blank target with no missing capability uses missing_target_identifier; more than one visible record with no missing capability uses ambiguous_target.",
             "Only when capabilities, target, and uniqueness are ready may should_abstain be false, missing_information and abstain_reason be empty, safe_next_action be continue_with_original_tool, and final_answer_recommendation be empty.",
             "Never call a native tool and never guess or manufacture a contact identifier.",

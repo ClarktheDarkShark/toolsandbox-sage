@@ -33,6 +33,7 @@ from sage_ts.adapters.openai_toolsandbox_roles import (
     _relative_time_actor_policy_message,
     _reminder_recency_search_result_actor_policy_message,
     _reminder_recency_workflow_tool_choice,
+    _safe_abstention_terminal_tool_free_turn,
     _safe_action_capability,
     _scheduling_timestamp_actor_policy_message,
     _search_window_result_handoff_actor_policy_message,
@@ -1285,6 +1286,21 @@ def test_abstention_helper_discovery_is_schema_based_not_name_based() -> None:
     ] = {"type": "string"}
     assert not toolsandbox_roles._validation_abstention_tool_names([wrong_boolean_type])
 
+    description_scrambled = json.loads(json.dumps(boolean_successor))
+    description_scrambled["function"]["description"] = ""
+    assert toolsandbox_roles._validation_abstention_tool_names(
+        [description_scrambled]
+    ) == {"assess_contact_removal_readiness"}
+
+    arg_type_scrambled = json.loads(json.dumps(boolean_successor))
+    for input_schema in arg_type_scrambled["function"]["parameters"][
+        "properties"
+    ].values():
+        input_schema.pop("type", None)
+    assert toolsandbox_roles._validation_abstention_tool_names(
+        [arg_type_scrambled]
+    ) == {"assess_contact_removal_readiness"}
+
     single_capability = json.loads(json.dumps(boolean_successor))
     del single_capability["function"]["parameters"]["properties"][
         "contact_lookup_available"
@@ -1584,6 +1600,130 @@ def test_contact_readiness_booleans_are_host_grounded_from_native_inventory() ->
     assert grounded_again_arguments["contact_lookup_available"] is False
     assert grounded_again_arguments["contact_update_available"] is True
     assert grounded_again_arguments["contact_removal_available"] is False
+
+
+def test_missing_required_tool_abstention_blocks_substitute_side_effects() -> None:
+    helper = {
+        "type": "function",
+        "function": {
+            "name": "assess_contact_removal_readiness",
+            # TOOL_DESCRIPTION_SCRAMBLED removes this description.
+            "description": "",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user_request": {"description": "Visible request."},
+                    "requested_action": {"description": "Requested action."},
+                    "target_identifier": {"description": "Visible target."},
+                    "visible_records_count": {"description": "Visible matches."},
+                    "contact_lookup_available": {
+                        "description": "Whether lookup is routed."
+                    },
+                    "contact_removal_available": {
+                        "description": "Whether removal is routed."
+                    },
+                },
+            },
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "should_abstain": {"type": "boolean"},
+                    "missing_information": {"type": "array"},
+                    "safe_next_action": {"type": "string"},
+                    "abstain_reason": {"type": "string"},
+                },
+            },
+        },
+    }
+    tools = [
+        helper,
+        {"type": "function", "function": {"name": "remove_contact"}},
+        {"type": "function", "function": {"name": "add_contact"}},
+    ]
+    recommendation = (
+        "I do not have access to search contacts, so I cannot safely remove "
+        "the contact identified by +15550100."
+    )
+    messages = [
+        {"role": "user", "content": "Remove the contact with phone +15550100."},
+        {
+            "role": "tool",
+            "name": "assess_contact_removal_readiness",
+            "content": repr(
+                {
+                    "should_abstain": True,
+                    "missing_information": ["contact_lookup"],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": recommendation,
+                    "abstain_reason": "missing_required_original_tool",
+                }
+            ),
+        },
+        {"role": "assistant", "content": recommendation},
+        {"role": "user", "content": "Please just do whatever you need to do."},
+    ]
+
+    assert _safe_abstention_terminal_tool_free_turn(messages, tools)
+    policy = toolsandbox_roles._safe_abstention_helper_actor_policy_message(
+        messages,
+        tools,
+    )
+    assert policy is not None
+    assert "Treat this as terminal" in policy["content"]
+    assert "Do not call any tool" in policy["content"]
+    assert recommendation in policy["content"]
+
+    grounded_completion = toolsandbox_roles.ChatCompletion.model_validate(
+        {
+            "id": "grounded-scrambled-readiness",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_helper",
+                                "type": "function",
+                                "function": {
+                                    "name": "assess_contact_removal_readiness",
+                                    "arguments": json.dumps(
+                                        {
+                                            "contact_lookup_available": True,
+                                            "contact_removal_available": False,
+                                        }
+                                    ),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "created": 0,
+            "model": "gpt-4o-mini",
+            "object": "chat.completion",
+        }
+    )
+    grounded_completion = toolsandbox_roles._ground_safe_abstention_available_tools(
+        grounded_completion,
+        tools,
+    )
+    grounded_arguments = json.loads(
+        grounded_completion.choices[0].message.tool_calls[0].function.arguments
+    )
+    assert grounded_arguments["contact_lookup_available"] is False
+    assert grounded_arguments["contact_removal_available"] is True
+
+    assert not _safe_abstention_terminal_tool_free_turn(
+        messages,
+        [*tools, {"type": "function", "function": {"name": "search_contacts"}}],
+    )
 
 
 def test_safe_abstention_inventory_grounding_uses_visible_scrambled_schemas() -> None:

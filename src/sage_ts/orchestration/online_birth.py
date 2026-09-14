@@ -3072,7 +3072,10 @@ class OnlineBirthController:
             lifecycle_request.get("source_tool_version"), default=1
         )
         entry = self.store.get(tool_name) if tool_name else None
-        retired = False
+        entry_was_active = False
+        entry_was_retired_before_terminalization = bool(
+            entry is not None and entry.retired
+        )
         retired_canonical_key: str | None = None
         if retire_current and entry is not None:
             binding, _binding_error = self._validation_contract_store.resolve(entry)
@@ -3081,23 +3084,41 @@ class OnlineBirthController:
                 if binding is not None
                 else self.observations_by_tool_name.get(tool_name)
             )
-            retired, retired_canonical_key = self._terminally_retire_tool(
+            entry_was_active, retired_canonical_key = self._terminally_retire_tool(
                 tool_name,
                 reason=reason,
                 observation=observation,
             )
+        postcondition_entry = self.store.get(tool_name) if tool_name else None
+        entry_retired = bool(
+            postcondition_entry is not None and postcondition_entry.retired
+        )
+        terminal_tombstone_persisted = bool(
+            tool_name in self.terminal_retired_tool_names
+            and retired_canonical_key is not None
+            and retired_canonical_key in self.terminal_retired_canonical_keys
+        )
         payload: dict[str, Any] = {
             "request_id": request_id,
             "tool_name": tool_name,
             "source_tool_version": source_version,
             "current_tool_version": entry.version if entry is not None else None,
             "reason": reason,
-            "entry_retired": retired,
+            # ``terminally_retire_generated_tool`` returns whether it changed an
+            # active entry. A bounded repair has already quarantined its known-bad
+            # source, so that transition flag is false even though the terminal
+            # postcondition is correctly persisted. Keep both facts explicit.
+            "entry_was_active": entry_was_active,
+            "entry_was_retired_before_terminalization": (
+                entry_was_retired_before_terminalization
+            ),
+            "entry_retired": entry_retired,
             "status": "rejected",
             "future_tasks_only": True,
             "triggering_task_replayed": False,
             "retired_canonical_key": retired_canonical_key,
-            "same_run_rebirth_suppressed": retired_canonical_key is not None,
+            "terminal_tombstone_persisted": terminal_tombstone_persisted,
+            "same_run_rebirth_suppressed": terminal_tombstone_persisted,
         }
         if error is not None:
             payload["error"] = f"{type(error).__name__}:{error}"
