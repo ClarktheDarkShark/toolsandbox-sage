@@ -15,7 +15,12 @@ Whole-task outcome is an alarm, not by itself proof that every generated tool
 called on that task is defective. Rewriting a tool from that signal alone would
 misattribute failures caused by the actor, another tool, or the final answer.
 Implementation regeneration therefore requires tool-attributable evidence such
-as failure of the tool's public contract or repeated execution failure.
+as failure of the tool's public contract or repeated execution failure. A
+successful generated helper call followed by the actor failing to execute the
+helper's requested native action is different evidence: it identifies an unsafe
+actor-route pairing, not defective generated code. That public family route is
+suppressed immediately. If no trustworthy public family is available, SAGE
+parks the tool globally because it cannot apply a narrower safe boundary.
 Three explicit execution failures trigger repair even when they occur across
 different public task families. At run end, one or two remaining explicit tool
 failures enter the same terminal queue so the affected version is retired
@@ -27,9 +32,10 @@ rather than silently surviving because no third observation occurred.
 | --- | --- |
 | A deployed implementation fails its public, task-independent contract | Quarantine that version; attempt bounded regeneration and full validation; retire it if no candidate passes. |
 | A generated tool repeatedly fails during execution | Treat it as an implementation failure and use the same repair-or-retire path. |
+| A generated helper returns a valid action plan, but the actor does not execute the required downstream native action | Suppress that exact public-family route immediately. Do not regenerate the helper from this actor-follow-through signal. Park globally only when no trustworthy public family is available. |
 | Calls are repeatedly harmful only in a semantic task family | Suppress that family route while retaining independently helpful routes. |
 | A tool is routed repeatedly but never selected | Repair its public schema/description, revalidate it, and canary the new version; retire it if adoption does not occur. |
-| The generated-tool executor explicitly reports a tool failure, or a generated call causes a confirmed safety failure | Count only that tool-attributable evidence; retire immediately when required by safety policy. A generic actor, user, evaluator, or framework exception is a run-integrity failure, not proof that a called tool failed. |
+| The generated-tool executor explicitly reports a tool failure, or the generated output itself violates its deterministic safety contract | Count only that tool-attributable evidence and use implementation repair-or-retire; retire immediately when required by safety policy. A downstream actor-follow-through failure, generic actor, user, evaluator, or framework exception is not proof that generated code failed. |
 | A repaired version is deployed | Limit it to a prospective canary. Promotion requires at least three audited, same-family observations where the current version was the sole generated tool called, at least two exact outcomes, no audited regression, and at least one success flip against the fresh matched control. Retire on a contract/tool-runtime failure or after eight eligible family tasks without adequate evidence. |
 | The run ends with repair or canary work unresolved | Retire the unresolved version and record a terminal acknowledgement; do not carry an unvalidated active tool into the final registry. |
 
@@ -50,9 +56,10 @@ matched policy-wrapper-without-generated-tools control, not the untouched
 upstream ToolSandbox actor. Protocol and per-arm manifests record this runtime
 identity, and strict verification rejects either arm if it drifts.
 
-Generation prompts use synthetic contract examples. Explicitly held-out
-validator cases are removed before prompt construction, and the exact prompt is
-audited immediately before model inference. Repair queues are reduced to public
+Generation prompts use synthetic contract examples. The cases labeled held-out
+are internal validation and model-selection data, not an unseen test set. Their
+values and expected outputs are removed before prompt construction, and the
+exact prompt is audited immediately before model inference. Repair queues are reduced to public
 operational counts and task-independent reason codes; recursive guards reject
 scenario/task identifiers, expected or reference answers, target state,
 evaluator traces, outcome values, and success-flip values at persistence,
@@ -97,8 +104,12 @@ strengthened validator.
 3. Transfer the complete content-addressed registry from the passing 10-task
    run into the disjoint 30-task cohort with generation and repair disabled.
    Require the exact promoted tool to generalize and the registry to remain
-   byte-identical, while four unrelated tasks remain exact with no negative
-   outcome delta. An independently seeded 30-task repair run is a separate
+   byte-identical. The preservation check is deliberately narrow: the two
+   historically successful generated tools must remain visible, called,
+   failure-free, and byte-identical on two overlapping reminder routes, while
+   two unrelated native-only tasks remain exact with no negative outcome delta.
+   It demonstrates those two working tools plus the disjoint cohort; it is not a
+   universal no-harm claim. An independently seeded 30-task repair run is a separate
    repair-process replication and cannot substitute for this transfer check.
 4. Freeze the code, then run a fresh-control, no-cache 1,032-task validation.
 5. Apply the content-addressed schema-v4 adaptive technical-readiness gate. The
@@ -113,6 +124,12 @@ contracts. It reconstructs generated-tool visibility, attempts, failures, and
 successful calls from the trajectory rather than accepting those claims from a
 summary sidecar. For the development lifecycle claim, each called version and
 code hash is additionally bound to the ordered after-task registry checkpoint.
+Post-deployment acceptance evidence is read from the launcher's append-complete
+protocol event journal; the manifest pins that journal's path, SHA-256 digest,
+and row count, and the verifier requires exactly one acceptance event bound to
+the same run, candidate directory, request, tool, and version transition. There
+is no unsealed legacy fallback: an older development run without this binding
+cannot support the lifecycle claim and must be rerun.
 
 The 10-task and 30-task cohorts are development diagnostics, not publication
 evidence or unseen test sets. Prior investigation has exposed the full

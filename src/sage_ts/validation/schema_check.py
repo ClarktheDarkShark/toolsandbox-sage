@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import re
+import symtable
 from dataclasses import dataclass
 from types import FunctionType
 from typing import Any
@@ -81,6 +83,51 @@ def _annotation_compatible(actual: object, expected: str) -> bool:
     return False
 
 
+def _undefined_global_names(
+    code: str,
+    *,
+    function_name: str,
+    allowed_names: set[str],
+) -> tuple[str, ...]:
+    """Find referenced globals unavailable in the generated execution namespace."""
+
+    try:
+        module_table = symtable.symtable(
+            code,
+            f"<generated:{function_name}>",
+            "exec",
+        )
+    except SyntaxError:
+        return ()
+    function_table = next(
+        (
+            child
+            for child in module_table.get_children()
+            if child.get_type() == "function" and child.get_name() == function_name
+        ),
+        None,
+    )
+    if function_table is None:
+        return ()
+
+    unresolved: set[str] = set()
+
+    def visit(table: Any) -> None:
+        for symbol in table.get_symbols():
+            name = symbol.get_name()
+            if (
+                symbol.is_referenced()
+                and symbol.is_global()
+                and name not in allowed_names
+            ):
+                unresolved.add(name)
+        for child in table.get_children():
+            visit(child)
+
+    visit(function_table)
+    return tuple(sorted(unresolved))
+
+
 def compile_generated_tool(
     tool: GeneratedTool,
     *,
@@ -113,7 +160,6 @@ def compile_generated_tool(
             None,
         )
 
-    namespace: dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
     # Native-action tools expose approved ToolSandbox state-changing callables.
     # ToolSandbox side-effect tools by bare name so generated code can call e.g.
     # add_reminder(...) directly. Default OFF leaves the namespace untouched.
@@ -124,6 +170,7 @@ def compile_generated_tool(
     )
 
     injected_native_names: set[str] = set()
+    native_tools: dict[str, Any] = {}
     if native_action_tool_enabled(tool):
         native_tools = native_tool_overrides or native_side_effect_tools()
         declared_names = set(native_action_names_for_tool(tool))
@@ -132,8 +179,25 @@ def compile_generated_tool(
             for name, function in native_tools.items()
             if name in declared_names
         }
-        namespace.update(native_tools)
         injected_native_names = set(native_tools)
+    undefined_names = _undefined_global_names(
+        tool.code,
+        function_name=tool.spec.tool_name,
+        allowed_names={
+            *SAFE_BUILTINS,
+            *injected_native_names,
+            tool.spec.tool_name,
+        },
+    )
+    if undefined_names:
+        return SchemaResult(
+            False,
+            tuple(f"undefined_name:{name}" for name in undefined_names),
+            None,
+        )
+
+    namespace: dict[str, Any] = {"__builtins__": SAFE_BUILTINS}
+    namespace.update(native_tools)
     errors: list[str] = []
     try:
         exec(
@@ -160,6 +224,27 @@ def compile_generated_tool(
         return SchemaResult(
             False,
             (f"function_name_mismatch:{fn.__name__}!={tool.spec.tool_name}",),
+            None,
+        )
+
+    signature = inspect.signature(fn)
+    parameters = tuple(signature.parameters.values())
+    expected_parameter_names = tuple(item.name for item in tool.spec.inputs)
+    actual_parameter_names = tuple(item.name for item in parameters)
+    invalid_parameter_kinds = tuple(
+        f"{item.name}:{item.kind.name}"
+        for item in parameters
+        if item.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
+    )
+    if actual_parameter_names != expected_parameter_names or invalid_parameter_kinds:
+        details = (
+            f"actual={actual_parameter_names!r}:expected={expected_parameter_names!r}"
+        )
+        if invalid_parameter_kinds:
+            details += f":non_simple={invalid_parameter_kinds!r}"
+        return SchemaResult(
+            False,
+            (f"input_signature_mismatch:{details}",),
             None,
         )
 

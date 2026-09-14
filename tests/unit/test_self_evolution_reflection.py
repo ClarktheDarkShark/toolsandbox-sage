@@ -17,6 +17,7 @@ from sage_ts.orchestration.self_evolution_reflection import (
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
+from sage_ts.runtime.toolsandbox_integration import _lifecycle_visibility_override
 from sage_ts.validation.sandbox_validator import ValidationResult
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
@@ -1092,7 +1093,7 @@ def test_metadata_non_adoption_does_not_replace_tool_working_in_another_family(
     assert current.retired is False
 
 
-def test_reflection_keeps_positive_tool_with_side_effect_audit(
+def test_reflection_suppresses_public_family_after_actor_followthrough_failure(
     tmp_path: Path,
 ) -> None:
     scenario = _scenario()
@@ -1105,8 +1106,10 @@ def test_reflection_keeps_positive_tool_with_side_effect_audit(
         score=0.0,
         outcome=0.0,
     )
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("prepare_reminder_creation_args"))
     controller = SelfEvolutionReflectionController(
-        store=RegistryStore(tmp_path / "registry"),
+        store=store,
         output_dir=tmp_path / "run",
         agent="gpt-4o-mini",
         user="gpt-4o-mini",
@@ -1117,7 +1120,7 @@ def test_reflection_keeps_positive_tool_with_side_effect_audit(
         min_pulse_tasks=1,
     )
 
-    controller.assess_scenario(
+    feedback = controller.assess_scenario(
         scenario_name="add_reminder_content_and_week_delta_and_time",
         baseline_scenario=scenario,
         result={"similarity": 1.0, "outcome_similarity": 1.0},
@@ -1128,14 +1131,46 @@ def test_reflection_keeps_positive_tool_with_side_effect_audit(
             "generated_tools_failed": [],
         },
         side_effect_failures=["prepare_reminder_creation_args"],
+        task_context_label=(
+            "visible_task_context(family=temporal_reminder_date_canonicalization)"
+        ),
+        task_family_key="temporal_reminder_date_canonicalization",
     )
 
     lifecycle = json.loads(
         (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
     )
     decision = lifecycle["tool_lifecycle"]["prepare_reminder_creation_args"]
-    assert decision["decision"] == "retain_with_safety_audit"
-    assert decision["side_effect_incident_count"] == 1
+    assert decision["decision"] == "needs_route_repair"
+    assert decision["decision_reason"] == "generated_helper_followup_failure"
+    assert decision["repair_kind"] == "routing"
+    assert decision["routing_disposition"] == "family_suppression_active"
+    assert decision["route_repair_families"] == [
+        "temporal_reminder_date_canonicalization"
+    ]
+    assert decision["route_repair_reason_codes"] == {
+        "temporal_reminder_date_canonicalization": ["generated_helper_followup_failure"]
+    }
+    assert decision["actor_followthrough_failure_count"] == 1
+    assert decision["implementation_repair_families"] == []
+    assert feedback["actor_followthrough_failures"] == [
+        "prepare_reminder_creation_args"
+    ]
+    assert controller.drain_pending_repair_requests() == ()
+    assert store.get("prepare_reminder_creation_args").retired is False  # type: ignore[union-attr]
+    assert _lifecycle_visibility_override(
+        tool_name="prepare_reminder_creation_args",
+        scenario_name="temporal_reminder_date_canonicalization",
+        lifecycle_state=lifecycle["tool_lifecycle"],
+    ) == (False, "lifecycle_suppressed_actor_followthrough_family")
+    assert (
+        _lifecycle_visibility_override(
+            tool_name="prepare_reminder_creation_args",
+            scenario_name="unrelated_public_family",
+            lifecycle_state=lifecycle["tool_lifecycle"],
+        )
+        is None
+    )
 
     actions = [
         json.loads(line)
@@ -1146,14 +1181,20 @@ def test_reflection_keeps_positive_tool_with_side_effect_audit(
     assert actions == [
         {
             "tool_name": "prepare_reminder_creation_args",
-            "decision": "needs_safety_audit",
-            "reason": "side_effect_preservation_audit",
-            "scenario": "visible_task_context(family=unclassified)",
+            "decision": "needs_route_repair",
+            "repair_kind": "routing",
+            "reason": "generated_helper_followup_failure",
+            "scenario": (
+                "visible_task_context(family=temporal_reminder_date_canonicalization)"
+            ),
+            "routing_disposition": "family_suppression_active",
+            "target_task_family": "temporal_reminder_date_canonicalization",
+            "source_tool_version": 1,
         }
     ]
 
 
-def test_reflection_keeps_neutral_tool_with_side_effect_audit(
+def test_reflection_parks_followthrough_failure_without_public_family(
     tmp_path: Path,
 ) -> None:
     scenario = _scenario()
@@ -1166,8 +1207,10 @@ def test_reflection_keeps_neutral_tool_with_side_effect_audit(
         score=1.0,
         outcome=1.0,
     )
+    store = RegistryStore(tmp_path / "registry")
+    store.put(_accepted_registry_tool("prepare_reminder_creation_args"))
     controller = SelfEvolutionReflectionController(
-        store=RegistryStore(tmp_path / "registry"),
+        store=store,
         output_dir=tmp_path / "run",
         agent="gpt-4o-mini",
         user="gpt-4o-mini",
@@ -1195,11 +1238,27 @@ def test_reflection_keeps_neutral_tool_with_side_effect_audit(
         (tmp_path / "registry" / "tool_lifecycle.json").read_text(encoding="utf-8")
     )
     decision = lifecycle["tool_lifecycle"]["prepare_reminder_creation_args"]
-    assert decision["decision"] == "retain_with_safety_audit"
-    assert (
-        decision["decision_reason"] == "positive_called_subset_with_side_effect_audit"
-    )
-    assert decision["side_effect_incident_count"] == 1
+    assert decision["decision"] == "parked"
+    assert decision["routing_disposition"] == "quarantined"
+    assert decision["actor_followthrough_failure_count"] == 1
+    assert decision["implementation_repair_families"] == []
+    assert store.get("prepare_reminder_creation_args").retired is True  # type: ignore[union-attr]
+    assert controller.drain_pending_repair_requests() == ()
+    actions = [
+        json.loads(line)
+        for line in (tmp_path / "run" / "self_evolution_tool_lifecycle.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert actions == [
+        {
+            "tool_name": "prepare_reminder_creation_args",
+            "decision": "parked",
+            "reason": "actor_followthrough_failure_without_public_family",
+            "scenario": "visible_task_context(family=unclassified)",
+            "source_tool_version": 1,
+        }
+    ]
 
 
 def test_reflection_hydrates_feedback_on_resume(tmp_path: Path) -> None:

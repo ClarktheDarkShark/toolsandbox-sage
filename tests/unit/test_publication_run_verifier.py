@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,18 @@ import pytest
 
 import scripts.run_sage_protocol as protocol_runner
 import scripts.verify_publication_run as publication_verifier
+from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
+from sage_ts.generation.tool_spec import (
+    GeneratedTool,
+    StructuredInadequacyEvidence,
+    ToolFamily,
+    ToolInput,
+    ToolSpec,
+)
+from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import ValidationContractBindingStore
+from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from scripts.run_chapter4_evidence_campaign import _job_command
 from scripts.verify_publication_run import verify_run
 from tool_sandbox.common.execution_context import ExecutionContext
@@ -131,6 +144,70 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
+def _write_registry_checkpoint(
+    candidate_dir: Path,
+    registry_dir: Path,
+    *,
+    scenario_name: str,
+    completed_count: int,
+    manifest: dict[str, Any] | None,
+) -> Path:
+    checkpoint_dir = (
+        candidate_dir
+        / "registry_checkpoints"
+        / (
+            f"after_{completed_count:04d}_"
+            f"{publication_verifier._safe_checkpoint_name(scenario_name)}"
+        )
+    )
+    copied_files: list[str] = []
+    if manifest is not None:
+        source_manifest = registry_dir / "registry_manifest.json"
+        if (
+            source_manifest.is_file()
+            and json.loads(source_manifest.read_text(encoding="utf-8")) == manifest
+        ):
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_manifest, checkpoint_dir / "registry_manifest.json")
+        else:
+            _write_json(checkpoint_dir / "registry_manifest.json", manifest)
+        copied_files.append("registry_manifest.json")
+    lifecycle_path = registry_dir / "tool_lifecycle.json"
+    if lifecycle_path.is_file():
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(lifecycle_path, checkpoint_dir / lifecycle_path.name)
+        copied_files.append(lifecycle_path.name)
+    contract_index = registry_dir / "validation_contract_bindings.json"
+    if contract_index.is_file():
+        shutil.copy2(contract_index, checkpoint_dir / contract_index.name)
+        copied_files.append(contract_index.name)
+        index = json.loads(contract_index.read_text(encoding="utf-8"))
+        contract_hashes = sorted(
+            {
+                metadata["contract_hash"]
+                for versions in index["bindings"].values()
+                for metadata in versions.values()
+            }
+        )
+        for contract_hash in contract_hashes:
+            relative = Path("validation_contracts") / f"{contract_hash}.json"
+            destination = checkpoint_dir / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(registry_dir / relative, destination)
+            copied_files.append(relative.as_posix())
+    _write_json(
+        checkpoint_dir / "checkpoint.json",
+        {
+            "scenario": scenario_name,
+            "completed_count": completed_count,
+            "registry_dir": str(registry_dir.resolve()),
+            "copied_files": copied_files,
+            "validation_contract_snapshot_errors": [],
+        },
+    )
+    return checkpoint_dir
+
+
 def _write_synthetic_trajectory(
     run_dir: Path,
     *,
@@ -155,6 +232,55 @@ def _feedback_outcome_with_source(
     if audited_outcome is not None:
         return float(audited_outcome), "audited_outcome"
     return None, "unavailable"
+
+
+def _convert_synthetic_run_to_frozen(run_root: Path) -> None:
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    protocol["mode"] = "full_benchmark"
+    protocol["generation_enabled"] = False
+    protocol["candidate_generated_tools_enabled"] = False
+    protocol["sage_policy"] = "none"
+    protocol["reflection_control_source"] = "not_applicable"
+    protocol["reflection_control_delivery"] = "not_applicable_generation_disabled"
+    registry_dir = Path(protocol["registry_dir"])
+    inventory = publication_verifier._registry_inventory_for_verification(registry_dir)
+    snapshot = protocol["registry_gate_snapshot"]
+    snapshot.update(
+        {
+            "manifest_existed_before_run": True,
+            "manifest_digest_before_run": hashlib.sha256(
+                (registry_dir / "registry_manifest.json").read_bytes()
+            ).hexdigest(),
+            "registry_directory_existed_before_run": True,
+            "registry_inventory_before_run": inventory,
+            "registry_inventory_count_before_run": len(inventory),
+            "registry_inventory_sha256": hashlib.sha256(
+                json.dumps(
+                    inventory,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
+    )
+    _write_json(protocol_path, protocol)
+    _write_json(
+        run_root / "registry_gate" / "registry_gate_snapshot.json",
+        snapshot,
+    )
+    for arm in ("control", "candidate"):
+        events_path = Path(protocol[f"{arm}_dir"]) / "llm_usage_events.jsonl"
+        events = [
+            json.loads(line)
+            for line in events_path.read_text(encoding="utf-8").splitlines()
+        ]
+        for event in events:
+            event["arm"] = f"full_benchmark_{arm}"
+        events_path.write_text(
+            "".join(json.dumps(event) + "\n" for event in events),
+            encoding="utf-8",
+        )
 
 
 def _reflection_feedback_row(
@@ -185,6 +311,7 @@ def _reflection_feedback_row(
             else None
         ),
         "task_family_key": "synthetic_family",
+        "task_context_label": "visible_task_context(family=synthetic_family)",
         "source_task_id_redacted": True,
         "generated_tools_visible": [],
         "generated_tools_called": [],
@@ -192,6 +319,8 @@ def _reflection_feedback_row(
         "generated_tools_failed": [],
         "generated_tool_contract_failures": [],
         "generated_tool_versions": {},
+        "actor_followthrough_failures": [],
+        "immediate_actions": [],
     }
 
 
@@ -607,9 +736,32 @@ def _fresh_run(tmp_path: Path) -> Path:
     registry_dir = tmp_path / "artifacts" / "native_action_registry"
     registry_manifest = registry_dir / "registry_manifest.json"
     _write_json(registry_manifest, {"schema_version": 1, "tools": {}})
+    for completed_count, scenario_name in enumerate(("task_a", "task_b"), start=1):
+        _write_registry_checkpoint(
+            candidate_dir,
+            registry_dir,
+            scenario_name=scenario_name,
+            completed_count=completed_count,
+            manifest={"schema_version": 1, "tools": {}},
+        )
     registry_manifest_sha256 = hashlib.sha256(
         registry_manifest.read_bytes()
     ).hexdigest()
+    artifact_root = registry_dir.parent
+    protocol_event_path = artifact_root / "events" / "latest.jsonl"
+    protocol_event_path.parent.mkdir(parents=True, exist_ok=True)
+    protocol_event_path.write_text(
+        json.dumps({"event": "synthetic_publication_run_started"}) + "\n",
+        encoding="utf-8",
+    )
+    protocol_event_journal = {
+        "schema_version": 1,
+        "artifact_root": str(artifact_root),
+        "path": str(protocol_event_path),
+        "sha256": hashlib.sha256(protocol_event_path.read_bytes()).hexdigest(),
+        "event_count": 1,
+        "append_closed_before_protocol_manifest": True,
+    }
     _write_json(
         run_root / "protocol_manifest.json",
         {
@@ -633,6 +785,7 @@ def _fresh_run(tmp_path: Path) -> Path:
             "control_dir": str(control_dir),
             "candidate_dir": str(candidate_dir),
             "registry_dir": str(registry_dir),
+            "protocol_event_journal": protocol_event_journal,
             "registry_manifest_digest_after_run": registry_manifest_sha256,
             "registry_gate_snapshot": {
                 "registry_dir": str(registry_dir),
@@ -810,6 +963,702 @@ def _verification_pins(run_root: Path) -> dict[str, str]:
         "expected_benchmark_sha256": str(protocol["benchmark_manifest_sha256"]),
         "expected_scenario_order_sha256": str(protocol["scenario_order_sha256"]),
     }
+
+
+def test_verifier_rejects_tampered_sealed_protocol_event_journal(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    journal_path.write_text(
+        journal_path.read_text(encoding="utf-8")
+        + json.dumps({"event": "post_seal_tamper"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="journal identity"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
+
+
+def _checkpoint_binding_artifacts(
+    tmp_path: Path,
+) -> tuple[
+    Path,
+    Path,
+    dict[str, dict[str, tuple[str, ...]]],
+    Path,
+]:
+    candidate_dir = tmp_path / "candidate"
+    registry_dir = tmp_path / "registry"
+    candidate_dir.mkdir(parents=True)
+    registry_dir.mkdir(parents=True)
+    code = "def helper(value: str) -> str:\n    return value\n"
+    tool = GeneratedTool(
+        spec=ToolSpec(
+            tool_name="helper",
+            family=ToolFamily.CANONICALIZER,
+            description="Normalize a caller-provided scalar without changing it.",
+            inputs=(ToolInput("value", "str", "Caller-provided scalar value."),),
+            output_annotation="str",
+            generalization_rationale=(
+                "The same deterministic scalar normalization applies across "
+                "multiple caller-controlled task families."
+            ),
+            inadequacy_evidence=StructuredInadequacyEvidence(
+                summary=(
+                    "Repeated callers need deterministic scalar normalization "
+                    "before downstream processing."
+                ),
+                signals=("repeated_scalar_normalization_gap",),
+            ),
+        ),
+        code=code,
+    )
+    examples = (
+        ToolExample(inputs={"value": "alpha"}, expected="alpha"),
+        ToolExample(inputs={"value": "beta"}, expected="beta", held_out=True),
+    )
+    validation = validate_generated_tool(tool, examples)
+    assert validation.accepted
+    registry_entry = replace(
+        RegistryEntry.accepted(tool, validation, "synthetic_birth"),
+        version=2,
+    )
+    RegistryStore(registry_dir).save_entries({"helper": registry_entry})
+    observation = CapabilityObservation(
+        scenario_name="synthetic_contract",
+        canonical_key="canonicalizer:helper",
+        observation=(
+            "Repeated callers need deterministic scalar normalization before "
+            "downstream processing."
+        ),
+        allowed_families=(ToolFamily.CANONICALIZER.value,),
+        validation_examples=examples,
+        generation_allowed=True,
+        reason="A deterministic reusable scalar helper is justified.",
+        inadequacy_signals=("repeated_scalar_normalization_gap",),
+        task_family_key="synthetic_scalar_normalization",
+    )
+    ValidationContractBindingStore(registry_dir).persist(
+        registry_entry,
+        observation,
+        validation_examples=examples,
+    )
+    entry = registry_entry.to_json()
+    common = {
+        "scenario": "synthetic_task",
+        "generated_tools_visible": ["helper"],
+        "generated_tools_called": ["helper"],
+        "generated_tools_attempted": ["helper"],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {"helper": 2},
+        "exception_type": None,
+    }
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        json.dumps(common) + "\n",
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        json.dumps(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "task_family_key": "synthetic_family",
+                "source_task_id_redacted": True,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    checkpoint_dir = _write_registry_checkpoint(
+        candidate_dir,
+        registry_dir,
+        scenario_name="synthetic_task",
+        completed_count=1,
+        manifest={"tools": {"helper": entry}},
+    )
+    trajectory_evidence = {
+        "synthetic_task": {
+            "generated_tools_visible": ("helper",),
+            "generated_tools_called": ("helper",),
+            "generated_tools_attempted": ("helper",),
+            "generated_tools_failed": (),
+        }
+    }
+    return candidate_dir, registry_dir, trajectory_evidence, checkpoint_dir
+
+
+def _checkpoint_contract_paths(checkpoint_dir: Path) -> tuple[Path, Path]:
+    index_path = checkpoint_dir / "validation_contract_bindings.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    contract_hash = index["bindings"]["helper"]["2"]["contract_hash"]
+    return index_path, checkpoint_dir / "validation_contracts" / f"{contract_hash}.json"
+
+
+def _rewrite_checkpoint_contract(
+    checkpoint_dir: Path,
+    mutate: Any,
+) -> None:
+    index_path, old_blob_path = _checkpoint_contract_paths(checkpoint_dir)
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    payload = json.loads(old_blob_path.read_text(encoding="utf-8"))
+    mutate(payload, index["bindings"]["helper"]["2"])
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    contract_hash = hashlib.sha256(canonical).hexdigest()
+    new_relative = Path("validation_contracts") / f"{contract_hash}.json"
+    _write_json(checkpoint_dir / new_relative, payload)
+    index["bindings"]["helper"]["2"]["contract_hash"] = contract_hash
+    _write_json(index_path, index)
+    checkpoint_path = checkpoint_dir / "checkpoint.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    old_relative = old_blob_path.relative_to(checkpoint_dir).as_posix()
+    checkpoint["copied_files"] = [
+        new_relative.as_posix() if item == old_relative else item
+        for item in checkpoint["copied_files"]
+    ]
+    _write_json(checkpoint_path, checkpoint)
+
+
+def _actor_followthrough_artifacts(
+    tmp_path: Path,
+    *,
+    public_family: bool = True,
+) -> tuple[Path, Path, dict[str, dict[str, tuple[str, ...]]], Path]:
+    candidate_dir = tmp_path / "candidate"
+    registry_dir = tmp_path / "registry"
+    candidate_dir.mkdir(parents=True)
+    registry_dir.mkdir(parents=True)
+    fixture = json.loads(
+        (
+            PROJECT_ROOT
+            / "docs"
+            / "sage_protocol"
+            / "fixtures"
+            / "historical_faulty_safe_action_registry.json"
+        ).read_text(encoding="utf-8")
+    )
+    target = "prepare_safe_action_or_abstain"
+    scenario = "synthetic_followthrough_task"
+    family = "synthetic_contact_action"
+    lifecycle_context = (
+        f"visible_task_context(family={family};signals=contact_action)"
+        if public_family
+        else "unclassified_public_task_context"
+    )
+    action = (
+        {
+            "tool_name": target,
+            "decision": "needs_route_repair",
+            "repair_kind": "routing",
+            "reason": "generated_helper_followup_failure",
+            "scenario": lifecycle_context,
+            "routing_disposition": "family_suppression_active",
+            "target_task_family": family,
+            "source_tool_version": 1,
+        }
+        if public_family
+        else {
+            "tool_name": target,
+            "decision": "parked",
+            "reason": "actor_followthrough_failure_without_public_family",
+            "scenario": lifecycle_context,
+            "source_tool_version": 1,
+        }
+    )
+    target_entry = fixture["tools"][target]
+    if not public_family:
+        target_entry["retired"] = True
+    _write_json(registry_dir / "registry_manifest.json", fixture)
+    lifecycle = {
+        "tool_lifecycle": (
+            {
+                target: {
+                    "tool_version": 1,
+                    "actor_followthrough_failure_count": 1,
+                    "actor_followthrough_failure_families": [family],
+                    "route_repair_families": [family],
+                    "route_repair_reason_codes": {
+                        family: ["generated_helper_followup_failure"]
+                    },
+                    "repair_kind": "routing",
+                    "routing_disposition": "family_suppression_active",
+                    "decision": "needs_route_repair",
+                }
+            }
+            if public_family
+            else {}
+        )
+    }
+    _write_json(registry_dir / "tool_lifecycle.json", lifecycle)
+    common = {
+        "scenario": scenario,
+        "generated_tools_visible": [target],
+        "generated_tools_called": [target],
+        "generated_tools_attempted": [target],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {target: 1},
+        "exception_type": None,
+    }
+    _write_json(candidate_dir / "scenario_tool_selection.jsonl", common)
+    _write_json(
+        candidate_dir / "self_evolution_task_feedback.jsonl",
+        {
+            **common,
+            "event": "self_evolution_task_assessed",
+            "source_task_id_redacted": public_family,
+            "task_family_key": family if public_family else "unclassified",
+            "task_context_label": lifecycle_context,
+            "actor_followthrough_failures": [target],
+            "immediate_actions": [action],
+        },
+    )
+    _write_json(
+        candidate_dir / "self_evolution_tool_lifecycle.jsonl",
+        action,
+    )
+    helper_output = {
+        "should_call_tools": True,
+        "required_original_tools": ["remove_contact"],
+    }
+    trajectory_dir = candidate_dir / "trajectories" / scenario
+    _write_json(
+        trajectory_dir / "execution_context.json",
+        {
+            "_dbs": {
+                "SANDBOX": [
+                    {
+                        "tool_trace": json.dumps(
+                            {"tool_name": target, "result": helper_output}
+                        )
+                    }
+                ]
+            }
+        },
+    )
+    (trajectory_dir / "conversation.json").write_text(
+        json.dumps(
+            [
+                {
+                    "role": "tool",
+                    "name": target,
+                    "content": json.dumps(helper_output),
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    checkpoint_dir = _write_registry_checkpoint(
+        candidate_dir,
+        registry_dir,
+        scenario_name=scenario,
+        completed_count=1,
+        manifest=fixture,
+    )
+    evidence = {
+        scenario: {
+            "generated_tools_visible": (target,),
+            "generated_tools_called": (target,),
+            "generated_tools_attempted": (target,),
+            "generated_tools_failed": (),
+        }
+    }
+    return candidate_dir, registry_dir, evidence, checkpoint_dir
+
+
+def test_registry_checkpoint_verifier_binds_name_version_and_code_hash(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir, evidence, _checkpoint_dir = (
+        _checkpoint_binding_artifacts(tmp_path)
+    )
+
+    report = publication_verifier._verify_registry_checkpoint_bindings(
+        candidate_dir,
+        registry_dir,
+        scenario_order=["synthetic_task"],
+        trajectory_evidence=evidence,
+    )
+
+    assert report["registry_checkpoint_count"] == 1
+    assert report["registry_checkpoint_binding_count"] == 1
+    assert len(report["registry_checkpoint_binding_sha256"]) == 64
+    contract_report = report["public_contract_binding_verification"]
+    assert contract_report["status"] == "pass"
+    assert contract_report["observed_contract_replay_count"] == 1
+    assert contract_report["final_active_contract_replay_count"] == 1
+    assert contract_report["validation_values_reported"] is False
+
+
+@pytest.mark.parametrize(
+    ("corruption", "message"),
+    [
+        ("missing_checkpoint", "checkpoint is missing"),
+        ("forged_version", "version disagrees"),
+        ("declared_name", "declared generated-tool name disagree"),
+        ("altered_code", "code hash is invalid"),
+        ("altered_hash", "code hash is invalid"),
+    ],
+)
+def test_registry_checkpoint_verifier_rejects_tampering(
+    tmp_path: Path,
+    corruption: str,
+    message: str,
+) -> None:
+    candidate_dir, registry_dir, evidence, checkpoint_dir = (
+        _checkpoint_binding_artifacts(tmp_path)
+    )
+    if corruption == "missing_checkpoint":
+        shutil.rmtree(checkpoint_dir)
+    elif corruption == "forged_version":
+        for filename in (
+            "scenario_tool_selection.jsonl",
+            "self_evolution_task_feedback.jsonl",
+        ):
+            path = candidate_dir / filename
+            row = json.loads(path.read_text(encoding="utf-8"))
+            row["generated_tool_versions"]["helper"] = 3
+            path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    else:
+        manifest_path = checkpoint_dir / "registry_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entry = manifest["tools"]["helper"]
+        if corruption == "declared_name":
+            entry["tool"]["spec"]["tool_name"] = "different_helper"
+        elif corruption == "altered_code":
+            entry["tool"]["code"] += "\n# tampered\n"
+        elif corruption == "altered_hash":
+            entry["code_hash"] = "f" * 64
+        else:  # pragma: no cover - parametrization is exhaustive.
+            raise AssertionError(corruption)
+        _write_json(manifest_path, manifest)
+
+    with pytest.raises(ValueError, match=message):
+        publication_verifier._verify_registry_checkpoint_bindings(
+            candidate_dir,
+            registry_dir,
+            scenario_order=["synthetic_task"],
+            trajectory_evidence=evidence,
+        )
+
+
+@pytest.mark.parametrize(
+    ("corruption", "message"),
+    [
+        ("missing_contract_index", "binding is invalid"),
+        ("missing_contract_blob", "binding is invalid"),
+        ("unlisted_contract_blob", "omits the exact validation contract"),
+        ("snapshot_error", "snapshot is invalid"),
+        ("tampered_contract_blob", "binding is invalid"),
+        ("wrong_contract_name", "binding is invalid"),
+        ("wrong_contract_version", "binding is invalid"),
+        ("wrong_contract_code_hash", "binding is invalid"),
+        ("wrong_contract_spec_hash", "binding is invalid"),
+        ("semantic_contract_failure", "is not accepted"),
+        ("stored_admission_disagreement", "disagrees with the stored"),
+    ],
+)
+def test_registry_checkpoint_verifier_rejects_contract_tampering(
+    tmp_path: Path,
+    corruption: str,
+    message: str,
+) -> None:
+    candidate_dir, registry_dir, evidence, checkpoint_dir = (
+        _checkpoint_binding_artifacts(tmp_path)
+    )
+    index_path, blob_path = _checkpoint_contract_paths(checkpoint_dir)
+    if corruption == "missing_contract_index":
+        index_path.unlink()
+    elif corruption == "missing_contract_blob":
+        blob_path.unlink()
+    elif corruption == "unlisted_contract_blob":
+        checkpoint_path = checkpoint_dir / "checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        relative = blob_path.relative_to(checkpoint_dir).as_posix()
+        checkpoint["copied_files"].remove(relative)
+        _write_json(checkpoint_path, checkpoint)
+    elif corruption == "snapshot_error":
+        checkpoint_path = checkpoint_dir / "checkpoint.json"
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        checkpoint["validation_contract_snapshot_errors"] = [
+            "missing_or_nonregular:validation_contracts/redacted.json"
+        ]
+        _write_json(checkpoint_path, checkpoint)
+    elif corruption == "tampered_contract_blob":
+        payload = json.loads(blob_path.read_text(encoding="utf-8"))
+        payload["contract"]["validation_examples"][0]["expected"] = "changed"
+        _write_json(blob_path, payload)
+    elif corruption == "wrong_contract_name":
+        _rewrite_checkpoint_contract(
+            checkpoint_dir,
+            lambda payload, _metadata: payload.__setitem__(
+                "tool_name", "different_helper"
+            ),
+        )
+    elif corruption == "wrong_contract_version":
+        _rewrite_checkpoint_contract(
+            checkpoint_dir,
+            lambda payload, _metadata: payload.__setitem__("tool_version", 3),
+        )
+    elif corruption == "wrong_contract_code_hash":
+        _rewrite_checkpoint_contract(
+            checkpoint_dir,
+            lambda payload, metadata: (
+                payload.__setitem__("tool_code_hash", "f" * 64),
+                metadata.__setitem__("tool_code_hash", "f" * 64),
+            ),
+        )
+    elif corruption == "wrong_contract_spec_hash":
+        _rewrite_checkpoint_contract(
+            checkpoint_dir,
+            lambda payload, metadata: (
+                payload.__setitem__("tool_spec_hash", "f" * 64),
+                metadata.__setitem__("tool_spec_hash", "f" * 64),
+            ),
+        )
+    elif corruption == "semantic_contract_failure":
+        _rewrite_checkpoint_contract(
+            checkpoint_dir,
+            lambda payload, _metadata: payload["contract"]["validation_examples"][
+                1
+            ].__setitem__("expected", "not-beta"),
+        )
+    elif corruption == "stored_admission_disagreement":
+        manifest_path = checkpoint_dir / "registry_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["tools"]["helper"]["validation"]["held_out_check_count"] = 7
+        _write_json(manifest_path, manifest)
+    else:  # pragma: no cover - parametrization is exhaustive.
+        raise AssertionError(corruption)
+
+    with pytest.raises(ValueError, match=message):
+        publication_verifier._verify_registry_checkpoint_bindings(
+            candidate_dir,
+            registry_dir,
+            scenario_order=["synthetic_task"],
+            trajectory_evidence=evidence,
+        )
+
+
+def test_registry_checkpoint_verifier_replays_unobserved_final_active_tool(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir, evidence, _checkpoint_dir = (
+        _checkpoint_binding_artifacts(tmp_path)
+    )
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        row = json.loads(path.read_text(encoding="utf-8"))
+        for field in publication_verifier._LIFECYCLE_SELECTION_FIELDS:
+            row[field] = []
+        row["generated_tool_versions"] = {}
+        _write_json(path, row)
+    evidence["synthetic_task"] = {
+        "generated_tools_visible": (),
+        "generated_tools_called": (),
+        "generated_tools_attempted": (),
+        "generated_tools_failed": (),
+    }
+
+    report = publication_verifier._verify_registry_checkpoint_bindings(
+        candidate_dir,
+        registry_dir,
+        scenario_order=["synthetic_task"],
+        trajectory_evidence=evidence,
+    )
+
+    contract_report = report["public_contract_binding_verification"]
+    assert contract_report["observed_contract_replay_count"] == 0
+    assert contract_report["final_active_contract_replay_count"] == 1
+
+
+def test_frozen_registry_checkpoint_uses_selection_and_contract_without_feedback(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, registry_dir, evidence, _checkpoint_dir = (
+        _checkpoint_binding_artifacts(tmp_path)
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").unlink()
+
+    report = publication_verifier._verify_registry_checkpoint_bindings(
+        candidate_dir,
+        registry_dir,
+        scenario_order=["synthetic_task"],
+        trajectory_evidence=evidence,
+        require_lifecycle_feedback=False,
+    )
+
+    assert report["public_contract_binding_verification"]["status"] == "pass"
+
+
+@pytest.mark.parametrize("public_family", [True, False])
+def test_actor_followthrough_verifier_accepts_family_suppression_or_retirement(
+    tmp_path: Path,
+    public_family: bool,
+) -> None:
+    candidate_dir, registry_dir, evidence, _checkpoint_dir = (
+        _actor_followthrough_artifacts(tmp_path, public_family=public_family)
+    )
+
+    report = publication_verifier._verify_actor_followthrough_closed(
+        candidate_dir,
+        registry_dir,
+        scenario_order=["synthetic_followthrough_task"],
+        trajectory_evidence=evidence,
+    )
+
+    assert report["status"] == "pass"
+    assert report["derived_obligation_count"] == 1
+    assert report["closed_after_task_count"] == 1
+    assert report["closed_at_run_end_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("corruption", "message"),
+    [
+        ("sidecar", "sidecar disagrees"),
+        ("immediate_action", "not closed immediately"),
+        ("journal_action", "not closed immediately"),
+        ("checkpoint_suppression", "not closed immediately"),
+        ("action_version", "not closed immediately"),
+        ("stale_run_end", "became stale by run end"),
+    ],
+)
+def test_actor_followthrough_verifier_rejects_unclosed_raw_failure(
+    tmp_path: Path,
+    corruption: str,
+    message: str,
+) -> None:
+    candidate_dir, registry_dir, evidence, checkpoint_dir = (
+        _actor_followthrough_artifacts(tmp_path)
+    )
+    feedback_path = candidate_dir / "self_evolution_task_feedback.jsonl"
+    journal_path = candidate_dir / "self_evolution_tool_lifecycle.jsonl"
+    if corruption == "sidecar":
+        feedback = json.loads(feedback_path.read_text(encoding="utf-8"))
+        feedback["actor_followthrough_failures"] = []
+        _write_json(feedback_path, feedback)
+    elif corruption == "immediate_action":
+        feedback = json.loads(feedback_path.read_text(encoding="utf-8"))
+        feedback["immediate_actions"] = []
+        _write_json(feedback_path, feedback)
+    elif corruption == "journal_action":
+        journal_path.write_text("", encoding="utf-8")
+    elif corruption == "checkpoint_suppression":
+        lifecycle_path = checkpoint_dir / "tool_lifecycle.json"
+        lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+        lifecycle["tool_lifecycle"]["prepare_safe_action_or_abstain"][
+            "route_repair_families"
+        ] = []
+        _write_json(lifecycle_path, lifecycle)
+    elif corruption == "action_version":
+        for path, field in ((feedback_path, "immediate_actions"),):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload[field][0]["source_tool_version"] = 2
+            _write_json(path, payload)
+    elif corruption == "stale_run_end":
+        finalization = (
+            candidate_dir / "registry_checkpoints" / "after_0001_run_finalization"
+        )
+        shutil.copytree(checkpoint_dir, finalization)
+        metadata_path = finalization / "checkpoint.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata["scenario"] = "run_finalization"
+        _write_json(metadata_path, metadata)
+        lifecycle_path = finalization / "tool_lifecycle.json"
+        lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+        lifecycle["tool_lifecycle"] = {}
+        _write_json(lifecycle_path, lifecycle)
+    else:  # pragma: no cover - parametrization is exhaustive.
+        raise AssertionError(corruption)
+
+    with pytest.raises(ValueError, match=message):
+        publication_verifier._verify_actor_followthrough_closed(
+            candidate_dir,
+            registry_dir,
+            scenario_order=["synthetic_followthrough_task"],
+            trajectory_evidence=evidence,
+        )
+
+
+def test_registry_checkpoint_verifier_allows_prebirth_empty_manifest(
+    tmp_path: Path,
+) -> None:
+    candidate_dir = tmp_path / "candidate"
+    registry_dir = tmp_path / "registry"
+    candidate_dir.mkdir(parents=True)
+    registry_dir.mkdir(parents=True)
+    common = {
+        "scenario": "prebirth_task",
+        "generated_tools_visible": [],
+        "generated_tools_called": [],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {},
+        "exception_type": None,
+    }
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        json.dumps(common) + "\n", encoding="utf-8"
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        json.dumps({**common, "event": "self_evolution_task_assessed"}) + "\n",
+        encoding="utf-8",
+    )
+    _write_registry_checkpoint(
+        candidate_dir,
+        registry_dir,
+        scenario_name="prebirth_task",
+        completed_count=1,
+        manifest=None,
+    )
+    final_manifest: dict[str, Any] = {"tools": {}}
+    _write_json(registry_dir / "registry_manifest.json", final_manifest)
+    _write_registry_checkpoint(
+        candidate_dir,
+        registry_dir,
+        scenario_name="run_finalization",
+        completed_count=1,
+        manifest=final_manifest,
+    )
+    empty_evidence: dict[str, dict[str, tuple[str, ...]]] = {
+        "prebirth_task": {
+            "generated_tools_visible": (),
+            "generated_tools_called": (),
+            "generated_tools_attempted": (),
+            "generated_tools_failed": (),
+        }
+    }
+
+    report = publication_verifier._verify_registry_checkpoint_bindings(
+        candidate_dir,
+        registry_dir,
+        scenario_order=["prebirth_task"],
+        trajectory_evidence=empty_evidence,
+    )
+
+    assert report["registry_checkpoint_count"] == 1
+    assert report["registry_checkpoint_binding_count"] == 0
 
 
 def _lifecycle_artifacts(
@@ -1430,6 +2279,77 @@ def test_lifecycle_verifier_requires_metadata_repair_after_nonadoption_threshold
     assert report["derived_repair_obligation_count"] == 1
 
 
+def test_metadata_nonadoption_is_not_global_when_version_is_called_elsewhere(
+    tmp_path: Path,
+) -> None:
+    candidate_dir, _registry_dir = _lifecycle_artifacts(
+        tmp_path,
+        request=False,
+        acknowledgement_status=None,
+        retired=False,
+    )
+    feedback_rows: list[dict[str, Any]] = []
+    selection_rows: list[dict[str, Any]] = []
+    for index in range(publication_verifier.LIFECYCLE_METADATA_VISIBLE_THRESHOLD):
+        common = {
+            "scenario": f"unused_family_task_{index}",
+            "generated_tools_visible": ["helper"],
+            "generated_tools_called": [],
+            "generated_tools_attempted": [],
+            "generated_tools_failed": [],
+            "generated_tool_contract_failures": [],
+            "generated_tool_versions": {"helper": 2},
+        }
+        selection_rows.append(dict(common))
+        feedback_rows.append(
+            {
+                **common,
+                "event": "self_evolution_task_assessed",
+                "task_family_key": "unused_family",
+                "source_task_id_redacted": True,
+            }
+        )
+    useful_common = {
+        "scenario": "useful_family_task",
+        "generated_tools_visible": ["helper"],
+        "generated_tools_called": ["helper"],
+        "generated_tools_attempted": ["helper"],
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": {"helper": 2},
+        "exception_type": None,
+    }
+    selection_rows.append(dict(useful_common))
+    feedback_rows.append(
+        {
+            **useful_common,
+            "event": "self_evolution_task_assessed",
+            "task_family_key": "useful_family",
+            "source_task_id_redacted": True,
+            "control_source": "same_run_fresh",
+            "control_outcome": 0.0,
+            "control_outcome_source": "audited_outcome",
+            "candidate_outcome": 1.0,
+            "candidate_outcome_source": "audited_outcome",
+            "outcome_delta": 1.0,
+        }
+    )
+    (candidate_dir / "scenario_tool_selection.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in selection_rows),
+        encoding="utf-8",
+    )
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in feedback_rows),
+        encoding="utf-8",
+    )
+
+    obligations = publication_verifier._derive_lifecycle_repair_obligations(
+        candidate_dir
+    )
+
+    assert obligations == ()
+
+
 @pytest.mark.parametrize(
     "corruption",
     [
@@ -1626,6 +2546,8 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
         "candidate": 4,
     }
     assert result["reflection_control_source"] == "same_run_fresh"
+    assert result["lifecycle_integrity"]["registry_checkpoint_count"] == 2
+    assert result["lifecycle_integrity"]["registry_checkpoint_binding_count"] == 0
     assert result["matched_policy_runtimes"] == {
         "control_condition": publication_verifier.MATCHED_CONTROL_CONDITION,
         "control_agent_runtime": publication_verifier.SAGE_WRAPPED_AGENT_RUNTIME,
@@ -1639,6 +2561,22 @@ def test_verifier_proves_same_run_fresh_control_mapping(tmp_path: Path) -> None:
     assert result["platform_machine"] == "arm64"
     assert result["external_distribution_count"] == 108
     assert len(result["external_distribution_sha256"]) == 64
+
+
+def test_verifier_rejects_missing_ordered_registry_checkpoint(tmp_path: Path) -> None:
+    run_root = _fresh_run(tmp_path)
+    checkpoint = (
+        run_root / "candidate" / "run" / "registry_checkpoints" / "after_0002_task_b"
+    )
+    shutil.rmtree(checkpoint)
+
+    with pytest.raises(ValueError, match="checkpoint is missing"):
+        verify_run(
+            run_root.parent,
+            expected_tasks=2,
+            expect_reflection="same-run-fresh",
+            **_verification_pins(run_root),
+        )
 
 
 @pytest.mark.parametrize("arm", ("control", "candidate"))
@@ -2801,6 +3739,25 @@ def test_verifier_rejects_generation_calls_in_frozen_candidate(
             expect_reflection="not-applicable",
             **_verification_pins(run_root),
         )
+
+
+def test_verifier_accepts_frozen_registry_with_immutable_checkpoint_proof(
+    tmp_path: Path,
+) -> None:
+    run_root = _fresh_run(tmp_path)
+    _convert_synthetic_run_to_frozen(run_root)
+
+    result = verify_run(
+        run_root.parent,
+        expected_tasks=2,
+        expect_reflection="not-applicable",
+        **_verification_pins(run_root),
+    )
+
+    lifecycle = result["lifecycle_integrity"]
+    assert lifecycle["lifecycle_mutation_expected"] is False
+    assert lifecycle["frozen_registry_integrity"]["status"] == "pass"
+    assert lifecycle["public_contract_binding_verification"]["status"] == "pass"
 
 
 def test_verifier_resolves_repo_relative_paths_and_validates_fixture_hash(

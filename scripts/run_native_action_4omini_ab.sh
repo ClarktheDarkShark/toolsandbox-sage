@@ -185,7 +185,7 @@ PINNED_RAPID_FIXTURE_SHA256="eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007
 PINNED_BENCHMARK_SHA256="21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec"
 VALIDATION_THRESHOLDS="docs/sage_protocol/publication_validation_thresholds_v4.json"
 LIFECYCLE_FAULT_FIXTURE="docs/sage_protocol/fixtures/historical_faulty_safe_action_registry.json"
-PINNED_LIFECYCLE_FAULT_FIXTURE_SHA256="285604ee15dcb3b066816267ef1730bb40dffab7a9880160ddd885b2894a5630"
+PINNED_LIFECYCLE_FAULT_FIXTURE_SHA256="7677756340ccde07c5edb7b43003f68b5f363611d2cd935afdc7363e3bc33e8a"
 export CONTROL_CACHE="off"
 unset CONTROL_CACHE_ROOT
 unset SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT
@@ -264,6 +264,8 @@ STUDY_FILE="$ARTIFACT_ROOT/study_manifest.txt"
 mkdir -p "$ARM_ARTIFACTS" "$(dirname "$COMMAND_FILE")" "$ARM_OUTPUT"
 
 LIFECYCLE_FAULT_FIXTURE_SHA256=""
+LIFECYCLE_CONTRACT_RECEIPT=""
+LIFECYCLE_CONTRACT_RECEIPT_SHA256=""
 DEVELOPMENT_FAULT_INJECTION="false"
 REGISTRY_TRANSFER_SOURCE_RUN=""
 if [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
@@ -319,6 +321,13 @@ elif [[ "$EXECUTION_MODE" == "development-only" ]]; then
   fi
   mkdir -p "$REGISTRY_DIR"
   cp "$LIFECYCLE_FAULT_FIXTURE" "$REGISTRY_DIR/registry_manifest.json"
+  LIFECYCLE_CONTRACT_RECEIPT="$ARM_ARTIFACTS/historical_validation_contract_binding.json"
+  PYTHONPATH="src:." "$PYTHON_EXECUTABLE" \
+    scripts/seed_lifecycle_validation_contract.py \
+    --registry-dir "$REGISTRY_DIR" \
+    --fixture "$LIFECYCLE_FAULT_FIXTURE" \
+    --receipt "$LIFECYCLE_CONTRACT_RECEIPT"
+  LIFECYCLE_CONTRACT_RECEIPT_SHA256="$($PYTHON_EXECUTABLE -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$LIFECYCLE_CONTRACT_RECEIPT")"
 elif [[ -e "$REGISTRY_DIR" || -L "$REGISTRY_DIR" ]]; then
   echo "Online publication registry directory must not exist: $REGISTRY_DIR" >&2
   exit 1
@@ -346,7 +355,11 @@ CMD=(
   --artifact-root "$ARM_ARTIFACTS"
 )
 if [[ "$EXECUTION_MODE" == "development-only" ]]; then
-  CMD+=(--allow-low-quality-cohort)
+  CMD+=(
+    --allow-low-quality-cohort
+    --development-validation-contract-receipt "$LIFECYCLE_CONTRACT_RECEIPT"
+    --development-validation-contract-receipt-sha256 "$LIFECYCLE_CONTRACT_RECEIPT_SHA256"
+  )
 elif [[ "$EXECUTION_MODE" == "development-transfer" ]]; then
   CMD+=(
     --allow-low-quality-cohort
@@ -407,6 +420,8 @@ fi
   echo "development_fault_injection=$DEVELOPMENT_FAULT_INJECTION"
   echo "development_fault_fixture=$([[ "$DEVELOPMENT_FAULT_INJECTION" == "true" ]] && echo "$LIFECYCLE_FAULT_FIXTURE" || true)"
   echo "development_fault_fixture_sha256=$LIFECYCLE_FAULT_FIXTURE_SHA256"
+  echo "development_validation_contract_receipt=$LIFECYCLE_CONTRACT_RECEIPT"
+  echo "development_validation_contract_receipt_sha256=$LIFECYCLE_CONTRACT_RECEIPT_SHA256"
   echo "registry_transfer_source_run=$REGISTRY_TRANSFER_SOURCE_RUN"
   printf 'command='
   printf '%q ' "${CMD[@]}"

@@ -21,9 +21,11 @@ from sage_ts.adapters.toolsandbox_adapter import (
     ScenarioTransform,
     ToolSandboxRunConfig,
 )
+from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import ValidationContractBindingStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
 from tool_sandbox.common.execution_context import ExecutionContext
 from tool_sandbox.common.scenario import Scenario
@@ -310,6 +312,26 @@ def test_snapshot_registry_checkpoint_copies_manifest_and_lifecycle(
         json.dumps({"tool_lifecycle": {}}) + "\n",
         encoding="utf-8",
     )
+    contract_hash = "a" * 64
+    (registry_dir / "validation_contract_bindings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "bindings": {
+                    "sample_tool": {
+                        "1": {"contract_hash": contract_hash},
+                    }
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (registry_dir / "validation_contracts").mkdir()
+    (registry_dir / "validation_contracts" / f"{contract_hash}.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("SAGE_TS_SCENARIO_ORDER_INDEX", "4")
 
     checkpoint = _snapshot_registry_checkpoint(
@@ -322,9 +344,14 @@ def test_snapshot_registry_checkpoint_copies_manifest_and_lifecycle(
     assert checkpoint.name == "after_0005_find_current_city"
     assert (checkpoint / "registry_manifest.json").exists()
     assert (checkpoint / "tool_lifecycle.json").exists()
+    assert (checkpoint / "validation_contract_bindings.json").exists()
+    assert (checkpoint / "validation_contracts" / f"{contract_hash}.json").exists()
     metadata = json.loads((checkpoint / "checkpoint.json").read_text())
     assert metadata["completed_count"] == 5
     assert metadata["scenario"] == "find current city?"
+    assert metadata["validation_contract_snapshot_errors"] == []
+    assert "validation_contract_bindings.json" in metadata["copied_files"]
+    assert f"validation_contracts/{contract_hash}.json" in metadata["copied_files"]
 
 
 def test_side_effect_preservation_allows_prerequisite_after_abstain() -> None:
@@ -585,16 +612,34 @@ def test_side_effect_preservation_flags_target_only_selection_without_side_effec
 
 def _registry_with_canonicalizer(path: Path) -> RegistryStore:
     tool = canonicalizer_tool()
+    examples = (
+        ToolExample({"label": "Wi-Fi"}, "wifi"),
+        ToolExample({"label": "mobile data"}, "cellular", held_out=True),
+    )
     validation = validate_generated_tool(
         tool,
-        examples=(
-            ToolExample({"label": "Wi-Fi"}, "wifi"),
-            ToolExample({"label": "mobile data"}, "cellular"),
-        ),
+        examples=examples,
     )
     assert validation.accepted
     store = RegistryStore(path)
     store.put(RegistryEntry.accepted(tool, validation, birth_scenario="toy_birth"))
+    entry = store.get("canonicalize_connectivity_label")
+    assert entry is not None
+    observation = CapabilityObservation(
+        scenario_name="synthetic_canonicalizer_contract",
+        canonical_key="canonicalizer:connectivity_label",
+        observation="Normalize public connectivity labels into stable labels.",
+        allowed_families=(str(ToolFamily.CANONICALIZER),),
+        validation_examples=examples,
+        generation_allowed=True,
+        reason="Predeclared synthetic contract for the retained test helper.",
+        task_family_key="connectivity_state",
+    )
+    ValidationContractBindingStore(path).persist(
+        entry,
+        observation,
+        validation_examples=examples,
+    )
     return store
 
 
@@ -720,6 +765,58 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
         ),
         generator=UnpicklableGenerator(),  # type: ignore[arg-type]
     )
+
+
+@pytest.mark.parametrize("tamper_mode", ("missing_index", "tampered_blob"))
+def test_frozen_registry_fails_before_injecting_tool_with_invalid_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tamper_mode: str,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+    index_path = store.root / "validation_contract_bindings.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    contract_hash = index["bindings"]["canonicalize_connectivity_label"]["1"][
+        "contract_hash"
+    ]
+    if tamper_mode == "missing_index":
+        index_path.unlink()
+    else:
+        blob_path = store.root / "validation_contracts" / f"{contract_hash}.json"
+        blob = json.loads(blob_path.read_text(encoding="utf-8"))
+        blob["contract"]["observation"] = "tampered"
+        blob_path.write_text(json.dumps(blob) + "\n", encoding="utf-8")
+
+    model_execution_started = False
+
+    def fail_if_started(*_args: object, **_kwargs: object) -> Path:
+        nonlocal model_execution_started
+        model_execution_started = True
+        raise AssertionError("model execution must not start")
+
+    monkeypatch.setattr(
+        "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
+        fail_if_started,
+    )
+    output_root = tmp_path / "outputs"
+    with pytest.raises(ValueError, match="valid exact validation-contract bindings"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="Unhelpful",
+                user="GPT_4_o_2024_05_13",
+                scenario_names=("toy_birth",),
+                output_dir=output_root,
+                registry_dir=store.root,
+            )
+        )
+
+    assert model_execution_started is False
+    failure = json.loads(
+        (output_root / "registry_contract_preflight_failures.json").read_text()
+    )
+    assert failure["model_execution_started"] is False
+    assert failure["failures"][0]["tool_name"] == "canonicalize_connectivity_label"
+    assert failure["failures"][0]["entry_injected"] is False
 
 
 def test_sage_runner_selection_summary_includes_resumed_rows(

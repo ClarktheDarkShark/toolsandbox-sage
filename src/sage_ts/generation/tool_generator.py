@@ -88,11 +88,45 @@ def _assert_post_deployment_repair_chat_request_safe(
 
 
 @dataclass(frozen=True)
+class PublicToolInputContract:
+    """Values-free callable interface shared with generation and validation."""
+
+    name: str
+    annotation: str
+    optional: bool = False
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "annotation": self.annotation,
+            "optional": self.optional,
+        }
+
+
+@dataclass(frozen=True)
+class PublicToolOutputContract:
+    """Values-free object-result interface shared with generation and routing."""
+
+    name: str
+    schema_types: tuple[str, ...]
+    optional: bool = False
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "types": list(self.schema_types),
+            "optional": self.optional,
+        }
+
+
+@dataclass(frozen=True)
 class ToolGenerationRequest:
     scenario_name: str
     observation: str
     allowed_families: tuple[str, ...]
     validation_examples: tuple[dict[str, object], ...] = ()
+    public_input_contract: tuple[PublicToolInputContract, ...] = ()
+    public_output_contract: tuple[PublicToolOutputContract, ...] = ()
     suggested_tool_name: str | None = None
     inadequacy_evidence: dict[str, object] | None = None
     failure_memory_context: dict[str, object] | None = None
@@ -100,6 +134,20 @@ class ToolGenerationRequest:
 
     def prompt(self) -> str:
         families = ", ".join(self.allowed_families)
+        input_contract = (
+            " Public callable input contract (names/types/optionality only; "
+            "held-out values remain hidden): "
+            f"{json.dumps([item.to_json() for item in self.public_input_contract])}."
+            if self.public_input_contract
+            else ""
+        )
+        output_contract = (
+            " Public callable object-output contract (names/types/optionality only; "
+            "held-out values remain hidden): "
+            f"{json.dumps([item.to_json() for item in self.public_output_contract])}."
+            if self.public_output_contract
+            else ""
+        )
         examples = (
             f" Validation examples: {json.dumps(list(self.validation_examples))}."
             if self.validation_examples
@@ -348,7 +396,8 @@ class ToolGenerationRequest:
             f"{tool_name_hint} "
             f"Allowed families: {families}. "
             f"Scenario: {self.scenario_name}. Observation: {self.observation}."
-            f"{evidence}{failure_memory}{cluster_context}{examples}"
+            f"{evidence}{failure_memory}{cluster_context}{input_contract}"
+            f"{output_contract}{examples}"
         )
 
 
@@ -436,11 +485,6 @@ class ToolGenerator:
         normalized = tuple(
             _normalize_model_authored_tool(request, tool) for tool in tools
         )
-        if _request_is_validation_abstention_helper(request):
-            # A validation helper is one ordered safety decision, not a portfolio of
-            # unrelated strategies.  Give each iterative validation round one complete
-            # candidate so the next feedback describes exactly the code being repaired.
-            return normalized[:1]
         return normalized
 
     def _contract_analysis_suffix(self, request: ToolGenerationRequest) -> str:
@@ -515,10 +559,10 @@ def _request_is_validation_abstention_helper(
     }
 
 
-def _model_authored_repair_candidate_count(request: ToolGenerationRequest) -> int:
-    if _request_is_validation_abstention_helper(request):
-        return 1
-    return 3
+def _model_authored_repair_candidate_count(_request: ToolGenerationRequest) -> int:
+    """Use the same independent-candidate portfolio for every repair family."""
+
+    return _model_authored_candidate_count()
 
 
 MODEL_AUTHORED_DEFAULT_FAMILIES_BY_TOOL: dict[str, tuple[str, ...]] = {
@@ -1499,11 +1543,16 @@ def _model_authored_final_repair_directive(
     """Restate structural invariants after verbose model-authored analysis."""
 
     if _request_is_validation_abstention_helper(request):
+        repair_candidate_count = _model_authored_repair_candidate_count(request)
         return (
             " FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE. This directive "
             "is authoritative and must be followed after every earlier instruction. "
-            "Return exactly one complete JSON repair object with top-level spec and "
-            "code_lines, never a candidates array. Keep the public function name and "
+            "Return a top-level candidates array with exactly "
+            + str(repair_candidate_count)
+            + " independently authored complete repair objects, each with top-level "
+            "spec and code_lines. Every candidate must implement the full contract; "
+            "vary control flow or normalization structure without weakening any safety "
+            "rule. Keep the public function name and "
             "signature. The function must be pure and must return exactly these six "
             "keys on every branch, with no extra or missing keys: should_abstain, "
             "missing_information, required_original_tools, safe_next_action, "
@@ -1703,6 +1752,14 @@ def _model_authored_generation_prompt(
     payload = {
         "required_tool_name": expected_tool_name,
         "candidate_count": candidate_count,
+        "public_input_contract": [
+            item.to_json() for item in request.public_input_contract
+        ],
+        "public_output_contract": [
+            item.to_json() for item in request.public_output_contract
+        ]
+        if not _complete_tools
+        else [],
         "task_context": _compact_text(request.scenario_name, 500)
         if contract_rules
         else request.scenario_name,
@@ -1801,6 +1858,16 @@ def _model_authored_generation_prompt(
         "The family must be one of allowed_families. Each input must be an object "
         "with name, annotation, and description. output_annotation must be one of "
         "str, int, float, bool, dict, or list. "
+        "The spec inputs and function signature must contain exactly the fields in "
+        "public_input_contract when that list is nonempty. Fields marked optional "
+        "must have a safe default of {}, [], '', false, 0, or 0.0 matching their "
+        "annotation. This values-free callable interface is authoritative; do not "
+        "drop an input merely because a model-visible example omits it. "
+        "When public_output_contract is nonempty, every return object and the "
+        "spec output_schema must use exactly those fields and types. Required "
+        "fields must be present on every branch, optional fields may be omitted, "
+        "and no undeclared output field is allowed. This values-free result "
+        "interface is authoritative; it reveals no held-out output value. "
         + (
             COMPLETE_TOOLS_PROMPT_CONSTRAINT + " "
             if _complete_tools
@@ -2228,7 +2295,10 @@ def _model_authored_repair_prompt(
         ),
     }.get(strategy_number, "Rewrite from the binding public contract.")
     syntax_repair = any(
-        "syntax_error" in error or "missing_generated_code" in error for error in errors
+        "syntax_error" in error
+        or "missing_generated_code" in error
+        or error.startswith("undefined_name:")
+        for error in errors
     )
     force_rewrite = request.suggested_tool_name in {
         "prepare_location_search_args",
@@ -3302,7 +3372,7 @@ def _normalize_model_authored_tool(
         updates["description"] = request.observation or (
             "Deterministic generated tool for a visible recurring task gap."
         )
-    inferred_inputs = _infer_inputs_from_examples(request)
+    inferred_inputs = _inputs_from_public_contract(request)
     if inferred_inputs:
         authored_inputs = {item.name: item for item in spec.inputs}
         inferred_inputs = tuple(
@@ -3322,6 +3392,10 @@ def _normalize_model_authored_tool(
             normalized_code,
             spec.tool_name,
             inferred_inputs,
+            optional_input_names=frozenset(
+                item.name for item in request.public_input_contract if item.optional
+            ),
+            public_contract_authoritative=bool(request.public_input_contract),
         )
     if complete_tools:
         effective_inputs = tuple(updates.get("inputs", spec.inputs))
@@ -3451,7 +3525,17 @@ def _normalize_model_authored_tool(
             ],
             "additionalProperties": True,
         }
-    if inferred_schema:
+    authoritative_output_schema = (
+        _output_schema_from_public_contract(request.public_output_contract)
+        if request.public_output_contract and not complete_tools
+        else None
+    )
+    if authoritative_output_schema is not None:
+        # Result-field names and types are part of the public callable interface.
+        # Do not let a partially authored schema hide fields that executable
+        # validation expects, or advertise fields that no contract branch returns.
+        updates["output_schema"] = authoritative_output_schema
+    elif inferred_schema:
         current_schema = (
             spec.output_schema if isinstance(spec.output_schema, dict) else {}
         )
@@ -3498,14 +3582,15 @@ def _normalize_model_authored_tool(
                 or "tool_name" not in description.lower()
             ):
                 updates["description"] = (description + state_contract_text).strip()
-        schema_source = updates.get("output_schema", spec.output_schema)
-        schema = dict(schema_source) if isinstance(schema_source, dict) else {}
-        props_source = schema.get("properties", {})
-        props = dict(props_source) if isinstance(props_source, dict) else {}
-        props["tool_name"] = {"type": "string", "enum": list(tool_name_enum)}
-        schema["type"] = schema.get("type") or "object"
-        schema["properties"] = props
-        updates["output_schema"] = schema
+        if authoritative_output_schema is None:
+            schema_source = updates.get("output_schema", spec.output_schema)
+            schema = dict(schema_source) if isinstance(schema_source, dict) else {}
+            props_source = schema.get("properties", {})
+            props = dict(props_source) if isinstance(props_source, dict) else {}
+            props["tool_name"] = {"type": "string", "enum": list(tool_name_enum)}
+            schema["type"] = schema.get("type") or "object"
+            schema["properties"] = props
+            updates["output_schema"] = schema
     if updates:
         spec = replace(spec, **updates)
     if normalized_code == tool.code and spec == tool.spec:
@@ -3517,6 +3602,9 @@ def _align_model_authored_function_signature(
     code: str,
     tool_name: str,
     inputs: tuple[ToolInput, ...],
+    *,
+    optional_input_names: frozenset[str] = frozenset(),
+    public_contract_authoritative: bool = False,
 ) -> str:
     """Align model-authored function shape with the public validation contract."""
 
@@ -3530,10 +3618,8 @@ def _align_model_authored_function_signature(
     if len(functions) != 1:
         return code
     fn = functions[0]
-    if fn.args.vararg is not None or fn.args.kwarg is not None:
-        return code
     defaults_by_name: dict[str, ast.expr | None] = {}
-    positional = fn.args.args
+    positional = [*fn.args.posonlyargs, *fn.args.args]
     defaults = list(fn.args.defaults)
     first_default = len(positional) - len(defaults)
     for index, arg in enumerate(positional):
@@ -3541,33 +3627,75 @@ def _align_model_authored_function_signature(
         defaults_by_name[arg.arg] = (
             defaults[default_index] if default_index >= 0 else None
         )
+    for arg, default in zip(fn.args.kwonlyargs, fn.args.kw_defaults, strict=True):
+        defaults_by_name[arg.arg] = default
     new_args: list[ast.arg] = []
-    new_defaults: list[ast.expr] = []
-    any_default = False
+    defaults_for_args: list[ast.expr | None] = []
     for item in inputs:
         annotation = ast.Name(id=item.annotation, ctx=ast.Load())
         new_args.append(
             ast.arg(arg=item.name, annotation=annotation, type_comment=None)
         )
-        default = defaults_by_name.get(item.name)
-        if default is None:
-            default = _model_authored_optional_input_default(tool_name, item)
-        if default is None and any_default:
-            default = ast.Constant(value=None)
-        if default is not None:
-            any_default = True
-            new_defaults.append(default)
-    if any_default and len(new_defaults) < len(new_args):
-        missing = len(new_args) - len(new_defaults)
-        new_defaults = [ast.Constant(value=None) for _ in range(missing)] + new_defaults
+        if public_contract_authoritative and item.name not in optional_input_names:
+            # Required fields in the values-free public interface stay required even
+            # when model code or a legacy tool-specific table supplied a default.
+            default = None
+        else:
+            default = defaults_by_name.get(item.name)
+            if default is None:
+                default = _model_authored_optional_input_default(tool_name, item)
+            if default is None and item.name in optional_input_names:
+                default = _safe_optional_input_default(item.annotation)
+        defaults_for_args.append(default)
+    first_default_index = next(
+        (
+            index
+            for index, default in enumerate(defaults_for_args)
+            if default is not None
+        ),
+        len(defaults_for_args),
+    )
+    new_defaults = [
+        default if default is not None else ast.Constant(value=None)
+        for default in defaults_for_args[first_default_index:]
+    ]
     fn.name = tool_name
+    # Generated tools expose one simple, keyword-callable interface. Convert
+    # every Python-only calling convention (positional-only, keyword-only, and
+    # variadic parameters) to the exact public input list before compilation.
+    fn.args.posonlyargs = []
     fn.args.args = new_args
     fn.args.defaults = new_defaults
+    fn.args.vararg = None
+    fn.args.kwonlyargs = []
+    fn.args.kw_defaults = []
+    fn.args.kwarg = None
     ast.fix_missing_locations(module)
     try:
         return ast.unparse(module) + "\n"
     except Exception:
         return code
+
+
+def _safe_optional_input_default(annotation: str) -> ast.expr:
+    """Return a type-shaped, data-free default for a public optional input."""
+
+    annotation_tokens = {
+        token.strip().lower()
+        for token in re.split(r"[|,\[\]]", annotation)
+        if token.strip()
+    }
+    if "dict" in annotation_tokens:
+        return ast.Dict(keys=[], values=[])
+    if "list" in annotation_tokens:
+        return ast.List(elts=[], ctx=ast.Load())
+    if "bool" in annotation_tokens:
+        return ast.Constant(value=False)
+    if "int" in annotation_tokens:
+        return ast.Constant(value=0)
+    if "float" in annotation_tokens:
+        return ast.Constant(value=0.0)
+    return ast.Constant(value="")
 
 
 def _model_authored_optional_input_default(
@@ -3669,6 +3797,146 @@ def _merge_output_schemas(
     merged["type"] = merged.get("type") or "object"
     merged["properties"] = props
     return merged
+
+
+def public_output_contract_from_example_outputs(
+    example_outputs: tuple[object, ...],
+) -> tuple[PublicToolOutputContract, ...]:
+    """Derive an object-result interface without exposing any expected value."""
+
+    usable_outputs = tuple(item for item in example_outputs if isinstance(item, dict))
+    if not usable_outputs:
+        return ()
+    values_by_name: dict[str, list[Any]] = {}
+    presence_by_name: dict[str, int] = {}
+    first_seen_names: list[str] = []
+    for output in usable_outputs:
+        for raw_name, value in output.items():
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            if name not in values_by_name:
+                first_seen_names.append(name)
+                values_by_name[name] = []
+                presence_by_name[name] = 0
+            values_by_name[name].append(value)
+            presence_by_name[name] += 1
+    return tuple(
+        PublicToolOutputContract(
+            name=name,
+            schema_types=_json_schema_types_for_values(values_by_name[name]),
+            optional=presence_by_name[name] < len(usable_outputs),
+        )
+        for name in first_seen_names
+    )
+
+
+def _output_schema_from_public_contract(
+    contract: tuple[PublicToolOutputContract, ...],
+) -> dict[str, Any]:
+    properties: dict[str, dict[str, object]] = {}
+    required: list[str] = []
+    for item in contract:
+        schema_type: object = (
+            item.schema_types[0]
+            if len(item.schema_types) == 1
+            else list(item.schema_types)
+        )
+        properties[item.name] = {"type": schema_type}
+        if not item.optional:
+            required.append(item.name)
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
+
+
+def public_input_contract_from_example_inputs(
+    example_inputs: tuple[dict[str, Any], ...],
+) -> tuple[PublicToolInputContract, ...]:
+    """Derive a callable interface without exposing any example values.
+
+    Behavioral hold-outs keep their concrete inputs and expected outputs hidden
+    from the model.  Their input *shape* remains public because a generated tool
+    cannot implement or advertise a callable parameter that SAGE later deletes.
+    """
+
+    usable_inputs = tuple(item for item in example_inputs if isinstance(item, dict))
+    if not usable_inputs:
+        return ()
+    values_by_name: dict[str, list[Any]] = {}
+    presence_by_name: dict[str, int] = {}
+    first_seen_names: list[str] = []
+    for inputs in usable_inputs:
+        for raw_name, value in inputs.items():
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            if name not in values_by_name:
+                first_seen_names.append(name)
+                values_by_name[name] = []
+                presence_by_name[name] = 0
+            values_by_name[name].append(value)
+            presence_by_name[name] += 1
+    contracts = tuple(
+        PublicToolInputContract(
+            name=name,
+            annotation=_python_annotation_for_values(values_by_name[name]),
+            optional=presence_by_name[name] < len(usable_inputs),
+        )
+        for name in first_seen_names
+    )
+    # Required positional parameters must precede defaulted optional parameters.
+    # Tool calls are keyword-based, so this ordering changes no semantic binding.
+    return tuple(item for item in contracts if not item.optional) + tuple(
+        item for item in contracts if item.optional
+    )
+
+
+def _inputs_from_public_contract(
+    request: ToolGenerationRequest,
+) -> tuple[ToolInput, ...]:
+    if request.public_input_contract:
+        ordered_contract = tuple(
+            item for item in request.public_input_contract if not item.optional
+        ) + tuple(item for item in request.public_input_contract if item.optional)
+        visible_values_by_name: dict[str, list[Any]] = {}
+        for example in request.validation_examples:
+            inputs = example.get("inputs") if isinstance(example, dict) else None
+            if not isinstance(inputs, dict):
+                continue
+            for raw_name, value in inputs.items():
+                visible_values_by_name.setdefault(str(raw_name), []).append(value)
+        return tuple(
+            ToolInput(
+                name=item.name,
+                annotation=item.annotation,
+                description=_public_input_description(
+                    item,
+                    visible_values_by_name.get(item.name, []),
+                ),
+            )
+            for item in ordered_contract
+        )
+    return _infer_inputs_from_examples(request)
+
+
+def _public_input_description(
+    item: PublicToolInputContract,
+    model_visible_values: list[Any],
+) -> str:
+    """Describe an input using model-visible structure, never held-out values."""
+
+    description = (
+        _visible_input_description(item.name, model_visible_values)
+        if model_visible_values
+        else f"Visible input {item.name}."
+    )
+    if item.optional:
+        description = description.rstrip(".") + ". Optional; omit when unavailable."
+    return description
 
 
 def _infer_inputs_from_examples(
@@ -3807,6 +4075,16 @@ def _json_schema_type(value: Any) -> str:
     if value is None:
         return "null"
     return "string"
+
+
+def _json_schema_types_for_values(values: list[Any]) -> tuple[str, ...]:
+    """Return a stable values-free JSON type union for one public output field."""
+
+    types = {_json_schema_type(value) for value in values}
+    if "integer" in types and "number" in types:
+        types.remove("integer")
+    order = ("object", "array", "boolean", "integer", "number", "string", "null")
+    return tuple(item for item in order if item in types) or ("null",)
 
 
 def _request_evidence(
@@ -3961,6 +4239,8 @@ def _single_validation_error_distance(error: str) -> int:
             "function_name_mismatch:",
             "missing_expected_function",
             "compile_error:",
+            "undefined_name:",
+            "input_signature_mismatch:",
             "denied_node:",
             "denied_call:",
             "denied_attribute_call:",

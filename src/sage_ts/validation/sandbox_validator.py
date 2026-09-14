@@ -264,11 +264,33 @@ def _recommendation_expresses_deficit(recommendation: str) -> bool:
     contradicted_deficit = re.search(
         r"\b(?:missing|unavailable|absent|unresolved|unknown|ambiguous|unclear|"
         r"insufficient|incomplete|needed|required)\b(?: [a-z0-9]+){0,6} "
-        r"(?:succeeded|succeeds|available|present|resolved|complete|completed|"
+        r"(?:succeeded|succeeds|available|present|resolved|completed|"
         r"provided|found|works|working)\b",
         normalized,
     )
-    if negated_deficit or contradicted_deficit:
+    # Bare ``complete`` is not a success signal: in ordinary abstention prose it
+    # commonly follows an infinitive ("a target is required to complete the
+    # action").  Only treat it as contradictory when it is a state asserted via
+    # a copula, such as "the missing information is now complete".
+    contradicted_complete_state = re.search(
+        r"\b(?:missing|unavailable|absent|unresolved|unknown|ambiguous|unclear|"
+        r"insufficient|incomplete|needed|required)\b(?: [a-z0-9]+){0,6} "
+        r"(?:is|are|was|were|became|becomes) (?:now |already )?complete\b",
+        normalized,
+    )
+    contradicted_modal_completion = re.search(
+        r"\b(?:missing|unavailable|absent|unresolved|unknown|ambiguous|unclear|"
+        r"insufficient|incomplete|needed|required)\b(?: [a-z0-9]+){0,6} "
+        r"(?:can|could|may|might|will|would|shall|should) "
+        r"(?:successfully )?complete\b",
+        normalized,
+    )
+    if (
+        negated_deficit
+        or contradicted_deficit
+        or contradicted_complete_state
+        or contradicted_modal_completion
+    ):
         return False
     tokens = set(ordered_tokens)
     return any(

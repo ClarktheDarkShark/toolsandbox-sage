@@ -20,7 +20,11 @@ from sage_ts.adequacy.inadequacy_classifier import (
 )
 from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
-from sage_ts.generation.tool_generator import ToolGenerationRequest
+from sage_ts.generation.tool_generator import (
+    ToolGenerationRequest,
+    public_input_contract_from_example_inputs,
+    public_output_contract_from_example_outputs,
+)
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
     ToolFamily,
@@ -32,6 +36,10 @@ from sage_ts.registry.manifest import (
     has_current_validation_proof,
 )
 from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import (
+    ResolvedValidationContract,
+    ValidationContractBindingStore,
+)
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
     ValidationResult,
@@ -664,6 +672,9 @@ def _validation_error_distance(error: str) -> int:
             "function_name_mismatch:",
             "missing_expected_function",
             "compile_error:",
+            "undefined_name:",
+            "generated_tool_name_mismatch:",
+            "input_signature_mismatch:",
             "denied_node:",
             "denied_call:",
             "denied_attribute_call:",
@@ -1219,9 +1230,92 @@ class OnlineBirthController:
     canary_state_by_tool: dict[str, dict[str, Any]] = field(default_factory=dict)
     repair_transactions_by_tool: dict[str, dict[str, Any]] = field(default_factory=dict)
     last_completed_count: int = 0
+    _validation_contract_store: ValidationContractBindingStore = field(
+        init=False, repr=False
+    )
+    _validation_contract_restore_failures: dict[str, str] = field(
+        init=False, default_factory=dict, repr=False
+    )
 
     def __post_init__(self) -> None:
+        self._validation_contract_store = ValidationContractBindingStore(
+            self.store.root
+        )
+        restored, self._validation_contract_restore_failures = (
+            self._validation_contract_store.restore(self.store.load_entries())
+        )
+        for tool_name, binding in restored.items():
+            self._install_restored_contract(tool_name, binding)
+        # An active implementation without its exact admission contract must
+        # never remain routable after process restart. Development fixtures bind
+        # explicitly before controller construction; there is no runtime backfill.
+        for tool_name, reason in self._validation_contract_restore_failures.items():
+            entry = self.store.get(tool_name)
+            if entry is None or entry.retired:
+                continue
+            self.store.retire(tool_name)
+            self._event(
+                "validation_contract_restore_failed_entry_retired",
+                {
+                    "tool_name": tool_name,
+                    "tool_version": entry.version,
+                    "tool_code_hash": entry.stored_code_hash,
+                    "binding_error": reason,
+                    "entry_retired": True,
+                    "repair_model_called": False,
+                    "raw_hidden_case_values_logged": False,
+                },
+            )
         self._load_repair_state()
+
+    def _install_restored_contract(
+        self,
+        tool_name: str,
+        binding: ResolvedValidationContract,
+    ) -> None:
+        """Restore only synthetic public contract context, never task identity."""
+
+        observation = binding.observation
+        self.observations_by_tool_name[tool_name] = observation
+        self.scenarios_by_key.setdefault(observation.canonical_key, set()).add(
+            f"validation_contract:v{binding.tool_version}"
+        )
+        self.base_families_by_key.setdefault(observation.canonical_key, set()).add(
+            _observation_family_key(observation)
+        )
+
+    def _resolve_validation_contract(
+        self,
+        entry: RegistryEntry,
+    ) -> tuple[ResolvedValidationContract | None, str | None]:
+        """Reverify the durable binding at each lifecycle decision boundary."""
+
+        binding, error = self._validation_contract_store.resolve(entry)
+        tool_name = entry.tool.spec.tool_name
+        if binding is None:
+            self.observations_by_tool_name.pop(tool_name, None)
+            self._validation_contract_restore_failures[tool_name] = (
+                error or "binding_invalid"
+            )
+            return None, error or "binding_invalid"
+        self._validation_contract_restore_failures.pop(tool_name, None)
+        self._install_restored_contract(tool_name, binding)
+        return binding, None
+
+    def _persist_validation_contract(
+        self,
+        entry: RegistryEntry,
+        observation: CapabilityObservation,
+        *,
+        validation_examples: tuple[ToolExample, ...],
+    ) -> ResolvedValidationContract:
+        binding = self._validation_contract_store.persist(
+            entry,
+            observation,
+            validation_examples=validation_examples,
+        )
+        self._install_restored_contract(entry.tool.spec.tool_name, binding)
+        return binding
 
     @property
     def repair_state_path(self) -> Path:
@@ -1488,12 +1582,18 @@ class OnlineBirthController:
             source_version = transaction.get("source_tool_version")
             expected_code_hash = str(transaction.get("replacement_code_hash") or "")
             entry = self.store.get(tool_name)
+            entry_binding, _binding_error = (
+                self._validation_contract_store.resolve(entry)
+                if entry is not None
+                else (None, "registry_entry_missing")
+            )
             matches_target = bool(
                 isinstance(target_version, int)
                 and not isinstance(target_version, bool)
                 and entry is not None
                 and entry.version == target_version
                 and not entry.retired
+                and entry_binding is not None
                 and entry.birth_scenario.startswith("post_deployment_repair:")
                 and (
                     not expected_code_hash
@@ -1588,6 +1688,38 @@ class OnlineBirthController:
             tool_name: self._normalize_loaded_canary_state(state)
             for tool_name, state in self.canary_state_by_tool.items()
         }
+        verified_canaries: dict[str, dict[str, Any]] = {}
+        for tool_name, state in self.canary_state_by_tool.items():
+            entry = self.store.get(tool_name)
+            binding, binding_error = (
+                self._validation_contract_store.resolve(entry)
+                if entry is not None
+                else (None, "registry_entry_missing")
+            )
+            raw_version = state.get("tool_version")
+            if (
+                entry is not None
+                and not entry.retired
+                and isinstance(raw_version, int)
+                and not isinstance(raw_version, bool)
+                and entry.version == raw_version
+                and binding is not None
+            ):
+                verified_canaries[tool_name] = state
+                continue
+            if entry is not None and not entry.retired:
+                self.store.retire(tool_name)
+            self._event(
+                "post_deployment_tool_canary_recovery_rejected",
+                {
+                    "tool_name": tool_name,
+                    "tool_version": raw_version,
+                    "binding_error": binding_error,
+                    "entry_retired": bool(entry is not None and not entry.retired),
+                    "repair_model_called": False,
+                },
+            )
+        self.canary_state_by_tool = verified_canaries
         for request_id, row in final_status_by_request.items():
             status = str(row.get("status") or "")
             if status in terminal_statuses:
@@ -1605,10 +1737,16 @@ class OnlineBirthController:
             ):
                 request = request_by_id.get(request_id, {})
                 entry = self.store.get(tool_name)
+                entry_binding, _binding_error = (
+                    self._validation_contract_store.resolve(entry)
+                    if entry is not None
+                    else (None, "registry_entry_missing")
+                )
                 if (
                     entry is not None
                     and entry.version == version
                     and not entry.retired
+                    and entry_binding is not None
                     and entry.birth_scenario.startswith("post_deployment_repair:")
                 ):
                     recovered_canary = self._prepared_canary_state(
@@ -1948,12 +2086,34 @@ class OnlineBirthController:
         failed: list[str] = []
         for tool_name in dict.fromkeys(str(item) for item in tool_names if item):
             entry = self.store.get(tool_name)
-            observation = self.observations_by_tool_name.get(tool_name)
-            if entry is None or observation is None:
+            if entry is None:
                 continue
+            binding, binding_error = self._resolve_validation_contract(entry)
+            if binding is None:
+                was_active = not entry.retired
+                if was_active:
+                    self.store.retire(tool_name)
+                failed.append(tool_name)
+                self._event(
+                    "post_deployment_public_contract_binding_invalid",
+                    {
+                        "tool_name": tool_name,
+                        "tool_version": entry.version,
+                        "tool_code_hash": entry.stored_code_hash,
+                        "binding_error": binding_error,
+                        "error_labels": ["invalid_public_contract_binding"],
+                        "entry_retired": was_active,
+                        "repair_model_called": False,
+                        "raw_hidden_case_values_logged": False,
+                    },
+                )
+                continue
+            observation = binding.observation
             validation = validate_generated_tool(
                 entry.tool,
-                examples=_validation_examples_for_tool(entry.tool, observation),
+                # The content-addressed binding freezes the exact synthetic
+                # source/held-out contract that admitted this version.
+                examples=observation.validation_examples,
             )
             original_contract_errors = _original_tool_contract_errors(
                 entry.tool, observation
@@ -2372,6 +2532,12 @@ class OnlineBirthController:
                 }
                 for item in model_visible_examples
             ),
+            public_input_contract=public_input_contract_from_example_inputs(
+                tuple(item.inputs for item in generation_examples)
+            ),
+            public_output_contract=public_output_contract_from_example_outputs(
+                tuple(item.expected for item in generation_examples)
+            ),
             suggested_tool_name=suggested_name,
             inadequacy_evidence=inadequacy_evidence,
             failure_memory_context=(
@@ -2566,7 +2732,6 @@ class OnlineBirthController:
                 continue
 
             entry = self.store.get(tool_name)
-            observation = self.observations_by_tool_name.get(tool_name)
             if entry is None:
                 self._reject_pending_repair(
                     lifecycle_request,
@@ -2610,16 +2775,31 @@ class OnlineBirthController:
                     acknowledge=acknowledge,
                 )
                 continue
-            if observation is None:
+            binding, binding_error = self._resolve_validation_contract(entry)
+            if binding is None:
                 self._event(
-                    "post_deployment_tool_repair_deferred",
+                    "post_deployment_public_contract_binding_invalid",
                     {
                         "request_id": request_id,
                         "tool_name": tool_name,
-                        "reason": "public_contract_observation_not_available",
+                        "tool_version": entry.version,
+                        "tool_code_hash": entry.stored_code_hash,
+                        "binding_error": binding_error,
+                        "error_labels": ["invalid_public_contract_binding"],
+                        "entry_retired": not entry.retired,
+                        "repair_model_called": False,
+                        "raw_hidden_case_values_logged": False,
                     },
                 )
+                self._reject_pending_repair(
+                    lifecycle_request,
+                    reason=(
+                        f"public_contract_binding_invalid:{binding_error or 'unknown'}"
+                    ),
+                    acknowledge=acknowledge,
+                )
                 continue
+            observation = binding.observation
             lifecycle_request["target_task_family"] = self._normalized_task_family(
                 lifecycle_request.get("target_task_family")
             )
@@ -2648,9 +2828,7 @@ class OnlineBirthController:
                     suggested_name=tool_name,
                     lifecycle_request=lifecycle_request,
                 )
-                validation_examples = _validation_examples_for_tool(
-                    entry.tool, observation
-                )
+                validation_examples = observation.validation_examples
                 prior_validation = validate_generated_tool(
                     entry.tool,
                     examples=validation_examples,
@@ -2680,6 +2858,9 @@ class OnlineBirthController:
             best_tool: GeneratedTool | None = None
             best_validation: ValidationResult | None = None
             model_authored_code_change_discarded = False
+            best_partial_tool = entry.tool
+            best_partial_validation = prior_validation
+            best_partial_score = _validation_failure_score(prior_validation)
             seed_tool = entry.tool
             seed_errors = tuple(
                 dict.fromkeys(
@@ -2770,7 +2951,9 @@ class OnlineBirthController:
                             )
                         else:
                             _gate, _live_check, validation = self._gate_and_validate(
-                                candidate, observation
+                                candidate,
+                                observation,
+                                expected_tool_name=tool_name,
                             )
                     except Exception as exc:
                         self._event(
@@ -2790,10 +2973,27 @@ class OnlineBirthController:
                     )
                 if not candidate_results:
                     continue
-                candidate, validation, _score = min(
-                    candidate_results,
-                    key=lambda item: (not item[1].accepted, item[2]),
+                selected_candidate_index = min(
+                    range(len(candidate_results)),
+                    key=lambda index: (
+                        not candidate_results[index][1].accepted,
+                        candidate_results[index][2],
+                        index,
+                    ),
                 )
+                candidate, validation, validation_score = candidate_results[
+                    selected_candidate_index
+                ]
+                improved_best = validation.accepted or (
+                    validation_score < best_partial_score
+                )
+                retained_equal_score = (
+                    not validation.accepted and validation_score == best_partial_score
+                )
+                if improved_best or retained_equal_score:
+                    best_partial_tool = candidate
+                    best_partial_validation = validation
+                    best_partial_score = validation_score
                 self._event(
                     "post_deployment_tool_repair_attempted",
                     {
@@ -2801,7 +3001,32 @@ class OnlineBirthController:
                         "tool_name": tool_name,
                         "attempt": attempt,
                         "candidate_count": len(candidate_results),
+                        "selected_candidate_index": selected_candidate_index,
                         "accepted": validation.accepted,
+                        "validation_score": validation_score,
+                        "best_validation_score": best_partial_score,
+                        "improved_best": improved_best,
+                        "retained_equal_score": retained_equal_score,
+                        "next_seed_source": (
+                            "selected_candidate"
+                            if improved_best or retained_equal_score
+                            else "best_previous_candidate"
+                        ),
+                        "candidate_validations": [
+                            {
+                                "candidate_index": index,
+                                "accepted": candidate_validation.accepted,
+                                "validation_score": candidate_score,
+                                "errors": list(
+                                    _repair_prompt_errors(candidate_validation.errors)
+                                ),
+                            }
+                            for index, (
+                                _candidate,
+                                candidate_validation,
+                                candidate_score,
+                            ) in enumerate(candidate_results)
+                        ],
                         "implementation_code_preserved": (
                             code_hash(candidate.code) == source_code_hash
                             if repair_kind == "metadata"
@@ -2815,17 +3040,15 @@ class OnlineBirthController:
                         "error_labels": list(_repair_prompt_errors(validation.errors)),
                     },
                 )
-                seed_tool = candidate
-                # Feedback must describe the candidate supplied to the next repair
-                # call.  Retaining failures from superseded candidates presents stale
-                # ACTUAL values as if they came from the current code and prevents a
-                # bounded iterative repair from converging.  Lifecycle trigger reasons
-                # remain immutable; all candidate-specific errors are freshly replaced.
+                # Never let a worse repair displace the best validated partial repair.
+                # Feedback always describes the exact candidate supplied to the next
+                # model call. Lifecycle trigger reasons remain immutable.
+                seed_tool = best_partial_tool
                 seed_errors = tuple(
                     dict.fromkeys(
                         (
                             *immutable_repair_errors,
-                            *_repair_prompt_errors(validation.errors),
+                            *_repair_prompt_errors(best_partial_validation.errors),
                         )
                     )
                 )
@@ -2932,6 +3155,11 @@ class OnlineBirthController:
                     )
                 ):
                     raise RuntimeError("activated repair version did not match lineage")
+                contract_binding = self._persist_validation_contract(
+                    saved_entry,
+                    observation,
+                    validation_examples=observation.validation_examples,
+                )
                 snapshot_dir = self.output_dir / "generated_tool_snapshots"
                 snapshot_dir.mkdir(parents=True, exist_ok=True)
                 snapshot_path = snapshot_dir / f"{tool_name}_v{saved_entry.version}.py"
@@ -3000,6 +3228,7 @@ class OnlineBirthController:
                         else None
                     ),
                     "snapshot_path": str(snapshot_path),
+                    "validation_contract_hash": contract_binding.contract_hash,
                     "canary_eligible_from_next_task": True,
                     "eligible_from_completed_count": eligible_count,
                     "activated_after_completed_count": completed_count,
@@ -3595,6 +3824,7 @@ class OnlineBirthController:
             memory_gate, live_check, validation = self._gate_and_validate(
                 tool,
                 observation,
+                expected_tool_name=suggested_name,
             )
             repair_attempted = False
             repair_attempt_count = 0
@@ -3611,7 +3841,6 @@ class OnlineBirthController:
             best_validation_score = _validation_failure_score(validation)
             repair_seed_tool = tool
             repair_seed_validation = validation
-            repair_error_history = list(_repair_prompt_errors(validation.errors))
             if not validation.accepted and callable(repair_method):
                 repair_errors = _repair_prompt_errors(validation.errors)
                 for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
@@ -3619,21 +3848,12 @@ class OnlineBirthController:
                         break
                     repair_attempted = True
                     repair_attempt_count = attempt
-                    current_errors = tuple(
-                        dict.fromkeys(
-                            (
-                                *repair_error_history,
-                                *_repair_prompt_errors(repair_seed_validation.errors),
-                            )
-                        )
+                    # Candidate-specific feedback must describe the exact best partial
+                    # implementation supplied to this round. Errors from superseded
+                    # candidates are stale and can reintroduce branches already fixed.
+                    current_errors = _repair_prompt_errors(
+                        repair_seed_validation.errors
                     )
-                    if repair_seed_tool.spec.native_action_delegation:
-                        # Repair the best candidate's remaining failures only. Old
-                        # errors describe branches that candidate already fixed and
-                        # can make model repair reintroduce those failures.
-                        current_errors = _repair_prompt_errors(
-                            repair_seed_validation.errors
-                        )
                     self._event(
                         "tool_repair_started",
                         {
@@ -3684,7 +3904,11 @@ class OnlineBirthController:
                             ),
                         )
                         candidate_gate, candidate_live_check, candidate_validation = (
-                            self._gate_and_validate(normalized_candidate, observation)
+                            self._gate_and_validate(
+                                normalized_candidate,
+                                observation,
+                                expected_tool_name=suggested_name,
+                            )
                         )
                         candidate_results.append(
                             (
@@ -3710,20 +3934,16 @@ class OnlineBirthController:
                         repaired_validation,
                         repaired_score,
                     ) = candidate_results[selected_candidate_index]
-                    advanced_case_frontier = (
-                        repair_seed_tool.spec.native_action_delegation
-                        and _advances_repair_case_frontier(
-                            tuple(repair_seed_validation.errors),
-                            tuple(repaired_validation.errors),
-                        )
-                    )
-                    repair_error_history.extend(
-                        error
-                        for error in _repair_prompt_errors(repaired_validation.errors)
-                        if error not in repair_error_history
+                    advanced_case_frontier = _advances_repair_case_frontier(
+                        tuple(repair_seed_validation.errors),
+                        tuple(repaired_validation.errors),
                     )
                     improved = repaired_validation.accepted or (
                         repaired_score < best_validation_score
+                    )
+                    retained_equal_score = (
+                        not repaired_validation.accepted
+                        and repaired_score == best_validation_score
                     )
                     repair_record = {
                         "attempt": attempt,
@@ -3738,6 +3958,7 @@ class OnlineBirthController:
                         "code": repaired_tool.code,
                         "validation_score": repaired_score,
                         "improved_best": improved,
+                        "retained_equal_score": retained_equal_score,
                         "advanced_case_frontier": advanced_case_frontier,
                         "repair_candidate_count": len(candidate_results),
                         "selected_candidate_index": selected_candidate_index,
@@ -3768,27 +3989,16 @@ class OnlineBirthController:
                             **repair_record,
                         },
                     )
-                    if improved:
+                    if improved or retained_equal_score:
                         best_tool = repaired_tool
                         best_memory_gate = repaired_gate
                         best_live_check = repaired_live_check
                         best_validation = repaired_validation
                         best_validation_score = repaired_score
-                    # A native-action candidate can temporarily score worse while it
-                    # fixes every previously failing case and exposes a different
-                    # branch. Continue from that complementary candidate so the next
-                    # repair can combine both behaviors; otherwise return to the best
-                    # proved candidate instead of drifting through arbitrary failures.
-                    if (
-                        best_tool.spec.native_action_delegation
-                        and not improved
-                        and not advanced_case_frontier
-                    ):
-                        repair_seed_tool = best_tool
-                        repair_seed_validation = best_validation
-                    else:
-                        repair_seed_tool = repaired_tool
-                        repair_seed_validation = repaired_validation
+                    # Equal-score candidates may advance implementation structure, but
+                    # a strictly worse candidate never becomes the next repair seed.
+                    repair_seed_tool = best_tool
+                    repair_seed_validation = best_validation
                     tool = best_tool
                     memory_gate = best_memory_gate
                     live_check = best_live_check
@@ -3887,14 +4097,58 @@ class OnlineBirthController:
             },
         )
         if validation.accepted:
-            self.generated_keys.add(observation.canonical_key)
             entry = RegistryEntry.accepted(
                 tool,
                 validation,
                 birth_scenario=birth_context,
             )
-            self.store.put(entry)
-            saved_entry = self.store.get(tool.spec.tool_name) or entry
+            try:
+                self.store.put(entry)
+                saved_entry = self.store.get(tool.spec.tool_name)
+                if (
+                    saved_entry is None
+                    or saved_entry.retired
+                    or saved_entry.stored_code_hash != entry.stored_code_hash
+                    or not saved_entry.code_hash_verified
+                ):
+                    raise RuntimeError(
+                        "accepted registry version did not match generated tool"
+                    )
+                contract_binding = self._persist_validation_contract(
+                    saved_entry,
+                    observation,
+                    validation_examples=_validation_examples_for_tool(
+                        tool, observation
+                    ),
+                )
+            except Exception as exc:
+                current_entry = self.store.get(tool.spec.tool_name)
+                if (
+                    current_entry is not None
+                    and not current_entry.retired
+                    and current_entry.stored_code_hash == entry.stored_code_hash
+                ):
+                    self.store.retire(tool.spec.tool_name)
+                self.generated_keys.discard(observation.canonical_key)
+                self.rejected_counts[observation.canonical_key] += 1
+                self._event(
+                    "tool_birth_validation_contract_binding_failed",
+                    {
+                        "canonical_key": observation.canonical_key,
+                        "tool_name": tool.spec.tool_name,
+                        "tool_version": (
+                            current_entry.version if current_entry is not None else None
+                        ),
+                        "tool_code_hash": entry.stored_code_hash,
+                        "error": f"{type(exc).__name__}:{exc}",
+                        "entry_retired": bool(
+                            current_entry is not None and not current_entry.retired
+                        ),
+                        "raw_hidden_case_values_logged": False,
+                    },
+                )
+                return None
+            self.generated_keys.add(observation.canonical_key)
             snapshot_dir = self.output_dir / "generated_tool_snapshots"
             snapshot_dir.mkdir(parents=True, exist_ok=True)
             snapshot_path = (
@@ -3909,6 +4163,7 @@ class OnlineBirthController:
                     "tool_name": tool.spec.tool_name,
                     "birth_scenario": birth_context,
                     "snapshot_path": str(snapshot_path),
+                    "validation_contract_hash": contract_binding.contract_hash,
                 },
             )
             self._event(
@@ -3919,6 +4174,7 @@ class OnlineBirthController:
                     **_observation_public_context(observation),
                     "family": tool.spec.family.value,
                     "snapshot_path": str(snapshot_path),
+                    "validation_contract_hash": contract_binding.contract_hash,
                     "code": tool.code,
                 },
             )
@@ -3927,6 +4183,8 @@ class OnlineBirthController:
                 {
                     "registry_dir": str(self.store.root),
                     "tool_name": tool.spec.tool_name,
+                    "tool_version": saved_entry.version,
+                    "validation_contract_hash": contract_binding.contract_hash,
                     **_observation_public_context(observation),
                 },
             )
@@ -3950,12 +4208,26 @@ class OnlineBirthController:
         self,
         tool: GeneratedTool,
         observation: CapabilityObservation,
+        *,
+        expected_tool_name: str | None = None,
     ) -> tuple[Any, Any, ValidationResult]:
         examples = _validation_examples_for_tool(tool, observation)
         memory_gate = evaluate_candidate_gate(
             tool.spec,
             failure_memory_path=self.failure_memory_path,
         )
+        if expected_tool_name and tool.spec.tool_name != expected_tool_name:
+            return (
+                memory_gate,
+                None,
+                ValidationResult(
+                    False,
+                    (
+                        "generated_tool_name_mismatch:"
+                        f"{tool.spec.tool_name}!={expected_tool_name}",
+                    ),
+                ),
+            )
         if not memory_gate.allowed:
             return (
                 memory_gate,

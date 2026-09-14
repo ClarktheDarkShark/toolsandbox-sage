@@ -20,6 +20,10 @@ from typing import Any, Iterator, cast
 from sage_ts.adapters.role_factory import (
     SAGE_WRAPPED_AGENT_RUNTIME as SAGE_WRAPPED_AGENT_RUNTIME,
 )
+from sage_ts.adapters.sage_run_adapter import (
+    _side_effect_followup_failures,
+    _tool_trace_events_from_execution_context,
+)
 from sage_ts.adapters.toolsandbox_adapter import DEFAULT_TOOL_BACKEND
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.online_feedback_score import (
@@ -34,7 +38,11 @@ from sage_ts.evaluation.outcome_score import (
 from sage_ts.evaluation.outcome_score import (
     outcome_evaluator_manifest as outcome_evaluator_manifest,
 )
+from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
+from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
+from sage_ts.registry.validation_contracts import ValidationContractBindingStore
+from sage_ts.validation.sandbox_validator import validate_generated_tool
 from tool_sandbox.cli.utils import resolve_scenarios
 from tool_sandbox.common.evaluation import Milestone, Minefield
 from tool_sandbox.common.execution_context import ExecutionContext
@@ -378,6 +386,79 @@ def _read_jsonl_objects(path: Path) -> list[dict[str, Any]]:
             )
         rows.append(row)
     return rows
+
+
+def _declared_path_is_symlink(run_root: Path, value: Any) -> bool:
+    """Reject a symlink before path resolution erases that fact."""
+
+    if not isinstance(value, str) or not value.strip():
+        return False
+    path = Path(value)
+    candidates = (
+        (path,)
+        if path.is_absolute()
+        else (REPO_ROOT / path, Path.cwd() / path, run_root / path)
+    )
+    return any(candidate.is_symlink() for candidate in candidates)
+
+
+def _verified_protocol_event_rows(
+    *,
+    run_root: Path,
+    protocol: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Load the manifest-pinned, append-complete protocol event journal."""
+
+    journal = protocol.get("protocol_event_journal")
+    if not isinstance(journal, dict):
+        raise ValueError("Publication run has no sealed protocol event journal.")
+    schema_version = journal.get("schema_version")
+    if (
+        isinstance(schema_version, bool)
+        or schema_version != 1
+        or journal.get("append_closed_before_protocol_manifest") is not True
+    ):
+        raise ValueError("Publication protocol event journal seal is malformed.")
+    declared_path = journal.get("path")
+    if _declared_path_is_symlink(run_root, declared_path):
+        raise ValueError("Publication protocol event journal must not be a symlink.")
+    artifact_root = _resolve_declared_path(
+        run_root,
+        journal.get("artifact_root"),
+        "protocol_event_journal.artifact_root",
+    )
+    journal_path = _resolve_declared_path(
+        run_root,
+        declared_path,
+        "protocol_event_journal.path",
+        required_parent=artifact_root / "events",
+    )
+    if journal_path != (artifact_root / "events" / "latest.jsonl").resolve():
+        raise ValueError("Publication protocol event journal is not latest.jsonl.")
+    if not journal_path.is_file() or journal_path.is_symlink():
+        raise ValueError("Publication protocol event journal is missing or unsafe.")
+    expected_sha256 = journal.get("sha256")
+    observed_sha256 = hashlib.sha256(journal_path.read_bytes()).hexdigest()
+    expected_count = journal.get("event_count")
+    if (
+        not isinstance(expected_sha256, str)
+        or _SHA256_HEX_PATTERN.fullmatch(expected_sha256) is None
+        or expected_sha256 != observed_sha256
+        or isinstance(expected_count, bool)
+        or not isinstance(expected_count, int)
+        or expected_count < 1
+    ):
+        raise ValueError("Publication protocol event journal identity is invalid.")
+    rows = _read_jsonl_objects(journal_path)
+    if len(rows) != expected_count:
+        raise ValueError("Publication protocol event journal count is invalid.")
+    return rows, {
+        "mode": "sealed_protocol_event_journal",
+        "path": str(journal_path),
+        "sha256": observed_sha256,
+        "event_count": len(rows),
+        "sealed": True,
+    }
 
 
 def _read_json_list(path: Path, *, label: str) -> list[Any]:
@@ -1018,6 +1099,969 @@ def _paired_lifecycle_evidence_rows(
     return tuple(paired)
 
 
+def _safe_checkpoint_name(scenario_name: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", scenario_name).strip("_")
+    return slug[:120] or "scenario"
+
+
+def _verified_checkpoint_tool_identity(
+    *,
+    entry: Any,
+    scenario: str,
+    tool_name: str,
+    expected_version: int,
+) -> dict[str, Any]:
+    """Return a registry-backed call-time identity or fail closed."""
+
+    if not isinstance(entry, dict):
+        raise ValueError(
+            f"Registry checkpoint for {scenario!r} has no entry for observed "
+            f"generated tool {tool_name!r}."
+        )
+    version = entry.get("version")
+    tool = entry.get("tool")
+    spec = tool.get("spec") if isinstance(tool, dict) else None
+    declared_name = spec.get("tool_name") if isinstance(spec, dict) else None
+    code = tool.get("code") if isinstance(tool, dict) else None
+    stored_code_hash = entry.get("code_hash")
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version < 1
+        or version != expected_version
+    ):
+        raise ValueError(
+            f"Registry checkpoint version disagrees with lifecycle evidence for "
+            f"{scenario!r} tool {tool_name!r}."
+        )
+    if declared_name != tool_name:
+        raise ValueError(
+            f"Registry checkpoint key and declared generated-tool name disagree "
+            f"for {scenario!r} tool {tool_name!r}."
+        )
+    if (
+        not isinstance(code, str)
+        or not isinstance(stored_code_hash, str)
+        or _SHA256_HEX_PATTERN.fullmatch(stored_code_hash) is None
+        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_code_hash
+    ):
+        raise ValueError(
+            f"Registry checkpoint code hash is invalid for {scenario!r} tool "
+            f"{tool_name!r}."
+        )
+    return {
+        "scenario": scenario,
+        "tool_name": tool_name,
+        "tool_version": version,
+        "code_hash": stored_code_hash,
+    }
+
+
+def _validated_checkpoint_contract_identity(
+    *,
+    checkpoint_dir: Path,
+    copied_files: set[str],
+    raw_entry: Any,
+    scenario: str,
+    tool_name: str,
+    expected_version: int,
+    require_active_proof: bool,
+) -> dict[str, Any]:
+    """Resolve and replay one contract using only one sealed checkpoint.
+
+    Held-out values remain inside the validator-side contract blob.  Neither
+    this function's result nor its errors serialize those values.
+    """
+
+    identity = _verified_checkpoint_tool_identity(
+        entry=raw_entry,
+        scenario=scenario,
+        tool_name=tool_name,
+        expected_version=expected_version,
+    )
+    try:
+        entry = RegistryEntry.from_json(raw_entry)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Registry checkpoint entry is malformed for {scenario!r} tool "
+            f"{tool_name!r}."
+        ) from exc
+    if (
+        entry.tool.spec.tool_name != tool_name
+        or entry.version != expected_version
+        or entry.stored_code_hash != identity["code_hash"]
+        or not entry.code_hash_verified
+    ):
+        raise ValueError(
+            f"Registry checkpoint entry identity changed while parsing "
+            f"{scenario!r} tool {tool_name!r}."
+        )
+
+    binding_store = ValidationContractBindingStore(checkpoint_dir)
+    binding, binding_error = binding_store.resolve(entry)
+    if binding is None:
+        raise ValueError(
+            f"Registry checkpoint validation-contract binding is invalid for "
+            f"{scenario!r} tool {tool_name!r}: "
+            f"{binding_error or 'unknown_binding_error'}."
+        )
+    index_relative = binding_store.index_path.relative_to(checkpoint_dir).as_posix()
+    blob_relative = (
+        (binding_store.blob_directory / f"{binding.contract_hash}.json")
+        .relative_to(checkpoint_dir)
+        .as_posix()
+    )
+    if index_relative not in copied_files or blob_relative not in copied_files:
+        raise ValueError(
+            f"Registry checkpoint metadata omits the exact validation contract "
+            f"for {scenario!r} tool {tool_name!r}."
+        )
+    spec_sha256 = hashlib.sha256(
+        json.dumps(
+            entry.tool.spec.to_json(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    if (
+        binding.tool_name != tool_name
+        or binding.tool_version != expected_version
+        or binding.tool_code_hash != identity["code_hash"]
+        or binding.tool_spec_hash != spec_sha256
+    ):
+        raise ValueError(
+            f"Registry checkpoint validation contract has the wrong identity for "
+            f"{scenario!r} tool {tool_name!r}."
+        )
+
+    replayed = validate_generated_tool(
+        entry.tool,
+        binding.observation.validation_examples,
+    )
+    if not replayed.accepted or not entry.validation.accepted:
+        raise ValueError(
+            f"Registry checkpoint validation contract is not accepted for "
+            f"{scenario!r} tool {tool_name!r}."
+        )
+    if replayed != entry.validation:
+        raise ValueError(
+            f"Registry checkpoint validation replay disagrees with the stored "
+            f"admission result for {scenario!r} tool {tool_name!r}."
+        )
+    if require_active_proof and not has_current_validation_proof(entry):
+        raise ValueError(
+            f"Final active registry tool lacks current validation proof: {tool_name!r}."
+        )
+
+    return {
+        **identity,
+        "contract_hash": binding.contract_hash,
+        "canonical_key_sha256": hashlib.sha256(
+            binding.canonical_key.encode("utf-8")
+        ).hexdigest(),
+        "tool_spec_sha256": binding.tool_spec_hash,
+        "validation_replayed": True,
+        "validation_accepted": True,
+    }
+
+
+def _checkpoint_metadata(
+    *,
+    checkpoint_dir: Path,
+    expected_registry_dir: Path,
+    scenario: str,
+    completed_count: int,
+) -> tuple[dict[str, Any], set[str]]:
+    metadata_path = checkpoint_dir / "checkpoint.json"
+    if (
+        not checkpoint_dir.is_dir()
+        or checkpoint_dir.is_symlink()
+        or not metadata_path.is_file()
+        or metadata_path.is_symlink()
+    ):
+        raise ValueError(
+            f"Registry checkpoint is missing for publication task {scenario!r}."
+        )
+    metadata = _read_json(metadata_path)
+    copied_files = metadata.get("copied_files")
+    snapshot_errors = metadata.get("validation_contract_snapshot_errors")
+    if (
+        metadata.get("scenario") != scenario
+        or metadata.get("completed_count") != completed_count
+        or not isinstance(metadata.get("registry_dir"), str)
+        or Path(metadata["registry_dir"]).resolve() != expected_registry_dir
+        or not isinstance(copied_files, list)
+        or any(not isinstance(item, str) or not item for item in copied_files)
+        or len(copied_files) != len(set(copied_files))
+        or not isinstance(snapshot_errors, list)
+        or snapshot_errors
+    ):
+        raise ValueError(
+            f"Registry checkpoint metadata or validation-contract snapshot is "
+            f"invalid for publication task {scenario!r}."
+        )
+    copied_set = set(copied_files)
+    if any(
+        Path(item).is_absolute()
+        or ".." in Path(item).parts
+        or Path(item).as_posix() != item
+        for item in copied_set
+    ):
+        raise ValueError(
+            f"Registry checkpoint copied-file paths are invalid for publication "
+            f"task {scenario!r}."
+        )
+    return metadata, copied_set
+
+
+def _selection_only_checkpoint_rows(
+    candidate_dir: Path,
+    *,
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+) -> tuple[dict[str, Any], ...]:
+    """Build checkpoint rows for immutable generation-off registry reuse."""
+
+    selection_rows = _read_jsonl_objects(
+        candidate_dir / "scenario_tool_selection.jsonl"
+    )
+    if not selection_rows or len(selection_rows) != len(trajectory_evidence):
+        raise ValueError("Frozen registry selection evidence is missing or incomplete.")
+    rows: list[dict[str, Any]] = []
+    for selection in selection_rows:
+        scenario = str(selection.get("scenario") or "")
+        raw = trajectory_evidence.get(scenario)
+        if not scenario or not isinstance(raw, dict):
+            raise ValueError(
+                "Frozen registry selection evidence has no matching raw trajectory."
+            )
+        selection_values = {
+            field: _lifecycle_tool_names(
+                selection,
+                field=field,
+                artifact=f"selection row for {scenario!r}",
+            )
+            for field in _LIFECYCLE_SELECTION_FIELDS
+        }
+        for field in (
+            "generated_tools_visible",
+            "generated_tools_called",
+            "generated_tools_attempted",
+            "generated_tools_failed",
+        ):
+            raw_values = raw.get(field)
+            if not isinstance(raw_values, tuple) or set(selection_values[field]) != set(
+                raw_values
+            ):
+                raise ValueError(
+                    "Frozen registry selection evidence disagrees with raw "
+                    f"trajectory {field!r} for {scenario!r}."
+                )
+        versions = _lifecycle_tool_versions(
+            selection,
+            artifact=f"selection row for {scenario!r}",
+        )
+        observed_tools = set().union(*map(set, selection_values.values()))
+        if set(versions) != observed_tools:
+            raise ValueError(
+                "Frozen registry evidence cannot bind every observed generated "
+                f"tool to its version for {scenario!r}."
+            )
+        rows.append(
+            {
+                "scenario": scenario,
+                "selection": selection,
+                "selection_values": selection_values,
+                "versions": versions,
+                "observed_tools": observed_tools,
+            }
+        )
+    return tuple(rows)
+
+
+def _verify_registry_checkpoint_bindings(
+    candidate_dir: Path,
+    registry_dir: Path,
+    *,
+    scenario_order: list[str] | tuple[str, ...],
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+    require_lifecycle_feedback: bool = True,
+) -> dict[str, Any]:
+    """Bind each task's generated-tool evidence to its after-task registry.
+
+    Selection and feedback files are both adapter-authored summaries.  A forged
+    version in both previously passed.  These checks instead require the exact
+    ordered checkpoint emitted after every task and hash the implementation
+    bytes stored there.  Empty-start tasks before the first tool birth may have
+    no registry manifest; that is valid only when no generated tool was visible
+    or executed on that task.
+    """
+
+    paired_rows = (
+        _paired_lifecycle_evidence_rows(
+            candidate_dir,
+            trajectory_evidence=trajectory_evidence,
+        )
+        if require_lifecycle_feedback
+        else _selection_only_checkpoint_rows(
+            candidate_dir,
+            trajectory_evidence=trajectory_evidence,
+        )
+    )
+    paired_order = tuple(str(row["scenario"]) for row in paired_rows)
+    expected_order = tuple(scenario_order)
+    if paired_order != expected_order:
+        raise ValueError(
+            "Registry checkpoint verification cannot bind lifecycle evidence to "
+            "the exact publication task order."
+        )
+
+    checkpoint_root = candidate_dir / "registry_checkpoints"
+    if not checkpoint_root.is_dir() or checkpoint_root.is_symlink():
+        raise ValueError(
+            "Completed online SAGE run is missing its registry checkpoint directory."
+        )
+
+    expected_registry_dir = registry_dir.resolve()
+    identities: list[dict[str, Any]] = []
+    checkpoint_count = 0
+    checkpoint_by_count: dict[int, Path] = {}
+    for completed_count, paired in enumerate(paired_rows, start=1):
+        scenario = str(paired["scenario"])
+        checkpoint_dir = checkpoint_root / (
+            f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario)}"
+        )
+        manifest_path = checkpoint_dir / "registry_manifest.json"
+        _metadata, copied_files = _checkpoint_metadata(
+            checkpoint_dir=checkpoint_dir,
+            expected_registry_dir=expected_registry_dir,
+            scenario=scenario,
+            completed_count=completed_count,
+        )
+        checkpoint_by_count[completed_count] = checkpoint_dir
+
+        observed_tools = set(paired["observed_tools"])
+        if not manifest_path.is_file() or manifest_path.is_symlink():
+            if "registry_manifest.json" in copied_files or observed_tools:
+                raise ValueError(
+                    f"Registry checkpoint for {scenario!r} cannot bind observed "
+                    "generated tools to a manifest."
+                )
+            checkpoint_count += 1
+            continue
+        if "registry_manifest.json" not in copied_files:
+            raise ValueError(
+                f"Registry checkpoint metadata omits its manifest for publication "
+                f"task {scenario!r}."
+            )
+        manifest = _read_json(manifest_path)
+        tools = manifest.get("tools")
+        if not isinstance(tools, dict):
+            raise ValueError(
+                f"Registry checkpoint manifest is invalid for publication task "
+                f"{scenario!r}."
+            )
+        versions = paired["versions"]
+        if set(versions) != observed_tools:
+            raise ValueError(
+                f"Registry checkpoint version coverage is incomplete for publication "
+                f"task {scenario!r}."
+            )
+        for tool_name in sorted(observed_tools):
+            identities.append(
+                _validated_checkpoint_contract_identity(
+                    checkpoint_dir=checkpoint_dir,
+                    copied_files=copied_files,
+                    raw_entry=tools.get(tool_name),
+                    scenario=scenario,
+                    tool_name=tool_name,
+                    expected_version=versions[tool_name],
+                    require_active_proof=False,
+                )
+            )
+        checkpoint_count += 1
+
+    finalization_dir = checkpoint_root / (
+        f"after_{len(paired_rows):04d}_{_safe_checkpoint_name('run_finalization')}"
+    )
+    if finalization_dir.exists() or finalization_dir.is_symlink():
+        final_checkpoint_dir = finalization_dir
+        final_scenario = "run_finalization"
+        _metadata, final_copied_files = _checkpoint_metadata(
+            checkpoint_dir=final_checkpoint_dir,
+            expected_registry_dir=expected_registry_dir,
+            scenario=final_scenario,
+            completed_count=len(paired_rows),
+        )
+    else:
+        final_checkpoint_dir = checkpoint_by_count[len(paired_rows)]
+        final_scenario = str(paired_rows[-1]["scenario"])
+        _metadata, final_copied_files = _checkpoint_metadata(
+            checkpoint_dir=final_checkpoint_dir,
+            expected_registry_dir=expected_registry_dir,
+            scenario=final_scenario,
+            completed_count=len(paired_rows),
+        )
+    final_checkpoint_manifest = final_checkpoint_dir / "registry_manifest.json"
+    final_registry_manifest = registry_dir / "registry_manifest.json"
+    if (
+        "registry_manifest.json" not in final_copied_files
+        or not final_checkpoint_manifest.is_file()
+        or final_checkpoint_manifest.is_symlink()
+        or not final_registry_manifest.is_file()
+        or final_registry_manifest.is_symlink()
+        or final_checkpoint_manifest.read_bytes()
+        != final_registry_manifest.read_bytes()
+    ):
+        raise ValueError(
+            "Final checkpoint registry manifest does not exactly match the sealed "
+            "final registry manifest."
+        )
+    final_manifest = _read_json(final_checkpoint_manifest)
+    final_tools = final_manifest.get("tools")
+    if not isinstance(final_tools, dict):
+        raise ValueError("Final checkpoint registry manifest has no tool mapping.")
+    final_active_identities: list[dict[str, Any]] = []
+    for tool_name, raw_entry in sorted(final_tools.items()):
+        if not isinstance(tool_name, str) or not tool_name:
+            raise ValueError("Final checkpoint registry has an invalid tool key.")
+        if not isinstance(raw_entry, dict):
+            raise ValueError(
+                f"Final checkpoint registry entry is malformed for {tool_name!r}."
+            )
+        # Match runtime's fail-closed interpretation: only literal true retires.
+        if raw_entry.get("retired") is True:
+            continue
+        version = raw_entry.get("version")
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise ValueError(
+                f"Final active registry tool has an invalid version: {tool_name!r}."
+            )
+        final_active_identities.append(
+            _validated_checkpoint_contract_identity(
+                checkpoint_dir=final_checkpoint_dir,
+                copied_files=final_copied_files,
+                raw_entry=raw_entry,
+                scenario=final_scenario,
+                tool_name=tool_name,
+                expected_version=version,
+                require_active_proof=True,
+            )
+        )
+
+    canonical_identity_bytes = json.dumps(
+        identities,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    canonical_contract_bytes = json.dumps(
+        {
+            "observed": identities,
+            "final_active": final_active_identities,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "registry_checkpoint_count": checkpoint_count,
+        "registry_checkpoint_binding_count": len(identities),
+        "registry_checkpoint_binding_sha256": hashlib.sha256(
+            canonical_identity_bytes
+        ).hexdigest(),
+        "public_contract_binding_verification": {
+            "status": "pass",
+            "source": "checkpoint_local_content_addressed_contracts",
+            "observed_contract_replay_count": len(identities),
+            "final_active_contract_replay_count": len(final_active_identities),
+            "validation_values_reported": False,
+            "contract_replay_identity_sha256": hashlib.sha256(
+                canonical_contract_bytes
+            ).hexdigest(),
+        },
+    }
+
+
+def _checkpoint_lifecycle_rows(path: Path) -> dict[str, Any] | None:
+    if not path.is_file() or path.is_symlink():
+        return None
+    payload = _read_json(path)
+    rows = payload.get("tool_lifecycle")
+    return rows if isinstance(rows, dict) else None
+
+
+def _public_actor_followthrough_family(feedback: dict[str, Any]) -> str | None:
+    family = feedback.get("task_family_key")
+    label = feedback.get("task_context_label")
+    if (
+        feedback.get("source_task_id_redacted") is not True
+        or not isinstance(family, str)
+        or re.fullmatch(r"[a-z0-9_.:-]{1,128}", family) is None
+        or not isinstance(label, str)
+        or not label.startswith(f"visible_task_context(family={family}")
+    ):
+        return None
+    return family
+
+
+def _actor_followthrough_family_suppressed(
+    lifecycle_row: Any,
+    *,
+    family: str,
+    tool_version: int,
+) -> bool:
+    if not isinstance(lifecycle_row, dict):
+        return False
+    reason_codes = lifecycle_row.get("route_repair_reason_codes")
+    failure_count = lifecycle_row.get("actor_followthrough_failure_count")
+    return bool(
+        lifecycle_row.get("tool_version") == tool_version
+        and isinstance(failure_count, int)
+        and not isinstance(failure_count, bool)
+        and failure_count >= 1
+        and family in (lifecycle_row.get("actor_followthrough_failure_families") or [])
+        and family in (lifecycle_row.get("route_repair_families") or [])
+        and isinstance(reason_codes, dict)
+        and "generated_helper_followup_failure" in (reason_codes.get(family) or [])
+        and lifecycle_row.get("repair_kind") == "routing"
+        and lifecycle_row.get("routing_disposition") == "family_suppression_active"
+        and lifecycle_row.get("decision")
+        in {"needs_route_repair", "retain_with_route_repair"}
+    )
+
+
+def _final_registry_checkpoint_directory(
+    candidate_dir: Path,
+    *,
+    scenario_order: list[str] | tuple[str, ...],
+) -> Path:
+    checkpoint_root = candidate_dir / "registry_checkpoints"
+    finalization = checkpoint_root / (
+        f"after_{len(scenario_order):04d}_{_safe_checkpoint_name('run_finalization')}"
+    )
+    if finalization.exists() or finalization.is_symlink():
+        return finalization
+    return checkpoint_root / (
+        f"after_{len(scenario_order):04d}_"
+        f"{_safe_checkpoint_name(str(scenario_order[-1]))}"
+    )
+
+
+def _terminal_actor_followthrough_supersession(
+    *,
+    candidate_dir: Path,
+    final_checkpoint_dir: Path,
+    protocol_events: list[dict[str, Any]],
+    tool_name: str,
+    source_tool_version: int,
+    final_entry_payload: Any,
+) -> dict[str, Any] | None:
+    """Prove that a validated implementation repair superseded a failed version."""
+
+    try:
+        if not isinstance(final_entry_payload, dict):
+            raise ValueError("final_entry_missing")
+        final_entry = RegistryEntry.from_json(final_entry_payload)
+        final_version = final_entry.version
+        if (
+            final_entry.tool.spec.tool_name != tool_name
+            or final_version <= source_tool_version
+        ):
+            raise ValueError("not_a_later_exact_tool_version")
+
+        # Resolve only from the immutable final checkpoint.  The mutable final
+        # registry is deliberately not a fallback source for this proof.
+        binding, binding_error = ValidationContractBindingStore(
+            final_checkpoint_dir
+        ).resolve(final_entry)
+        if binding is None:
+            raise ValueError(binding_error or "binding_invalid")
+        replay = validate_generated_tool(
+            final_entry.tool,
+            binding.observation.validation_examples,
+        )
+        if not replay.accepted or replay != final_entry.validation:
+            raise ValueError("validation_replay_mismatch")
+
+        repair_requests = _read_jsonl_objects(
+            candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+        )
+        request_candidates = [
+            row
+            for row in repair_requests
+            if row.get("tool_name") == tool_name
+            and row.get("source_tool_version") == source_tool_version
+            and not isinstance(row.get("source_tool_version"), bool)
+        ]
+        if len(request_candidates) != 1:
+            raise ValueError("repair_request_not_unique")
+        request = request_candidates[0]
+        request_id = request.get("request_id")
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or request.get("repair_kind") != "implementation"
+            or request.get("future_tasks_only") is not True
+            or request.get("triggering_task_replay_allowed") is not False
+        ):
+            raise ValueError("repair_request_not_terminal_implementation")
+
+        acknowledgements = _read_jsonl_objects(
+            candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+        )
+        request_acknowledgements = [
+            row for row in acknowledgements if row.get("request_id") == request_id
+        ]
+        promoted_acknowledgements = [
+            row
+            for row in request_acknowledgements
+            if row.get("status") == "promoted"
+            and row.get("tool_name") == tool_name
+            and row.get("new_version") == final_version
+            and not isinstance(row.get("new_version"), bool)
+        ]
+        if (
+            len(promoted_acknowledgements) != 1
+            or not request_acknowledgements
+            or request_acknowledgements[-1] != promoted_acknowledgements[0]
+        ):
+            raise ValueError("terminal_promoted_acknowledgement_missing")
+
+        acceptance_candidates = [
+            row
+            for row in protocol_events
+            if row.get("event") == "post_deployment_tool_repair_accepted"
+            and (
+                row.get("request_id") == request_id
+                or (
+                    row.get("tool_name") == tool_name
+                    and row.get("source_tool_version") == source_tool_version
+                    and not isinstance(row.get("source_tool_version"), bool)
+                )
+            )
+        ]
+        accepted_events = [
+            row
+            for row in acceptance_candidates
+            if row.get("request_id") == request_id
+            and row.get("tool_name") == tool_name
+            and row.get("source_tool_version") == source_tool_version
+            and not isinstance(row.get("source_tool_version"), bool)
+            and row.get("new_tool_version") == final_version
+            and not isinstance(row.get("new_tool_version"), bool)
+            and row.get("repair_kind") == "implementation"
+            and row.get("validation_contract_hash") == binding.contract_hash
+            and row.get("triggering_task_replayed") is False
+        ]
+        if len(acceptance_candidates) != 1 or len(accepted_events) != 1:
+            raise ValueError("sealed_acceptance_event_missing_or_ambiguous")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    return {
+        "request_id": request_id,
+        "source_tool_version": source_tool_version,
+        "new_tool_version": final_version,
+        "new_tool_retired": final_entry.retired,
+        "new_tool_code_hash": binding.tool_code_hash,
+        "new_tool_spec_hash": binding.tool_spec_hash,
+        "validation_contract_hash": binding.contract_hash,
+        "terminal_acknowledgement": "promoted",
+        "sealed_acceptance_event_count": 1,
+    }
+
+
+def _verify_actor_followthrough_closed(
+    candidate_dir: Path,
+    registry_dir: Path,
+    *,
+    scenario_order: list[str] | tuple[str, ...],
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+    protocol_events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Derive actor follow-through failures from raw traces and prove closure."""
+
+    paired_rows = _paired_lifecycle_evidence_rows(
+        candidate_dir,
+        trajectory_evidence=trajectory_evidence,
+    )
+    expected_registry_dir = registry_dir.resolve()
+    action_journal = _read_jsonl_objects(
+        candidate_dir / "self_evolution_tool_lifecycle.jsonl"
+    )
+    protocol_events = protocol_events or []
+    consumed_action_indices: set[int] = set()
+    last_consumed_action_index = -1
+    obligations: list[dict[str, Any]] = []
+    for completed_count, paired in enumerate(paired_rows, start=1):
+        scenario = str(paired["scenario"])
+        checkpoint_dir = (
+            candidate_dir
+            / "registry_checkpoints"
+            / (f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario)}")
+        )
+        _metadata, copied_files = _checkpoint_metadata(
+            checkpoint_dir=checkpoint_dir,
+            expected_registry_dir=expected_registry_dir,
+            scenario=scenario,
+            completed_count=completed_count,
+        )
+        manifest = _read_json(checkpoint_dir / "registry_manifest.json")
+        checkpoint_tools = manifest.get("tools")
+        conversation = _read_json_list(
+            candidate_dir / "trajectories" / scenario / "conversation.json",
+            label=f"candidate trajectory {scenario!r} conversation",
+        )
+        if not isinstance(checkpoint_tools, dict):
+            raise ValueError(
+                f"Actor follow-through checkpoint is malformed for {scenario!r}."
+            )
+        trace_events = _tool_trace_events_from_execution_context(
+            candidate_dir / "trajectories" / scenario / "execution_context.json"
+        )
+        derived_failures: list[tuple[str, int]] = []
+        called_tools = trajectory_evidence[scenario]["generated_tools_called"]
+        for tool_name in called_tools:
+            raw_entry = checkpoint_tools.get(tool_name)
+            try:
+                if not isinstance(raw_entry, dict):
+                    raise ValueError("checkpoint_entry_missing")
+                entry = RegistryEntry.from_json(raw_entry)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Actor follow-through checkpoint entry is invalid for "
+                    f"{scenario!r} tool {tool_name!r}."
+                ) from exc
+            if entry.version != paired["versions"].get(tool_name):
+                raise ValueError(
+                    f"Actor follow-through tool version is unbound for "
+                    f"{scenario!r} tool {tool_name!r}."
+                )
+            if native_action_tool_enabled(entry.tool):
+                continue
+            if _side_effect_followup_failures(
+                conversation,
+                helper_name=tool_name,
+                required_original_tool_calls=tuple(
+                    entry.tool.spec.required_original_tool_calls
+                ),
+                actual_tool_trace_events=trace_events,
+            ):
+                derived_failures.append((tool_name, entry.version))
+
+        feedback = paired["feedback"]
+        raw_recorded = feedback.get("actor_followthrough_failures")
+        if (
+            not isinstance(raw_recorded, list)
+            or any(not isinstance(item, str) or not item for item in raw_recorded)
+            or len(raw_recorded) != len(set(raw_recorded))
+            or set(raw_recorded) != {name for name, _version in derived_failures}
+        ):
+            raise ValueError(
+                f"Actor follow-through sidecar disagrees with raw trajectory "
+                f"evidence for {scenario!r}."
+            )
+        family = _public_actor_followthrough_family(feedback)
+        immediate_actions = feedback.get("immediate_actions")
+        if not isinstance(immediate_actions, list) or any(
+            not isinstance(item, dict) for item in immediate_actions
+        ):
+            raise ValueError(
+                f"Actor follow-through immediate actions are malformed for "
+                f"{scenario!r}."
+            )
+        lifecycle_rows = _checkpoint_lifecycle_rows(
+            checkpoint_dir / "tool_lifecycle.json"
+        )
+        lifecycle_context = str(feedback.get("task_context_label") or "")
+        for tool_name, tool_version in derived_failures:
+            raw_entry = checkpoint_tools[tool_name]
+            if family is None:
+                expected_action = {
+                    "tool_name": tool_name,
+                    "decision": "parked",
+                    "reason": "actor_followthrough_failure_without_public_family",
+                    "scenario": lifecycle_context,
+                    "source_tool_version": tool_version,
+                }
+                checkpoint_closed = raw_entry.get("retired") is True
+                disposition = "global_retirement"
+            else:
+                expected_action = {
+                    "tool_name": tool_name,
+                    "decision": "needs_route_repair",
+                    "repair_kind": "routing",
+                    "reason": "generated_helper_followup_failure",
+                    "scenario": lifecycle_context,
+                    "routing_disposition": "family_suppression_active",
+                    "target_task_family": family,
+                    "source_tool_version": tool_version,
+                }
+                checkpoint_closed = raw_entry.get("retired") is True or (
+                    "tool_lifecycle.json" in copied_files
+                    and isinstance(lifecycle_rows, dict)
+                    and _actor_followthrough_family_suppressed(
+                        lifecycle_rows.get(tool_name),
+                        family=family,
+                        tool_version=tool_version,
+                    )
+                )
+                disposition = (
+                    "global_retirement"
+                    if raw_entry.get("retired") is True
+                    else "family_suppression"
+                )
+            matching_immediate = [
+                action
+                for action in immediate_actions
+                if all(
+                    action.get(key) == value for key, value in expected_action.items()
+                )
+            ]
+            matching_journal_indices = [
+                index
+                for index, action in enumerate(action_journal)
+                if index > last_consumed_action_index
+                and index not in consumed_action_indices
+                and all(
+                    action.get(key) == value for key, value in expected_action.items()
+                )
+            ]
+            matched_action_index = (
+                matching_journal_indices[0] if matching_journal_indices else None
+            )
+            if matched_action_index is not None:
+                consumed_action_indices.add(matched_action_index)
+                last_consumed_action_index = matched_action_index
+            if (
+                len(matching_immediate) != 1
+                or matched_action_index is None
+                or not checkpoint_closed
+            ):
+                raise ValueError(
+                    f"Actor follow-through failure was not closed immediately for "
+                    f"{scenario!r} tool {tool_name!r} v{tool_version}."
+                )
+            obligations.append(
+                {
+                    "scenario_sha256": hashlib.sha256(
+                        scenario.encode("utf-8")
+                    ).hexdigest(),
+                    "tool_name": tool_name,
+                    "tool_version": tool_version,
+                    "family_sha256": (
+                        hashlib.sha256(family.encode("utf-8")).hexdigest()
+                        if family is not None
+                        else None
+                    ),
+                    "terminal_disposition": disposition,
+                    "lifecycle_action_journal_index": matched_action_index,
+                }
+            )
+
+    actor_action_indices = {
+        index
+        for index, action in enumerate(action_journal)
+        if action.get("reason")
+        in {
+            "generated_helper_followup_failure",
+            "actor_followthrough_failure_without_public_family",
+        }
+    }
+    if actor_action_indices != consumed_action_indices:
+        raise ValueError(
+            "Actor follow-through lifecycle journal has extra, missing, or "
+            "reordered actions."
+        )
+
+    final_checkpoint_dir = _final_registry_checkpoint_directory(
+        candidate_dir,
+        scenario_order=scenario_order,
+    )
+    final_manifest = _read_json(final_checkpoint_dir / "registry_manifest.json")
+    final_tools = final_manifest.get("tools")
+    final_lifecycle = _checkpoint_lifecycle_rows(
+        final_checkpoint_dir / "tool_lifecycle.json"
+    )
+    if not isinstance(final_tools, dict):
+        raise ValueError("Final actor follow-through registry checkpoint is malformed.")
+    for obligation in obligations:
+        tool_name = str(obligation["tool_name"])
+        tool_version = int(obligation["tool_version"])
+        final_entry = final_tools.get(tool_name)
+        final_retired = bool(
+            isinstance(final_entry, dict)
+            and final_entry.get("version") == tool_version
+            and final_entry.get("retired") is True
+        )
+        final_suppressed = False
+        if obligation["terminal_disposition"] == "family_suppression":
+            for paired in paired_rows:
+                scenario_hash = hashlib.sha256(
+                    str(paired["scenario"]).encode("utf-8")
+                ).hexdigest()
+                if scenario_hash != obligation["scenario_sha256"]:
+                    continue
+                family = _public_actor_followthrough_family(paired["feedback"])
+                final_suppressed = bool(
+                    isinstance(family, str)
+                    and isinstance(final_entry, dict)
+                    and final_entry.get("version") == tool_version
+                    and final_entry.get("retired") is False
+                    and isinstance(final_lifecycle, dict)
+                    and _actor_followthrough_family_suppressed(
+                        final_lifecycle.get(tool_name),
+                        family=family,
+                        tool_version=tool_version,
+                    )
+                )
+                break
+        terminal_supersession = None
+        if not final_retired and not final_suppressed:
+            terminal_supersession = _terminal_actor_followthrough_supersession(
+                candidate_dir=candidate_dir,
+                final_checkpoint_dir=final_checkpoint_dir,
+                protocol_events=protocol_events,
+                tool_name=tool_name,
+                source_tool_version=tool_version,
+                final_entry_payload=final_entry,
+            )
+        if not final_retired and not final_suppressed and not terminal_supersession:
+            raise ValueError(
+                f"Actor follow-through closure became stale by run end for "
+                f"tool {tool_name!r} v{tool_version}."
+            )
+        obligation["terminal_disposition"] = (
+            "global_retirement"
+            if final_retired
+            else "family_suppression"
+            if final_suppressed
+            else "validated_implementation_supersession"
+        )
+        obligation["terminal_supersession"] = terminal_supersession
+
+    obligation_bytes = json.dumps(
+        obligations,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "status": "pass",
+        "derived_obligation_count": len(obligations),
+        "closed_after_task_count": len(obligations),
+        "closed_at_run_end_count": len(obligations),
+        "validated_implementation_supersession_count": sum(
+            obligation["terminal_disposition"]
+            == "validated_implementation_supersession"
+            for obligation in obligations
+        ),
+        "lifecycle_action_journal_indices": sorted(consumed_action_indices),
+        "sidecar_reconciled_task_count": len(paired_rows),
+        "raw_validation_values_reported": False,
+        "obligation_identity_sha256": hashlib.sha256(obligation_bytes).hexdigest(),
+    }
+
+
 def _derive_lifecycle_repair_obligations(
     candidate_dir: Path,
     *,
@@ -1096,6 +2140,12 @@ def _derive_lifecycle_repair_obligations(
 
     obligations: list[dict[str, Any]] = []
     for (tool_name, version), family_stats_by_name in sorted(stats.items()):
+        # Runtime metadata repair replaces one registry version globally. Mirror
+        # that boundary here: a version adopted anywhere must not be replaced or
+        # retired merely because it was not selected in another visible family.
+        globally_called = any(
+            family_stats["called"] > 0 for family_stats in family_stats_by_name.values()
+        )
         implementation_targets: dict[str, set[str]] = {}
         for family, family_stats in sorted(family_stats_by_name.items()):
             reasons: set[str] = set()
@@ -1132,7 +2182,8 @@ def _derive_lifecycle_repair_obligations(
             )
         for family, family_stats in sorted(family_stats_by_name.items()):
             if (
-                family_stats["visible"] >= LIFECYCLE_METADATA_VISIBLE_THRESHOLD
+                not globally_called
+                and family_stats["visible"] >= LIFECYCLE_METADATA_VISIBLE_THRESHOLD
                 and family_stats["called"] == 0
             ):
                 obligations.append(
@@ -1756,6 +2807,81 @@ def _verify_empty_online_registry_start(
                 f"{field}={snapshot.get(field)!r}, expected {expected!r}."
             )
     return snapshot
+
+
+def _registry_inventory_for_verification(registry_dir: Path) -> list[dict[str, Any]]:
+    """Independently hash every object in an immutable frozen registry."""
+
+    if not registry_dir.is_dir() or registry_dir.is_symlink():
+        raise ValueError("Frozen publication registry is not a regular directory.")
+    inventory: list[dict[str, Any]] = []
+    for path in sorted(registry_dir.rglob("*")):
+        relative_path = path.relative_to(registry_dir).as_posix()
+        if path.is_symlink():
+            inventory.append(
+                {
+                    "path": relative_path,
+                    "kind": "symlink",
+                    "target": os.readlink(path),
+                }
+            )
+        elif path.is_dir():
+            inventory.append({"path": relative_path, "kind": "directory"})
+        elif path.is_file():
+            inventory.append(
+                {
+                    "path": relative_path,
+                    "kind": "file",
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                }
+            )
+        else:
+            inventory.append({"path": relative_path, "kind": "other"})
+    return inventory
+
+
+def _verify_frozen_registry_immutable(
+    run_root: Path,
+    protocol: dict[str, Any],
+    registry_dir: Path,
+) -> dict[str, Any]:
+    """Prove generation-off reuse did not alter its installed registry."""
+
+    snapshot = protocol.get("registry_gate_snapshot")
+    snapshot_path = run_root / "registry_gate" / "registry_gate_snapshot.json"
+    if not isinstance(snapshot, dict) or _read_json(snapshot_path) != snapshot:
+        raise ValueError("Frozen publication registry snapshot is missing or changed.")
+    before = snapshot.get("registry_inventory_before_run")
+    before_count = snapshot.get("registry_inventory_count_before_run")
+    before_sha256 = snapshot.get("registry_inventory_sha256")
+    if (
+        not isinstance(before, list)
+        or isinstance(before_count, bool)
+        or not isinstance(before_count, int)
+        or before_count != len(before)
+        or not isinstance(before_sha256, str)
+        or _SHA256_HEX_PATTERN.fullmatch(before_sha256) is None
+    ):
+        raise ValueError("Frozen publication registry snapshot inventory is invalid.")
+    canonical_before = json.dumps(
+        before,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if hashlib.sha256(canonical_before).hexdigest() != before_sha256:
+        raise ValueError(
+            "Frozen publication pre-run registry inventory hash is invalid."
+        )
+    after = _registry_inventory_for_verification(registry_dir)
+    if before != after:
+        raise ValueError("Frozen publication registry changed during execution.")
+    if protocol.get("registry_gate_restore") is not None:
+        raise ValueError("Frozen publication run unexpectedly restored its registry.")
+    return {
+        "status": "pass",
+        "inventory_count": len(after),
+        "inventory_sha256": before_sha256,
+    }
 
 
 def _verify_no_scenario_transform_failures(candidate_dir: Path) -> None:
@@ -2510,6 +3636,10 @@ def verify_run(
         raise ValueError(f"No completed paired run found under {search_root}.")
     run_root = runs[-1]
     protocol = _read_json(run_root / "protocol_manifest.json")
+    protocol_events, protocol_event_journal = _verified_protocol_event_rows(
+        run_root=run_root,
+        protocol=protocol,
+    )
     cache_report = _read_json(run_root / "control_cache_report.json")
     comparison = _read_json(run_root / "paired_comparison.json")
     current_outcome_evaluator = outcome_evaluator_manifest()
@@ -2783,43 +3913,39 @@ def verify_run(
     )
     _verify_no_scenario_transform_failures(candidate_dir)
     lifecycle_integrity: dict[str, Any] | None = None
-    registry_dir: Path | None = None
-    generated_tool_names: set[str] = set()
+    registry_dir = _resolve_declared_path(
+        run_root,
+        protocol.get("registry_dir"),
+        "registry_dir",
+    )
+    registry_manifest = registry_dir / "registry_manifest.json"
+    if not registry_manifest.is_file() or registry_manifest.is_symlink():
+        raise ValueError(
+            "Completed SAGE run is missing its final registry manifest or it is "
+            "not a regular file: "
+            f"{registry_manifest}"
+        )
+    recorded_registry_digest = protocol.get("registry_manifest_digest_after_run")
+    if not isinstance(recorded_registry_digest, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", recorded_registry_digest
+    ):
+        raise ValueError(
+            "Protocol does not record a valid final registry manifest digest."
+        )
+    observed_registry_digest = hashlib.sha256(
+        registry_manifest.read_bytes()
+    ).hexdigest()
+    if observed_registry_digest != recorded_registry_digest:
+        raise ValueError("Final registry manifest does not match the protocol digest.")
+    registry_payload = _read_json(registry_manifest)
+    registry_tools = registry_payload.get("tools")
+    if not isinstance(registry_tools, dict) or any(
+        not isinstance(tool_name, str) or not tool_name for tool_name in registry_tools
+    ):
+        raise ValueError("Final registry manifest has an invalid tool mapping.")
+    generated_tool_names = set(registry_tools)
     if expected_generation:
         _verify_empty_online_registry_start(run_root, protocol)
-        registry_dir = _resolve_declared_path(
-            run_root,
-            protocol.get("registry_dir"),
-            "registry_dir",
-        )
-        registry_manifest = registry_dir / "registry_manifest.json"
-        if not registry_manifest.is_file():
-            raise ValueError(
-                "Completed online SAGE run is missing its final registry manifest: "
-                f"{registry_manifest}"
-            )
-        recorded_registry_digest = protocol.get("registry_manifest_digest_after_run")
-        if not isinstance(recorded_registry_digest, str) or not re.fullmatch(
-            r"[0-9a-f]{64}", recorded_registry_digest
-        ):
-            raise ValueError(
-                "Protocol does not record a valid final registry manifest digest."
-            )
-        observed_registry_digest = hashlib.sha256(
-            registry_manifest.read_bytes()
-        ).hexdigest()
-        if observed_registry_digest != recorded_registry_digest:
-            raise ValueError(
-                "Final registry manifest does not match the protocol digest."
-            )
-        registry_payload = _read_json(registry_manifest)
-        registry_tools = registry_payload.get("tools")
-        if not isinstance(registry_tools, dict) or any(
-            not isinstance(tool_name, str) or not tool_name
-            for tool_name in registry_tools
-        ):
-            raise ValueError("Final registry manifest has an invalid tool mapping.")
-        generated_tool_names = set(registry_tools)
     control_rows, control_order, control_llm_usage = _uncached_rows(
         control_dir,
         expected_tasks=expected_tasks,
@@ -2878,14 +4004,39 @@ def verify_run(
         arm="candidate",
         generated_tool_names=generated_tool_names,
     )
+    checkpoint_integrity = _verify_registry_checkpoint_bindings(
+        candidate_dir,
+        registry_dir,
+        scenario_order=candidate_order,
+        trajectory_evidence=candidate_trajectory_evidence,
+        require_lifecycle_feedback=expected_generation,
+    )
     if expected_generation:
-        if registry_dir is None:
-            raise AssertionError("online publication run has no registry directory")
         lifecycle_integrity = _verify_lifecycle_closed(
             candidate_dir,
             registry_dir,
             trajectory_evidence=candidate_trajectory_evidence,
         )
+        lifecycle_integrity.update(checkpoint_integrity)
+        lifecycle_integrity["actor_followthrough_closure"] = (
+            _verify_actor_followthrough_closed(
+                candidate_dir,
+                registry_dir,
+                scenario_order=candidate_order,
+                trajectory_evidence=candidate_trajectory_evidence,
+                protocol_events=protocol_events,
+            )
+        )
+    else:
+        lifecycle_integrity = {
+            "lifecycle_mutation_expected": False,
+            "frozen_registry_integrity": _verify_frozen_registry_immutable(
+                run_root,
+                protocol,
+                registry_dir,
+            ),
+            **checkpoint_integrity,
+        }
     _verify_paired_outcome_aggregates(
         comparison,
         control_rows=control_rows,
@@ -2944,6 +4095,7 @@ def verify_run(
         "reporting_outcome_evaluator": current_outcome_evaluator,
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "lifecycle_integrity": lifecycle_integrity,
+        "protocol_event_journal": protocol_event_journal,
         "external_fixture_sha256": observed_fixture_sha256,
         "git_commit": publication_provenance["git_commit"],
         "git_tree": publication_provenance["git_tree"],

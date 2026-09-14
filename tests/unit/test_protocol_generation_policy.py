@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+import hashlib
 import json
 import os
 import subprocess
@@ -23,6 +24,7 @@ from scripts.run_sage_protocol import (
     _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
+    _sealed_protocol_event_journal,
     _snapshot_registry_for_gate,
     _validate_gate_purpose_for_cohort,
     _validate_uncached_result_rows,
@@ -51,6 +53,31 @@ def test_discovery_manifest_enables_generation_in_transfer_mode() -> None:
         _generation_enabled_by_default("transfer_40", "sage_diverse_cluster_discovery")
         is True
     )
+
+
+def test_protocol_event_journal_is_content_addressed_before_manifest(
+    tmp_path: Path,
+) -> None:
+    journal_path = tmp_path / "events" / "latest.jsonl"
+    journal_path.parent.mkdir(parents=True)
+    journal_path.write_text(
+        json.dumps({"event": "run_started"})
+        + "\n"
+        + json.dumps({"event": "run_finished"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    sealed = _sealed_protocol_event_journal(tmp_path)
+
+    assert sealed == {
+        "schema_version": 1,
+        "artifact_root": str(tmp_path),
+        "path": str(journal_path),
+        "sha256": hashlib.sha256(journal_path.read_bytes()).hexdigest(),
+        "event_count": 2,
+        "append_closed_before_protocol_manifest": True,
+    }
 
 
 def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:

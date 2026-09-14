@@ -4444,6 +4444,15 @@ class CapabilityObservation:
         )
 
     def to_json(self) -> dict[str, Any]:
+        """Return the audit-safe observation representation.
+
+        Explicit held-out examples are validator/model-selection data.  Their
+        concrete inputs and expected outputs must not be copied into the general
+        run event stream, trajectory result, or a later repair prompt.  Field
+        names and JSON-like types remain visible because they form the public
+        callable interface rather than an expected answer.
+        """
+
         source_task_id_redacted = self.evidence_source in {
             "visible_task_context",
             "visible_execution_trace",
@@ -4458,12 +4467,7 @@ class CapabilityObservation:
             "observation": self.observation,
             "allowed_families": list(self.allowed_families),
             "validation_examples": [
-                {
-                    "inputs": item.inputs,
-                    "expected": item.expected,
-                    "held_out": item.held_out,
-                    "negative_applicability": item.negative_applicability,
-                }
+                _audit_safe_validation_example(item)
                 for item in self.validation_examples
             ],
             "generation_allowed": self.generation_allowed,
@@ -4473,6 +4477,54 @@ class CapabilityObservation:
             "task_family_key": self.task_family_key,
             "inadequacy_evidence": self.to_inadequacy_evidence().to_json(),
         }
+
+
+def _audit_safe_validation_example(example: ToolExample) -> dict[str, Any]:
+    """Serialize one synthetic contract example without logging hold-out values."""
+
+    if not example.held_out:
+        return {
+            "inputs": example.inputs,
+            "expected": example.expected,
+            "held_out": False,
+            "negative_applicability": example.negative_applicability,
+        }
+    return {
+        "held_out": True,
+        "negative_applicability": example.negative_applicability,
+        "values_redacted": True,
+        "input_contract": _values_free_mapping_contract(example.inputs),
+        "output_contract": _values_free_output_contract(example.expected),
+    }
+
+
+def _values_free_mapping_contract(value: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {"name": str(name), "type": _json_like_type(item)}
+        for name, item in value.items()
+    ]
+
+
+def _values_free_output_contract(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, dict):
+        return [{"name": "$result", "type": _json_like_type(value)}]
+    return _values_free_mapping_contract(value)
+
+
+def _json_like_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, (list, tuple)):
+        return "array"
+    return "string"
 
 
 def visible_task_context_from_scenario(scenario: Scenario) -> VisibleTaskContext:

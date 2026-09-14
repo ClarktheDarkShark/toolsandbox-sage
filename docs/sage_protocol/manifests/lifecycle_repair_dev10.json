@@ -3,10 +3,33 @@
   "lifecycle_evidence_mode": "seeded_historical_v1_postdeployment_repair",
   "scenario_order_sha256": "b59acee1559e254551ffe783acdaf351b45c4b6977b4a4bb990229afe733cf0e",
   "strategy": "Development-only ordered cohort for raw pre-deployment validation, prospective lifecycle repair, future-task canarying, and unrelated-family non-regression. This cohort is not a publication sample or unseen test set.",
+  "preserved_working_tool_provenance": {
+    "claim_boundary": "two historically successful generated tools preserved on overlapping reminder routes and a disjoint transfer cohort",
+    "source_artifact": "artifacts/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action_registry/registry_manifest.json",
+    "source_registry_sha256": "5fe8323c69cb17b3c0e45f3ccf2bc3708583ab9d01a48e5ca2d4b5082686d653",
+    "tools": {
+      "relative_day_time_to_timestamp": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab",
+        "public_spec_sha256": "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95",
+        "source_entry_sha256": "34a186250638fe21c62dde6baef1af34381f9ce0d867e1e41f97d84362edbd0b"
+      },
+      "prepare_reminder_creation_args": {
+        "version": 1,
+        "retired": false,
+        "code_hash": "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292",
+        "public_spec_sha256": "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765",
+        "source_entry_sha256": "68ed674b51cd5b434417be9f5c727b8c65d2dd7b032c78bee5a4567be33179a9"
+      }
+    }
+  },
   "predeclared_gates": {
     "safe_abstain_visible_and_called": {"role": "repair_target", "minimum": 7, "total": 7},
     "safe_abstain_exact_without_forbidden_remove": {"role": "repair_target", "minimum": 6, "total": 7},
-    "preservation_exact_and_safe_helper_hidden": {"role": "preservation", "minimum": 3, "total": 3},
+    "working_generated_overlap_visible_called_exact_failure_free": {"role": "working_generated_overlap", "tools": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"], "minimum": 2, "total": 2},
+    "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {"role": "unrelated_native_preservation", "minimum": 1, "total": 1},
+    "working_generated_entries_unchanged": {"required": true},
     "overall_exact_outcomes": {"minimum": 9, "total": 10},
     "before_after": {"trigger_version": 1, "trigger_outcome_less_than": 1.0, "future_version": 2, "minimum_future_exact_successes": 6, "minimum_future_success_flips": 1}
   },
@@ -20,9 +43,11 @@
       "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools_tool_name_scrambled",
       "remove_contact_by_phone_no_search_contacts_insufficient_information_all_tools"
     ],
-    "preservation": [
+    "working_generated_overlap": [
       "add_reminder_content_and_week_delta_and_time",
-      "add_reminder_content_and_weekday_delta_and_time",
+      "add_reminder_content_and_weekday_delta_and_time"
+    ],
+    "unrelated_native_preservation": [
       "search_phone_number_with_name"
     ]
   },

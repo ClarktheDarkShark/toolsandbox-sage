@@ -33,6 +33,7 @@ from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
 )
 from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import ValidationContractBindingStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 from sage_ts.runtime.toolsandbox_integration import (
     load_tool_lifecycle_routing_state,
@@ -239,6 +240,45 @@ def _snapshot_registry_checkpoint(
         if source.exists():
             shutil.copy2(source, checkpoint_dir / filename)
             copied.append(filename)
+    contract_snapshot_errors: list[str] = []
+    contract_index = registry_dir / "validation_contract_bindings.json"
+    if contract_index.exists() and not contract_index.is_symlink():
+        shutil.copy2(contract_index, checkpoint_dir / contract_index.name)
+        copied.append(contract_index.name)
+        try:
+            index_payload = json.loads(contract_index.read_text(encoding="utf-8"))
+            raw_bindings = index_payload.get("bindings")
+            if not isinstance(raw_bindings, dict):
+                raise ValueError("bindings_not_object")
+            contract_hashes = sorted(
+                {
+                    str(metadata.get("contract_hash") or "")
+                    for versions in raw_bindings.values()
+                    if isinstance(versions, dict)
+                    for metadata in versions.values()
+                    if isinstance(metadata, dict)
+                }
+            )
+            if any(not re.fullmatch(r"[0-9a-f]{64}", item) for item in contract_hashes):
+                raise ValueError("invalid_contract_hash")
+            for contract_hash in contract_hashes:
+                relative_path = Path("validation_contracts") / f"{contract_hash}.json"
+                source = registry_dir / relative_path
+                if not source.is_file() or source.is_symlink():
+                    contract_snapshot_errors.append(
+                        f"missing_or_nonregular:{relative_path.as_posix()}"
+                    )
+                    continue
+                destination = checkpoint_dir / relative_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                copied.append(relative_path.as_posix())
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            contract_snapshot_errors.append(
+                f"contract_index_unverifiable:{type(exc).__name__}:{exc}"
+            )
+    elif contract_index.exists() or contract_index.is_symlink():
+        contract_snapshot_errors.append("contract_index_nonregular")
     for filename in (
         "post_deployment_repair_state.json",
         "self_evolution_tool_repair_requests.jsonl",
@@ -255,6 +295,7 @@ def _snapshot_registry_checkpoint(
         "completed_count": completed_count,
         "registry_dir": str(registry_dir),
         "copied_files": copied,
+        "validation_contract_snapshot_errors": contract_snapshot_errors,
     }
     (checkpoint_dir / "checkpoint.json").write_text(
         json.dumps(metadata, indent=2) + "\n",
@@ -774,6 +815,36 @@ class SageRunConfig:
     fail_on_scenario_transform_error: bool = False
 
 
+def _frozen_registry_contract_failures(
+    store: RegistryStore,
+) -> list[dict[str, object]]:
+    """Return audit-safe binding failures for active frozen registry entries."""
+
+    binding_store = ValidationContractBindingStore(store.root)
+    failures: list[dict[str, object]] = []
+    for manifest_name, entry in sorted(store.load_entries().items()):
+        if entry.retired:
+            continue
+        if manifest_name != entry.tool.spec.tool_name:
+            error = "registry_tool_name_mismatch"
+        else:
+            binding, binding_error = binding_store.resolve(entry)
+            error = binding_error if binding is None else None
+        if error is not None:
+            failures.append(
+                {
+                    "tool_name": manifest_name,
+                    "tool_version": entry.version,
+                    "tool_code_hash": entry.stored_code_hash,
+                    "binding_error": error,
+                    "entry_injected": False,
+                    "repair_model_called": False,
+                    "raw_hidden_case_values_logged": False,
+                }
+            )
+    return failures
+
+
 def run_sage_with_registry(
     config: SageRunConfig,
     *,
@@ -784,6 +855,30 @@ def run_sage_with_registry(
 ) -> Path:
     """Run ToolSandbox scenarios with accepted generated tools available."""
     store = RegistryStore(config.registry_dir)
+    if generator is None:
+        frozen_binding_failures = _frozen_registry_contract_failures(store)
+        if frozen_binding_failures:
+            config.output_dir.mkdir(parents=True, exist_ok=True)
+            failure_path = (
+                config.output_dir / "registry_contract_preflight_failures.json"
+            )
+            failure_path.write_text(
+                json.dumps(
+                    {
+                        "event": "frozen_registry_contract_preflight_failed",
+                        "registry_dir": str(config.registry_dir),
+                        "failures": frozen_binding_failures,
+                        "model_execution_started": False,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            raise ValueError(
+                "Frozen registry contains active tools without valid exact "
+                f"validation-contract bindings; see {failure_path}."
+            )
     registry_tools = sorted(store.load_entries())
     visible_generated_by_scenario: dict[str, list[str]] = {}
     called_generated_by_scenario: dict[str, list[str]] = {}

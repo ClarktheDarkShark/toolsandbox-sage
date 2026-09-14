@@ -101,6 +101,16 @@ def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def _normalized_public_family_label(value: Any) -> str | None:
+    normalized = str(value or "").strip().lower()
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_.:-")
+    if not normalized or len(normalized) > 128:
+        return None
+    if any(character not in allowed for character in normalized):
+        return None
+    return normalized
+
+
 def _read_jsonl_objects_strict(path: Path, *, label: str) -> list[dict[str, Any]]:
     """Read an append-only journal without silently discarding corruption."""
 
@@ -151,6 +161,7 @@ class ToolFamilyLifecycleStats:
     called_count: int = 0
     failed_count: int = 0
     contract_failure_count: int = 0
+    actor_followthrough_failure_count: int = 0
     success_flip_count: int = 0
     public_visible_context_count: int = 0
     sole_generated_call_count: int = 0
@@ -170,6 +181,9 @@ class ToolFamilyLifecycleStats:
             "called_count": self.called_count,
             "failed_count": self.failed_count,
             "contract_failure_count": self.contract_failure_count,
+            "actor_followthrough_failure_count": (
+                self.actor_followthrough_failure_count
+            ),
             "success_flip_count": self.success_flip_count,
             "public_visible_context_count": self.public_visible_context_count,
             "sole_generated_call_count": self.sole_generated_call_count,
@@ -199,7 +213,7 @@ class ToolLifecycleStats:
     attempted_count: int = 0
     failed_count: int = 0
     visible_not_called_count: int = 0
-    side_effect_incident_count: int = 0
+    actor_followthrough_failure_count: int = 0
     contract_failure_count: int = 0
     success_flip_count: int = 0
     called_candidate_outcomes: list[float] = field(default_factory=list)
@@ -233,7 +247,9 @@ class ToolLifecycleStats:
             "attempted_count": self.attempted_count,
             "failed_count": self.failed_count,
             "visible_not_called_count": self.visible_not_called_count,
-            "side_effect_incident_count": self.side_effect_incident_count,
+            "actor_followthrough_failure_count": (
+                self.actor_followthrough_failure_count
+            ),
             "contract_failure_count": self.contract_failure_count,
             "success_flip_count": self.success_flip_count,
             "candidate_outcome_observation_count": (
@@ -309,7 +325,7 @@ class SelfEvolutionReflectionController:
     control_scores: list[float] = field(default_factory=list)
     control_outcomes: list[float] = field(default_factory=list)
     runtime_exceptions: int = 0
-    side_effect_incidents: int = 0
+    actor_followthrough_failure_count: int = 0
     tool_stats: dict[str, ToolLifecycleStats] = field(default_factory=dict)
     bucket_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
     retired_this_run: set[str] = field(default_factory=set)
@@ -624,6 +640,9 @@ class SelfEvolutionReflectionController:
             "generated_tools_attempted",
             "generated_tools_failed",
             "generated_tool_contract_failures",
+            "actor_followthrough_failures",
+            # Legacy resumable journals used this ambiguous name. New rows emit
+            # actor_followthrough_failures instead.
             "side_effect_failures",
             "post_deployment_repair_request_ids",
         )
@@ -955,12 +974,12 @@ class SelfEvolutionReflectionController:
             return
         raw_task_context_label = row.get("task_context_label")
         raw_task_family_key = row.get("task_family_key")
+        normalized_public_family = _normalized_public_family_label(raw_task_family_key)
         has_public_lifecycle_context = bool(
             row.get("source_task_id_redacted") is True
             and isinstance(raw_task_context_label, str)
             and raw_task_context_label.strip()
-            and isinstance(raw_task_family_key, str)
-            and raw_task_family_key.strip()
+            and normalized_public_family is not None
         )
         task_context_label = (
             raw_task_context_label.strip()
@@ -968,9 +987,7 @@ class SelfEvolutionReflectionController:
             else UNCLASSIFIED_PUBLIC_TASK_CONTEXT
         )
         task_family_key = (
-            raw_task_family_key.strip()
-            if has_public_lifecycle_context
-            else "unclassified"
+            normalized_public_family if has_public_lifecycle_context else "unclassified"
         )
 
         self.completed_count += 1
@@ -1001,12 +1018,16 @@ class SelfEvolutionReflectionController:
 
         if row.get("exception_type"):
             self.runtime_exceptions += 1
-        side_effect_failures = [
+        raw_actor_followthrough_failures = row.get("actor_followthrough_failures")
+        if raw_actor_followthrough_failures is None:
+            # Read old resumable evidence without continuing its misleading label.
+            raw_actor_followthrough_failures = row.get("side_effect_failures")
+        actor_followthrough_failures = [
             str(item)
-            for item in (row.get("side_effect_failures") or [])
+            for item in (raw_actor_followthrough_failures or [])
             if isinstance(item, str)
         ]
-        self.side_effect_incidents += len(side_effect_failures)
+        self.actor_followthrough_failure_count += len(actor_followthrough_failures)
 
         family = task_family_key
         bucket = self.bucket_stats.setdefault(
@@ -1085,6 +1106,7 @@ class SelfEvolutionReflectionController:
             | set(attempted)
             | set(failed)
             | set(contract_failures)
+            | set(actor_followthrough_failures)
         ):
             stats = self._tool_stats_for_version(
                 tool_name,
@@ -1144,8 +1166,9 @@ class SelfEvolutionReflectionController:
                 family_stats.contract_failure_count += 1
             if tool_name in visible and tool_name not in called:
                 stats.visible_not_called_count += 1
-            if tool_name in side_effect_failures:
-                stats.side_effect_incident_count += 1
+            if tool_name in actor_followthrough_failures:
+                stats.actor_followthrough_failure_count += 1
+                family_stats.actor_followthrough_failure_count += 1
 
     def assess_scenario(
         self,
@@ -1214,7 +1237,14 @@ class SelfEvolutionReflectionController:
         contract_failures = self._contract_failure_tools(selection_record)
         observed_tool_names = {
             str(item)
-            for item in (*visible, *called, *attempted, *failed, *contract_failures)
+            for item in (
+                *visible,
+                *called,
+                *attempted,
+                *failed,
+                *contract_failures,
+                *side_effect_failures,
+            )
             if isinstance(item, str) and item
         }
         registry_entries = self.store.load_entries() if observed_tool_names else {}
@@ -1223,11 +1253,13 @@ class SelfEvolutionReflectionController:
             for tool_name in sorted(observed_tool_names)
             if tool_name in registry_entries
         }
+        normalized_public_family = _normalized_public_family_label(task_family_key)
         has_public_lifecycle_context = bool(
             isinstance(task_context_label, str)
             and task_context_label.strip()
             and isinstance(task_family_key, str)
             and task_family_key.strip()
+            and normalized_public_family is not None
         )
         lifecycle_context = (
             task_context_label.strip()
@@ -1235,13 +1267,15 @@ class SelfEvolutionReflectionController:
             else UNCLASSIFIED_PUBLIC_TASK_CONTEXT
         )
         family = (
-            task_family_key.strip() if has_public_lifecycle_context else "unclassified"
+            normalized_public_family if has_public_lifecycle_context else "unclassified"
         )
 
         immediate_actions = self._immediate_lifecycle_actions(
             scenario_name=lifecycle_context,
             called_tools=called,
-            side_effect_failures=side_effect_failures,
+            actor_followthrough_failures=side_effect_failures,
+            public_task_family=(family if has_public_lifecycle_context else None),
+            generated_tool_versions=generated_tool_versions,
             score_delta=score_delta,
             outcome_delta=outcome_delta,
         )
@@ -1278,7 +1312,7 @@ class SelfEvolutionReflectionController:
             "generated_tools_failed": failed,
             "generated_tool_contract_failures": contract_failures,
             "generated_tool_versions": generated_tool_versions,
-            "side_effect_failures": side_effect_failures,
+            "actor_followthrough_failures": side_effect_failures,
             "immediate_actions": immediate_actions,
         }
         self._record_feedback_row(task_feedback)
@@ -1317,7 +1351,12 @@ class SelfEvolutionReflectionController:
         return score_delta is not None and score_delta >= 0.10
 
     def _retire_tool(
-        self, tool_name: str, reason: str, scenario_name: str
+        self,
+        tool_name: str,
+        reason: str,
+        scenario_name: str,
+        *,
+        source_tool_version: int | None = None,
     ) -> dict[str, Any]:
         self.store.retire(tool_name)
         self.retired_this_run.add(tool_name)
@@ -1327,6 +1366,8 @@ class SelfEvolutionReflectionController:
             "reason": reason,
             "scenario": scenario_name,
         }
+        if source_tool_version is not None:
+            action["source_tool_version"] = source_tool_version
         append_jsonl(self.output_dir / "self_evolution_tool_lifecycle.jsonl", action)
         return action
 
@@ -1335,28 +1376,26 @@ class SelfEvolutionReflectionController:
         tool_name: str,
         reason: str,
         scenario_name: str,
+        *,
+        target_task_family: str | None = None,
+        source_tool_version: int | None = None,
     ) -> dict[str, Any]:
         action = {
             "tool_name": tool_name,
             "decision": "needs_route_repair",
+            "repair_kind": "routing",
             "reason": reason,
             "scenario": scenario_name,
+            "routing_disposition": (
+                "family_suppression_active"
+                if target_task_family is not None
+                else "route_repair_unresolved_no_public_family"
+            ),
         }
-        append_jsonl(self.output_dir / "self_evolution_tool_lifecycle.jsonl", action)
-        return action
-
-    def _safety_audit_tool(
-        self,
-        tool_name: str,
-        reason: str,
-        scenario_name: str,
-    ) -> dict[str, Any]:
-        action = {
-            "tool_name": tool_name,
-            "decision": "needs_safety_audit",
-            "reason": reason,
-            "scenario": scenario_name,
-        }
+        if target_task_family is not None:
+            action["target_task_family"] = target_task_family
+        if source_tool_version is not None:
+            action["source_tool_version"] = source_tool_version
         append_jsonl(self.output_dir / "self_evolution_tool_lifecycle.jsonl", action)
         return action
 
@@ -1365,30 +1404,40 @@ class SelfEvolutionReflectionController:
         *,
         scenario_name: str,
         called_tools: list[str],
-        side_effect_failures: list[str],
+        actor_followthrough_failures: list[str],
+        public_task_family: str | None,
+        generated_tool_versions: dict[str, int],
         score_delta: float | None,
         outcome_delta: float | None,
     ) -> list[dict[str, Any]]:
         actions: list[dict[str, Any]] = []
-        for tool_name in side_effect_failures:
-            if self._is_harmful_call(score_delta, outcome_delta):
+        followthrough_failure_tools = set(actor_followthrough_failures)
+        for tool_name in dict.fromkeys(actor_followthrough_failures):
+            source_tool_version = generated_tool_versions.get(tool_name)
+            if public_task_family is None:
                 actions.append(
                     self._retire_tool(
                         tool_name,
-                        "side_effect_preservation_failure",
+                        "actor_followthrough_failure_without_public_family",
                         scenario_name,
+                        source_tool_version=source_tool_version,
                     )
                 )
             else:
                 actions.append(
-                    self._safety_audit_tool(
+                    self._route_repair_tool(
                         tool_name,
-                        "side_effect_preservation_audit",
+                        "generated_helper_followup_failure",
                         scenario_name,
+                        target_task_family=public_task_family,
+                        source_tool_version=source_tool_version,
                     )
                 )
         for tool_name in called_tools:
-            if tool_name in self.retired_this_run:
+            if (
+                tool_name in self.retired_this_run
+                or tool_name in followthrough_failure_tools
+            ):
                 continue
             if self._is_harmful_call(score_delta, outcome_delta):
                 actions.append(
@@ -1396,6 +1445,8 @@ class SelfEvolutionReflectionController:
                         tool_name,
                         "severe_negative_called_delta",
                         scenario_name,
+                        target_task_family=public_task_family,
+                        source_tool_version=generated_tool_versions.get(tool_name),
                     )
                 )
         return actions
@@ -1482,13 +1533,7 @@ class SelfEvolutionReflectionController:
 
         if family_stats.public_visible_context_count <= 0:
             return "unclassified"
-        normalized = str(family or "").strip().lower()
-        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_.:-")
-        if not normalized or len(normalized) > 128:
-            return "unclassified"
-        if any(character not in allowed for character in normalized):
-            return "unclassified"
-        return normalized
+        return _normalized_public_family_label(family) or "unclassified"
 
     def _metadata_repair_families(
         self,
@@ -1516,17 +1561,42 @@ class SelfEvolutionReflectionController:
         self,
         stats: ToolLifecycleStats,
     ) -> list[str]:
-        """Return families with repeated, sole-tool, fresh-control regressions."""
+        """Return public families whose generated-helper route is now suppressed."""
 
         return sorted(
             family
             for family, family_stats in stats.family_stats.items()
             if family_stats.public_visible_context_count > 0
-            and family_stats.attributable_harmful_call_count
-            >= self.min_route_repair_harmful_calls
-            and family_stats.attributable_harmful_call_count
-            > family_stats.attributable_helpful_call_count
+            and (
+                family_stats.actor_followthrough_failure_count > 0
+                or (
+                    family_stats.attributable_harmful_call_count
+                    >= self.min_route_repair_harmful_calls
+                    and family_stats.attributable_harmful_call_count
+                    > family_stats.attributable_helpful_call_count
+                )
+            )
         )
+
+    def _route_repair_reason_codes(
+        self,
+        stats: ToolLifecycleStats,
+    ) -> dict[str, tuple[str, ...]]:
+        evidence: dict[str, tuple[str, ...]] = {}
+        for family in self._active_route_repair_families(stats):
+            family_stats = stats.family_stats[family]
+            reasons: list[str] = []
+            if family_stats.actor_followthrough_failure_count > 0:
+                reasons.append("generated_helper_followup_failure")
+            if (
+                family_stats.attributable_harmful_call_count
+                >= self.min_route_repair_harmful_calls
+                and family_stats.attributable_harmful_call_count
+                > family_stats.attributable_helpful_call_count
+            ):
+                reasons.append("repeated_sole_tool_family_regression")
+            evidence[family] = tuple(reasons)
+        return evidence
 
     def _emit_post_deployment_repair_requests(
         self,
@@ -1722,15 +1792,14 @@ class SelfEvolutionReflectionController:
             routing_disposition = "unchanged"
             called_outcome = row["called_outcome_delta_mean"]
             called_score = row["called_score_delta_mean"]
-            helpful_count = len(stats.helpful_called_scenarios)
-            harmful_count = len(stats.harmful_called_scenarios)
             implementation_repair_evidence = self._implementation_repair_evidence(stats)
             implementation_repair_families = sorted(implementation_repair_evidence)
             outcome_shortfall_alarm_families = (
                 self._outcome_shortfall_diagnostic_families(stats)
             )
             metadata_repair_families = self._metadata_repair_families(stats)
-            route_repair_families = self._active_route_repair_families(stats)
+            route_repair_reason_codes = self._route_repair_reason_codes(stats)
+            route_repair_families = sorted(route_repair_reason_codes)
             row["implementation_repair_families"] = implementation_repair_families
             row["implementation_repair_reason_codes"] = {
                 family: list(reason_codes)
@@ -1744,20 +1813,19 @@ class SelfEvolutionReflectionController:
             )
             row["metadata_repair_families"] = metadata_repair_families
             row["route_repair_families"] = route_repair_families
-            if called_outcome is not None:
-                negative_called_subset = called_outcome < -0.05
-            else:
-                negative_called_subset = (
-                    called_score is not None and called_score < -0.05
-                ) or harmful_count > helpful_count
+            row["route_repair_reason_codes"] = {
+                family: list(reason_codes)
+                for family, reason_codes in route_repair_reason_codes.items()
+            }
+            row["actor_followthrough_failure_families"] = sorted(
+                family
+                for family, family_stats in stats.family_stats.items()
+                if family_stats.public_visible_context_count > 0
+                and family_stats.actor_followthrough_failure_count > 0
+            )
             if tool_name in self.retired_this_run:
                 decision = "parked"
                 reason = "retired_this_run"
-                routing_disposition = "quarantined"
-            elif stats.side_effect_incident_count and negative_called_subset:
-                decision = "park"
-                reason = "side_effect_incident_with_negative_called_subset"
-                repair_kind = "safety"
                 routing_disposition = "quarantined"
             elif implementation_repair_families:
                 decision = "needs_implementation_repair"
@@ -1782,12 +1850,15 @@ class SelfEvolutionReflectionController:
                     else "needs_route_repair"
                 )
                 repair_kind = "routing"
-                reason = "repeated_sole_tool_family_regression"
+                reason = (
+                    "generated_helper_followup_failure"
+                    if any(
+                        "generated_helper_followup_failure" in reason_codes
+                        for reason_codes in route_repair_reason_codes.values()
+                    )
+                    else "repeated_sole_tool_family_regression"
+                )
                 routing_disposition = "family_suppression_active"
-            elif stats.side_effect_incident_count:
-                decision = "retain_with_safety_audit"
-                reason = "positive_called_subset_with_side_effect_audit"
-                repair_kind = "safety"
             elif outcome_shortfall_alarm_families:
                 decision = "diagnostic_alarm"
                 reason = "low_task_outcome_not_tool_attributable"
@@ -1828,9 +1899,9 @@ class SelfEvolutionReflectionController:
         if self.runtime_exceptions:
             on_track = False
             reasons.append("runtime_exceptions_present")
-        if self.side_effect_incidents:
+        if self.actor_followthrough_failure_count:
             on_track = False
-            reasons.append("side_effect_incidents_present")
+            reasons.append("actor_followthrough_failures_present")
         if self.completed_count >= self.min_pulse_tasks:
             score_ok = (
                 score_lift_percent is not None
@@ -1853,7 +1924,9 @@ class SelfEvolutionReflectionController:
             "score_lift_percent": score_lift_percent,
             "outcome_delta_mean": outcome_delta_mean,
             "runtime_exceptions": self.runtime_exceptions,
-            "side_effect_incidents": self.side_effect_incidents,
+            "actor_followthrough_failure_count": (
+                self.actor_followthrough_failure_count
+            ),
             "on_track": on_track,
             "off_track_reasons": reasons,
             "tool_lifecycle": self._tool_lifecycle_snapshot(),
@@ -1883,7 +1956,9 @@ class SelfEvolutionReflectionController:
             "score_delta_mean": _mean(self.score_deltas),
             "outcome_delta_mean": _mean(self.outcome_deltas),
             "runtime_exceptions": self.runtime_exceptions,
-            "side_effect_incidents": self.side_effect_incidents,
+            "actor_followthrough_failure_count": (
+                self.actor_followthrough_failure_count
+            ),
             "tool_lifecycle": self._tool_lifecycle_snapshot(),
             "top_gap_buckets": self._top_gap_buckets(),
         }

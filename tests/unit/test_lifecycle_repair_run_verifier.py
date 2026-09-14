@@ -9,7 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from scripts import verify_lifecycle_repair_run
+from sage_ts.adequacy.inadequacy_classifier import (
+    _safe_action_or_abstain_observation,
+)
+from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import ValidationContractBindingStore
+from scripts import run_sage_protocol, verify_lifecycle_repair_run
+from scripts.seed_lifecycle_validation_contract import seed_binding
 from tool_sandbox.common.execution_context import (
     DatabaseNamespace,
     ExecutionContext,
@@ -20,31 +26,32 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _TEST_OUTCOME_MARKER = "__lifecycle_test_outcome__"
 
 
-def _synthetic_conversation(helper_called: bool) -> list[dict[str, object]]:
-    if not helper_called:
-        return []
-    return [
-        {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
+def _synthetic_conversation(tool_names: tuple[str, ...]) -> list[dict[str, object]]:
+    messages: list[dict[str, object]] = []
+    for index, tool_name in enumerate(tool_names):
+        call_id = f"synthetic-call-{index}"
+        messages.extend(
+            [
                 {
-                    "id": "synthetic-call",
-                    "type": "function",
-                    "function": {
-                        "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
-                        "arguments": "{}",
-                    },
-                }
-            ],
-        },
-        {
-            "tool_call_id": "synthetic-call",
-            "role": "tool",
-            "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
-            "content": "{'should_abstain': True}",
-        },
-    ]
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": call_id,
+                            "type": "function",
+                            "function": {"name": tool_name, "arguments": "{}"},
+                        }
+                    ],
+                },
+                {
+                    "tool_call_id": call_id,
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": "{}",
+                },
+            ]
+        )
+    return messages
 
 
 def _fake_trajectory_recomputation(
@@ -71,8 +78,11 @@ def _fake_trajectory_recomputation(
         },
         "paper_outcome": {"outcome_similarity": None},
         "conversation": _synthetic_conversation(
-            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
-            in (execution_context.tool_allow_list or [])
+            tuple(
+                item
+                for item in (execution_context.tool_allow_list or [])
+                if not item.startswith(_TEST_OUTCOME_MARKER)
+            )
         ),
     }
 
@@ -102,21 +112,47 @@ def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
 
+def _rewrite_protocol_event_journal(
+    run_root: Path, rows: list[dict[str, object]]
+) -> Path:
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    journal = protocol["protocol_event_journal"]
+    journal_path = Path(journal["path"])
+    _write_jsonl(journal_path, rows)
+    journal["sha256"] = hashlib.sha256(journal_path.read_bytes()).hexdigest()
+    journal["event_count"] = len(rows)
+    _write_json(protocol_path, protocol)
+    return journal_path
+
+
 def _write_synthetic_trajectory(
     run_dir: Path,
     *,
     scenario_name: str,
     outcome: float,
-    helper_called: bool,
+    helper_called: bool = False,
+    generated_tools: tuple[str, ...] = (),
 ) -> None:
     trajectory_dir = run_dir / "trajectories" / scenario_name
     trajectory_dir.mkdir(parents=True, exist_ok=True)
     context = ExecutionContext()
     context.tool_allow_list = [f"{_TEST_OUTCOME_MARKER}{outcome!r}"]
-    if helper_called:
-        context.tool_allow_list.append(
-            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    tool_names = tuple(
+        dict.fromkeys(
+            (
+                *(
+                    (verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,)
+                    if helper_called
+                    else ()
+                ),
+                *generated_tools,
+            )
         )
+    )
+    for index, tool_name in enumerate(tool_names):
+        context.tool_allow_list.append(tool_name)
+        call_id = f"synthetic-call-{index}"
         context.add_to_database(
             DatabaseNamespace.SANDBOX,
             rows=[
@@ -124,19 +160,15 @@ def _write_synthetic_trajectory(
                     "sender": RoleType.AGENT,
                     "recipient": RoleType.EXECUTION_ENVIRONMENT,
                     "content": "synthetic generated-tool request",
-                    "openai_tool_call_id": "synthetic-call",
-                    "openai_function_name": (
-                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
-                    ),
+                    "openai_tool_call_id": call_id,
+                    "openai_function_name": tool_name,
                 },
                 {
                     "sender": RoleType.EXECUTION_ENVIRONMENT,
                     "recipient": RoleType.AGENT,
                     "content": "{'should_abstain': True}",
-                    "openai_tool_call_id": "synthetic-call",
-                    "openai_function_name": (
-                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
-                    ),
+                    "openai_tool_call_id": call_id,
+                    "openai_function_name": tool_name,
                 },
             ],
         )
@@ -146,13 +178,14 @@ def _write_synthetic_trajectory(
     )
     _write_json(
         trajectory_dir / "conversation.json",
-        _synthetic_conversation(helper_called),
+        _synthetic_conversation(tool_names),
     )
 
 
 def _write_registry_checkpoints(
     candidate_dir: Path,
     registry_dir: Path,
+    initial_contract_dir: Path,
     *,
     scenario_order: tuple[str, ...],
     versions: dict[str, int | None],
@@ -177,52 +210,101 @@ def _write_registry_checkpoints(
             )
         )
         version = versions.get(scenario_name)
-        manifest = fault_manifest if version == 1 else promoted_manifest
+        use_initial = version == 1
+        manifest = fault_manifest if use_initial else promoted_manifest
         _write_json(checkpoint_dir / "registry_manifest.json", manifest)
+        contract_source = initial_contract_dir if use_initial else registry_dir
+        copied_files = ["registry_manifest.json"]
+        contract_index = contract_source / "validation_contract_bindings.json"
+        shutil.copy2(contract_index, checkpoint_dir / contract_index.name)
+        copied_files.append(contract_index.name)
+        index = json.loads(contract_index.read_text(encoding="utf-8"))
+        contract_hashes = sorted(
+            {
+                str(metadata["contract_hash"])
+                for versions_by_tool in index["bindings"].values()
+                for metadata in versions_by_tool.values()
+            }
+        )
+        for contract_hash in contract_hashes:
+            relative = Path("validation_contracts") / f"{contract_hash}.json"
+            destination = checkpoint_dir / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(contract_source / relative, destination)
+            copied_files.append(relative.as_posix())
         _write_json(
             checkpoint_dir / "checkpoint.json",
             {
                 "scenario": scenario_name,
                 "completed_count": completed_count,
                 "registry_dir": str(registry_dir),
-                "copied_files": ["registry_manifest.json"],
+                "copied_files": copied_files,
+                "validation_contract_snapshot_errors": [],
             },
         )
 
 
 def _promoted_registry_manifest() -> dict[str, object]:
     code = (
-        "def prepare_safe_action_or_abstain(user_request: str, "
-        "requested_action: str):\n"
-        "    return {'should_abstain': True, 'missing_information': "
-        "['contact_lookup'], 'required_original_tools': ['search_contacts'], "
-        "'safe_next_action': 'ask_user_or_abstain', "
-        "'final_answer_recommendation': 'I do not have enough information.', "
-        "'abstain_reason': 'missing_required_original_tool'}\n"
+        "def prepare_safe_action_or_abstain(user_request: str=None, requested_action: str=None, "
+        "target_identifier: str='', required_original_tools: list=[], "
+        "available_original_tools: list=[], visible_records_count: int=0):\n"
+        "    aliases = {'search_contacts': 'contact_lookup', 'search_reminder': 'reminder_lookup', "
+        "'send_message_with_phone_number': 'message_send', 'send_message': 'message_send', "
+        "'get_current_timestamp': 'current_time'}\n"
+        "    required_raw = [required_original_tools] if isinstance(required_original_tools, str) else list(required_original_tools or [])\n"
+        "    available_raw = [available_original_tools] if isinstance(available_original_tools, str) else list(available_original_tools or [])\n"
+        "    required = [aliases.get(str(item).strip(), str(item).strip()) for item in required_raw]\n"
+        "    available = [aliases.get(str(item).strip(), str(item).strip()) for item in available_raw]\n"
+        "    action = str(requested_action or '').strip().lower().replace(' ', '_')\n"
+        "    target = str(target_identifier or '').strip()\n"
+        "    if ('send' in action or 'message' in action) and target and not target.replace('+', '').replace('-', '').replace(' ', '').isdigit() and 'contact_lookup' not in required:\n"
+        "        required.append('contact_lookup')\n"
+        "    missing = [item for item in required if item not in available]\n"
+        "    if missing:\n"
+        "        facts = ', '.join(item.replace('_', ' ') for item in missing)\n"
+        "        recommendation = 'Cannot continue because the required ' + facts + ' capability is missing or unavailable.'\n"
+        "        return {'should_abstain': True, 'missing_information': missing, 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': recommendation, 'abstain_reason': 'missing_required_original_tool'}\n"
+        "    mutating = any(word in action for word in ('add', 'archive', 'create', 'delete', 'modify', 'remove', 'send', 'set', 'update')) and not any(word in action for word in ('search', 'lookup', 'find', 'list', 'read', 'check'))\n"
+        "    if mutating and not target:\n"
+        "        return {'should_abstain': True, 'missing_information': ['target_identifier'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Cannot continue because the target identifier or contact name is missing.', 'abstain_reason': 'missing_target_identifier'}\n"
+        "    if mutating and int(visible_records_count or 0) > 1:\n"
+        "        return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'Cannot continue because multiple matches make the target ambiguous; please clarify which one.', 'abstain_reason': 'ambiguous_target'}\n"
+        "    return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}\n"
     )
-    return {
-        "tools": {
-            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: {
-                "version": 2,
-                "retired": False,
-                "birth_scenario": "post_deployment_repair:contact",
-                "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
-                "tool": {
-                    "spec": {
-                        "schema_version": 2,
-                        "tool_name": (
-                            verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
-                        ),
-                        "family": "validation_abstention_helper",
-                        "description": "Safely abstain when a required lookup is absent.",
-                        "inputs": [],
-                        "output_annotation": "dict",
-                    },
-                    "code": code,
-                },
-            }
+    fixture = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "docs"
+            / "sage_protocol"
+            / "fixtures"
+            / "historical_faulty_safe_action_registry.json"
+        ).read_text(encoding="utf-8")
+    )
+    tools = dict(fixture["tools"])
+    target = dict(tools[verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL])
+    target.update(
+        {
+            "version": 2,
+            "retired": False,
+            "birth_scenario": "post_deployment_repair:contact",
+            "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+            "tool": {
+                "spec": target["tool"]["spec"],
+                "code": code,
+            },
+            "validation": {
+                "accepted": True,
+                "errors": [],
+                "source_example_count": 2,
+                "held_out_check_count": 2,
+                "negative_applicability_count": 2,
+                "runtime_smoke_passed": True,
+            },
         }
-    }
+    )
+    tools[verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL] = target
+    return {"tools": tools}
 
 
 def _zero_usage() -> dict[str, object]:
@@ -313,7 +395,8 @@ def _development_artifacts(
     spec = verify_lifecycle_repair_run.COHORT_SPECS[benchmark["manifest_type"]]
     order = tuple(spec["order"])
     safe_names = tuple(spec["roles"][spec["safe_role"]])
-    preservation_names = tuple(spec["roles"]["preservation"])
+    working_overlap_names = tuple(spec["roles"]["working_generated_overlap"])
+    unrelated_preservation_names = tuple(spec["roles"]["unrelated_native_preservation"])
     trigger_name = safe_names[0]
     request_id = "prepare-safe-v1-after-1"
 
@@ -345,7 +428,22 @@ def _development_artifacts(
     feedback_rows: list[dict[str, object]] = []
     for completed_count, name in enumerate(order, start=1):
         safe = name in safe_names
-        visible = [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL] if safe else []
+        if safe:
+            visible = [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
+        elif name in working_overlap_names:
+            visible = list(verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES)
+        else:
+            visible = []
+        versions = {
+            tool_name: (
+                1
+                if tool_name in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                else 1
+                if name == trigger_name
+                else 2
+            )
+            for tool_name in visible
+        }
         selection_rows.append(
             {
                 "scenario": name,
@@ -358,15 +456,7 @@ def _development_artifacts(
                     if name == trigger_name
                     else []
                 ),
-                "generated_tool_versions": (
-                    {
-                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: (
-                            1 if name == trigger_name else 2
-                        )
-                    }
-                    if safe
-                    else {}
-                ),
+                "generated_tool_versions": versions,
                 "exception_type": None,
             }
         )
@@ -380,15 +470,7 @@ def _development_artifacts(
                 "generated_tools_called": visible,
                 "generated_tools_attempted": visible,
                 "generated_tools_failed": [],
-                "generated_tool_versions": (
-                    {
-                        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: (
-                            1 if name == trigger_name else 2
-                        )
-                    }
-                    if safe
-                    else {}
-                ),
+                "generated_tool_versions": versions,
                 "generated_tool_contract_failures": (
                     [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
                     if name == trigger_name
@@ -397,6 +479,7 @@ def _development_artifacts(
                 "post_deployment_repair_request_ids": (
                     [request_id] if name == trigger_name else []
                 ),
+                "actor_followthrough_failures": [],
                 "exception_type": None,
             }
         )
@@ -419,7 +502,13 @@ def _development_artifacts(
             candidate_dir,
             scenario_name=name,
             outcome=candidate_outcome_by_name[name],
-            helper_called=name in safe_names,
+            generated_tools=(
+                (verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,)
+                if name in safe_names
+                else verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                if name in working_overlap_names
+                else ()
+            ),
         )
     _write_jsonl(
         candidate_dir / "self_evolution_tool_repair_requests.jsonl",
@@ -469,21 +558,76 @@ def _development_artifacts(
             "repair_transactions_by_tool": {},
         },
     )
-    _write_jsonl(
-        candidate_dir / "sage_run_events.jsonl",
-        [
-            {
-                "event": "post_deployment_tool_repair_accepted",
-                "request_id": request_id,
-                "tool_name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
-                "source_tool_version": 1,
-                "new_tool_version": 2,
-                "triggering_task_replayed": False,
-            }
-        ],
+    acceptance_event = {
+        "event": "post_deployment_tool_repair_accepted",
+        "request_id": request_id,
+        "tool_name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+        "source_tool_version": 1,
+        "new_tool_version": 2,
+        "repair_kind": "implementation",
+        "triggering_task_replayed": False,
+        "mode": "online_build_full",
+        "run_root": str(run_root),
+        "run_dir": str(candidate_dir),
+    }
+    fault_fixture = (
+        REPOSITORY_ROOT
+        / "docs"
+        / "sage_protocol"
+        / "fixtures"
+        / "historical_faulty_safe_action_registry.json"
     )
     registry_manifest_path = registry_dir / "registry_manifest.json"
+    registry_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_manifest_path.write_bytes(fault_fixture.read_bytes())
+    contract_receipt_path = run_root / "validation_contract_seed_receipt.json"
+    seed_binding(
+        registry_dir=registry_dir,
+        fixture_path=fault_fixture,
+        receipt_path=contract_receipt_path,
+    )
+    initial_contract_dir = run_root / "registry_gate" / "initial_contract_store"
+    initial_contract_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        registry_dir / "validation_contract_bindings.json",
+        initial_contract_dir / "validation_contract_bindings.json",
+    )
+    shutil.copytree(
+        registry_dir / "validation_contracts",
+        initial_contract_dir / "validation_contracts",
+    )
+    sealed_contracts = run_sage_protocol._seal_development_validation_contract_receipt(
+        run_root=run_root,
+        registry_dir=registry_dir,
+        registry_snapshot={
+            "manifest_digest_before_run": (
+                verify_lifecycle_repair_run.LIFECYCLE_FAULT_FIXTURE_SHA256
+            )
+        },
+        receipt_path=contract_receipt_path,
+        receipt_sha256=hashlib.sha256(contract_receipt_path.read_bytes()).hexdigest(),
+    )
     _write_json(registry_manifest_path, _promoted_registry_manifest())
+    final_entry = RegistryStore(registry_dir).get(
+        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    )
+    assert final_entry is not None
+    final_observation = _safe_action_or_abstain_observation(
+        "development_synthetic_validation_contract"
+    )
+    final_binding = ValidationContractBindingStore(registry_dir).persist(
+        final_entry,
+        final_observation,
+        validation_examples=final_observation.validation_examples,
+    )
+    acceptance_event["validation_contract_hash"] = final_binding.contract_hash
+    # Keep the historical local stream as a compatibility decoy. New manifests
+    # must bind verification to the independently sealed protocol journal below.
+    _write_jsonl(candidate_dir / "sage_run_events.jsonl", [acceptance_event])
+    artifact_root = search_root / "protocol_artifacts"
+    event_journal_path = artifact_root / "events" / "latest.jsonl"
+    _write_jsonl(event_journal_path, [acceptance_event])
+    event_journal_sha256 = hashlib.sha256(event_journal_path.read_bytes()).hexdigest()
     _write_json(
         registry_dir / "tool_lifecycle.json",
         {
@@ -491,7 +635,17 @@ def _development_artifacts(
             "tools": {
                 verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: {
                     "status": "promoted"
-                }
+                },
+                "relative_day_time_to_timestamp": {
+                    "status": "retained",
+                    "decision": "retain",
+                    "routing_disposition": "unchanged",
+                },
+                "prepare_reminder_creation_args": {
+                    "status": "retained",
+                    "decision": "retain",
+                    "routing_disposition": "unchanged",
+                },
             },
         },
     )
@@ -502,6 +656,7 @@ def _development_artifacts(
     _write_registry_checkpoints(
         candidate_dir,
         registry_dir,
+        initial_contract_dir,
         scenario_order=order,
         versions={
             name: 1 if name == trigger_name else 2 if name in safe_names else None
@@ -557,13 +712,6 @@ def _development_artifacts(
         "overlap_monotonic_ns": 200,
         "overlap_seconds": 2e-7,
     }
-    fault_fixture = (
-        REPOSITORY_ROOT
-        / "docs"
-        / "sage_protocol"
-        / "fixtures"
-        / "historical_faulty_safe_action_registry.json"
-    )
     fault_snapshot_path = (
         run_root / "registry_gate" / "registry_manifest_before_run.json"
     )
@@ -596,6 +744,7 @@ def _development_artifacts(
     _write_json(
         run_root / "protocol_manifest.json",
         {
+            "mode": "online_build_full",
             "manifest_type": benchmark["manifest_type"],
             "benchmark_manifest_path": str(manifest_path),
             "benchmark_manifest_sha256": hashlib.sha256(
@@ -622,18 +771,32 @@ def _development_artifacts(
             "candidate_dir": str(candidate_dir),
             "registry_dir": str(registry_dir),
             "registry_manifest_digest_after_run": registry_sha256,
+            "protocol_event_journal": {
+                "schema_version": 1,
+                "artifact_root": str(artifact_root),
+                "path": str(event_journal_path),
+                "sha256": event_journal_sha256,
+                "event_count": 1,
+                "append_closed_before_protocol_manifest": True,
+            },
             "registry_gate_snapshot": {
                 "manifest_existed_before_run": True,
                 "manifest_digest_before_run": (
                     verify_lifecycle_repair_run.LIFECYCLE_FAULT_FIXTURE_SHA256
                 ),
                 "snapshot_path": str(fault_snapshot_path),
+                "working_tool_provenance": json.loads(
+                    fault_snapshot_path.read_text(encoding="utf-8")
+                )["working_tool_provenance"],
+                "seeded_validation_contract_bindings": sealed_contracts,
             },
+            "seeded_validation_contract_bindings": sealed_contracts,
             "dashboard_open_receipt_path": str(receipt_path),
             "dashboard_task_compare_url": dashboard_url,
         },
     )
-    assert set(preservation_names).isdisjoint(safe_names)
+    assert set(working_overlap_names).isdisjoint(safe_names)
+    assert set(unrelated_preservation_names).isdisjoint(safe_names)
     return search_root, run_root, candidate_dir, manifest_path
 
 
@@ -669,7 +832,8 @@ def _transfer_artifacts(
     spec = verify_lifecycle_repair_run.COHORT_SPECS[benchmark["manifest_type"]]
     order = tuple(spec["order"])
     safe_names = tuple(spec["roles"][spec["safe_role"]])
-    preservation_names = tuple(spec["roles"]["preservation"])
+    working_overlap_names = tuple(spec["roles"]["working_generated_overlap"])
+    unrelated_preservation_names = tuple(spec["roles"]["unrelated_native_preservation"])
 
     _write_json(
         candidate_dir / "result_summary.json",
@@ -685,11 +849,12 @@ def _transfer_artifacts(
     )
     selection_rows = []
     for name in order:
-        visible = (
-            [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
-            if name in safe_names
-            else []
-        )
+        if name in safe_names:
+            visible = [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
+        elif name in working_overlap_names:
+            visible = list(verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES)
+        else:
+            visible = []
         selection_rows.append(
             {
                 "scenario": name,
@@ -697,11 +862,16 @@ def _transfer_artifacts(
                 "generated_tools_called": visible,
                 "generated_tools_attempted": visible,
                 "generated_tools_failed": [],
-                "generated_tool_versions": (
-                    {verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: 2}
-                    if visible
-                    else {}
-                ),
+                "generated_tool_contract_failures": [],
+                "generated_tool_versions": {
+                    tool_name: (
+                        1
+                        if tool_name
+                        in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                        else 2
+                    )
+                    for tool_name in visible
+                },
             }
         )
     _write_jsonl(candidate_dir / "scenario_tool_selection.jsonl", selection_rows)
@@ -716,10 +886,17 @@ def _transfer_artifacts(
             candidate_dir,
             scenario_name=name,
             outcome=1.0,
-            helper_called=name in safe_names,
+            generated_tools=(
+                (verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,)
+                if name in safe_names
+                else verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                if name in working_overlap_names
+                else ()
+            ),
         )
     _write_registry_checkpoints(
         candidate_dir,
+        registry_dir,
         registry_dir,
         scenario_order=order,
         versions={name: 2 if name in safe_names else None for name in order},
@@ -745,13 +922,13 @@ def _transfer_artifacts(
             {
                 "event": "registry_load",
                 "generation_enabled": False,
-                "registry_tools": [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL],
+                "registry_tools": list(verify_lifecycle_repair_run.FIXTURE_TOOL_NAMES),
             },
             {
                 "event": "run_finished",
                 "lifecycle_finalization_count": 0,
                 "final_registry_tools": [
-                    verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                    *verify_lifecycle_repair_run.FIXTURE_TOOL_NAMES
                 ],
             },
         ],
@@ -771,6 +948,14 @@ def _transfer_artifacts(
     inventory_sha256 = verify_lifecycle_repair_run._inventory_sha256(inventory)
     target_identity = verify_lifecycle_repair_run._target_tool_identity(registry_dir)
     assert target_identity is not None
+    target_contract_identity = (
+        verify_lifecycle_repair_run._target_validation_contract_identity(registry_dir)
+    )
+    contract_identities = verify_lifecycle_repair_run._validation_contract_identities(
+        registry_dir
+    )
+    assert target_contract_identity is not None
+    assert contract_identities is not None
     snapshot_path = run_root / "registry_gate" / "registry_manifest_before_run.json"
     snapshot_path.write_bytes((registry_dir / "registry_manifest.json").read_bytes())
     snapshot = {
@@ -803,6 +988,8 @@ def _transfer_artifacts(
         "installed_registry_dir": str(registry_dir.resolve()),
         "installed_registry_inventory_sha256": inventory_sha256,
         "target_tool": target_identity,
+        "target_validation_contract": target_contract_identity,
+        "validation_contract_bindings": contract_identities,
     }
     protocol_path = run_root / "protocol_manifest.json"
     protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
@@ -831,7 +1018,8 @@ def _transfer_artifacts(
         }
     )
     _write_json(protocol_path, protocol)
-    assert set(preservation_names).isdisjoint(safe_names)
+    assert set(working_overlap_names).isdisjoint(safe_names)
+    assert set(unrelated_preservation_names).isdisjoint(safe_names)
     return search_root, run_root, candidate_dir, registry_dir, source_run
 
 
@@ -1001,6 +1189,309 @@ def test_predeclared_development_cohort_passes_with_real_artifact_fields(
     assert report["status"] == "pass"
     assert report["historical_v1_observed_failure_proved"] is True
     assert report["repaired_version_future_success_flip_count"] >= 1
+    assert report["actor_followthrough_closure"]["derived_obligation_count"] == 0
+
+
+def test_followthrough_closure_orders_repeated_actions_and_binds_supersession(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    registry_dir = Path(protocol["registry_dir"])
+    spec = verify_lifecycle_repair_run.COHORT_SPECS[
+        "development_diagnostic_lifecycle_repair_dev10"
+    ]
+    order = tuple(spec["order"])
+    safe_names = tuple(spec["roles"][spec["safe_role"]])
+    failing_names = safe_names[:3]
+    family = "contact"
+    context_label = "visible_task_context(family=contact; signals=followthrough)"
+
+    selection_rows = verify_lifecycle_repair_run._read_jsonl(
+        candidate_dir / "scenario_tool_selection.jsonl"
+    )
+    trajectory_evidence = {
+        str(row["scenario"]): {
+            field: tuple(row[field])
+            for field in (
+                "generated_tools_visible",
+                "generated_tools_called",
+                "generated_tools_attempted",
+                "generated_tools_failed",
+            )
+        }
+        for row in selection_rows
+    }
+    feedback_rows = verify_lifecycle_repair_run._read_jsonl(
+        candidate_dir / "self_evolution_task_feedback.jsonl"
+    )
+    feedback_by_name = {str(row["scenario"]): row for row in feedback_rows}
+    actions: list[dict[str, object]] = []
+    for scenario_name in failing_names:
+        completed_count = order.index(scenario_name) + 1
+        version = 1 if scenario_name == safe_names[0] else 2
+        conversation = [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "followthrough-call",
+                        "type": "function",
+                        "function": {
+                            "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+                            "arguments": "{}",
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "followthrough-call",
+                "name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+                "content": {
+                    "should_call_tool": True,
+                    "downstream_tool_name": "remove_contact",
+                    "downstream_tool_kwargs": {"person_id": "public-record-id"},
+                },
+            },
+            {"role": "assistant", "content": "Done."},
+        ]
+        _write_json(
+            candidate_dir / "trajectories" / scenario_name / "conversation.json",
+            conversation,
+        )
+        action = {
+            "tool_name": verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,
+            "decision": "needs_route_repair",
+            "repair_kind": "routing",
+            "reason": "generated_helper_followup_failure",
+            "scenario": context_label,
+            "routing_disposition": "family_suppression_active",
+            "target_task_family": family,
+            "source_tool_version": version,
+        }
+        actions.append(action)
+        feedback_by_name[scenario_name].update(
+            {
+                "task_context_label": context_label,
+                "task_family_key": family,
+                "source_task_id_redacted": True,
+                "actor_followthrough_failures": [
+                    verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                ],
+                "immediate_actions": [action],
+            }
+        )
+        checkpoint_dir = verify_lifecycle_repair_run._checkpoint_directory(
+            candidate_dir,
+            completed_count=completed_count,
+            scenario_name=scenario_name,
+        )
+        _write_json(
+            checkpoint_dir / "tool_lifecycle.json",
+            {
+                "tools": {
+                    verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL: {
+                        "tool_version": version,
+                        "actor_followthrough_failure_count": 1,
+                        "actor_followthrough_failure_families": [family],
+                        "route_repair_families": [family],
+                        "route_repair_reason_codes": {
+                            family: ["generated_helper_followup_failure"]
+                        },
+                        "repair_kind": "routing",
+                        "routing_disposition": "family_suppression_active",
+                        "decision": "needs_route_repair",
+                    }
+                }
+            },
+        )
+    _write_jsonl(candidate_dir / "self_evolution_tool_lifecycle.jsonl", actions)
+
+    lifecycle_path = registry_dir / "tool_lifecycle.json"
+    lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
+    working_rows_before = {
+        name: dict(lifecycle["tools"][name])
+        for name in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+    }
+    lifecycle["tools"][verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL] = {
+        "tool_version": 2,
+        "actor_followthrough_failure_count": 2,
+        "actor_followthrough_failure_families": [family],
+        "route_repair_families": [family],
+        "route_repair_reason_codes": {family: ["generated_helper_followup_failure"]},
+        "repair_kind": "routing",
+        "routing_disposition": "family_suppression_active",
+        "decision": "needs_route_repair",
+    }
+    _write_json(lifecycle_path, lifecycle)
+    protocol_events, _journal = (
+        verify_lifecycle_repair_run._verified_protocol_event_rows(
+            run_root=run_root,
+            protocol=protocol,
+        )
+    )
+
+    report, reasons = verify_lifecycle_repair_run._actor_followthrough_closure_report(
+        candidate_dir=candidate_dir,
+        registry_dir=registry_dir,
+        scenario_order=order,
+        trajectory_evidence=trajectory_evidence,
+        feedback_by_name=feedback_by_name,
+        protocol_events=protocol_events,
+    )
+
+    assert reasons == []
+    assert report["derived_obligation_count"] == 3
+    assert report["closed_after_task_count"] == 3
+    assert report["closed_at_run_end_count"] == 3
+    assert [row["lifecycle_action_journal_index"] for row in report["obligations"]] == [
+        0,
+        1,
+        2,
+    ]
+    assert report["obligations"][0]["terminal_disposition"] == (
+        "validated_implementation_supersession"
+    )
+    assert all(
+        report["obligations"][index]["terminal_disposition"] == "family_suppression"
+        for index in (1, 2)
+    )
+    assert {
+        name: lifecycle["tools"][name]
+        for name in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+    } == working_rows_before
+
+    tampered_events = [dict(row) for row in protocol_events]
+    tampered_events[0]["validation_contract_hash"] = "0" * 64
+    tampered_report, tampered_reasons = (
+        verify_lifecycle_repair_run._actor_followthrough_closure_report(
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            scenario_order=order,
+            trajectory_evidence=trajectory_evidence,
+            feedback_by_name=feedback_by_name,
+            protocol_events=tampered_events,
+        )
+    )
+    assert tampered_report["obligations"][0]["closed_at_run_end"] is False
+    assert any("obligation_stale_at_run_end" in reason for reason in tampered_reasons)
+
+    _write_jsonl(
+        candidate_dir / "self_evolution_tool_lifecycle.jsonl",
+        [*actions, actions[-1]],
+    )
+    _extra_report, extra_reasons = (
+        verify_lifecycle_repair_run._actor_followthrough_closure_report(
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            scenario_order=order,
+            trajectory_evidence=trajectory_evidence,
+            feedback_by_name=feedback_by_name,
+            protocol_events=protocol_events,
+        )
+    )
+    assert "actor_followthrough_action_journal_mismatch" in extra_reasons
+
+
+def test_development_verifier_reads_sealed_protocol_event_journal(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    _write_jsonl(candidate_dir / "sage_run_events.jsonl", [])
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "pass"
+    assert report["repair_acceptance_event_source"]["mode"] == (
+        "sealed_protocol_event_journal"
+    )
+    assert report["repair_acceptance_event_source"]["sealed"] is True
+
+
+def test_development_verifier_rejects_tampered_protocol_event_journal(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    with journal_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"event": "forged"}) + "\n")
+
+    with pytest.raises(ValueError, match="journal digest"):
+        verify_lifecycle_repair_run.verify(search_root, 10)
+
+
+def test_development_verifier_rejects_symlink_protocol_event_journal(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    journal = protocol["protocol_event_journal"]
+    journal_path = Path(journal["path"])
+    target_path = journal_path.with_name("sealed.jsonl")
+    journal_path.rename(target_path)
+    journal_path.symlink_to(target_path.name)
+
+    with pytest.raises(ValueError, match="must not be a symbolic link"):
+        verify_lifecycle_repair_run.verify(search_root, 10)
+
+
+def test_development_verifier_rejects_duplicate_acceptance_event(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    accepted = json.loads(journal_path.read_text(encoding="utf-8").splitlines()[0])
+    _rewrite_protocol_event_journal(run_root, [accepted, accepted])
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert report["repair_acceptance_event_count"] == 2
+    assert "postdeployment_v2_acceptance_event_not_unique" in report["reasons"]
+
+
+def test_development_verifier_rejects_foreign_acceptance_event_binding(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    accepted = json.loads(journal_path.read_text(encoding="utf-8").splitlines()[0])
+    accepted["run_dir"] = str(tmp_path / "different-run" / "candidate")
+    _rewrite_protocol_event_journal(run_root, [accepted])
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert report["repair_acceptance_event_count"] == 0
+    assert report["repair_acceptance_event_binding_mismatch_count"] == 1
+    assert "postdeployment_v2_acceptance_event_binding_mismatch" in report["reasons"]
+
+
+def test_development_verifier_rejects_unsealed_candidate_local_legacy_stream(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+    del protocol["protocol_event_journal"]
+    _write_json(protocol_path, protocol)
+
+    with pytest.raises(ValueError, match="requires a sealed protocol event journal"):
+        verify_lifecycle_repair_run.verify(search_root, 10)
 
 
 def test_frozen_dev30_transfer_passes_with_exact_promoted_registry(
@@ -1016,7 +1507,8 @@ def test_frozen_dev30_transfer_passes_with_exact_promoted_registry(
     assert report["safe_abstain_visible_and_called_count"] == 26
     assert report["safe_abstain_exact_outcome_count"] >= 21
     assert report["fresh_control_success_flip_count"] >= 1
-    assert report["preservation_exact_hidden_nonregression_count"] == 4
+    assert report["working_generated_overlap_pass_count"] == 2
+    assert report["unrelated_native_preservation_pass_count"] == 2
 
 
 def test_development_cohort_requires_complete_trajectory_artifacts(
@@ -1096,6 +1588,78 @@ def test_development_cohort_rejects_checkpoint_version_corruption(
 
     assert report["status"] == "fail"
     assert "registry_checkpoint_version_mismatch" in report["reasons"]
+
+
+def test_development_cohort_rejects_missing_checkpoint_contract_blob(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[0]
+    checkpoint_dir = (
+        run_root
+        / "candidate"
+        / "registry_checkpoints"
+        / (
+            "after_0001_"
+            f"{verify_lifecycle_repair_run._safe_checkpoint_name(scenario_name)}"
+        )
+    )
+    index = json.loads(
+        (checkpoint_dir / "validation_contract_bindings.json").read_text()
+    )
+    contract_hash = index["bindings"][
+        verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+    ]["1"]["contract_hash"]
+    (checkpoint_dir / "validation_contracts" / f"{contract_hash}.json").unlink()
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "registry_checkpoint_version_mismatch" in report["reasons"]
+
+
+def test_development_cohort_binds_acceptance_to_final_contract_hash(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    protocol = json.loads(
+        (run_root / "protocol_manifest.json").read_text(encoding="utf-8")
+    )
+    journal_path = Path(protocol["protocol_event_journal"]["path"])
+    accepted = json.loads(journal_path.read_text().splitlines()[0])
+    accepted["validation_contract_hash"] = "0" * 64
+    _rewrite_protocol_event_journal(run_root, [accepted])
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "postdeployment_v2_acceptance_event_binding_mismatch" in report["reasons"]
+
+
+def test_development_cohort_rejects_failure_of_preserved_working_tool(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.COHORT_SPECS[
+        "development_diagnostic_lifecycle_repair_dev10"
+    ]["roles"]["working_generated_overlap"][0]
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        for row in rows:
+            if row["scenario"] == scenario_name:
+                row["generated_tool_contract_failures"] = [
+                    verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES[0]
+                ]
+        _write_jsonl(path, rows)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    assert report["status"] == "fail"
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
 
 
 def test_frozen_transfer_requires_complete_trajectory_artifacts(
@@ -1222,10 +1786,7 @@ def test_frozen_transfer_rejects_preservation_regression_or_helper_leak(
     report = verify_lifecycle_repair_run.verify(search_root, 30)
 
     assert report["status"] == "fail"
-    assert (
-        "transfer_preservation_exact_hidden_nonregression_gate_failed"
-        in report["reasons"]
-    )
+    assert "transfer_unrelated_native_preservation_gate_failed" in report["reasons"]
 
 
 def test_development_cohort_recursively_rejects_private_repair_evidence(
@@ -1342,7 +1903,7 @@ def test_development_cohort_rejects_candidate_path_outside_run(
 def test_development_cohort_cannot_pass_without_lifecycle_evidence(
     tmp_path: Path,
 ) -> None:
-    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    search_root, run_root, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
     for filename in (
         "self_evolution_tool_repair_requests.jsonl",
         "self_evolution_tool_repair_acknowledgements.jsonl",
@@ -1350,6 +1911,17 @@ def test_development_cohort_cannot_pass_without_lifecycle_evidence(
         "sage_run_events.jsonl",
     ):
         (candidate_dir / filename).write_text("", encoding="utf-8")
+    _rewrite_protocol_event_journal(
+        run_root,
+        [
+            {
+                "event": "run_finished",
+                "mode": "online_build_full",
+                "run_root": str(run_root),
+                "run_dir": str(candidate_dir),
+            }
+        ],
+    )
 
     report = verify_lifecycle_repair_run.verify(search_root, 10)
 
@@ -1457,7 +2029,7 @@ def test_preservation_fails_if_safe_helper_leaks_into_working_family(
 
     report = verify_lifecycle_repair_run.verify(search_root, 10)
 
-    assert "preservation_exact_and_safe_helper_hidden_gate_failed" in report["reasons"]
+    assert "unrelated_native_preservation_gate_failed" in report["reasons"]
 
 
 def test_observed_before_after_gate_rejects_v1_trigger_success(

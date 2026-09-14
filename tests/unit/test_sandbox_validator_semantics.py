@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from sage_ts.adequacy.inadequacy_classifier import (
     _safe_action_or_abstain_observation,
 )
@@ -248,6 +250,36 @@ def test_validator_accepts_clear_dynamic_deficit_recommendation() -> None:
     assert result.accepted, result.errors
 
 
+def test_validator_accepts_required_to_complete_as_deficit_recommendation() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'A target identifier is required.'",
+        "'A target identifier is required to complete the action.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert result.accepted, result.errors
+
+
+@pytest.mark.parametrize("modal", ["can", "will"])
+def test_validator_rejects_required_lookup_completion_claim(modal: str) -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        (
+            "'The required ' + ', '.join(item.replace('_', ' ') for item in missing) "
+            f"+ ' {modal} complete successfully.'"
+        ),
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_final_recommendation_missing_deficit_semantics" in error
+        for error in result.errors
+    )
+
+
 def test_validator_rejects_fact_named_only_as_successful() -> None:
     code = _GENERAL_IMPLEMENTATION.replace(
         "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
@@ -282,6 +314,21 @@ def test_validator_rejects_contradictory_missing_success_recommendation() -> Non
     code = _GENERAL_IMPLEMENTATION.replace(
         "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
         "'The missing ' + ', '.join(item.replace('_', ' ') for item in missing) + ' succeeded.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert not result.accepted
+    assert any(
+        "source_0_raw_final_recommendation_missing_deficit_semantics" in error
+        for error in result.errors
+    )
+
+
+def test_validator_rejects_missing_fact_described_as_complete() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+        "'The missing ' + ', '.join(item.replace('_', ' ') for item in missing) + ' is now complete.'",
     )
 
     result = validate_generated_tool(_abstention_tool(code), _examples())

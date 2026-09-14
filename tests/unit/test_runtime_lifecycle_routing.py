@@ -19,6 +19,10 @@ from sage_ts.runtime.toolsandbox_integration import (
         ),
         ("quarantined", "lifecycle_suppressed_quarantined_tool"),
         ("retired_after_failed_repair", "lifecycle_suppressed_retired_tool"),
+        (
+            "retain_with_safety_audit",
+            "lifecycle_suppressed_legacy_followthrough_audit",
+        ),
     ),
 )
 def test_non_executable_lifecycle_states_are_hidden_globally(
@@ -42,7 +46,7 @@ def test_operational_cleanliness_does_not_exempt_abstention_tool_from_repair_rou
         "prepare_safe_action_or_abstain": {
             "decision": "retain_with_route_repair",
             "failed_count": 0,
-            "side_effect_incident_count": 0,
+            "actor_followthrough_failure_count": 0,
             "harmful_called_count": 2,
             "harmful_called_families": [family, f"{family}_alt"],
             "helpful_called_families": ["unrelated_safe_abstention"],
@@ -85,6 +89,25 @@ def test_mixed_tool_is_hidden_only_in_its_harmful_family() -> None:
         )
         is None
     )
+
+
+def test_actor_followthrough_failure_has_distinct_family_suppression_reason() -> None:
+    family = "temporal_reminder_date_canonicalization"
+    state = {
+        "prepare_reminder_creation_args": {
+            "decision": "needs_route_repair",
+            "route_repair_families": [family],
+            "route_repair_reason_codes": {
+                family: ["generated_helper_followup_failure"]
+            },
+        }
+    }
+
+    assert _lifecycle_visibility_override(
+        tool_name="prepare_reminder_creation_args",
+        scenario_name=family,
+        lifecycle_state=state,
+    ) == (False, "lifecycle_suppressed_actor_followthrough_family")
 
 
 def test_private_exact_scenario_history_cannot_suppress_a_route() -> None:

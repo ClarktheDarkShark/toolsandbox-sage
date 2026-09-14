@@ -1,3 +1,4 @@
+import ast
 import json
 from dataclasses import dataclass
 
@@ -9,10 +10,12 @@ from sage_ts.adequacy.inadequacy_classifier import (
     _add_contact_argument_observation,
     _address_answer_extraction_observation,
     _broad_location_search_argument_observation,
+    _contact_lookup_query_planner_observation,
     _device_status_lookup_observation,
     _distance_answer_extraction_observation,
     _external_service_answer_extraction_observation,
     _holiday_search_args_observation,
+    _latest_record_selection_observation,
     _location_search_argument_observation,
     _message_counterparty_search_plan_observation,
     _plan_device_state_action_sequence_observation,
@@ -25,9 +28,13 @@ from sage_ts.generation.tool_generator import (
     MODEL_AUTHORED_DEFAULT_ORIGINAL_CALLS_BY_TOOL,
     ToolGenerationRequest,
     ToolGenerator,
+    _inputs_from_public_contract,
     _model_authored_contract_rules,
     _model_authored_final_repair_directive,
     _model_authored_generation_prompt,
+    _normalize_model_authored_tool,
+    public_input_contract_from_example_inputs,
+    public_output_contract_from_example_outputs,
 )
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
 from sage_ts.orchestration.online_birth import _model_visible_generation_examples
@@ -94,6 +101,9 @@ def _serialized_model_visible_contract(
                 "negative_applicability": example.negative_applicability,
             }
             for example in visible_examples
+        ),
+        public_input_contract=public_input_contract_from_example_inputs(
+            tuple(example.inputs for example in observation.validation_examples)
         ),
         suggested_tool_name=suggested_tool_name,
     )
@@ -195,6 +205,294 @@ def test_model_visible_contracts_do_not_serialize_benchmark_literals() -> None:
 
     lowered = serialized.lower()
     assert [literal for literal in prohibited if literal in lowered] == []
+
+
+def test_public_input_contract_exposes_shape_without_held_out_values() -> None:
+    hidden_input = "HELD_OUT_INPUT_VALUE_MUST_STAY_PRIVATE"
+    hidden_expected = "HELD_OUT_EXPECTED_VALUE_MUST_STAY_PRIVATE"
+    examples = (
+        ToolExample(
+            inputs={"query": "visible example"},
+            expected={"value": ""},
+        ),
+        ToolExample(
+            inputs={
+                "query": hidden_input,
+                "selected_record": {"private_field": hidden_input},
+            },
+            expected={"value": hidden_expected, "confidence": 0.75},
+            held_out=True,
+        ),
+    )
+    visible_examples = _model_visible_generation_examples(examples)
+    contract = public_input_contract_from_example_inputs(
+        tuple(item.inputs for item in examples)
+    )
+    output_contract = public_output_contract_from_example_outputs(
+        tuple(item.expected for item in examples)
+    )
+    request = ToolGenerationRequest(
+        scenario_name="synthetic_visible_task_context",
+        observation="Use a visible record when one is available.",
+        allowed_families=("composite_workflow_helper",),
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in visible_examples
+        ),
+        public_input_contract=contract,
+        public_output_contract=output_contract,
+        suggested_tool_name="select_visible_record",
+    )
+
+    prompt = _model_authored_generation_prompt(request)
+
+    assert [item.to_json() for item in contract] == [
+        {"name": "query", "annotation": "str", "optional": False},
+        {"name": "selected_record", "annotation": "dict", "optional": True},
+    ]
+    assert '"name": "selected_record"' in prompt
+    assert '"annotation": "dict"' in prompt
+    assert '"optional": true' in prompt
+    assert [item.to_json() for item in output_contract] == [
+        {"name": "value", "types": ["string"], "optional": False},
+        {"name": "confidence", "types": ["number"], "optional": True},
+    ]
+    assert '"name": "confidence"' in prompt
+    assert '"types": ["number"]' in prompt
+    assert "private_field" not in prompt
+    assert hidden_input not in prompt
+    assert hidden_expected not in prompt
+
+
+@pytest.mark.parametrize(
+    "signature",
+    (
+        (
+            "def prepare_safe_action_or_abstain(user_request: str, "
+            "requested_action: str, target_identifier: str, "
+            "required_original_tools: list, available_original_tools: list, "
+            "visible_records_count: int) -> dict:"
+        ),
+        (
+            "def prepare_safe_action_or_abstain(user_request: str = 'fixed', "
+            "requested_action: str = 'fixed', target_identifier: str = 'fixed', "
+            "required_original_tools: list = [], "
+            "available_original_tools: list = [], "
+            "visible_records_count: int = 99) -> dict:"
+        ),
+        (
+            "def prepare_safe_action_or_abstain(user_request: str, /, "
+            "requested_action: str, *extra, target_identifier: str = 'fixed', "
+            "required_original_tools: list = [], available_original_tools: list = [], "
+            "visible_records_count: int = 99, **kwargs) -> dict:"
+        ),
+    ),
+)
+def test_public_contract_required_inputs_never_receive_defaults(signature: str) -> None:
+    example_inputs = {
+        "user_request": "Visible request",
+        "requested_action": "modify_record",
+        "target_identifier": "visible-id",
+        "required_original_tools": ["record_update"],
+        "available_original_tools": ["record_update"],
+        "visible_records_count": 1,
+    }
+    contract = public_input_contract_from_example_inputs(
+        (example_inputs, dict(example_inputs))
+    )
+    request = ToolGenerationRequest(
+        scenario_name="synthetic_visible_task_context",
+        observation="Decide whether visible prerequisites permit an action.",
+        allowed_families=(str(ToolFamily.VALIDATION_ABSTENTION_HELPER),),
+        public_input_contract=contract,
+        suggested_tool_name="prepare_safe_action_or_abstain",
+    )
+    spec = ToolSpec(
+        tool_name="prepare_safe_action_or_abstain",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        description="Decide whether visible prerequisites permit an action.",
+        inputs=tuple(
+            ToolInput(item.name, item.annotation, f"Visible {item.name}.")
+            for item in contract
+        ),
+        output_annotation="dict",
+    )
+    normalized = _normalize_model_authored_tool(
+        request,
+        GeneratedTool(spec=spec, code=signature + "\n    return {}\n"),
+    )
+
+    function = next(
+        node
+        for node in ast.parse(normalized.code).body
+        if isinstance(node, ast.FunctionDef)
+    )
+    assert all(not item.optional for item in contract)
+    assert function.args.defaults == []
+    assert function.args.posonlyargs == []
+    assert function.args.vararg is None
+    assert function.args.kwonlyargs == []
+    assert function.args.kwarg is None
+    assert [item.arg for item in function.args.args] == [item.name for item in contract]
+
+
+def test_public_input_contract_preserves_model_visible_record_description() -> None:
+    observation = _latest_record_selection_observation("synthetic")
+    visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    request = ToolGenerationRequest(
+        scenario_name="synthetic_visible_task_context",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {"inputs": item.inputs, "expected": item.expected}
+            for item in visible_examples
+        ),
+        public_input_contract=public_input_contract_from_example_inputs(
+            tuple(item.inputs for item in observation.validation_examples)
+        ),
+    )
+
+    inputs = {item.name: item for item in _inputs_from_public_contract(request)}
+
+    assert inputs["records"].description.startswith("Complete visible records")
+    assert "preserve every record, field, and value" in inputs["records"].description
+    assert inputs["selection_mode"].description == (
+        "Visible semantic selection mode requested by the user."
+    )
+
+
+def test_contact_planner_normalization_preserves_hidden_case_interface() -> None:
+    observation = _contact_lookup_query_planner_observation("synthetic")
+    visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    contract = public_input_contract_from_example_inputs(
+        tuple(item.inputs for item in observation.validation_examples)
+    )
+    output_contract = public_output_contract_from_example_outputs(
+        tuple(item.expected for item in observation.validation_examples)
+    )
+    request = ToolGenerationRequest(
+        scenario_name="synthetic_visible_task_context",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in visible_examples
+        ),
+        public_input_contract=contract,
+        public_output_contract=output_contract,
+        suggested_tool_name="plan_contact_lookup_query",
+        inadequacy_evidence=observation.to_inadequacy_evidence().to_json(),
+    )
+    spec = ToolSpec(
+        tool_name="plan_contact_lookup_query",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        description="Prepare a contact lookup and extract a visible result field.",
+        inputs=(
+            ToolInput("contact_name", "str", "Visible contact name."),
+            ToolInput("phone_number", "str", "Visible phone number."),
+            ToolInput("relationship", "str", "Visible relationship."),
+            ToolInput("requested_field", "str", "Requested result field."),
+            ToolInput("selected_record", "dict", "Optional visible contact record."),
+        ),
+        output_annotation="dict",
+        output_schema={
+            "type": "object",
+            "properties": {
+                "should_call_search_contacts": {"type": "boolean"},
+                "search_contacts_kwargs": {"type": "object"},
+                "answer_field": {"type": "string"},
+                "selected_record": {"type": "object"},
+                "answer_value": {"type": "string"},
+                "final_answer_recommendation": {"type": "string"},
+                "copy_exactly": {"type": "boolean"},
+                "abstain_reason": {"type": "string"},
+                "legacy_undeclared_field": {"type": "string"},
+            },
+        },
+        positive_triggers=("contact_lookup", "contact_target_lookup"),
+        negative_triggers=("missing_lookup_constraint", "ambiguous_contact"),
+        preserves_side_effect_tools=("search_contacts",),
+        required_original_tool_calls=("search_contacts",),
+        abstain_behavior="Abstain when no visible lookup constraint is available.",
+        generalization_rationale=(
+            "The same two-phase lookup contract supports contact answers and actions."
+        ),
+        estimated_step_compression=3,
+        cross_task_applicability_count=2,
+        applicable_task_families=("contact_lookup", "contact_side_effect_target"),
+        reason_tool_is_decisive=(
+            "It preserves visible lookup evidence across search and extraction."
+        ),
+        shortfall_cluster_evidence=("contact_lookup_argument_planning",),
+        known_failure_mechanisms_addressed=("missing_contact_lookup_plan",),
+        inadequacy_evidence=observation.to_inadequacy_evidence(),
+    )
+    code = """
+def plan_contact_lookup_query(contact_name: str, phone_number: str, relationship: str, requested_field: str, selected_record: dict = {}) -> dict:
+    kwargs = {}
+    if str(contact_name or "").strip():
+        kwargs["name"] = str(contact_name).strip()
+    if str(phone_number or "").strip():
+        kwargs["phone_number"] = str(phone_number).strip()
+    if str(relationship or "").strip():
+        kwargs["relationship"] = str(relationship).strip()
+    requested = str(requested_field or "").strip()
+    selected = selected_record if isinstance(selected_record, dict) else {}
+    if selected:
+        value = selected.get(requested, "")
+        subject = str(phone_number or contact_name or relationship).strip()
+        recommendation = "" if requested == "person_id" else requested + " for " + subject + ": " + str(value)
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": kwargs, "answer_field": requested, "selected_record": selected, "answer_value": value, "final_answer_recommendation": recommendation, "copy_exactly": True, "abstain_reason": ""}
+    if not kwargs:
+        return {"should_call_search_contacts": False, "search_contacts_kwargs": {}, "answer_field": requested, "selected_record": {}, "answer_value": "", "final_answer_recommendation": "", "copy_exactly": False, "abstain_reason": "missing_lookup_constraint"}
+    return {"should_call_search_contacts": True, "search_contacts_kwargs": kwargs, "answer_field": requested, "selected_record": {}, "answer_value": "", "final_answer_recommendation": "", "copy_exactly": False, "abstain_reason": ""}
+""".strip()
+
+    normalized = _normalize_model_authored_tool(
+        request,
+        GeneratedTool(spec=spec, code=code),
+    )
+    validation = validate_generated_tool(
+        normalized,
+        observation.validation_examples,
+    )
+
+    assert [item.name for item in normalized.spec.inputs] == [
+        "contact_name",
+        "phone_number",
+        "relationship",
+        "requested_field",
+        "selected_record",
+    ]
+    assert "selected_record:dict={}" in normalized.code.replace(" ", "")
+    assert normalized.spec.output_schema == {
+        "type": "object",
+        "properties": {
+            item.name: {
+                "type": item.schema_types[0]
+                if len(item.schema_types) == 1
+                else list(item.schema_types)
+            }
+            for item in output_contract
+        },
+        "required": [item.name for item in output_contract if not item.optional],
+        "additionalProperties": False,
+    }
+    assert validation.accepted, validation.errors
 
 
 def test_tool_generator_authors_each_tool_fresh() -> None:
@@ -384,9 +682,15 @@ def test_validation_abstention_repair_final_directive() -> None:
 
         def complete(self, chat_request: ChatRequest) -> str:
             self.requests.append(chat_request)
-            # Even a nonconforming multi-candidate response is narrowed to the one
-            # coherent validation-helper candidate requested by the prompt.
-            return json.dumps({"candidates": [rejected.to_json(), rejected.to_json()]})
+            return json.dumps(
+                {
+                    "candidates": [
+                        rejected.to_json(),
+                        rejected.to_json(),
+                        rejected.to_json(),
+                    ]
+                }
+            )
 
     completer = CapturingCompleter()
     generator = ToolGenerator(completer=completer)
@@ -397,19 +701,20 @@ def test_validation_abstention_repair_final_directive() -> None:
 
     repaired = generator.repair_candidates(request, rejected, errors)
 
-    assert len(repaired) == 1
+    assert len(repaired) == 3
     assert len(completer.requests) == 1
     prompt = completer.requests[0].user
     directive = _model_authored_final_repair_directive(request, errors)
     assert prompt.endswith(directive)
-    assert '"candidate_count": 1' in prompt
-    assert "Return exactly one complete JSON repair object" in directive
+    assert '"candidate_count": 3' in prompt
+    assert "candidates array with exactly 3 independently authored" in directive
     assert "exactly these six keys" in directive
     assert "names every missing capability" in directive
     assert "explicitly says target identifier" in directive
     assert "explicitly names ambiguity or multiple matches" in directive
     step_positions = [directive.index(f"STEP {index}:") for index in range(1, 7)]
     assert step_positions == sorted(step_positions)
+    assert len(request.validation_examples) == 1
     assert hidden_task not in prompt
     assert hidden_answer not in prompt
 

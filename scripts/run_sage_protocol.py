@@ -58,6 +58,11 @@ from sage_ts.orchestration.self_evolution_reflection import (
     FRESH_CONTROL_ERROR_EVENT,
     FRESH_CONTROL_ROW_EVENT,
 )
+from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import (
+    VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+    ValidationContractBindingStore,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
 # Run modes are also split names. Keep these explicit so bad campaign labels
@@ -96,6 +101,69 @@ ACTOR_SELECTION_MODE = "policy"
 MATCHED_CONTROL_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
 MATCHED_CANDIDATE_AGENT_RUNTIME = SAGE_WRAPPED_AGENT_RUNTIME
 MATCHED_CONTROL_CONDITION = "matched_policy_wrapper_without_generated_tools"
+LIFECYCLE_USE_CASE_TOOL = "prepare_safe_action_or_abstain"
+LIFECYCLE_DEVELOPMENT_MANIFEST_TYPES = frozenset(
+    {
+        "development_diagnostic_lifecycle_repair_dev10",
+        "development_diagnostic_lifecycle_repair_dev30",
+    }
+)
+PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256 = (
+    "96d4c39f1dce124adbc195481dd5f96add2c05c2759014b4a5d0a444878cfd08"
+)
+PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
+    "prepare_reminder_creation_args": {
+        "tool_name": "prepare_reminder_creation_args",
+        "tool_version": 1,
+        "tool_code_hash": (
+            "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292"
+        ),
+        "tool_spec_hash": (
+            "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765"
+        ),
+        "canonical_key": "composite:prepare_reminder_creation_args",
+        "contract_hash": (
+            "caeeb92e4fe201b5d3e16ecdf05c33cd0d9006f2add755cf9c59006361f9806e"
+        ),
+        "binding_blob_sha256": (
+            "694f1a88f282fb3445985ca5174dca441b9310c676187013160b76fc489a6d3b"
+        ),
+    },
+    LIFECYCLE_USE_CASE_TOOL: {
+        "tool_name": LIFECYCLE_USE_CASE_TOOL,
+        "tool_version": 1,
+        "tool_code_hash": (
+            "16262a4c141901a7ec4f7fb8d289ec8067c09473352df77b1a1fd262743386a9"
+        ),
+        "tool_spec_hash": (
+            "1dd3336746267042c54b9ac0486afeaaf41ea9e0e4997128a56d7322f1792258"
+        ),
+        "canonical_key": "validation:prepare_safe_action_or_abstain",
+        "contract_hash": (
+            "a5343c05a8a7b2435a3be5e2e51750cd579d618eee05bc1b9accae0bc0e212d2"
+        ),
+        "binding_blob_sha256": (
+            "7280df34cf2024f010213cd64e2e158ffabf740e41d7189583d5bcf2eb1e37f2"
+        ),
+    },
+    "relative_day_time_to_timestamp": {
+        "tool_name": "relative_day_time_to_timestamp",
+        "tool_version": 1,
+        "tool_code_hash": (
+            "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab"
+        ),
+        "tool_spec_hash": (
+            "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95"
+        ),
+        "canonical_key": "canonicalizer:relative_day_time_timestamp",
+        "contract_hash": (
+            "800cf8677f9533df83fd005648cf83f4c3447813c07d212910da47b7d3a11cc4"
+        ),
+        "binding_blob_sha256": (
+            "b56aab87e514929c60e01205bebb0d566740a54f05ee59683357e2fa14921ace"
+        ),
+    },
+}
 PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
 PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION = "campaign-inclusion"
 PUBLICATION_GATE_PURPOSE_DEVELOPMENT_DIAGNOSTIC = "development-diagnostic"
@@ -505,6 +573,31 @@ def _digest_file(path: Path) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sealed_protocol_event_journal(artifact_root: Path) -> dict[str, object]:
+    """Describe the append-complete event stream consumed by run verifiers."""
+
+    journal_path = artifact_root / "events" / "latest.jsonl"
+    if not journal_path.is_file():
+        raise ValueError(
+            f"Protocol event journal is missing before manifest seal: {journal_path}"
+        )
+    raw_lines = journal_path.read_text(encoding="utf-8").splitlines()
+    event_count = sum(bool(line.strip()) for line in raw_lines)
+    if event_count < 1:
+        raise ValueError("Protocol event journal is empty before manifest seal.")
+    journal_sha256 = _digest_file(journal_path)
+    if journal_sha256 is None:
+        raise ValueError("Protocol event journal could not be hashed.")
+    return {
+        "schema_version": 1,
+        "artifact_root": str(artifact_root),
+        "path": str(journal_path),
+        "sha256": journal_sha256,
+        "event_count": event_count,
+        "append_closed_before_protocol_manifest": True,
+    }
+
+
 def _external_distribution_lock_identity(lock_path: Path) -> tuple[int, str]:
     """Independently derive the canonical external-distribution identity."""
 
@@ -873,10 +966,191 @@ def _snapshot_registry_for_gate(run_root: Path, registry_dir: Path) -> dict[str,
         "registry_inventory_count_before_run": len(inventory),
         "registry_inventory_sha256": _inventory_sha256(inventory),
     }
+    if existed:
+        try:
+            manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            manifest_payload = {}
+        working_tool_provenance = (
+            manifest_payload.get("working_tool_provenance")
+            if isinstance(manifest_payload, dict)
+            else None
+        )
+        if isinstance(working_tool_provenance, dict):
+            metadata["working_tool_provenance"] = working_tool_provenance
     (gate_dir / "registry_gate_snapshot.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
     )
     return metadata
+
+
+def _validation_contract_identity(
+    registry_dir: Path,
+    *,
+    tool_name: str = LIFECYCLE_USE_CASE_TOOL,
+) -> dict[str, Any]:
+    """Verify and describe the contract bound to the current registry version."""
+
+    store = RegistryStore(registry_dir)
+    entry = store.get(tool_name)
+    if entry is None:
+        raise ValueError(f"Registry is missing generated tool {tool_name!r}.")
+    binding_store = ValidationContractBindingStore(registry_dir)
+    binding, error = binding_store.resolve(entry)
+    if binding is None:
+        raise ValueError(
+            f"Registry validation-contract binding is invalid: {error or 'unknown'}."
+        )
+    blob_path = binding_store.blob_directory / f"{binding.contract_hash}.json"
+    return {
+        "tool_name": binding.tool_name,
+        "tool_version": binding.tool_version,
+        "tool_code_hash": binding.tool_code_hash,
+        "tool_spec_hash": binding.tool_spec_hash,
+        "canonical_key": binding.canonical_key,
+        "contract_hash": binding.contract_hash,
+        "binding_index_path": str(binding_store.index_path.resolve()),
+        "binding_index_sha256": _digest_file(binding_store.index_path),
+        "binding_blob_path": str(blob_path.resolve()),
+        "binding_blob_sha256": _digest_file(blob_path),
+    }
+
+
+def _validation_contract_identities(registry_dir: Path) -> dict[str, dict[str, Any]]:
+    """Verify and describe every current registry entry's exact binding."""
+
+    entries = RegistryStore(registry_dir).load_entries()
+    identities: dict[str, dict[str, Any]] = {}
+    for manifest_name, entry in sorted(entries.items()):
+        if manifest_name != entry.tool.spec.tool_name:
+            raise ValueError(
+                f"Registry key/name mismatch for generated tool {manifest_name!r}."
+            )
+        identities[manifest_name] = _validation_contract_identity(
+            registry_dir,
+            tool_name=manifest_name,
+        )
+    return identities
+
+
+def _seal_development_validation_contract_receipt(
+    *,
+    run_root: Path,
+    registry_dir: Path,
+    registry_snapshot: dict[str, Any],
+    receipt_path: Path | None,
+    receipt_sha256: str | None,
+) -> dict[str, Any]:
+    """Fail before execution unless every historical fixture tool is bound."""
+
+    if receipt_path is None or not receipt_path.is_file():
+        raise ValueError(
+            "Development lifecycle run requires a validation-contract seed receipt."
+        )
+    observed_receipt_sha256 = _digest_file(receipt_path)
+    if not receipt_sha256 or observed_receipt_sha256 != receipt_sha256.strip().lower():
+        raise ValueError("Development validation-contract receipt hash mismatch.")
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Development validation-contract receipt is malformed."
+        ) from exc
+    if not isinstance(receipt, dict):
+        raise ValueError("Development validation-contract receipt is malformed.")
+    identities = _validation_contract_identities(registry_dir)
+    if set(identities) != set(PINNED_LIFECYCLE_V1_CONTRACTS):
+        raise ValueError(
+            "Development historical registry does not match its contract pin set."
+        )
+    for tool_name, pinned in PINNED_LIFECYCLE_V1_CONTRACTS.items():
+        identity = identities[tool_name]
+        if any(identity.get(key) != value for key, value in pinned.items()):
+            raise ValueError(
+                "Development historical validation contract does not match its "
+                f"pin for {tool_name!r}."
+            )
+        if (
+            identity.get("binding_index_sha256")
+            != PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256
+        ):
+            raise ValueError(
+                "Development historical validation-contract index does not "
+                "match its aggregate pin."
+            )
+    receipt_bindings = {
+        tool_name: {
+            key: identity[key]
+            for key in (
+                "tool_name",
+                "tool_version",
+                "tool_code_hash",
+                "tool_spec_hash",
+                "canonical_key",
+                "contract_hash",
+                "binding_blob_path",
+                "binding_blob_sha256",
+            )
+        }
+        for tool_name, identity in sorted(identities.items())
+    }
+    expected_receipt_fields = {
+        "receipt_type": "development_only_historical_validation_contract_bindings",
+        "fixture_sha256": registry_snapshot.get("manifest_digest_before_run"),
+        "binding_count": len(receipt_bindings),
+        "bindings": receipt_bindings,
+        "contract_schema_version": VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+        "contract_provenance": "predeclared_synthetic_validator_contract",
+        "held_out_usage": "validator_and_model_selection_only",
+        "benchmark_identifiers_persisted": False,
+        "binding_index_path": next(iter(identities.values()))["binding_index_path"],
+        "binding_index_sha256": PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256,
+    }
+    if receipt != expected_receipt_fields:
+        raise ValueError(
+            "Development validation-contract receipt does not match installed bytes."
+        )
+
+    gate_dir = run_root / "registry_gate"
+    receipt_snapshot = gate_dir / "validation_contract_seed_receipt.json"
+    index_snapshot = gate_dir / "validation_contract_bindings_before_run.json"
+    shutil.copy2(receipt_path, receipt_snapshot)
+    shutil.copy2(
+        Path(str(next(iter(identities.values()))["binding_index_path"])),
+        index_snapshot,
+    )
+    blob_snapshots: dict[str, dict[str, Any]] = {}
+    for tool_name, identity in sorted(identities.items()):
+        blob_snapshot = gate_dir / f"{identity['contract_hash']}.json"
+        shutil.copy2(Path(str(identity["binding_blob_path"])), blob_snapshot)
+        blob_snapshots[tool_name] = {
+            "contract_hash": identity["contract_hash"],
+            "path": str(blob_snapshot.resolve()),
+            "sha256": _digest_file(blob_snapshot),
+        }
+    sealed = {
+        key: value
+        for key, value in expected_receipt_fields.items()
+        if key != "binding_index_path"
+    }
+    sealed["bindings"] = {
+        tool_name: {
+            key: value for key, value in binding.items() if key != "binding_blob_path"
+        }
+        for tool_name, binding in receipt_bindings.items()
+    }
+    sealed.update(
+        {
+            "source_receipt_path": str(receipt_path.resolve()),
+            "source_receipt_sha256": observed_receipt_sha256,
+            "receipt_snapshot_path": str(receipt_snapshot.resolve()),
+            "receipt_snapshot_sha256": _digest_file(receipt_snapshot),
+            "binding_index_snapshot_path": str(index_snapshot.resolve()),
+            "binding_index_snapshot_sha256": _digest_file(index_snapshot),
+            "binding_blob_snapshots": blob_snapshots,
+        }
+    )
+    return sealed
 
 
 def _resolve_run_declared_path(run_root: Path, raw_value: Any, label: str) -> Path:
@@ -967,6 +1241,30 @@ def _registry_transfer_provenance(
         raise ValueError(
             "Passing dev10 source does not contain a valid active repaired helper."
         )
+    source_contracts = _validation_contract_identities(source_registry_dir)
+    installed_contracts = _validation_contract_identities(installed_registry_dir)
+    contract_identity_keys = {
+        "tool_name",
+        "tool_version",
+        "tool_code_hash",
+        "tool_spec_hash",
+        "canonical_key",
+        "contract_hash",
+        "binding_index_sha256",
+        "binding_blob_sha256",
+    }
+    source_contract_identities = {
+        tool_name: {key: identity[key] for key in sorted(contract_identity_keys)}
+        for tool_name, identity in sorted(source_contracts.items())
+    }
+    installed_contract_identities = {
+        tool_name: {key: identity[key] for key in sorted(contract_identity_keys)}
+        for tool_name, identity in sorted(installed_contracts.items())
+    }
+    if source_contract_identities != installed_contract_identities:
+        raise ValueError(
+            "Installed transfer validation-contract bindings are not byte-identical."
+        )
     spec_sha256 = hashlib.sha256(
         json.dumps(spec, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -989,6 +1287,11 @@ def _registry_transfer_provenance(
             "code_hash": stored_code_hash,
             "public_spec_sha256": spec_sha256,
         },
+        "target_validation_contract": {
+            key: source_contracts[LIFECYCLE_USE_CASE_TOOL][key]
+            for key in sorted(contract_identity_keys)
+        },
+        "validation_contract_bindings": source_contract_identities,
     }
 
 
@@ -1671,6 +1974,18 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--development-validation-contract-receipt",
+        type=Path,
+        help=(
+            "Development-only receipt proving the historical v1 fixture was "
+            "bound to its predeclared synthetic validation contract."
+        ),
+    )
+    parser.add_argument(
+        "--development-validation-contract-receipt-sha256",
+        help="Expected SHA-256 of the development-only contract seed receipt.",
+    )
+    parser.add_argument(
         "-o",
         "--output-root",
         type=Path,
@@ -1888,6 +2203,37 @@ def main() -> None:
     candidate_root = run_root / "candidate"
     registry_dir = args.registry_dir or (run_root / "registry")
     registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
+    seeded_validation_contract_bindings: dict[str, Any] | None = None
+    if manifest_type in LIFECYCLE_DEVELOPMENT_MANIFEST_TYPES:
+        try:
+            seeded_validation_contract_bindings = (
+                _seal_development_validation_contract_receipt(
+                    run_root=run_root,
+                    registry_dir=registry_dir,
+                    registry_snapshot=registry_gate_snapshot,
+                    receipt_path=args.development_validation_contract_receipt,
+                    receipt_sha256=(
+                        args.development_validation_contract_receipt_sha256
+                    ),
+                )
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        registry_gate_snapshot["seeded_validation_contract_bindings"] = (
+            seeded_validation_contract_bindings
+        )
+        (run_root / "registry_gate" / "registry_gate_snapshot.json").write_text(
+            json.dumps(registry_gate_snapshot, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    elif (
+        args.development_validation_contract_receipt is not None
+        or args.development_validation_contract_receipt_sha256 is not None
+    ):
+        raise SystemExit(
+            "Development validation-contract receipt options are valid only for "
+            "the seeded dev10/dev30 lifecycle cohorts."
+        )
     control_dir: Path | None = None
     candidate_dir: Path | None = None
     fresh_control_dir: Path | None = None
@@ -2757,6 +3103,7 @@ def main() -> None:
             _assert_publication_source_unchanged(publication_provenance)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
+    protocol_event_journal = _sealed_protocol_event_journal(args.artifact_root)
     manifest = {
         "mode": args.mode,
         "manifest_split": split_name,
@@ -2790,12 +3137,14 @@ def main() -> None:
         "candidate_dir": str(candidate_dir),
         "registry_dir": str(registry_dir),
         "registry_gate_snapshot": registry_gate_snapshot,
+        "seeded_validation_contract_bindings": seeded_validation_contract_bindings,
         "registry_transfer_provenance": registry_transfer_provenance,
         "lifecycle_mutation_enabled": generation_enabled,
         "registry_gate_restore": registry_gate_restore,
         "registry_manifest_digest_after_run": _digest_file(
             registry_dir / "registry_manifest.json"
         ),
+        "protocol_event_journal": protocol_event_journal,
         "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
         "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
         "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
@@ -2909,6 +3258,7 @@ def main() -> None:
             "candidate_dir": str(candidate_dir),
             "registry_dir": str(registry_dir),
             "registry_gate_snapshot": registry_gate_snapshot,
+            "seeded_validation_contract_bindings": seeded_validation_contract_bindings,
             "registry_gate_restore": registry_gate_restore,
             "registry_manifest_digest_after_run": _digest_file(
                 registry_dir / "registry_manifest.json"

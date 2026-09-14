@@ -40,6 +40,34 @@ def test_held_out_examples_use_only_synthetic_values() -> None:
     assert "keep me posted" not in held_out_payload
 
 
+def test_observation_audit_json_redacts_held_out_values() -> None:
+    observation = _contact_lookup_query_planner_observation("synthetic")
+    held_out_examples = [
+        example for example in observation.validation_examples if example.held_out
+    ]
+    assert held_out_examples
+    secret_input = next(
+        value
+        for example in held_out_examples
+        for value in example.inputs.values()
+        if isinstance(value, str) and value
+    )
+    serialized = json.dumps(observation.to_json(), sort_keys=True)
+
+    assert secret_input not in serialized
+    logged_held_out = [
+        example
+        for example in observation.to_json()["validation_examples"]
+        if example["held_out"]
+    ]
+    assert logged_held_out
+    assert all(example["values_redacted"] is True for example in logged_held_out)
+    assert all("inputs" not in example for example in logged_held_out)
+    assert all("expected" not in example for example in logged_held_out)
+    assert all(example["input_contract"] for example in logged_held_out)
+    assert all(example["output_contract"] for example in logged_held_out)
+
+
 def test_model_visible_observation_has_no_benchmark_scenario_identifier() -> None:
     observation = _contact_update_by_id_observation("private_task_identifier")
 

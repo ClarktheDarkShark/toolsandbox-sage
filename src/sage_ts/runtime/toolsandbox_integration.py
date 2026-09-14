@@ -2068,6 +2068,11 @@ def _lifecycle_visibility_override(
     decision = str(row.get("decision") or "")
     if decision in {"park", "parked"}:
         return False, "lifecycle_suppressed_parked_tool"
+    if decision == "retain_with_safety_audit":
+        # Legacy reflection mislabeled actor follow-through failures as an open
+        # safety audit. With no trustworthy family binding in that state, fail
+        # closed globally instead of leaving the unresolved route active.
+        return False, "lifecycle_suppressed_legacy_followthrough_audit"
     if decision == "needs_implementation_repair":
         return False, "lifecycle_suppressed_pending_implementation_repair"
     if decision == "quarantined":
@@ -2088,6 +2093,14 @@ def _lifecycle_visibility_override(
     }:
         return None
     if scenario_family in route_repair_families:
+        raw_reason_codes = row.get("route_repair_reason_codes")
+        family_reason_codes = (
+            raw_reason_codes.get(scenario_family, [])
+            if isinstance(raw_reason_codes, dict)
+            else []
+        )
+        if "generated_helper_followup_failure" in family_reason_codes:
+            return False, "lifecycle_suppressed_actor_followthrough_family"
         return False, "lifecycle_suppressed_harmful_called_family"
     return None
 

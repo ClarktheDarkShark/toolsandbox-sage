@@ -1,6 +1,6 @@
 # mypy: ignore-errors
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -815,6 +815,20 @@ class FakeRepairCandidateBatchGenerator(FakeRecordSelectorGenerator):
 
 
 @dataclass
+class FakeWrongNameRecordSelectorGenerator(FakeRecordSelectorGenerator):
+    """Return a valid implementation under a name outside the public request."""
+
+    def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
+        tool = super().generate(request)
+        wrong_name = "model_invented_record_selector"
+        return replace(
+            tool,
+            spec=replace(tool.spec, tool_name=wrong_name),
+            code=tool.code.replace(_RECORD_SELECTOR_TOOL_NAME, wrong_name),
+        )
+
+
+@dataclass
 class FakeStagedRepairRecordSelectorGenerator(FakeRecordSelectorGenerator):
     repair_calls: int = 0
     repair_error_inputs: tuple[tuple[str, ...], ...] = ()
@@ -843,6 +857,23 @@ class FakeContactLookupGenerator:
     def generate(self, request: ToolGenerationRequest) -> GeneratedTool:
         self.calls += 1
         assert request.suggested_tool_name == _CONTACT_LOOKUP_TOOL_NAME
+        assert [item.to_json() for item in request.public_input_contract] == [
+            {"name": "contact_name", "annotation": "str", "optional": False},
+            {"name": "phone_number", "annotation": "str", "optional": False},
+            {"name": "relationship", "annotation": "str", "optional": False},
+            {"name": "requested_field", "annotation": "str", "optional": False},
+            {"name": "selected_record", "annotation": "dict", "optional": True},
+        ]
+        assert {item.name for item in request.public_output_contract} == {
+            "should_call_search_contacts",
+            "search_contacts_kwargs",
+            "answer_field",
+            "selected_record",
+            "answer_value",
+            "final_answer_recommendation",
+            "copy_exactly",
+            "abstain_reason",
+        }
         spec = ToolSpec(
             tool_name=_CONTACT_LOOKUP_TOOL_NAME,
             family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
@@ -1110,6 +1141,63 @@ def test_rejected_birth_can_retry_on_later_observation(tmp_path: Path) -> None:
         for line in (tmp_path / "tool_birth_events.jsonl").read_text().splitlines()
     ]
     assert [event["accepted"] for event in birth_events] == [False, True]
+
+
+def test_birth_rejects_model_tool_name_outside_public_request(tmp_path: Path) -> None:
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    controller = OnlineBirthController(
+        store=store,
+        generator=FakeWrongNameRecordSelectorGenerator(),
+        output_dir=tmp_path,
+        recurrence_threshold=1,
+    )
+
+    assert controller.observe(observation) is None
+    assert store.get(_RECORD_SELECTOR_TOOL_NAME) is None
+    assert store.get("model_invented_record_selector") is None
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "tool_birth_events.jsonl").read_text().splitlines()
+    ]
+    assert events[-1]["accepted"] is False
+    assert any(
+        error.startswith("generated_tool_name_mismatch:")
+        for error in events[-1]["errors"]
+    )
+
+
+def test_accepted_birth_persists_and_restores_exact_validation_contract(
+    tmp_path: Path,
+) -> None:
+    observation = _latest_record_observation()
+    store = RegistryStore(tmp_path / "registry")
+    first = OnlineBirthController(
+        store=store,
+        generator=FakeRecordSelectorGenerator(),
+        output_dir=tmp_path / "first",
+        recurrence_threshold=1,
+    )
+
+    assert first.observe(observation) == _RECORD_SELECTOR_TOOL_NAME
+    entry = store.get(_RECORD_SELECTOR_TOOL_NAME)
+    assert entry is not None
+    assert (store.root / "validation_contract_bindings.json").is_file()
+
+    restored = OnlineBirthController(
+        store=store,
+        generator=FakeRecordSelectorGenerator(),
+        output_dir=tmp_path / "restored",
+        recurrence_threshold=1,
+    )
+    restored_observation = restored.observations_by_tool_name[
+        _RECORD_SELECTOR_TOOL_NAME
+    ]
+    assert restored_observation.scenario_name.startswith("validation_contract:")
+    assert restored_observation.scenario_name != observation.scenario_name
+    assert restored_observation.validation_examples == observation.validation_examples
+    assert restored.contract_failures_for_tools([_RECORD_SELECTOR_TOOL_NAME]) == ()
+    assert store.get(_RECORD_SELECTOR_TOOL_NAME).retired is False  # type: ignore[union-attr]
 
 
 def test_native_action_repair_ranking_keeps_near_argument_match() -> None:

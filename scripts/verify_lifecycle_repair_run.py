@@ -16,9 +16,21 @@ import re
 from pathlib import Path
 from typing import Any
 
+from sage_ts.adapters.sage_run_adapter import (
+    _side_effect_followup_failures,
+    _tool_trace_events_from_execution_context,
+)
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.orchestration.online_birth import prohibited_repair_payload_paths
+from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.registry.store import RegistryStore
+from sage_ts.registry.validation_contracts import (
+    VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+    ValidationContractBindingStore,
+)
+from sage_ts.validation.sandbox_validator import validate_generated_tool
 
 try:
     from scripts import verify_publication_run as _strict_run_verifier
@@ -28,8 +40,110 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution from scripts/
 LIFECYCLE_USE_CASE_TOOL = "prepare_safe_action_or_abstain"
 TRANSFER_MANIFEST_TYPE = "development_diagnostic_lifecycle_repair_transfer_dev30"
 LIFECYCLE_FAULT_FIXTURE_SHA256 = (
-    "285604ee15dcb3b066816267ef1730bb40dffab7a9880160ddd885b2894a5630"
+    "7677756340ccde07c5edb7b43003f68b5f363611d2cd935afdc7363e3bc33e8a"
 )
+PRESERVED_WORKING_TOOL_NAMES = (
+    "relative_day_time_to_timestamp",
+    "prepare_reminder_creation_args",
+)
+FIXTURE_TOOL_NAMES = (LIFECYCLE_USE_CASE_TOOL, *PRESERVED_WORKING_TOOL_NAMES)
+PRESERVED_WORKING_TOOL_PROVENANCE: dict[str, Any] = {
+    "claim_boundary": (
+        "two historically successful generated tools preserved on overlapping "
+        "reminder routes and a disjoint transfer cohort"
+    ),
+    "source_artifact": (
+        "artifacts/publication_validation/paper_policy_final10_20260909_134651/"
+        "rep01/native_action_registry/registry_manifest.json"
+    ),
+    "source_registry_sha256": (
+        "5fe8323c69cb17b3c0e45f3ccf2bc3708583ab9d01a48e5ca2d4b5082686d653"
+    ),
+    "tools": {
+        "relative_day_time_to_timestamp": {
+            "version": 1,
+            "retired": False,
+            "code_hash": (
+                "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab"
+            ),
+            "public_spec_sha256": (
+                "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95"
+            ),
+            "source_entry_sha256": (
+                "34a186250638fe21c62dde6baef1af34381f9ce0d867e1e41f97d84362edbd0b"
+            ),
+        },
+        "prepare_reminder_creation_args": {
+            "version": 1,
+            "retired": False,
+            "code_hash": (
+                "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292"
+            ),
+            "public_spec_sha256": (
+                "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765"
+            ),
+            "source_entry_sha256": (
+                "68ed674b51cd5b434417be9f5c727b8c65d2dd7b032c78bee5a4567be33179a9"
+            ),
+        },
+    },
+}
+PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256 = (
+    "96d4c39f1dce124adbc195481dd5f96add2c05c2759014b4a5d0a444878cfd08"
+)
+PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
+    "prepare_reminder_creation_args": {
+        "tool_name": "prepare_reminder_creation_args",
+        "tool_version": 1,
+        "tool_code_hash": (
+            "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292"
+        ),
+        "tool_spec_hash": (
+            "288a07d0d51747cc6db95d5adf6408c5ab1b1a5c3c999680c073568ca50f9765"
+        ),
+        "canonical_key": "composite:prepare_reminder_creation_args",
+        "contract_hash": (
+            "caeeb92e4fe201b5d3e16ecdf05c33cd0d9006f2add755cf9c59006361f9806e"
+        ),
+        "binding_blob_sha256": (
+            "694f1a88f282fb3445985ca5174dca441b9310c676187013160b76fc489a6d3b"
+        ),
+    },
+    LIFECYCLE_USE_CASE_TOOL: {
+        "tool_name": LIFECYCLE_USE_CASE_TOOL,
+        "tool_version": 1,
+        "tool_code_hash": (
+            "16262a4c141901a7ec4f7fb8d289ec8067c09473352df77b1a1fd262743386a9"
+        ),
+        "tool_spec_hash": (
+            "1dd3336746267042c54b9ac0486afeaaf41ea9e0e4997128a56d7322f1792258"
+        ),
+        "canonical_key": "validation:prepare_safe_action_or_abstain",
+        "contract_hash": (
+            "a5343c05a8a7b2435a3be5e2e51750cd579d618eee05bc1b9accae0bc0e212d2"
+        ),
+        "binding_blob_sha256": (
+            "7280df34cf2024f010213cd64e2e158ffabf740e41d7189583d5bcf2eb1e37f2"
+        ),
+    },
+    "relative_day_time_to_timestamp": {
+        "tool_name": "relative_day_time_to_timestamp",
+        "tool_version": 1,
+        "tool_code_hash": (
+            "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab"
+        ),
+        "tool_spec_hash": (
+            "e8d8720e6c81e70469b9fc972ba82c3952528f2d7edc5d4834e9bc2574f93c95"
+        ),
+        "canonical_key": "canonicalizer:relative_day_time_timestamp",
+        "contract_hash": (
+            "800cf8677f9533df83fd005648cf83f4c3447813c07d212910da47b7d3a11cc4"
+        ),
+        "binding_blob_sha256": (
+            "b56aab87e514929c60e01205bebb0d566740a54f05ee59683357e2fa14921ace"
+        ),
+    },
+}
 DEV10_ORDER = (
     "remove_contact_by_phone_no_search_contacts_insufficient_information",
     "remove_contact_by_phone_no_search_contacts_insufficient_information_3_distraction_tools",
@@ -86,14 +200,16 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "order_sha256": "b59acee1559e254551ffe783acdaf351b45c4b6977b4a4bb990229afe733cf0e",
         "roles": {
             "repair_target": DEV10_ORDER[:7],
-            "preservation": DEV10_ORDER[7:],
+            "working_generated_overlap": DEV10_ORDER[7:9],
+            "unrelated_native_preservation": DEV10_ORDER[9:],
         },
         "safe_role": "repair_target",
         "contact_role": "repair_target",
         "safe_visible_called_minimum": 7,
         "safe_exact_minimum": 6,
         "contact_exact_no_remove_minimum": 6,
-        "preservation_exact_hidden_minimum": 3,
+        "working_overlap_minimum": 2,
+        "unrelated_preservation_minimum": 1,
         "overall_exact_minimum": 9,
         "future_v2_exact_minimum": 6,
         "future_v2_success_flip_minimum": 1,
@@ -108,11 +224,18 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 6,
                 "total": 7,
             },
-            "preservation_exact_and_safe_helper_hidden": {
-                "role": "preservation",
-                "minimum": 3,
-                "total": 3,
+            "working_generated_overlap_visible_called_exact_failure_free": {
+                "role": "working_generated_overlap",
+                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
+                "minimum": 2,
+                "total": 2,
             },
+            "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
+                "role": "unrelated_native_preservation",
+                "minimum": 1,
+                "total": 1,
+            },
+            "working_generated_entries_unchanged": {"required": True},
             "overall_exact_outcomes": {"minimum": 9, "total": 10},
             "before_after": {
                 "trigger_version": 1,
@@ -130,7 +253,8 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
             "safe_abstain_confirmation": DEV30_ORDER[:26],
             "cross_family_safe_abstain": DEV30_ORDER[9:13],
             "contact_repair_confirmation": DEV30_ORDER[:9],
-            "preservation": DEV30_ORDER[26:],
+            "working_generated_overlap": DEV30_ORDER[26:28],
+            "unrelated_native_preservation": DEV30_ORDER[28:],
         },
         "safe_role": "safe_abstain_confirmation",
         "contact_role": "contact_repair_confirmation",
@@ -138,7 +262,8 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "safe_visible_called_minimum": 26,
         "safe_exact_minimum": 21,
         "contact_exact_no_remove_minimum": 8,
-        "preservation_exact_hidden_minimum": 4,
+        "working_overlap_minimum": 2,
+        "unrelated_preservation_minimum": 2,
         "overall_exact_minimum": 25,
         "future_v2_exact_minimum": 21,
         "future_v2_success_flip_minimum": 1,
@@ -158,11 +283,18 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 21,
                 "total": 26,
             },
-            "preservation_exact_and_safe_helper_hidden": {
-                "role": "preservation",
-                "minimum": 4,
-                "total": 4,
+            "working_generated_overlap_visible_called_exact_failure_free": {
+                "role": "working_generated_overlap",
+                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
+                "minimum": 2,
+                "total": 2,
             },
+            "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
+                "role": "unrelated_native_preservation",
+                "minimum": 2,
+                "total": 2,
+            },
+            "working_generated_entries_unchanged": {"required": True},
             "overall_exact_outcomes": {"minimum": 25, "total": 30},
             "before_after": {
                 "trigger_version": 1,
@@ -179,14 +311,16 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "roles": {
             "safe_abstain_confirmation": DEV30_ORDER[:26],
             "contact_repair_confirmation": DEV30_ORDER[:9],
-            "preservation": DEV30_ORDER[26:],
+            "working_generated_overlap": DEV30_ORDER[26:28],
+            "unrelated_native_preservation": DEV30_ORDER[28:],
         },
         "safe_role": "safe_abstain_confirmation",
         "contact_role": "contact_repair_confirmation",
         "safe_visible_called_minimum": 26,
         "safe_exact_minimum": 21,
         "contact_exact_no_remove_minimum": 8,
-        "preservation_exact_hidden_minimum": 4,
+        "working_overlap_minimum": 2,
+        "unrelated_preservation_minimum": 2,
         "overall_exact_minimum": 25,
         "future_v2_success_flip_minimum": 1,
         "predeclared_gates": {
@@ -212,11 +346,18 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 1,
                 "total": 26,
             },
-            "preservation_exact_hidden_and_nonregressing": {
-                "role": "preservation",
-                "minimum": 4,
-                "total": 4,
+            "working_generated_overlap_visible_called_exact_failure_free": {
+                "role": "working_generated_overlap",
+                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
+                "minimum": 2,
+                "total": 2,
             },
+            "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
+                "role": "unrelated_native_preservation",
+                "minimum": 2,
+                "total": 2,
+            },
+            "working_generated_entries_unchanged": {"required": True},
             "overall_exact_outcomes": {"minimum": 25, "total": 30},
         },
     },
@@ -280,6 +421,117 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _declared_path_is_symlink(run_root: Path, value: Any) -> bool:
+    """Inspect every lexical interpretation before the shared resolver follows it."""
+
+    if not isinstance(value, str) or not value.strip():
+        return False
+    path = Path(value)
+    candidates = (
+        (path,)
+        if path.is_absolute()
+        else (
+            _strict_run_verifier.REPO_ROOT / path,
+            Path.cwd() / path,
+            run_root / path,
+        )
+    )
+    return any(candidate.is_symlink() for candidate in candidates)
+
+
+def _verified_protocol_event_rows(
+    *,
+    run_root: Path,
+    protocol: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Load the manifest-pinned, append-complete launcher event journal."""
+
+    journal = protocol.get("protocol_event_journal")
+    if journal is None:
+        raise ValueError(
+            "Lifecycle development verification requires a sealed protocol "
+            "event journal."
+        )
+    if not isinstance(journal, dict):
+        raise ValueError("Protocol event journal declaration is malformed.")
+    if journal.get("schema_version") != 1:
+        raise ValueError("Protocol event journal schema version is not 1.")
+    if journal.get("append_closed_before_protocol_manifest") is not True:
+        raise ValueError("Protocol event journal was not sealed before the manifest.")
+
+    declared_journal_path = journal.get("path")
+    if _declared_path_is_symlink(run_root, declared_journal_path):
+        raise ValueError("Protocol event journal must not be a symbolic link.")
+
+    artifact_root = _strict_run_verifier._resolve_declared_path(
+        run_root,
+        journal.get("artifact_root"),
+        "protocol_event_journal.artifact_root",
+    )
+    expected_path = (artifact_root / "events" / "latest.jsonl").resolve()
+    journal_path = _strict_run_verifier._resolve_declared_path(
+        run_root,
+        declared_journal_path,
+        "protocol_event_journal.path",
+        required_parent=artifact_root / "events",
+    )
+    if journal_path != expected_path:
+        raise ValueError("Protocol event journal is not the sealed latest.jsonl file.")
+    if not journal_path.is_file():
+        raise ValueError("Protocol event journal is missing.")
+
+    expected_sha256 = journal.get("sha256")
+    observed_sha256 = hashlib.sha256(journal_path.read_bytes()).hexdigest()
+    if (
+        not isinstance(expected_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+        or expected_sha256 != observed_sha256
+    ):
+        raise ValueError("Protocol event journal digest does not match the manifest.")
+    expected_count = journal.get("event_count")
+    if (
+        not isinstance(expected_count, int)
+        or isinstance(expected_count, bool)
+        or expected_count < 1
+    ):
+        raise ValueError("Protocol event journal count is invalid.")
+
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(
+        journal_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+        value = json.loads(line)
+        if not isinstance(value, dict):
+            raise ValueError(
+                "Protocol event journal contains a non-object row at line "
+                f"{line_number}."
+            )
+        rows.append(value)
+    if len(rows) != expected_count:
+        raise ValueError("Protocol event journal count does not match the manifest.")
+    return rows, {
+        "mode": "sealed_protocol_event_journal",
+        "path": str(journal_path),
+        "sha256": observed_sha256,
+        "event_count": len(rows),
+        "sealed": True,
+    }
+
+
+def _event_path_matches(run_root: Path, value: Any, expected: Path) -> bool:
+    try:
+        resolved = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            value,
+            "protocol event path",
+        )
+    except ValueError:
+        return False
+    return resolved == expected.resolve()
+
+
 def _manifest_task_names(
     manifest: dict[str, Any], split: str = "full_benchmark"
 ) -> tuple[str, ...]:
@@ -311,6 +563,79 @@ def _role_names(manifest: dict[str, Any], role: str) -> tuple[str, ...]:
 def _selection_has_tool(row: dict[str, Any], field: str, tool_name: str) -> bool:
     values = row.get(field)
     return isinstance(values, list) and tool_name in values
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _registry_entry_identity(
+    entry: Any,
+    *,
+    expected_name: str,
+) -> dict[str, Any] | None:
+    """Return the immutable identity of one well-formed generated-tool entry."""
+
+    if not isinstance(entry, dict):
+        return None
+    tool = entry.get("tool")
+    spec = tool.get("spec") if isinstance(tool, dict) else None
+    code = tool.get("code") if isinstance(tool, dict) else None
+    version = entry.get("version")
+    retired = entry.get("retired")
+    stored_code_hash = entry.get("code_hash")
+    if (
+        not isinstance(tool, dict)
+        or not isinstance(spec, dict)
+        or spec.get("tool_name") != expected_name
+        or not isinstance(code, str)
+        or isinstance(version, bool)
+        or not isinstance(version, int)
+        or version < 1
+        or not isinstance(retired, bool)
+        or not isinstance(stored_code_hash, str)
+        or re.fullmatch(r"[0-9a-f]{64}", stored_code_hash) is None
+        or hashlib.sha256(code.encode("utf-8")).hexdigest() != stored_code_hash
+    ):
+        return None
+    immutable_entry = {
+        key: value
+        for key, value in entry.items()
+        if key not in {"reuse_count", "success_flips"}
+    }
+    return {
+        "tool_name": expected_name,
+        "version": version,
+        "retired": retired,
+        "code_hash": stored_code_hash,
+        "public_spec_sha256": _canonical_json_sha256(spec),
+        "immutable_entry_sha256": _canonical_json_sha256(immutable_entry),
+    }
+
+
+def _working_tool_failure_free(
+    row: dict[str, Any],
+    *,
+    include_actor_followthrough: bool,
+) -> bool:
+    fields = ["generated_tools_failed", "generated_tool_contract_failures"]
+    if include_actor_followthrough:
+        fields.append("actor_followthrough_failures")
+    for field in fields:
+        values = row.get(field)
+        if not isinstance(values, list):
+            return False
+        if set(values) & set(PRESERVED_WORKING_TOOL_NAMES):
+            return False
+    return True
 
 
 def _exact_outcome(row: dict[str, Any]) -> bool:
@@ -575,6 +900,7 @@ def _verify_registry_checkpoint_versions(
             mismatches.append(f"{scenario_name}:invalid_checkpoint")
             continue
         copied_files = metadata.get("copied_files")
+        contract_snapshot_errors = metadata.get("validation_contract_snapshot_errors")
         if (
             metadata.get("scenario") != scenario_name
             or metadata.get("completed_count") != completed_count
@@ -582,6 +908,8 @@ def _verify_registry_checkpoint_versions(
             != expected_registry_dir
             or not isinstance(copied_files, list)
             or "registry_manifest.json" not in copied_files
+            or "validation_contract_bindings.json" not in copied_files
+            or contract_snapshot_errors != []
         ):
             mismatches.append(f"{scenario_name}:checkpoint_metadata")
             continue
@@ -600,6 +928,36 @@ def _verify_registry_checkpoint_versions(
         if not isinstance(versions, dict) or set(versions) != observed_tools:
             mismatches.append(f"{scenario_name}:version_coverage")
             continue
+        binding_store = ValidationContractBindingStore(checkpoint_dir)
+        for manifest_name, raw_entry in sorted(tools.items()):
+            try:
+                if not isinstance(raw_entry, dict):
+                    raise ValueError("entry_not_object")
+                parsed_entry = RegistryEntry.from_json(raw_entry)
+                if parsed_entry.tool.spec.tool_name != manifest_name:
+                    raise ValueError("entry_name_mismatch")
+                binding, binding_error = binding_store.resolve(parsed_entry)
+                if binding is None:
+                    raise ValueError(binding_error or "binding_invalid")
+                blob_relative = f"validation_contracts/{binding.contract_hash}.json"
+                if blob_relative not in copied_files:
+                    raise ValueError("binding_blob_not_declared_copied")
+                replay = validate_generated_tool(
+                    parsed_entry.tool,
+                    binding.observation.validation_examples,
+                )
+                if (
+                    manifest_name == LIFECYCLE_USE_CASE_TOOL
+                    and parsed_entry.version == 1
+                ):
+                    if replay.accepted:
+                        raise ValueError("historical_fault_no_longer_reproduces")
+                elif not replay.accepted or replay != parsed_entry.validation:
+                    raise ValueError("validation_replay_mismatch")
+            except (KeyError, TypeError, ValueError):
+                mismatches.append(
+                    f"{scenario_name}:{manifest_name}:validation_contract"
+                )
         for tool_name in sorted(observed_tools):
             version = versions.get(tool_name)
             entry = tools.get(tool_name)
@@ -620,7 +978,768 @@ def _verify_registry_checkpoint_versions(
                 mismatches.append(f"{scenario_name}:{tool_name}:version_or_hash")
                 continue
             bound_tools += 1
+    try:
+        final_store = RegistryStore(registry_dir)
+        final_binding_store = ValidationContractBindingStore(registry_dir)
+        for manifest_name, entry in sorted(final_store.load_entries().items()):
+            if entry.retired:
+                continue
+            binding, binding_error = final_binding_store.resolve(entry)
+            if binding is None:
+                raise ValueError(
+                    f"{manifest_name}:{binding_error or 'binding_invalid'}"
+                )
+            replay = validate_generated_tool(
+                entry.tool,
+                binding.observation.validation_examples,
+            )
+            if not replay.accepted or replay != entry.validation:
+                raise ValueError(f"{manifest_name}:validation_replay_mismatch")
+    except (KeyError, TypeError, ValueError):
+        mismatches.append("final_active_registry:validation_contract")
     return bound_tools, mismatches
+
+
+def _checkpoint_directory(
+    candidate_dir: Path,
+    *,
+    completed_count: int,
+    scenario_name: str,
+) -> Path:
+    return (
+        candidate_dir
+        / "registry_checkpoints"
+        / (f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario_name)}")
+    )
+
+
+def _lifecycle_rows(path: Path) -> dict[str, Any] | None:
+    if not path.is_file() or path.is_symlink():
+        return None
+    payload = _load_json(path)
+    if not isinstance(payload, dict):
+        return None
+    for field in ("tool_lifecycle", "tools"):
+        rows = payload.get(field)
+        if isinstance(rows, dict):
+            return rows
+    return None
+
+
+def _public_followthrough_family(feedback: dict[str, Any]) -> str | None:
+    """Return the bounded public family carried by lifecycle feedback."""
+
+    family = feedback.get("task_family_key")
+    label = feedback.get("task_context_label")
+    if (
+        feedback.get("source_task_id_redacted") is not True
+        or not isinstance(family, str)
+        or re.fullmatch(r"[a-z0-9_.:-]{1,128}", family) is None
+        or not isinstance(label, str)
+        or not label.startswith(f"visible_task_context(family={family}")
+    ):
+        return None
+    return family
+
+
+def _family_followthrough_suppressed(
+    lifecycle_row: Any,
+    *,
+    family: str,
+    tool_version: int,
+) -> bool:
+    if not isinstance(lifecycle_row, dict):
+        return False
+    reason_codes = lifecycle_row.get("route_repair_reason_codes")
+    failure_count = lifecycle_row.get("actor_followthrough_failure_count")
+    return bool(
+        lifecycle_row.get("tool_version") == tool_version
+        and isinstance(failure_count, int)
+        and not isinstance(failure_count, bool)
+        and failure_count >= 1
+        and family in (lifecycle_row.get("actor_followthrough_failure_families") or [])
+        and family in (lifecycle_row.get("route_repair_families") or [])
+        and isinstance(reason_codes, dict)
+        and "generated_helper_followup_failure" in (reason_codes.get(family) or [])
+        and lifecycle_row.get("repair_kind") == "routing"
+        and lifecycle_row.get("routing_disposition") == "family_suppression_active"
+        and lifecycle_row.get("decision")
+        in {"needs_route_repair", "retain_with_route_repair"}
+    )
+
+
+def _terminal_followthrough_supersession(
+    *,
+    candidate_dir: Path,
+    registry_dir: Path,
+    protocol_events: list[dict[str, Any]],
+    tool_name: str,
+    source_tool_version: int,
+    final_entry_payload: Any,
+) -> dict[str, Any] | None:
+    """Prove that a later validated implementation terminally replaced a version.
+
+    A version mismatch by itself is not closure. The replacement must be tied
+    to one implementation-repair request, its terminal promoted
+    acknowledgement, a sealed acceptance event, and the final registry's exact
+    code/spec-bound public validation contract.
+    """
+
+    try:
+        if not isinstance(final_entry_payload, dict):
+            raise ValueError("final_entry_missing")
+        final_entry = RegistryEntry.from_json(final_entry_payload)
+        final_version = final_entry.version
+        if (
+            final_entry.tool.spec.tool_name != tool_name
+            or final_version <= source_tool_version
+        ):
+            raise ValueError("not_a_later_exact_tool_version")
+
+        binding_store = ValidationContractBindingStore(registry_dir)
+        binding, binding_error = binding_store.resolve(final_entry)
+        if binding is None:
+            raise ValueError(binding_error or "binding_invalid")
+        replay = validate_generated_tool(
+            final_entry.tool,
+            binding.observation.validation_examples,
+        )
+        if not replay.accepted or replay != final_entry.validation:
+            raise ValueError("validation_replay_mismatch")
+
+        repair_requests = _read_jsonl(
+            candidate_dir / "self_evolution_tool_repair_requests.jsonl"
+        )
+        request_candidates = [
+            row
+            for row in repair_requests
+            if row.get("tool_name") == tool_name
+            and row.get("source_tool_version") == source_tool_version
+            and not isinstance(row.get("source_tool_version"), bool)
+        ]
+        if len(request_candidates) != 1:
+            raise ValueError("repair_request_not_unique")
+        request = request_candidates[0]
+        request_id = request.get("request_id")
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or request.get("repair_kind") != "implementation"
+            or request.get("future_tasks_only") is not True
+            or request.get("triggering_task_replay_allowed") is not False
+        ):
+            raise ValueError("repair_request_not_terminal_implementation")
+
+        acknowledgements = _read_jsonl(
+            candidate_dir / "self_evolution_tool_repair_acknowledgements.jsonl"
+        )
+        request_acknowledgements = [
+            row for row in acknowledgements if row.get("request_id") == request_id
+        ]
+        promoted_acknowledgements = [
+            row
+            for row in request_acknowledgements
+            if row.get("status") == "promoted"
+            and row.get("tool_name") == tool_name
+            and row.get("new_version") == final_version
+            and not isinstance(row.get("new_version"), bool)
+        ]
+        if (
+            len(promoted_acknowledgements) != 1
+            or not request_acknowledgements
+            or request_acknowledgements[-1] != promoted_acknowledgements[0]
+        ):
+            raise ValueError("terminal_promoted_acknowledgement_missing")
+
+        acceptance_candidates = [
+            row
+            for row in protocol_events
+            if row.get("event") == "post_deployment_tool_repair_accepted"
+            and (
+                row.get("request_id") == request_id
+                or (
+                    row.get("tool_name") == tool_name
+                    and row.get("source_tool_version") == source_tool_version
+                    and not isinstance(row.get("source_tool_version"), bool)
+                )
+            )
+        ]
+        accepted_events = [
+            row
+            for row in acceptance_candidates
+            if row.get("request_id") == request_id
+            and row.get("tool_name") == tool_name
+            and row.get("source_tool_version") == source_tool_version
+            and not isinstance(row.get("source_tool_version"), bool)
+            and row.get("new_tool_version") == final_version
+            and not isinstance(row.get("new_tool_version"), bool)
+            and row.get("repair_kind") == "implementation"
+            and row.get("validation_contract_hash") == binding.contract_hash
+            and row.get("triggering_task_replayed") is False
+        ]
+        if len(acceptance_candidates) != 1 or len(accepted_events) != 1:
+            raise ValueError("sealed_acceptance_event_missing_or_ambiguous")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    return {
+        "request_id": request_id,
+        "source_tool_version": source_tool_version,
+        "new_tool_version": final_version,
+        "new_tool_retired": final_entry.retired,
+        "new_tool_code_hash": binding.tool_code_hash,
+        "new_tool_spec_hash": binding.tool_spec_hash,
+        "validation_contract_hash": binding.contract_hash,
+        "terminal_acknowledgement": "promoted",
+        "sealed_acceptance_event_count": 1,
+    }
+
+
+def _actor_followthrough_closure_report(
+    *,
+    candidate_dir: Path,
+    registry_dir: Path,
+    scenario_order: tuple[str, ...],
+    trajectory_evidence: dict[str, dict[str, tuple[str, ...]]],
+    feedback_by_name: dict[str, dict[str, Any]],
+    protocol_events: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[str]]:
+    """Recompute actor-follow-through failures and prove immediate closure.
+
+    Failure attribution comes only from the canonical conversation, execution
+    trace, and checkpoint-bound public ToolSpec. The lifecycle feedback field is
+    reconciled against that result; it is never accepted as the source of truth.
+    """
+
+    reasons: list[str] = []
+    obligations: list[dict[str, Any]] = []
+    action_journal = _read_jsonl(candidate_dir / "self_evolution_tool_lifecycle.jsonl")
+    consumed_action_indices: set[int] = set()
+    last_consumed_action_index = -1
+    for completed_count, scenario_name in enumerate(scenario_order, start=1):
+        checkpoint_dir = _checkpoint_directory(
+            candidate_dir,
+            completed_count=completed_count,
+            scenario_name=scenario_name,
+        )
+        try:
+            checkpoint = _load_json(checkpoint_dir / "registry_manifest.json")
+            checkpoint_tools = checkpoint.get("tools")
+            conversation = _load_json(
+                candidate_dir / "trajectories" / scenario_name / "conversation.json"
+            )
+            if not isinstance(checkpoint_tools, dict) or not isinstance(
+                conversation, list
+            ):
+                raise ValueError("malformed raw follow-through evidence")
+            trace_events = _tool_trace_events_from_execution_context(
+                candidate_dir
+                / "trajectories"
+                / scenario_name
+                / "execution_context.json"
+            )
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            reasons.append(f"actor_followthrough_raw_evidence_invalid:{scenario_name}")
+            continue
+
+        called_tools = tuple(
+            trajectory_evidence.get(scenario_name, {}).get("generated_tools_called", ())
+        )
+        derived_failures: list[tuple[str, int]] = []
+        for tool_name in called_tools:
+            raw_entry = checkpoint_tools.get(tool_name)
+            try:
+                if not isinstance(raw_entry, dict):
+                    raise ValueError("checkpoint entry missing")
+                entry = RegistryEntry.from_json(raw_entry)
+            except (KeyError, TypeError, ValueError):
+                reasons.append(
+                    f"actor_followthrough_checkpoint_entry_invalid:"
+                    f"{scenario_name}:{tool_name}"
+                )
+                continue
+            if native_action_tool_enabled(entry.tool):
+                continue
+            if _side_effect_followup_failures(
+                conversation,
+                helper_name=tool_name,
+                required_original_tool_calls=tuple(
+                    entry.tool.spec.required_original_tool_calls
+                ),
+                actual_tool_trace_events=trace_events,
+            ):
+                derived_failures.append((tool_name, entry.version))
+
+        feedback = feedback_by_name.get(scenario_name)
+        raw_recorded = (
+            feedback.get("actor_followthrough_failures")
+            if isinstance(feedback, dict)
+            else None
+        )
+        recorded_failures_valid = bool(
+            raw_recorded is not None
+            and isinstance(raw_recorded, list)
+            and all(isinstance(item, str) and item for item in raw_recorded)
+            and len(raw_recorded) == len(set(raw_recorded))
+        )
+        recorded_failures = raw_recorded if recorded_failures_valid else []
+        derived_names = [tool_name for tool_name, _version in derived_failures]
+        if isinstance(feedback, dict) and (
+            not recorded_failures_valid or set(recorded_failures) != set(derived_names)
+        ):
+            reasons.append(f"actor_followthrough_sidecar_mismatch:{scenario_name}")
+        elif not isinstance(feedback, dict) and derived_failures:
+            reasons.append(f"actor_followthrough_feedback_missing:{scenario_name}")
+
+        family = (
+            _public_followthrough_family(feedback)
+            if isinstance(feedback, dict)
+            else None
+        )
+        immediate_actions = (
+            feedback.get("immediate_actions") if isinstance(feedback, dict) else None
+        )
+        immediate_actions = (
+            immediate_actions if isinstance(immediate_actions, list) else []
+        )
+        checkpoint_lifecycle = _lifecycle_rows(checkpoint_dir / "tool_lifecycle.json")
+        action_scenario = (
+            feedback.get("task_context_label")
+            if isinstance(feedback, dict)
+            and isinstance(feedback.get("task_context_label"), str)
+            else None
+        )
+        for tool_name, tool_version in derived_failures:
+            raw_entry = checkpoint_tools[tool_name]
+            retired = raw_entry.get("retired") is True
+            if family is None:
+                expected_action = {
+                    "tool_name": tool_name,
+                    "decision": "parked",
+                    "reason": "actor_followthrough_failure_without_public_family",
+                    "scenario": action_scenario,
+                    "source_tool_version": tool_version,
+                }
+                checkpoint_closed = retired
+                disposition = "global_retirement"
+            else:
+                expected_action = {
+                    "tool_name": tool_name,
+                    "decision": "needs_route_repair",
+                    "repair_kind": "routing",
+                    "reason": "generated_helper_followup_failure",
+                    "scenario": action_scenario,
+                    "routing_disposition": "family_suppression_active",
+                    "target_task_family": family,
+                    "source_tool_version": tool_version,
+                }
+                checkpoint_closed = retired or (
+                    isinstance(checkpoint_lifecycle, dict)
+                    and _family_followthrough_suppressed(
+                        checkpoint_lifecycle.get(tool_name),
+                        family=family,
+                        tool_version=tool_version,
+                    )
+                )
+                disposition = "global_retirement" if retired else "family_suppression"
+            matching_immediate = [
+                action
+                for action in immediate_actions
+                if isinstance(action, dict)
+                and all(
+                    action.get(key) == value for key, value in expected_action.items()
+                )
+            ]
+            matching_journal_indices = [
+                index
+                for index, action in enumerate(action_journal)
+                if index > last_consumed_action_index
+                and index not in consumed_action_indices
+                and all(
+                    action.get(key) == value for key, value in expected_action.items()
+                )
+            ]
+            matched_action_index = (
+                matching_journal_indices[0] if matching_journal_indices else None
+            )
+            if matched_action_index is not None:
+                consumed_action_indices.add(matched_action_index)
+                last_consumed_action_index = matched_action_index
+            closed = bool(
+                len(matching_immediate) == 1
+                and matched_action_index is not None
+                and checkpoint_closed
+            )
+            if not closed:
+                reasons.append(
+                    f"actor_followthrough_obligation_unclosed:"
+                    f"{scenario_name}:{tool_name}:v{tool_version}"
+                )
+            obligations.append(
+                {
+                    "scenario": scenario_name,
+                    "tool_name": tool_name,
+                    "tool_version": tool_version,
+                    "task_family_key": family,
+                    "required_disposition": disposition,
+                    "closed_after_task": closed,
+                    "lifecycle_action_journal_index": matched_action_index,
+                }
+            )
+
+    actor_action_indices = {
+        index
+        for index, action in enumerate(action_journal)
+        if action.get("reason")
+        in {
+            "generated_helper_followup_failure",
+            "actor_followthrough_failure_without_public_family",
+        }
+    }
+    if actor_action_indices != consumed_action_indices:
+        reasons.append("actor_followthrough_action_journal_mismatch")
+
+    try:
+        final_manifest = _load_json(registry_dir / "registry_manifest.json")
+        final_tools = final_manifest.get("tools")
+        final_lifecycle = _lifecycle_rows(registry_dir / "tool_lifecycle.json")
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        final_tools = None
+        final_lifecycle = None
+    for obligation in obligations:
+        tool_name = str(obligation["tool_name"])
+        tool_version = int(obligation["tool_version"])
+        family = obligation["task_family_key"]
+        final_entry = (
+            final_tools.get(tool_name) if isinstance(final_tools, dict) else None
+        )
+        final_retired = bool(
+            isinstance(final_entry, dict)
+            and final_entry.get("version") == tool_version
+            and final_entry.get("retired") is True
+        )
+        final_suppressed = bool(
+            isinstance(family, str)
+            and isinstance(final_entry, dict)
+            and final_entry.get("version") == tool_version
+            and final_entry.get("retired") is False
+            and isinstance(final_lifecycle, dict)
+            and _family_followthrough_suppressed(
+                final_lifecycle.get(tool_name),
+                family=family,
+                tool_version=tool_version,
+            )
+        )
+        terminal_supersession = None
+        if not final_retired and not final_suppressed:
+            terminal_supersession = _terminal_followthrough_supersession(
+                candidate_dir=candidate_dir,
+                registry_dir=registry_dir,
+                protocol_events=protocol_events,
+                tool_name=tool_name,
+                source_tool_version=tool_version,
+                final_entry_payload=final_entry,
+            )
+        final_closed = final_retired or final_suppressed or bool(terminal_supersession)
+        obligation["closed_at_run_end"] = final_closed
+        obligation["terminal_disposition"] = (
+            "global_retirement"
+            if final_retired
+            else "family_suppression"
+            if final_suppressed
+            else "validated_implementation_supersession"
+            if terminal_supersession
+            else "unresolved"
+        )
+        obligation["terminal_supersession"] = terminal_supersession
+        if not final_closed:
+            reasons.append(
+                f"actor_followthrough_obligation_stale_at_run_end:"
+                f"{obligation['scenario']}:{tool_name}:v{tool_version}"
+            )
+
+    return (
+        {
+            "derived_obligation_count": len(obligations),
+            "closed_after_task_count": sum(
+                item["closed_after_task"] for item in obligations
+            ),
+            "closed_at_run_end_count": sum(
+                item.get("closed_at_run_end") is True for item in obligations
+            ),
+            "obligations": obligations,
+        },
+        list(dict.fromkeys(reasons)),
+    )
+
+
+def _working_tool_provenance_report(
+    *,
+    run_root: Path,
+    benchmark_manifest: dict[str, Any],
+    registry_snapshot: dict[str, Any],
+    initial_manifest_path: Path,
+) -> tuple[dict[str, Any], list[str]]:
+    """Bind seeded working tools to exact entries in the claim-grade source."""
+
+    reasons: list[str] = []
+    if (
+        benchmark_manifest.get("preserved_working_tool_provenance")
+        != PRESERVED_WORKING_TOOL_PROVENANCE
+    ):
+        reasons.append("working_tool_manifest_provenance_mismatch")
+    initial_manifest = _load_json(initial_manifest_path)
+    fixture_provenance = (
+        initial_manifest.get("working_tool_provenance")
+        if isinstance(initial_manifest, dict)
+        else None
+    )
+    if not isinstance(fixture_provenance, dict):
+        reasons.append("working_tool_fixture_provenance_missing")
+        fixture_provenance = {}
+    for field in ("claim_boundary", "source_artifact", "source_registry_sha256"):
+        if fixture_provenance.get(field) != PRESERVED_WORKING_TOOL_PROVENANCE[field]:
+            reasons.append(f"working_tool_fixture_{field}_mismatch")
+    fixture_tool_pins = fixture_provenance.get("tools")
+    expected_tool_pins = PRESERVED_WORKING_TOOL_PROVENANCE["tools"]
+    if not isinstance(fixture_tool_pins, dict):
+        reasons.append("working_tool_fixture_tool_pins_missing")
+        fixture_tool_pins = {}
+    for tool_name in PRESERVED_WORKING_TOOL_NAMES:
+        expected_pin = expected_tool_pins[tool_name]
+        actual_pin = fixture_tool_pins.get(tool_name)
+        if not isinstance(actual_pin, dict) or any(
+            actual_pin.get(field) != expected_pin[field]
+            for field in (
+                "version",
+                "retired",
+                "code_hash",
+                "public_spec_sha256",
+                "source_entry_sha256",
+            )
+        ):
+            reasons.append(f"working_tool_fixture_pin_mismatch:{tool_name}")
+    if registry_snapshot.get("working_tool_provenance") != fixture_provenance:
+        reasons.append("working_tool_protocol_provenance_mismatch")
+
+    source_path: Path | None = None
+    source_digest: str | None = None
+    identities: dict[str, Any] = {}
+    try:
+        source_path = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            PRESERVED_WORKING_TOOL_PROVENANCE["source_artifact"],
+            "preserved working-tool source registry",
+        )
+        if not source_path.is_file() or source_path.is_symlink():
+            raise ValueError("working-tool source registry is not a regular file")
+        source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        if source_digest != PRESERVED_WORKING_TOOL_PROVENANCE["source_registry_sha256"]:
+            reasons.append("working_tool_source_registry_digest_mismatch")
+        source_manifest = _load_json(source_path)
+        source_tools = (
+            source_manifest.get("tools") if isinstance(source_manifest, dict) else None
+        )
+        initial_tools = (
+            initial_manifest.get("tools")
+            if isinstance(initial_manifest, dict)
+            else None
+        )
+        if not isinstance(source_tools, dict) or not isinstance(initial_tools, dict):
+            raise ValueError("working-tool source or fixture tool mapping is malformed")
+        for tool_name in PRESERVED_WORKING_TOOL_NAMES:
+            source_entry = source_tools.get(tool_name)
+            initial_entry = initial_tools.get(tool_name)
+            expected_pin = expected_tool_pins[tool_name]
+            source_identity = _registry_entry_identity(
+                source_entry,
+                expected_name=tool_name,
+            )
+            initial_identity = _registry_entry_identity(
+                initial_entry,
+                expected_name=tool_name,
+            )
+            if (
+                source_identity is None
+                or initial_identity is None
+                or source_entry != initial_entry
+                or _canonical_json_sha256(source_entry)
+                != expected_pin["source_entry_sha256"]
+                or any(
+                    source_identity.get(field) != expected_pin[field]
+                    for field in (
+                        "version",
+                        "retired",
+                        "code_hash",
+                        "public_spec_sha256",
+                    )
+                )
+            ):
+                reasons.append(f"working_tool_source_entry_mismatch:{tool_name}")
+            else:
+                identities[tool_name] = source_identity
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        reasons.append("working_tool_source_registry_unverifiable")
+    return (
+        {
+            "claim_boundary": PRESERVED_WORKING_TOOL_PROVENANCE["claim_boundary"],
+            "source_registry_path": str(source_path) if source_path else None,
+            "source_registry_sha256": source_digest,
+            "tools": identities,
+        },
+        reasons,
+    )
+
+
+def _working_tool_lifecycle_row_is_unchanged(row: Any) -> bool:
+    if not isinstance(row, dict):
+        return True
+    prohibited_decisions = {
+        "adoption_repair",
+        "needs_implementation_repair",
+        "needs_route_repair",
+        "parked",
+        "retain_with_route_repair",
+    }
+    return not any(
+        (
+            row.get("decision") in prohibited_decisions,
+            row.get("repair_kind") not in {None, ""},
+            row.get("routing_disposition") not in {None, "", "unchanged"},
+            bool(row.get("implementation_repair_families")),
+            bool(row.get("metadata_repair_families")),
+            bool(row.get("route_repair_families")),
+            bool(row.get("route_repair_reason_codes")),
+            bool(row.get("actor_followthrough_failure_families")),
+        )
+    )
+
+
+def _verify_working_tool_entries_unchanged(
+    *,
+    candidate_dir: Path,
+    registry_dir: Path,
+    initial_manifest_path: Path,
+    scenario_order: tuple[str, ...],
+    repair_requests: list[dict[str, Any]],
+    acknowledgements: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[str]]:
+    """Require the two established tools to survive without lifecycle action."""
+
+    reasons: list[str] = []
+    initial_manifest = _load_json(initial_manifest_path)
+    final_manifest = _load_json(registry_dir / "registry_manifest.json")
+    initial_tools = (
+        initial_manifest.get("tools") if isinstance(initial_manifest, dict) else None
+    )
+    final_tools = (
+        final_manifest.get("tools") if isinstance(final_manifest, dict) else None
+    )
+    initial_identities: dict[str, dict[str, Any]] = {}
+    final_identities: dict[str, dict[str, Any]] = {}
+    if not isinstance(initial_tools, dict) or not isinstance(final_tools, dict):
+        return (
+            {"checkpoint_binding_count": 0, "tools": {}},
+            ["working_tool_registry_mapping_invalid"],
+        )
+    for tool_name in PRESERVED_WORKING_TOOL_NAMES:
+        initial_identity = _registry_entry_identity(
+            initial_tools.get(tool_name), expected_name=tool_name
+        )
+        final_identity = _registry_entry_identity(
+            final_tools.get(tool_name), expected_name=tool_name
+        )
+        if initial_identity is None:
+            reasons.append(f"working_tool_initial_identity_invalid:{tool_name}")
+            continue
+        initial_identities[tool_name] = initial_identity
+        if final_identity is None:
+            reasons.append(f"working_tool_final_identity_invalid:{tool_name}")
+            continue
+        final_identities[tool_name] = final_identity
+        if final_identity != initial_identity:
+            reasons.append(f"working_tool_final_entry_changed:{tool_name}")
+
+    checkpoint_binding_count = 0
+    for completed_count, scenario_name in enumerate(scenario_order, start=1):
+        checkpoint_dir = (
+            candidate_dir
+            / "registry_checkpoints"
+            / (f"after_{completed_count:04d}_{_safe_checkpoint_name(scenario_name)}")
+        )
+        manifest_path = checkpoint_dir / "registry_manifest.json"
+        if not manifest_path.is_file() or manifest_path.is_symlink():
+            reasons.append(f"working_tool_checkpoint_missing:{scenario_name}")
+            continue
+        try:
+            checkpoint_manifest = _load_json(manifest_path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            reasons.append(f"working_tool_checkpoint_invalid:{scenario_name}")
+            continue
+        checkpoint_tools = (
+            checkpoint_manifest.get("tools")
+            if isinstance(checkpoint_manifest, dict)
+            else None
+        )
+        if not isinstance(checkpoint_tools, dict):
+            reasons.append(f"working_tool_checkpoint_invalid:{scenario_name}")
+            continue
+        for tool_name, initial_identity in initial_identities.items():
+            checkpoint_identity = _registry_entry_identity(
+                checkpoint_tools.get(tool_name), expected_name=tool_name
+            )
+            if checkpoint_identity != initial_identity:
+                reasons.append(
+                    f"working_tool_checkpoint_entry_changed:{scenario_name}:{tool_name}"
+                )
+            else:
+                checkpoint_binding_count += 1
+
+    for artifact, rows in (
+        ("request", repair_requests),
+        ("acknowledgement", acknowledgements),
+    ):
+        for row in rows:
+            tool_name = str(row.get("tool_name") or "")
+            if tool_name in PRESERVED_WORKING_TOOL_NAMES:
+                reasons.append(f"working_tool_lifecycle_{artifact}_present:{tool_name}")
+
+    lifecycle_path = registry_dir / "tool_lifecycle.json"
+    if lifecycle_path.is_file():
+        lifecycle_payload = _load_json(lifecycle_path)
+        lifecycle_rows = None
+        if isinstance(lifecycle_payload, dict):
+            for field in ("tool_lifecycle", "tools"):
+                candidate = lifecycle_payload.get(field)
+                if isinstance(candidate, dict):
+                    lifecycle_rows = candidate
+                    break
+        if isinstance(lifecycle_rows, dict):
+            for tool_name in PRESERVED_WORKING_TOOL_NAMES:
+                lifecycle_row = lifecycle_rows.get(tool_name)
+                if not isinstance(lifecycle_row, dict):
+                    reasons.append(f"working_tool_lifecycle_row_missing:{tool_name}")
+                elif not _working_tool_lifecycle_row_is_unchanged(lifecycle_row):
+                    reasons.append(f"working_tool_lifecycle_action_present:{tool_name}")
+        else:
+            reasons.append("working_tool_lifecycle_mapping_missing")
+
+    return (
+        {
+            "checkpoint_binding_count": checkpoint_binding_count,
+            "expected_checkpoint_binding_count": (
+                len(scenario_order) * len(PRESERVED_WORKING_TOOL_NAMES)
+            ),
+            "tools": {
+                tool_name: {
+                    "initial": initial_identities.get(tool_name),
+                    "final": final_identities.get(tool_name),
+                }
+                for tool_name in PRESERVED_WORKING_TOOL_NAMES
+            },
+        },
+        reasons,
+    )
 
 
 def _lifecycle_integrity(
@@ -823,6 +1942,235 @@ def _target_tool_identity(registry_dir: Path) -> dict[str, Any] | None:
     }
 
 
+def _target_validation_contract_identity(
+    registry_dir: Path,
+) -> dict[str, Any] | None:
+    store = RegistryStore(registry_dir)
+    try:
+        entry = store.get(LIFECYCLE_USE_CASE_TOOL)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if entry is None:
+        return None
+    binding_store = ValidationContractBindingStore(registry_dir)
+    binding, _error = binding_store.resolve(entry)
+    if binding is None:
+        return None
+    blob_path = binding_store.blob_directory / f"{binding.contract_hash}.json"
+    return {
+        "binding_blob_sha256": hashlib.sha256(blob_path.read_bytes()).hexdigest(),
+        "binding_index_sha256": hashlib.sha256(
+            binding_store.index_path.read_bytes()
+        ).hexdigest(),
+        "canonical_key": binding.canonical_key,
+        "contract_hash": binding.contract_hash,
+        "tool_code_hash": binding.tool_code_hash,
+        "tool_spec_hash": binding.tool_spec_hash,
+        "tool_name": binding.tool_name,
+        "tool_version": binding.tool_version,
+    }
+
+
+def _validation_contract_identities(
+    registry_dir: Path,
+) -> dict[str, dict[str, Any]] | None:
+    """Return verified current bindings, or fail closed on any registry entry."""
+
+    store = RegistryStore(registry_dir)
+    binding_store = ValidationContractBindingStore(registry_dir)
+    identities: dict[str, dict[str, Any]] = {}
+    try:
+        entries = store.load_entries()
+    except (KeyError, TypeError, ValueError):
+        return None
+    for manifest_name, entry in sorted(entries.items()):
+        if manifest_name != entry.tool.spec.tool_name:
+            return None
+        binding, _error = binding_store.resolve(entry)
+        if binding is None:
+            return None
+        blob_path = binding_store.blob_directory / f"{binding.contract_hash}.json"
+        identities[manifest_name] = {
+            "binding_blob_sha256": hashlib.sha256(blob_path.read_bytes()).hexdigest(),
+            "binding_index_sha256": hashlib.sha256(
+                binding_store.index_path.read_bytes()
+            ).hexdigest(),
+            "canonical_key": binding.canonical_key,
+            "contract_hash": binding.contract_hash,
+            "tool_code_hash": binding.tool_code_hash,
+            "tool_spec_hash": binding.tool_spec_hash,
+            "tool_name": binding.tool_name,
+            "tool_version": binding.tool_version,
+        }
+    return identities
+
+
+def _seeded_validation_contract_reasons(
+    *,
+    run_root: Path,
+    protocol: dict[str, Any],
+    registry_snapshot: dict[str, Any],
+    initial_manifest_path: Path,
+) -> list[str]:
+    """Verify every exact predeclared fixture contract sealed before execution."""
+
+    reasons: list[str] = []
+    sealed = protocol.get("seeded_validation_contract_bindings")
+    if not isinstance(sealed, dict):
+        return ["seeded_validation_contract_bindings_missing"]
+    if registry_snapshot.get("seeded_validation_contract_bindings") != sealed:
+        reasons.append("seeded_validation_contract_snapshot_mismatch")
+    pinned_common = {
+        "receipt_type": "development_only_historical_validation_contract_bindings",
+        "binding_count": len(PINNED_LIFECYCLE_V1_CONTRACTS),
+        "binding_index_sha256": PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256,
+        "fixture_sha256": LIFECYCLE_FAULT_FIXTURE_SHA256,
+        "contract_schema_version": VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+        "contract_provenance": "predeclared_synthetic_validator_contract",
+        "held_out_usage": "validator_and_model_selection_only",
+        "benchmark_identifiers_persisted": False,
+    }
+    if any(sealed.get(key) != value for key, value in pinned_common.items()):
+        reasons.append("seeded_validation_contract_pin_mismatch")
+    sealed_bindings = sealed.get("bindings")
+    if sealed_bindings != PINNED_LIFECYCLE_V1_CONTRACTS:
+        reasons.append("seeded_validation_contract_binding_set_mismatch")
+    try:
+        for key in (
+            "receipt_snapshot_path",
+            "binding_index_snapshot_path",
+        ):
+            if _declared_path_is_symlink(run_root, sealed.get(key)):
+                raise ValueError(f"{key} must not be a symbolic link")
+        receipt_path = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            sealed.get("receipt_snapshot_path"),
+            "seeded validation-contract receipt snapshot",
+            required_parent=run_root / "registry_gate",
+        )
+        index_path = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            sealed.get("binding_index_snapshot_path"),
+            "seeded validation-contract index snapshot",
+            required_parent=run_root / "registry_gate",
+        )
+        if hashlib.sha256(receipt_path.read_bytes()).hexdigest() != sealed.get(
+            "receipt_snapshot_sha256"
+        ):
+            reasons.append("seeded_validation_contract_receipt_hash_mismatch")
+        if sealed.get("receipt_snapshot_sha256") != sealed.get("source_receipt_sha256"):
+            reasons.append("seeded_validation_contract_receipt_copy_mismatch")
+        if hashlib.sha256(index_path.read_bytes()).hexdigest() != (
+            PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256
+        ):
+            reasons.append("seeded_validation_contract_index_hash_mismatch")
+
+        index = _load_json(index_path)
+        expected_index_bindings = {
+            tool_name: {
+                "1": {
+                    key: pinned[key]
+                    for key in (
+                        "tool_version",
+                        "tool_code_hash",
+                        "tool_spec_hash",
+                        "canonical_key",
+                        "contract_hash",
+                    )
+                }
+            }
+            for tool_name, pinned in PINNED_LIFECYCLE_V1_CONTRACTS.items()
+        }
+        if index != {
+            "schema_version": VALIDATION_CONTRACT_BINDING_SCHEMA_VERSION,
+            "bindings": expected_index_bindings,
+        }:
+            reasons.append("seeded_validation_contract_index_content_mismatch")
+
+        blob_snapshots = sealed.get("binding_blob_snapshots")
+        if not isinstance(blob_snapshots, dict) or set(blob_snapshots) != set(
+            PINNED_LIFECYCLE_V1_CONTRACTS
+        ):
+            raise ValueError("binding_blob_snapshots is malformed")
+        for tool_name, pinned in PINNED_LIFECYCLE_V1_CONTRACTS.items():
+            snapshot = blob_snapshots.get(tool_name)
+            if not isinstance(snapshot, dict):
+                raise ValueError("binding blob snapshot metadata is malformed")
+            if _declared_path_is_symlink(run_root, snapshot.get("path")):
+                raise ValueError("binding blob snapshot must not be a symbolic link")
+            blob_path = _strict_run_verifier._resolve_declared_path(
+                run_root,
+                snapshot.get("path"),
+                f"seeded validation-contract blob snapshot for {tool_name}",
+                required_parent=run_root / "registry_gate",
+            )
+            observed_blob_sha256 = hashlib.sha256(blob_path.read_bytes()).hexdigest()
+            if any(
+                (
+                    snapshot.get("contract_hash") != pinned["contract_hash"],
+                    snapshot.get("sha256") != pinned["binding_blob_sha256"],
+                    observed_blob_sha256 != pinned["binding_blob_sha256"],
+                )
+            ):
+                reasons.append("seeded_validation_contract_blob_hash_mismatch")
+            blob = _load_json(blob_path)
+            canonical_blob_hash = hashlib.sha256(
+                json.dumps(blob, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            if canonical_blob_hash != pinned["contract_hash"] or any(
+                (
+                    blob.get("tool_name") != tool_name,
+                    blob.get("tool_version") != pinned["tool_version"],
+                    blob.get("tool_code_hash") != pinned["tool_code_hash"],
+                    blob.get("tool_spec_hash") != pinned["tool_spec_hash"],
+                    blob.get("canonical_key") != pinned["canonical_key"],
+                    "scenario_name" in blob,
+                    "task_context_label" in blob,
+                )
+            ):
+                reasons.append("seeded_validation_contract_blob_content_mismatch")
+        receipt = _load_json(receipt_path)
+        if any(receipt.get(key) != value for key, value in pinned_common.items()):
+            reasons.append("seeded_validation_contract_receipt_content_mismatch")
+        receipt_bindings = receipt.get("bindings")
+        if not isinstance(receipt_bindings, dict) or set(receipt_bindings) != set(
+            PINNED_LIFECYCLE_V1_CONTRACTS
+        ):
+            reasons.append("seeded_validation_contract_receipt_content_mismatch")
+        else:
+            for tool_name, pinned in PINNED_LIFECYCLE_V1_CONTRACTS.items():
+                receipt_binding = receipt_bindings.get(tool_name)
+                if not isinstance(receipt_binding, dict) or any(
+                    receipt_binding.get(key) != value for key, value in pinned.items()
+                ):
+                    reasons.append(
+                        "seeded_validation_contract_receipt_content_mismatch"
+                    )
+        if hashlib.sha256(initial_manifest_path.read_bytes()).hexdigest() != (
+            LIFECYCLE_FAULT_FIXTURE_SHA256
+        ):
+            reasons.append("seeded_validation_contract_fixture_snapshot_mismatch")
+        initial_manifest = _load_json(initial_manifest_path)
+        initial_entries = initial_manifest.get("tools", {})
+        if not isinstance(initial_entries, dict) or set(initial_entries) != set(
+            PINNED_LIFECYCLE_V1_CONTRACTS
+        ):
+            reasons.append("seeded_validation_contract_tool_binding_mismatch")
+        else:
+            for tool_name, pinned in PINNED_LIFECYCLE_V1_CONTRACTS.items():
+                initial_entry = initial_entries.get(tool_name)
+                if (
+                    not isinstance(initial_entry, dict)
+                    or initial_entry.get("version") != 1
+                    or initial_entry.get("retired") is not False
+                    or initial_entry.get("code_hash") != pinned["tool_code_hash"]
+                ):
+                    reasons.append("seeded_validation_contract_tool_binding_mismatch")
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        reasons.append("seeded_validation_contract_artifact_unverifiable")
+    return list(dict.fromkeys(reasons))
+
+
 def _write_report(run_root: Path, report: dict[str, Any]) -> dict[str, Any]:
     (run_root / "lifecycle_repair_validation_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
@@ -847,7 +2195,8 @@ def _verify_frozen_transfer(
     roles = spec["roles"]
     safe_names = tuple(roles[str(spec["safe_role"])])
     contact_names = tuple(roles[str(spec["contact_role"])])
-    preservation_names = tuple(roles["preservation"])
+    working_overlap_names = tuple(roles["working_generated_overlap"])
+    unrelated_preservation_names = tuple(roles["unrelated_native_preservation"])
     reasons: list[str] = []
 
     manifest_order = _manifest_task_names(benchmark_manifest, "transfer_30")
@@ -871,6 +2220,11 @@ def _verify_frozen_transfer(
         reasons.append("transfer_lifecycle_evidence_mode_mismatch")
     if benchmark_manifest.get("predeclared_gates") != spec["predeclared_gates"]:
         reasons.append("transfer_predeclared_gate_contract_mismatch")
+    if (
+        benchmark_manifest.get("preserved_working_tool_provenance")
+        != PRESERVED_WORKING_TOOL_PROVENANCE
+    ):
+        reasons.append("transfer_working_tool_provenance_contract_mismatch")
     observed_roles = benchmark_manifest.get("validation_roles")
     if not isinstance(observed_roles, dict) or set(observed_roles) != set(roles):
         reasons.append("transfer_validation_role_set_mismatch")
@@ -1007,6 +2361,14 @@ def _verify_frozen_transfer(
         source_inventory = _registry_inventory(source_registry_dir)
         source_inventory_hash = _inventory_sha256(source_inventory)
         source_identity = _target_tool_identity(source_registry_dir)
+        source_contract_identity = _target_validation_contract_identity(
+            source_registry_dir
+        )
+        source_contract_identities = _validation_contract_identities(
+            source_registry_dir
+        )
+        if source_contract_identity is None or source_contract_identities is None:
+            reasons.append("transfer_source_validation_contract_binding_invalid")
         if any(
             item.get("kind") not in {"directory", "file"} for item in source_inventory
         ):
@@ -1032,6 +2394,8 @@ def _verify_frozen_transfer(
             ),
             "installed_registry_inventory_sha256": source_inventory_hash,
             "target_tool": source_identity,
+            "target_validation_contract": source_contract_identity,
+            "validation_contract_bindings": source_contract_identities,
         }
         if provenance != expected_provenance:
             reasons.append("transfer_registry_provenance_mismatch")
@@ -1048,12 +2412,22 @@ def _verify_frozen_transfer(
     )
     snapshot = protocol.get("registry_gate_snapshot")
     snapshot_artifact = run_root / "registry_gate" / "registry_gate_snapshot.json"
+    initial_manifest_path: Path | None = None
     if not isinstance(snapshot, dict) or not snapshot_artifact.is_file():
         reasons.append("transfer_initial_registry_snapshot_missing")
         initial_inventory: list[dict[str, Any]] = []
     else:
         if _load_json(snapshot_artifact) != snapshot:
             reasons.append("transfer_initial_registry_snapshot_artifact_mismatch")
+        try:
+            initial_manifest_path = _strict_run_verifier._resolve_declared_path(
+                run_root,
+                snapshot.get("snapshot_path"),
+                "transfer registry_gate_snapshot.snapshot_path",
+                required_parent=run_root / "registry_gate",
+            )
+        except ValueError:
+            reasons.append("transfer_initial_registry_manifest_snapshot_invalid")
         initial_inventory = snapshot.get("registry_inventory_before_run")
         if not isinstance(initial_inventory, list):
             initial_inventory = []
@@ -1075,6 +2449,15 @@ def _verify_frozen_transfer(
     target_identity = _target_tool_identity(registry_dir)
     if target_identity is None or target_identity != provenance.get("target_tool"):
         reasons.append("transfer_target_tool_identity_mismatch")
+    target_contract_identity = _target_validation_contract_identity(registry_dir)
+    contract_identities = _validation_contract_identities(registry_dir)
+    if (
+        target_contract_identity is None
+        or target_contract_identity != provenance.get("target_validation_contract")
+        or contract_identities is None
+        or contract_identities != provenance.get("validation_contract_bindings")
+    ):
+        reasons.append("transfer_validation_contract_binding_mismatch")
     registry_manifest_path = registry_dir / "registry_manifest.json"
     if (
         not registry_manifest_path.is_file()
@@ -1132,6 +2515,12 @@ def _verify_frozen_transfer(
     ):
         reasons.append("transfer_tool_selection_trajectory_mismatch")
     checkpoint_version_binding_count = 0
+    actor_followthrough_closure: dict[str, Any] = {
+        "derived_obligation_count": 0,
+        "closed_after_task_count": 0,
+        "closed_at_run_end_count": 0,
+        "obligations": [],
+    }
     if trajectory_error is None:
         (
             checkpoint_version_binding_count,
@@ -1145,6 +2534,18 @@ def _verify_frozen_transfer(
         )
         if checkpoint_version_mismatches:
             reasons.append("transfer_registry_checkpoint_version_mismatch")
+        (
+            actor_followthrough_closure,
+            actor_followthrough_reasons,
+        ) = _actor_followthrough_closure_report(
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            scenario_order=expected_order,
+            trajectory_evidence=trajectory_evidence["candidate"],
+            feedback_by_name={},
+            protocol_events=[],
+        )
+        reasons.extend(f"transfer_{reason}" for reason in actor_followthrough_reasons)
     target_version = (
         target_identity.get("version") if isinstance(target_identity, dict) else None
     )
@@ -1193,24 +2594,98 @@ def _verify_frozen_transfer(
     ]
     if not success_flip_names:
         reasons.append("transfer_fresh_control_success_flip_missing")
-    preservation_pass_names = [
+    side_effect_failure_rows = _read_jsonl(
+        candidate_dir / "side_effect_preservation_report.jsonl"
+    )
+    side_effect_failures_by_name = {
+        str(row.get("scenario") or ""): set(
+            str(item)
+            for item in (row.get("side_effect_preservation_failures") or [])
+            if isinstance(item, str)
+        )
+        for row in side_effect_failure_rows
+    }
+    working_overlap_pass_names = [
         name
-        for name in preservation_names
+        for name in working_overlap_names
         if name in candidate_by_name
         and name in control_by_name
         and _exact_outcome(candidate_by_name[name])
         and (_outcome(candidate_by_name[name]) or 0.0)
         >= (_outcome(control_by_name[name]) or 0.0)
         and name in selection_by_name
+        and all(
+            _selection_has_tool(
+                selection_by_name[name], "generated_tools_visible", tool
+            )
+            and _selection_has_tool(
+                selection_by_name[name], "generated_tools_called", tool
+            )
+            and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
+            and selection_by_name[name]["generated_tool_versions"].get(tool) == 1
+            for tool in PRESERVED_WORKING_TOOL_NAMES
+        )
         and not _selection_has_tool(
             selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
         )
         and not _selection_has_tool(
             selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
         )
+        and _working_tool_failure_free(
+            selection_by_name[name], include_actor_followthrough=False
+        )
+        and not (
+            side_effect_failures_by_name.get(name, set())
+            & set(PRESERVED_WORKING_TOOL_NAMES)
+        )
     ]
-    if len(preservation_pass_names) != 4:
-        reasons.append("transfer_preservation_exact_hidden_nonregression_gate_failed")
+    if len(working_overlap_pass_names) < int(spec["working_overlap_minimum"]):
+        reasons.append("transfer_working_generated_overlap_gate_failed")
+    unrelated_preservation_pass_names = [
+        name
+        for name in unrelated_preservation_names
+        if name in candidate_by_name
+        and name in control_by_name
+        and _exact_outcome(candidate_by_name[name])
+        and (_outcome(candidate_by_name[name]) or 0.0)
+        >= (_outcome(control_by_name[name]) or 0.0)
+        and name in selection_by_name
+        and all(
+            not _selection_has_tool(
+                selection_by_name[name], "generated_tools_visible", tool
+            )
+            and not _selection_has_tool(
+                selection_by_name[name], "generated_tools_called", tool
+            )
+            for tool in FIXTURE_TOOL_NAMES
+        )
+    ]
+    if len(unrelated_preservation_pass_names) < int(
+        spec["unrelated_preservation_minimum"]
+    ):
+        reasons.append("transfer_unrelated_native_preservation_gate_failed")
+    working_tool_preservation: dict[str, Any] = {
+        "checkpoint_binding_count": 0,
+        "expected_checkpoint_binding_count": (
+            len(expected_order) * len(PRESERVED_WORKING_TOOL_NAMES)
+        ),
+        "tools": {},
+    }
+    if initial_manifest_path is not None:
+        (
+            working_tool_preservation,
+            working_tool_preservation_reasons,
+        ) = _verify_working_tool_entries_unchanged(
+            candidate_dir=candidate_dir,
+            registry_dir=registry_dir,
+            initial_manifest_path=initial_manifest_path,
+            scenario_order=expected_order,
+            repair_requests=[],
+            acknowledgements=[],
+        )
+        reasons.extend(working_tool_preservation_reasons)
+    else:
+        reasons.append("transfer_working_tool_integrity_unverifiable")
     overall_exact = sum(_exact_outcome(row) for row in candidate_rows)
     if overall_exact < 25:
         reasons.append("transfer_overall_exact_outcome_gate_failed")
@@ -1231,17 +2706,27 @@ def _verify_frozen_transfer(
         "registry_inventory_sha256": _inventory_sha256(final_inventory),
         "registry_unchanged": final_inventory == initial_inventory,
         "target_tool": target_identity,
+        "preserved_working_tool_provenance": source_report.get(
+            "preserved_working_tool_provenance"
+        ),
+        "preserved_working_tool_integrity": working_tool_preservation,
         "parallel_arm_execution": parallel_execution,
         "matched_policy_runtimes": matched_runtimes,
         "trajectory_audit_count": {
             arm: len(evidence) for arm, evidence in trajectory_evidence.items()
         },
         "registry_checkpoint_version_binding_count": (checkpoint_version_binding_count),
+        "actor_followthrough_closure": actor_followthrough_closure,
         "safe_abstain_visible_and_called_count": len(visible_called_names),
         "safe_abstain_exact_outcome_count": len(exact_safe_names),
         "contact_exact_without_forbidden_remove_count": len(contact_exact_names),
         "fresh_control_success_flip_count": len(success_flip_names),
-        "preservation_exact_hidden_nonregression_count": len(preservation_pass_names),
+        "working_generated_overlap_task_count": len(working_overlap_names),
+        "working_generated_overlap_pass_count": len(working_overlap_pass_names),
+        "unrelated_native_preservation_task_count": len(unrelated_preservation_names),
+        "unrelated_native_preservation_pass_count": len(
+            unrelated_preservation_pass_names
+        ),
         "overall_exact_success_count": overall_exact,
         "runtime_exception_count": comparison.get("runtime_exception_count"),
         "reasons": sorted(set(reasons)),
@@ -1308,6 +2793,11 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         reasons.append("lifecycle_evidence_mode_mismatch")
     if benchmark_manifest.get("predeclared_gates") != spec["predeclared_gates"]:
         reasons.append("predeclared_gate_contract_mismatch")
+    if (
+        benchmark_manifest.get("preserved_working_tool_provenance")
+        != PRESERVED_WORKING_TOOL_PROVENANCE
+    ):
+        reasons.append("working_tool_provenance_contract_mismatch")
     observed_roles = benchmark_manifest.get("validation_roles")
     expected_roles = spec["roles"]
     if not isinstance(observed_roles, dict) or set(observed_roles) != set(
@@ -1460,28 +2950,54 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             )
         except ValueError:
             reasons.append("lifecycle_feedback_trajectory_mismatch")
+    protocol_events, protocol_event_journal = _verified_protocol_event_rows(
+        run_root=run_root,
+        protocol=protocol,
+    )
     checkpoint_version_binding_count = 0
+    actor_followthrough_closure: dict[str, Any] = {
+        "derived_obligation_count": 0,
+        "closed_after_task_count": 0,
+        "closed_at_run_end_count": 0,
+        "obligations": [],
+    }
     if trajectory_error is None:
+        checkpoint_registry_dir = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            protocol.get("registry_dir"),
+            "registry_dir",
+        )
         (
             checkpoint_version_binding_count,
             checkpoint_version_mismatches,
         ) = _verify_registry_checkpoint_versions(
             candidate_dir=candidate_dir,
-            registry_dir=_strict_run_verifier._resolve_declared_path(
-                run_root,
-                protocol.get("registry_dir"),
-                "registry_dir",
-            ),
+            registry_dir=checkpoint_registry_dir,
             scenario_order=expected_order,
             selection_by_name=selection_by_name,
             trajectory_evidence=trajectory_evidence["candidate"],
         )
         if checkpoint_version_mismatches:
             reasons.append("registry_checkpoint_version_mismatch")
+        (
+            actor_followthrough_closure,
+            actor_followthrough_reasons,
+        ) = _actor_followthrough_closure_report(
+            candidate_dir=candidate_dir,
+            registry_dir=checkpoint_registry_dir,
+            scenario_order=expected_order,
+            trajectory_evidence=trajectory_evidence["candidate"],
+            feedback_by_name=feedback_by_name,
+            protocol_events=protocol_events,
+        )
+        reasons.extend(actor_followthrough_reasons)
 
     safe_names = tuple(expected_roles[str(spec["safe_role"])])
     contact_names = tuple(expected_roles[str(spec["contact_role"])])
-    preservation_names = tuple(expected_roles["preservation"])
+    working_overlap_names = tuple(expected_roles["working_generated_overlap"])
+    unrelated_preservation_names = tuple(
+        expected_roles["unrelated_native_preservation"]
+    )
     safe_visible_called_names = [
         name
         for name in safe_names
@@ -1528,30 +3044,86 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         spec["contact_exact_no_remove_minimum"]
     ):
         reasons.append("contact_exact_without_forbidden_remove_gate_failed")
-    preservation_exact_hidden_names = [
+    working_overlap_pass_names = [
         name
-        for name in preservation_names
+        for name in working_overlap_names
         if name in candidate_by_name
+        and name in control_by_name
         and _exact_outcome(candidate_by_name[name])
+        and (_outcome(candidate_by_name[name]) or 0.0)
+        >= (_outcome(control_by_name[name]) or 0.0)
         and name in selection_by_name
+        and name in feedback_by_name
+        and all(
+            _selection_has_tool(
+                selection_by_name[name], "generated_tools_visible", tool
+            )
+            and _selection_has_tool(
+                selection_by_name[name], "generated_tools_called", tool
+            )
+            and _selection_has_tool(
+                feedback_by_name[name], "generated_tools_visible", tool
+            )
+            and _selection_has_tool(
+                feedback_by_name[name], "generated_tools_called", tool
+            )
+            and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
+            and selection_by_name[name]["generated_tool_versions"].get(tool) == 1
+            and isinstance(feedback_by_name[name].get("generated_tool_versions"), dict)
+            and feedback_by_name[name]["generated_tool_versions"].get(tool) == 1
+            for tool in PRESERVED_WORKING_TOOL_NAMES
+        )
         and not _selection_has_tool(
             selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
         )
         and not _selection_has_tool(
             selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
         )
-        and name in feedback_by_name
         and not _selection_has_tool(
             feedback_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
         )
         and not _selection_has_tool(
             feedback_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
         )
+        and _working_tool_failure_free(
+            selection_by_name[name], include_actor_followthrough=False
+        )
+        and _working_tool_failure_free(
+            feedback_by_name[name], include_actor_followthrough=True
+        )
     ]
-    if len(preservation_exact_hidden_names) < int(
-        spec["preservation_exact_hidden_minimum"]
+    if len(working_overlap_pass_names) < int(spec["working_overlap_minimum"]):
+        reasons.append("working_generated_overlap_gate_failed")
+    unrelated_preservation_pass_names = [
+        name
+        for name in unrelated_preservation_names
+        if name in candidate_by_name
+        and name in control_by_name
+        and _exact_outcome(candidate_by_name[name])
+        and (_outcome(candidate_by_name[name]) or 0.0)
+        >= (_outcome(control_by_name[name]) or 0.0)
+        and name in selection_by_name
+        and name in feedback_by_name
+        and all(
+            not _selection_has_tool(
+                selection_by_name[name], "generated_tools_visible", tool
+            )
+            and not _selection_has_tool(
+                selection_by_name[name], "generated_tools_called", tool
+            )
+            and not _selection_has_tool(
+                feedback_by_name[name], "generated_tools_visible", tool
+            )
+            and not _selection_has_tool(
+                feedback_by_name[name], "generated_tools_called", tool
+            )
+            for tool in FIXTURE_TOOL_NAMES
+        )
+    ]
+    if len(unrelated_preservation_pass_names) < int(
+        spec["unrelated_preservation_minimum"]
     ):
-        reasons.append("preservation_exact_and_safe_helper_hidden_gate_failed")
+        reasons.append("unrelated_native_preservation_gate_failed")
 
     registry_dir = _strict_run_verifier._resolve_declared_path(
         run_root,
@@ -1561,6 +3133,19 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
     lifecycle = _lifecycle_integrity(candidate_dir, registry_dir)
     repair_requests = lifecycle["repair_requests"]
     acknowledgements = lifecycle["acknowledgements"]
+    working_tool_provenance: dict[str, Any] = {
+        "claim_boundary": PRESERVED_WORKING_TOOL_PROVENANCE["claim_boundary"],
+        "source_registry_path": None,
+        "source_registry_sha256": None,
+        "tools": {},
+    }
+    working_tool_preservation: dict[str, Any] = {
+        "checkpoint_binding_count": 0,
+        "expected_checkpoint_binding_count": (
+            len(expected_order) * len(PRESERVED_WORKING_TOOL_NAMES)
+        ),
+        "tools": {},
+    }
     initial_registry = protocol.get("registry_gate_snapshot")
     if not isinstance(initial_registry, dict) or any(
         (
@@ -1583,6 +3168,37 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             != LIFECYCLE_FAULT_FIXTURE_SHA256
         ):
             reasons.append("pinned_historical_fault_snapshot_bytes_mismatch")
+        else:
+            (
+                working_tool_provenance,
+                working_tool_provenance_reasons,
+            ) = _working_tool_provenance_report(
+                run_root=run_root,
+                benchmark_manifest=benchmark_manifest,
+                registry_snapshot=initial_registry,
+                initial_manifest_path=initial_snapshot_path,
+            )
+            reasons.extend(working_tool_provenance_reasons)
+            (
+                working_tool_preservation,
+                working_tool_preservation_reasons,
+            ) = _verify_working_tool_entries_unchanged(
+                candidate_dir=candidate_dir,
+                registry_dir=registry_dir,
+                initial_manifest_path=initial_snapshot_path,
+                scenario_order=expected_order,
+                repair_requests=repair_requests,
+                acknowledgements=acknowledgements,
+            )
+            reasons.extend(working_tool_preservation_reasons)
+            reasons.extend(
+                _seeded_validation_contract_reasons(
+                    run_root=run_root,
+                    protocol=protocol,
+                    registry_snapshot=initial_registry,
+                    initial_manifest_path=initial_snapshot_path,
+                )
+            )
     repair_request_prohibited_paths: dict[str, list[str]] = {}
     for request in repair_requests:
         prohibited_paths = prohibited_repair_payload_paths(request)
@@ -1723,19 +3339,45 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
     if future_v2_success_flips < int(spec["future_v2_success_flip_minimum"]):
         reasons.append("future_v2_affirmative_success_flip_missing")
 
-    run_events = _read_jsonl(candidate_dir / "sage_run_events.jsonl")
+    final_validation_contract = _target_validation_contract_identity(registry_dir)
+    if final_validation_contract is None:
+        reasons.append("promoted_v2_validation_contract_binding_invalid")
+    repair_acceptance_candidates = [
+        row
+        for row in protocol_events
+        if row.get("event") == "post_deployment_tool_repair_accepted"
+        and (
+            row.get("request_id") == use_case_request_id
+            or (
+                row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
+                and row.get("source_tool_version") == 1
+            )
+        )
+    ]
     repair_acceptance_events = [
         row
-        for row in run_events
-        if row.get("event") == "post_deployment_tool_repair_accepted"
-        and row.get("request_id") == use_case_request_id
+        for row in repair_acceptance_candidates
+        if row.get("request_id") == use_case_request_id
         and row.get("tool_name") == LIFECYCLE_USE_CASE_TOOL
         and row.get("source_tool_version") == 1
         and row.get("new_tool_version") == 2
+        and isinstance(final_validation_contract, dict)
+        and row.get("validation_contract_hash")
+        == final_validation_contract.get("contract_hash")
         and row.get("triggering_task_replayed") is False
+        and row.get("mode") == protocol.get("mode")
+        and _event_path_matches(run_root, row.get("run_root"), run_root)
+        and _event_path_matches(run_root, row.get("run_dir"), candidate_dir)
     ]
-    if len(repair_acceptance_events) != 1:
+    repair_acceptance_binding_mismatches = len(repair_acceptance_candidates) - len(
+        repair_acceptance_events
+    )
+    if not repair_acceptance_events:
         reasons.append("postdeployment_v2_acceptance_event_missing")
+    elif len(repair_acceptance_events) > 1:
+        reasons.append("postdeployment_v2_acceptance_event_not_unique")
+    if repair_acceptance_binding_mismatches:
+        reasons.append("postdeployment_v2_acceptance_event_binding_mismatch")
 
     registry_path = registry_dir / "registry_manifest.json"
     registry = _load_json(registry_path)
@@ -1767,6 +3409,7 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
             arm: len(evidence) for arm, evidence in trajectory_evidence.items()
         },
         "registry_checkpoint_version_binding_count": (checkpoint_version_binding_count),
+        "actor_followthrough_closure": actor_followthrough_closure,
         "candidate_audited_outcome_count": len(candidate_outcomes),
         "control_audited_outcome_count": len(control_outcomes),
         "outcome_evaluator": expected_evaluator,
@@ -1789,10 +3432,14 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "contact_exact_without_forbidden_remove_count": len(
             contact_exact_no_remove_names
         ),
-        "preservation_task_count": len(preservation_names),
-        "preservation_exact_and_safe_helper_hidden_count": len(
-            preservation_exact_hidden_names
+        "working_generated_overlap_task_count": len(working_overlap_names),
+        "working_generated_overlap_pass_count": len(working_overlap_pass_names),
+        "unrelated_native_preservation_task_count": len(unrelated_preservation_names),
+        "unrelated_native_preservation_pass_count": len(
+            unrelated_preservation_pass_names
         ),
+        "preserved_working_tool_provenance": working_tool_provenance,
+        "preserved_working_tool_integrity": working_tool_preservation,
         "historical_fault_fixture_sha256": LIFECYCLE_FAULT_FIXTURE_SHA256,
         "use_case_tool": LIFECYCLE_USE_CASE_TOOL,
         "use_case_request_id": use_case_request_id or None,
@@ -1807,6 +3454,11 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         "repaired_version_future_exact_success_count": future_v2_exact_successes,
         "repaired_version_future_success_flip_count": future_v2_success_flips,
         "repair_acceptance_event_count": len(repair_acceptance_events),
+        "repair_acceptance_event_binding_mismatch_count": (
+            repair_acceptance_binding_mismatches
+        ),
+        "repair_acceptance_event_source": protocol_event_journal,
+        "promoted_v2_validation_contract": final_validation_contract,
         "repair_request_count": len(repair_requests),
         "repair_request_prohibited_paths": repair_request_prohibited_paths,
         "repair_acknowledgement_count": len(acknowledgements),
