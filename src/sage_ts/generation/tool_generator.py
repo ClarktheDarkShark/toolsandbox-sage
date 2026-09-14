@@ -1519,7 +1519,11 @@ def _model_authored_contract_analysis_prompt(
             "mutating_actions, target_exceptions, case_coverage, and invariants. "
             "For case_coverage, state why every expected branch is reached. Do not "
             "output Python and do not invent requirements absent from the public "
-            "contract. Required tool name: "
+            "contract. algorithm_steps must be a nonempty array; "
+            "capability_aliases must be an object; inferred_prerequisites, "
+            "read_only_actions, mutating_actions, target_exceptions, and invariants "
+            "may be arrays or descriptive objects; case_coverage must be an object. "
+            "Required tool name: "
             + str(request.suggested_tool_name or "infer_from_contract")
             + ". Public observation: "
             + request.observation
@@ -1630,21 +1634,24 @@ def _validated_validation_helper_contract_analysis(raw_analysis: str) -> str:
         ) from exc
     if not isinstance(analysis, dict):
         raise ValueError("validation helper contract analysis must be a JSON object")
-    list_fields = (
-        "algorithm_steps",
+    algorithm_steps = analysis.get("algorithm_steps")
+    if not isinstance(algorithm_steps, list) or not algorithm_steps:
+        raise ValueError(
+            "validation helper contract analysis needs nonempty algorithm_steps"
+        )
+    structured_collection_fields = (
         "inferred_prerequisites",
         "read_only_actions",
         "mutating_actions",
         "target_exceptions",
         "invariants",
     )
-    for field in list_fields:
-        if not isinstance(analysis.get(field), list):
+    for field in structured_collection_fields:
+        if not isinstance(analysis.get(field), (list, dict)):
             raise ValueError(
-                f"validation helper contract analysis field {field} must be a list"
+                "validation helper contract analysis field "
+                f"{field} must be a list or object"
             )
-    if not analysis["algorithm_steps"]:
-        raise ValueError("validation helper contract analysis needs algorithm steps")
     for field in ("capability_aliases", "case_coverage"):
         if not isinstance(analysis.get(field), dict):
             raise ValueError(

@@ -837,7 +837,7 @@ def test_validation_helper_contract_analysis_requires_a_structured_plan() -> Non
     valid = {
         "algorithm_steps": ["normalize", "infer", "validate"],
         "capability_aliases": {},
-        "inferred_prerequisites": [],
+        "inferred_prerequisites": {"message_send": ["contact_lookup"]},
         "read_only_actions": ["search"],
         "mutating_actions": ["send"],
         "target_exceptions": ["read-only search"],
@@ -856,6 +856,9 @@ def test_validation_helper_contract_analysis_requires_a_structured_plan() -> Non
         )
     with pytest.raises(ValueError, match="not valid JSON"):
         _validated_validation_helper_contract_analysis("not-json")
+    malformed = {**valid, "target_exceptions": "read-only search"}
+    with pytest.raises(ValueError, match="target_exceptions"):
+        _validated_validation_helper_contract_analysis(json.dumps(malformed))
 
 
 def test_generation_request_includes_reusable_name_hint() -> None:
