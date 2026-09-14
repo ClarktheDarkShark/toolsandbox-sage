@@ -18,6 +18,7 @@ from sage_ts.validation.sandbox_validator import (
     ToolExample,
     _action_requires_target,
     _recommendation_mentions_fact,
+    _recommendation_states_capability_deficit,
     validate_generated_tool,
 )
 
@@ -282,6 +283,12 @@ def safe_contact_action_gate(user_request: str, requested_action: str, target_id
         return {'should_abstain': True, 'missing_information': ['ambiguous_target'], 'required_original_tools': required, 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'The contact target is ambiguous because multiple matches are visible.', 'abstain_reason': 'ambiguous_target'}
     return {'should_abstain': False, 'missing_information': [], 'required_original_tools': required, 'safe_next_action': 'continue_with_original_tool', 'final_answer_recommendation': '', 'abstain_reason': ''}
 """
+
+
+_BOOLEAN_WRONG_DEFICIT_IMPLEMENTATION = _BOOLEAN_GENERAL_IMPLEMENTATION.replace(
+    "'Missing capability: ' + ', '.join(item.replace('_', ' ') for item in missing) + '.'",
+    "'Contact lookup is unavailable, so removal cannot continue.'",
+)
 
 
 _BOOLEAN_PUBLIC_ONLY_IMPLEMENTATION = """
@@ -564,6 +571,49 @@ def test_validator_accepts_boolean_capability_withholding_contract() -> None:
     )
 
     assert result.accepted, result.errors
+
+
+def test_validator_rejects_boolean_recommendation_for_wrong_missing_capability() -> (
+    None
+):
+    """A search-only explanation cannot cover missing removal access."""
+
+    result = validate_generated_tool(
+        _boolean_abstention_tool(_BOOLEAN_WRONG_DEFICIT_IMPLEMENTATION),
+        _boolean_examples(),
+    )
+
+    assert not result.accepted
+    public_errors = tuple(
+        error for error in result.errors if not error.startswith("blind_property_")
+    )
+    assert not public_errors
+    assert any(
+        "blind_property_1_missing_capability_1_boolean_"
+        "final_recommendation_capability_deficit" in error
+        for error in result.errors
+    )
+    assert any(
+        "blind_property_1_all_boolean_capabilities_1_"
+        "final_recommendation_capability_deficit" in error
+        for error in result.errors
+    )
+
+
+def test_capability_deficit_requires_the_deficit_and_fact_in_same_clause() -> None:
+    recommendation = (
+        "I do not have access to search contacts, so I cannot safely remove the "
+        "requested contact."
+    )
+
+    assert _recommendation_states_capability_deficit(
+        recommendation,
+        "contact_lookup",
+    )
+    assert not _recommendation_states_capability_deficit(
+        recommendation,
+        "contact_removal",
+    )
 
 
 def test_validator_hidden_withholding_rejects_ignored_boolean_capabilities() -> None:

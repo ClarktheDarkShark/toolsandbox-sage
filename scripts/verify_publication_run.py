@@ -586,10 +586,13 @@ def _json_values_equal(left: Any, right: Any) -> bool:
         return set(left) == set(right) and all(
             _json_values_equal(left[key], right[key]) for key in left
         )
-    if isinstance(left, list) and isinstance(right, list):
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
         # The explicit length check is the strictness guarantee.  Avoid
         # ``zip(strict=True)`` so legacy development fixtures can still be
-        # verified under their Python 3.9 test environment.
+        # verified under their Python 3.9 test environment. Evaluator
+        # contracts may retain tuples in memory, while their persisted JSON
+        # representation necessarily contains arrays; those are the same
+        # serialized value and must compare element-for-element.
         return len(left) == len(right) and all(
             _json_values_equal(left_item, right_item)
             for left_item, right_item in zip(left, right)

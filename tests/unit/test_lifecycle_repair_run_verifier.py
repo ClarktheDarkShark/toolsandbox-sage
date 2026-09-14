@@ -999,6 +999,58 @@ def test_safety_gate_extracts_exact_called_tool_not_helper_argument(
     )
 
 
+def test_working_path_accepts_authenticated_uncalled_visible_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_tools = (
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args",
+    )
+    extra_visible_tool = "next_weekday_time_to_timestamp"
+    visible_tools = (*expected_tools, extra_visible_tool)
+    versions = {tool_name: 1 for tool_name in visible_tools}
+    selection = {
+        "exception_type": None,
+        "generated_tools_visible": list(visible_tools),
+        "generated_tools_attempted": list(expected_tools),
+        "generated_tools_called": list(expected_tools),
+        "generated_tools_failed": [],
+        "generated_tool_contract_failures": [],
+        "generated_tool_versions": versions,
+    }
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "_checkpoint_contract_identity",
+        lambda **kwargs: {
+            "tool_name": kwargs["tool_name"],
+            "tool_version": kwargs["expected_version"],
+            "validation_replayed": True,
+        },
+    )
+
+    evidence = verify_lifecycle_repair_run._working_overlap_path_evidence(
+        candidate_dir=Path("unused"),
+        scenario_order=("working_scenario",),
+        scenario_name="working_scenario",
+        expected_tools=expected_tools,
+        candidate_by_name={"working_scenario": {"outcome_similarity": 1.0}},
+        control_by_name={"working_scenario": {"outcome_similarity": 0.0}},
+        selection_by_name={"working_scenario": selection},
+        feedback_by_name=None,
+        trajectory_row={
+            "generated_tools_visible": visible_tools,
+            "generated_tools_attempted": expected_tools,
+            "generated_tools_called": expected_tools,
+            "generated_tools_failed": (),
+        },
+    )
+
+    assert evidence["selection_path_present"] is True
+    assert evidence["trajectory_path_present"] is True
+    assert evidence["contract_bound_and_replayed"] is True
+    assert evidence["passed"] is True
+
+
 def _development_artifacts(
     tmp_path: Path, cohort: str
 ) -> tuple[Path, Path, Path, Path]:

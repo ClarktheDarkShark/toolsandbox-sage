@@ -376,7 +376,11 @@ def _contact_removal_readiness_observation(
             "requires contact_removal followed by contact_lookup. The target is an "
             "unresolved user-facing locator such as a name or phone number, never "
             "an already-resolved database record id. Missing capabilities take "
-            "priority over target checks. Then abstain for a blank target or "
+            "priority over target checks. The recommendation must identify the "
+            "capability that is actually absent: search contacts for missing "
+            "contact_lookup, remove contacts for missing contact_removal, or both "
+            "when both are absent. It must not claim that an available capability "
+            "is unavailable. Then abstain for a blank target or "
             "multiple visible matches; otherwise continue with the routed original "
             "tools. Never "
             "search, remove, select, or guess a record. Preserve search_contacts "
@@ -492,8 +496,36 @@ def _contact_removal_readiness_observation(
                     ],
                     "safe_next_action": "ask_user_or_abstain",
                     "final_answer_recommendation": (
-                        "I need contact removal before I can safely complete this "
-                        "contact removal."
+                        "I do not have access to remove contacts, so I cannot safely "
+                        "remove the requested contact."
+                    ),
+                    "abstain_reason": "missing_required_original_tool",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": "Remove the contact named Casey Morgan.",
+                    "requested_action": "remove_contact",
+                    "target_identifier": "Casey Morgan",
+                    "contact_lookup_available": False,
+                    "contact_removal_available": False,
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "required_original_tools": [
+                        "contact_removal",
+                        "contact_lookup",
+                    ],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "I do not have access to remove or search contacts, so I "
+                        "cannot safely remove the contact identified by Casey Morgan."
                     ),
                     "abstain_reason": "missing_required_original_tool",
                 },

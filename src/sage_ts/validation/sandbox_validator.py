@@ -316,6 +316,39 @@ def _recommendation_mentions_fact(recommendation: str, fact: str) -> bool:
     return any(all(token in text for token in group) for group in groups if group)
 
 
+def _recommendation_states_capability_deficit(
+    recommendation: str,
+    capability: str,
+) -> bool:
+    """Require an availability deficit to be tied to its named capability.
+
+    A generic consequence such as ``cannot remove`` is not evidence that the
+    removal capability itself is absent. Splitting causal clauses prevents a
+    sentence about missing contact search from being accepted as an explanation
+    for missing contact removal merely because the final action is also named.
+    """
+
+    clauses = re.split(
+        r"[;.!?]+|\b(?:because|so|therefore|thus|since)\b",
+        recommendation.lower(),
+    )
+    for clause in clauses:
+        normalized = re.sub(r"[^a-z0-9]+", " ", clause).strip()
+        if not normalized or not _recommendation_mentions_fact(normalized, capability):
+            continue
+        if re.search(
+            r"\b(?:missing|unavailable|absent|lacking|lack|need|needs|needed|"
+            r"require|requires|required)\b",
+            normalized,
+        ) or re.search(
+            r"\b(?:no access|not available|do not have|don t have|does not have|"
+            r"doesn t have)\b",
+            normalized,
+        ):
+            return True
+    return False
+
+
 def _recommendation_expresses_deficit(recommendation: str) -> bool:
     """Require abstention prose to state that a prerequisite is not satisfied."""
 
@@ -476,6 +509,20 @@ def _raw_structured_abstention_errors(
                     f"{label}_raw_final_recommendation_missing_facts:"
                     f"{','.join(missing_facts)}"
                 )
+            if expected_reason == "missing_required_original_tool":
+                unexplained_capabilities = [
+                    fact
+                    for fact in _required_recommendation_facts(expected)
+                    if not _recommendation_states_capability_deficit(
+                        recommendation,
+                        fact,
+                    )
+                ]
+                if unexplained_capabilities:
+                    errors.append(
+                        f"{label}_raw_final_recommendation_missing_capability_"
+                        f"deficits:{','.join(unexplained_capabilities)}"
+                    )
     elif (
         recommendation != str(expected.get("final_answer_recommendation") or "").strip()
     ):
@@ -560,6 +607,15 @@ def _blind_abstention_result_errors(
         errors.append(f"{label}_final_recommendation_fact")
     if recommendation and not _recommendation_expresses_deficit(recommendation):
         errors.append(f"{label}_final_recommendation_deficit_semantics")
+    if (
+        recommendation
+        and expected_reason == "missing_required_original_tool"
+        and not _recommendation_states_capability_deficit(
+            recommendation,
+            required_fact,
+        )
+    ):
+        errors.append(f"{label}_final_recommendation_capability_deficit")
     return tuple(errors)
 
 
@@ -761,6 +817,49 @@ def _validate_blind_abstention_properties(
                             f"blind_property_{index}_missing_capability_"
                             f"{capability_index}_and_target",
                             combined_actual,
+                            required_fact=capability,
+                            expected_reason="missing_required_original_tool",
+                            require_original_tool_fact=True,
+                        )
+                    )
+
+        boolean_requirements = [
+            (capability, boolean_inputs.get(capability, ()))
+            for capability in required_items
+            if boolean_inputs.get(capability)
+        ]
+        if len(boolean_requirements) >= 2:
+            all_missing_variant = dict(inputs)
+            for _capability, field_names in boolean_requirements:
+                for field_name in field_names:
+                    all_missing_variant[field_name] = False
+            try:
+                all_missing_actual = function(**all_missing_variant)
+            except Exception as exc:
+                errors.append(
+                    f"blind_property_{index}_all_boolean_capabilities_error:"
+                    f"{type(exc).__name__}"
+                )
+            else:
+                expected_missing = {item[0] for item in boolean_requirements}
+                actual_missing = (
+                    set(_semantic_labels(all_missing_actual.get("missing_information")))
+                    if isinstance(all_missing_actual, dict)
+                    else set()
+                )
+                if actual_missing != expected_missing:
+                    errors.append(
+                        f"blind_property_{index}_all_boolean_capabilities_"
+                        "missing_information"
+                    )
+                for capability_index, (capability, _fields) in enumerate(
+                    boolean_requirements
+                ):
+                    errors.extend(
+                        _blind_abstention_result_errors(
+                            f"blind_property_{index}_all_boolean_capabilities_"
+                            f"{capability_index}",
+                            all_missing_actual,
                             required_fact=capability,
                             expected_reason="missing_required_original_tool",
                             require_original_tool_fact=True,

@@ -2794,6 +2794,27 @@ def test_verifier_requires_complete_trajectory_for_every_task(
         )
 
 
+def test_json_comparison_accepts_persisted_tuple_as_json_array() -> None:
+    """Evaluator tuples must round-trip through JSON without losing integrity."""
+
+    persisted = {
+        "context_groups": [["christmas"], ["day", "days"]],
+    }
+    recomputed = {
+        "context_groups": (("christmas",), ("day", "days")),
+    }
+
+    assert publication_verifier._json_values_equal(persisted, recomputed)
+    assert not publication_verifier._json_values_equal(
+        persisted,
+        {"context_groups": (("christmas",), ("day", "weeks"))},
+    )
+    assert not publication_verifier._json_values_equal(
+        persisted,
+        {"context_groups": (("christmas",),)},
+    )
+
+
 def test_verifier_rejects_trajectory_backed_v9_outcome_corruption(
     tmp_path: Path,
 ) -> None:

@@ -958,7 +958,7 @@ def _working_overlap_path_evidence(
     expected_versions: dict[str, int] = {}
     versions_valid = bool(
         isinstance(selection_versions, dict)
-        and set(selection_versions) == set(expected_tools)
+        and set(expected_tools).issubset(selection_versions)
     )
     if isinstance(selection_versions, dict):
         for tool_name in expected_tools:
@@ -992,17 +992,18 @@ def _working_overlap_path_evidence(
             isinstance(row, dict)
             and row.get("exception_type") is None
             and visible is not None
-            and set(visible) == set(expected_tools)
+            and set(expected_tools).issubset(visible)
             and attempted == list(expected_tools)
             and called == list(expected_tools)
             and isinstance(versions, dict)
-            and set(versions) == set(expected_tools)
+            and set(versions) == set(visible)
         )
 
     trajectory_path_present = bool(
         isinstance(trajectory_row, dict)
-        and set(trajectory_row.get("generated_tools_visible", ()))
-        == set(expected_tools)
+        and set(expected_tools).issubset(
+            trajectory_row.get("generated_tools_visible", ())
+        )
         and tuple(trajectory_row.get("generated_tools_attempted", ())) == expected_tools
         and tuple(trajectory_row.get("generated_tools_called", ())) == expected_tools
     )
@@ -3840,8 +3841,22 @@ def _verify_frozen_transfer(
     )
     if trajectory_error is not None:
         reasons.append("transfer_trajectory_integrity_failed")
+    # Live development-transfer runs keep each immutable runtime manifest at
+    # the arm root, while older fixtures colocate it with result artifacts.
+    # Accept only those two exact layouts; both bind to the already-verified
+    # arm subtree and neither searches outside it.
+    control_runtime_dir = (
+        control_dir
+        if (control_dir / "sage_ts_run_manifest.json").is_file()
+        else run_root / "control"
+    )
+    candidate_runtime_dir = (
+        candidate_dir
+        if (candidate_dir / "sage_ts_run_manifest.json").is_file()
+        else run_root / "candidate"
+    )
     matched_runtimes = _strict_run_verifier._verify_matched_policy_runtimes(
-        control_dir, candidate_dir
+        control_runtime_dir, candidate_runtime_dir
     )
     _strict_run_verifier._verify_no_scenario_transform_failures(candidate_dir)
     control_rows = _result_rows(control_dir)

@@ -2093,6 +2093,9 @@ def _model_authored_final_repair_directive(
             "When contact_lookup is missing, the terminal recommendation must "
             "plainly say that search-contact access is unavailable, that removal "
             "cannot safely proceed, and include the visible target_identifier. "
+            "When contact_removal is missing, it must instead say that "
+            "remove-contact access is unavailable. When both are missing, it must "
+            "name both deficits. Never report an available capability as absent. "
             "After the missing-capability branch, a blank target must abstain for "
             "both contact update and contact removal, and more than one visible "
             "record for a non-UUID target must abstain as ambiguous. "
@@ -2621,7 +2624,7 @@ def _model_authored_contract_rules(request: ToolGenerationRequest) -> tuple[str,
             "Treat contact_lookup_available and contact_removal_available as authoritative host-grounded booleans describing the routed native inventory. Never derive or change them from user_request.",
             "This helper applies only to contact removal before record resolution. Ignore user_request and requested_action when constructing requirements and always set required_original_tools to contact_removal followed by contact_lookup.",
             "Treat target_identifier as an unresolved user-facing name or phone number, never as an already-resolved database record id. Both required capabilities remain required when the target is blank or visible_records_count is nonzero.",
-            "Compute missing capabilities from the two matching availability booleans. Missing capabilities take priority over blank-target and ambiguity checks. For a missing contact_lookup, preserve the visible target_identifier and recommend: 'I do not have access to search contacts, so I cannot safely remove the contact identified by <target_identifier>.' Use 'the requested contact' only when target_identifier is blank.",
+            "Compute missing capabilities from the two matching availability booleans. Missing capabilities take priority over blank-target and ambiguity checks. Preserve the visible target_identifier, using 'the requested contact' only when it is blank. Use distinct recommendations keyed by the computed missing list: missing contact_lookup only says 'I do not have access to search contacts'; missing contact_removal only says 'I do not have access to remove contacts'; both missing says 'I do not have access to remove or search contacts'. Every branch must also say removal cannot safely proceed and identify the visible target. Never claim that an available capability is unavailable.",
             "On every abstention set safe_next_action to ask_user_or_abstain. A blank target with no missing capability uses missing_target_identifier; more than one visible record with no missing capability uses ambiguous_target.",
             "Only when capabilities, target, and uniqueness are ready may should_abstain be false, missing_information and abstain_reason be empty, safe_next_action be continue_with_original_tool, and final_answer_recommendation be empty.",
             "Never call a native tool and never guess or manufacture a contact identifier.",
@@ -3539,8 +3542,10 @@ def _model_authored_repair_prompt(
         "order: missing capability, blank target, multiple matches, then safe "
         "continue. Every branch must return all six public output fields. Preserve "
         "the normalized required capability order. Recommendations must state the "
-        "missing fact and a need/cannot/required deficit; copy the exact public "
-        "example wording where an exact expected object is shown. "
+        "actual missing capability and a need/cannot/required deficit. Use separate "
+        "search-only, removal-only, and both-missing recommendation branches; never "
+        "describe a capability whose Boolean is true as unavailable. Copy the exact "
+        "public example wording where an exact expected object is shown. "
         if request.suggested_tool_name == "assess_contact_removal_readiness"
         else ""
     )
