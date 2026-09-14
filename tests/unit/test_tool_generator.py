@@ -764,6 +764,21 @@ def test_validation_abstention_repair_uses_compact_code_specific_cegis() -> None
     assert hidden_task not in analysis_prompt + prompt
     assert hidden_answer not in analysis_prompt + prompt
 
+    completer.requests.clear()
+    generator.repair_candidates(
+        request,
+        rejected,
+        (*errors, "repair_stagnation_duplicate_candidate"),
+    )
+    assert len(completer.requests) == 1
+    clean_room_request = completer.requests[0]
+    assert "clean-room" in clean_room_request.system
+    assert "clean-room replacement" in clean_room_request.user
+    assert '"repair_mode": "clean_room_after_duplicate"' in (clean_room_request.user)
+    assert '"current_candidate": null' in clean_room_request.user
+    assert "return {}" not in clean_room_request.user
+    assert '"focused_public_failure"' in clean_room_request.user
+
 
 @pytest.mark.parametrize(
     ("code_suffix", "errors", "prohibited_token"),
@@ -957,6 +972,17 @@ def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
     assert "same executable code and the same sanitized validation frontier" in (
         stagnant_directive
     )
+
+    stagnant_prompt = _model_authored_repair_prompt(
+        request,
+        rejected,
+        (*errors, "repair_stagnation_duplicate_candidate"),
+    )
+    assert stagnant_prompt.startswith("Synthesize a clean-room replacement")
+    assert '"current_candidate": null' in stagnant_prompt
+    assert '"repair_mode": "clean_room_after_duplicate"' in stagnant_prompt
+    assert rejected.code not in stagnant_prompt
+    assert '"focused_public_failure"' in stagnant_prompt
 
 
 def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:

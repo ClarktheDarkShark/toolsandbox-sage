@@ -109,7 +109,7 @@ LIFECYCLE_DEVELOPMENT_MANIFEST_TYPES = frozenset(
     }
 )
 PINNED_LIFECYCLE_V1_CONTRACT_INDEX_SHA256 = (
-    "ccdcf421fcfbc30e19f630eccdac39ed99ee93864b5229c42152fe6cac37a3bf"
+    "5c53f48884ae7b02476df98a62cea47bdeb416dc8b04a36805660d62d2a9d72c"
 )
 PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
     "prepare_reminder_creation_args": {
@@ -140,10 +140,10 @@ PINNED_LIFECYCLE_V1_CONTRACTS: dict[str, dict[str, Any]] = {
         ),
         "canonical_key": "validation:prepare_safe_action_or_abstain",
         "contract_hash": (
-            "034fc73d0ab157a7db934c5c87f66c20ff4d2c3e5b1de8b9d14839a1b75ca1a7"
+            "74b6ecf95169da106c92ddcf4bc8a843725bcc4741cb49dd96a5386550a6df01"
         ),
         "binding_blob_sha256": (
-            "cdae64ebfab7200a0385f09c100aa447ab97972235d241fe5ddded61c9160321"
+            "eb9559a2f77e46a8b7b4228a68c0cf702be151360f54fcb3b55e8284b3a9aa2a"
         ),
     },
     "relative_day_time_to_timestamp": {

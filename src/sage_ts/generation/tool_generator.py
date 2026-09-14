@@ -464,25 +464,32 @@ class ToolGenerator:
         """Return independently authored repairs for contract validation."""
 
         prompt = _model_authored_repair_prompt(request, rejected_tool, errors)
+        stagnating = "repair_stagnation_duplicate_candidate" in errors
         if _request_is_validation_abstention_helper(request):
             # Validation helpers are pure decision procedures. A compact,
             # code-specific plan followed by one complete implementation converges
             # more reliably than concatenating the generic generation prompt, a
             # contract analysis, the rejected candidate, and a second long final
             # directive. The unchanged validator remains the acceptance boundary.
-            prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
+            if not stagnating:
+                prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
             prompt += _model_authored_final_repair_directive(request, errors)
         else:
             prompt += self._contract_analysis_suffix(request)
             prompt += self._repair_analysis_suffix(request, rejected_tool, errors)
             prompt += _model_authored_final_repair_directive(request, errors)
+        system = (
+            "You synthesize a clean-room deterministic Python helper replacement. "
+            "Do not reproduce the omitted rejected implementation. Return valid "
+            "JSON only."
+            if _request_is_validation_abstention_helper(request) and stagnating
+            else "You repair rejected deterministic Python helper tools. Return valid "
+            "JSON only."
+        )
         response = self._complete(
             request,
             ChatRequest(
-                system=(
-                    "You repair rejected deterministic Python helper tools. "
-                    "Return valid JSON only."
-                ),
+                system=system,
                 user=prompt,
                 model=self.completer.model,
                 response_format_json=True,
@@ -1663,6 +1670,45 @@ def _minimal_validation_helper_candidate(
     }
 
 
+def _validation_helper_public_failure_focus(
+    request: ToolGenerationRequest,
+    errors: tuple[str, ...],
+    *,
+    strategy_number: int,
+) -> dict[str, object] | None:
+    """Select one model-visible failed case without exposing held-out values."""
+
+    public_cases = _model_visible_validation_helper_cases(request)
+    case_by_label = {
+        str(item["case_label"]): item
+        for item in public_cases
+        if isinstance(item.get("case_label"), str)
+    }
+    failed_labels: list[str] = []
+    for error in errors:
+        match = re.match(r"^((?:source|negative)_\d+)_", str(error))
+        if match and match.group(1) in case_by_label:
+            label = match.group(1)
+            if label not in failed_labels:
+                failed_labels.append(label)
+    if not failed_labels:
+        return None
+    focused_label = failed_labels[(max(1, strategy_number) - 1) % len(failed_labels)]
+    return {
+        "case_label": focused_label,
+        "case": case_by_label[focused_label],
+        "case_validator_feedback": [
+            error
+            for error in _sanitized_validation_helper_repair_errors(errors)
+            if error.startswith(focused_label + "_")
+        ],
+        "all_unresolved_public_case_labels": failed_labels,
+        "public_regression_case_labels": [
+            label for label in case_by_label if label not in failed_labels
+        ],
+    }
+
+
 def _validation_helper_repair_payload(
     request: ToolGenerationRequest,
     rejected_tool: GeneratedTool,
@@ -1672,6 +1718,7 @@ def _validation_helper_repair_payload(
 ) -> dict[str, object]:
     """Build the compact public CEGIS payload used by both repair stages."""
 
+    stagnating = "repair_stagnation_duplicate_candidate" in errors
     return {
         "required_tool_name": request.suggested_tool_name
         or rejected_tool.spec.tool_name,
@@ -1685,8 +1732,21 @@ def _validation_helper_repair_payload(
         "public_contract_rules": list(_model_authored_contract_rules(request)),
         "model_visible_public_cases": _model_visible_validation_helper_cases(request),
         "validator_feedback": list(_sanitized_validation_helper_repair_errors(errors)),
+        "focused_public_failure": _validation_helper_public_failure_focus(
+            request,
+            errors,
+            strategy_number=strategy_number,
+        ),
+        "repair_mode": (
+            "clean_room_after_duplicate" if stagnating else "incremental_cegis"
+        ),
         "repair_strategy": strategy_number,
-        "current_candidate": _minimal_validation_helper_candidate(rejected_tool),
+        # Once both code and validation frontier repeat, showing the same source
+        # again anchors a deterministic model to the failed predicates. The exact
+        # omitted candidate remains preserved in the append-only repair journal.
+        "current_candidate": (
+            None if stagnating else _minimal_validation_helper_candidate(rejected_tool)
+        ),
     }
 
 
@@ -1749,8 +1809,17 @@ def _model_authored_validation_helper_repair_prompt(
         errors,
         strategy_number=strategy_number,
     )
+    clean_room = payload["repair_mode"] == "clean_room_after_duplicate"
     return (
-        "Repair one rejected pure deterministic validation helper. Return exactly "
+        (
+            "Synthesize a clean-room replacement for a stagnating pure deterministic "
+            "validation helper. The repeated implementation is intentionally omitted; "
+            "derive new control flow only from the model-visible public contract. "
+            if clean_room
+            else "Repair one rejected pure deterministic validation helper. "
+        )
+        + "Resolve the focused public failure first, then replay every model-visible "
+        "public case as a regression check. Return exactly "
         "one JSON object with top-level keys spec and code_lines; do not return a "
         "candidates array. spec must contain tool_name, family, description, inputs, "
         "output_annotation, and output_schema. code_lines must contain one complete "

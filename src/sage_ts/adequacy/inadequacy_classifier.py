@@ -146,6 +146,24 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             ),
             ToolExample(
                 {
+                    "user_request": "Update the uniquely resolved contact.",
+                    "requested_action": "modify_contact",
+                    "target_identifier": ("11111111-1111-1111-1111-111111111111"),
+                    "required_original_tools": ["modify_contact"],
+                    "available_original_tools": ["modify_contact"],
+                    "visible_records_count": 1,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["modify_contact"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
+            ),
+            ToolExample(
+                {
                     "user_request": "Remove the contact with phone +15550100",
                     "requested_action": "remove_contact",
                     "target_identifier": "+15550100",
@@ -187,6 +205,28 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
             ),
             ToolExample(
                 {
+                    "user_request": "Update the matching contact.",
+                    "requested_action": "modify_contact",
+                    "target_identifier": "Alex Morgan",
+                    "required_original_tools": ["modify_contact"],
+                    "available_original_tools": ["modify_contact"],
+                    "visible_records_count": 2,
+                },
+                {
+                    "should_abstain": True,
+                    "missing_information": ["ambiguous_target"],
+                    "required_original_tools": ["modify_contact"],
+                    "safe_next_action": "ask_user_or_abstain",
+                    "final_answer_recommendation": (
+                        "The target is ambiguous because multiple contact "
+                        "matches are visible."
+                    ),
+                    "abstain_reason": "ambiguous_target",
+                },
+                negative_applicability=True,
+            ),
+            ToolExample(
+                {
                     "user_request": "Which reminder was due yesterday?",
                     "requested_action": "relative_time_search",
                     "target_identifier": "",
@@ -204,6 +244,33 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                         "to resolve the relative time in that request."
                     ),
                     "abstain_reason": "missing_required_original_tool",
+                },
+            ),
+            ToolExample(
+                {
+                    "user_request": "Which reminder is due tomorrow?",
+                    "requested_action": "relative_time_search",
+                    "target_identifier": "",
+                    "required_original_tools": [
+                        "reminder_lookup",
+                        "current_time",
+                    ],
+                    "available_original_tools": [
+                        "reminder_lookup",
+                        "current_time",
+                    ],
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": [
+                        "reminder_lookup",
+                        "current_time",
+                    ],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
                 },
             ),
             ToolExample(
@@ -252,6 +319,24 @@ def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObserva
                     "abstain_reason": "missing_required_original_tool",
                 },
                 negative_applicability=True,
+            ),
+            ToolExample(
+                {
+                    "user_request": ("Send the visible note to +12025550147."),
+                    "requested_action": "send a message",
+                    "target_identifier": "+12025550147",
+                    "required_original_tools": "message_send",
+                    "available_original_tools": "message_send",
+                    "visible_records_count": 0,
+                },
+                {
+                    "should_abstain": False,
+                    "missing_information": [],
+                    "required_original_tools": ["message_send"],
+                    "safe_next_action": "continue_with_original_tool",
+                    "final_answer_recommendation": "",
+                    "abstain_reason": "",
+                },
             ),
         ),
         generation_allowed=True,

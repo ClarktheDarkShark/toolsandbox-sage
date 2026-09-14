@@ -40,37 +40,6 @@ def _dedupe_strings(values: Any) -> list[str]:
     return deduped
 
 
-def _append_unique(values: list[str], value: str) -> None:
-    if value not in values:
-        values.append(value)
-
-
-def _looks_like_personal_location_lookup(value: Any) -> bool:
-    """Recognize a current/self location lookup from compositional terms."""
-
-    text = str(value or "").lower().replace("_", " ").replace("-", " ")
-    words = set(re.findall(r"[a-z]+", text))
-    location_subject = bool(words & {"city", "location", "place", "town", "where"})
-    personal_context = bool(words & {"current", "here", "i", "me", "my"})
-    lookup_intent = bool(
-        words
-        & {
-            "determine",
-            "find",
-            "get",
-            "identify",
-            "locate",
-            "lookup",
-            "what",
-            "where",
-            "which",
-        }
-    )
-    return (
-        location_subject and personal_context and (lookup_intent or "current" in words)
-    )
-
-
 _DEVICE_SETTING_SERVICES = (
     (
         re.compile(r"\b(?:cellular(?:\s+service)?|mobile\s+data)\b"),
@@ -478,200 +447,6 @@ def _normalize_composite_workflow_output(
     elif abstain_reason and not normalized.get("safety_notes"):
         normalized["safety_notes"] = "abstain; no safe unique action"
 
-    return normalized
-
-
-def _normalize_validation_abstention_output(
-    value: dict[str, Any],
-    *,
-    inputs: dict[str, Any] | None,
-) -> dict[str, Any]:
-    def looks_like_phone(raw: Any) -> bool:
-        text = str(raw or "").strip()
-        digits = re.findall(r"\d", text)
-        return len(digits) >= 7 and (
-            text.startswith("+") or bool(re.search(r"[\d][\d\s().-]{6,}", text))
-        )
-
-    def to_capability(raw: Any) -> str:
-        text = str(raw or "").strip()
-        if text.startswith("functions."):
-            text = text.split(".", 1)[1]
-        normalized_text = text.lower().replace("-", "_").replace(" ", "_")
-        mapping = {
-            "search_contacts": "contact_lookup",
-            "remove_contact": "contact_removal",
-            "delete_contact": "contact_removal",
-            "modify_contact": "contact_update",
-            "update_contact": "contact_update",
-            "search_messages": "message_lookup",
-            "send_message": "message_send",
-            "send_message_with_phone_number": "message_send",
-            "search_reminder": "reminder_lookup",
-            "remove_reminder": "reminder_removal",
-            "modify_reminder": "reminder_update",
-            "add_reminder": "reminder_creation",
-            "get_current_timestamp": "current_time",
-            "current_timestamp": "current_time",
-            "current_time": "current_time",
-            "get_current_location": "location_lookup",
-            "get_current_city": "location_lookup",
-            "find_current_city": "location_lookup",
-        }
-        mapped = mapping.get(text, mapping.get(normalized_text))
-        if mapped:
-            return mapped
-        if _looks_like_personal_location_lookup(normalized_text):
-            return "location_lookup"
-        return text
-
-    normalized = dict(value)
-    missing_information = [
-        to_capability(item)
-        for item in _dedupe_strings(normalized.get("missing_information"))
-    ]
-    required_original_tools = [
-        to_capability(item)
-        for item in _dedupe_strings(normalized.get("required_original_tools"))
-    ]
-    if not required_original_tools and inputs:
-        required_original_tools = [
-            to_capability(item)
-            for item in _dedupe_strings(inputs.get("required_original_tools"))
-        ]
-    available_original_tools = (
-        [
-            to_capability(item)
-            for item in _dedupe_strings(inputs.get("available_original_tools"))
-        ]
-        if inputs
-        else []
-    )
-    action = to_capability((inputs or {}).get("requested_action"))
-    user_request_lower = str((inputs or {}).get("user_request") or "").lower()
-    target = str((inputs or {}).get("target_identifier") or "").strip()
-    message_send_request = action == "message_send" or (
-        bool(target)
-        and any(
-            token in user_request_lower
-            for token in ("send", "text", "message", "ask", "tell")
-        )
-    )
-    if message_send_request:
-        if "message_send" not in required_original_tools:
-            required_original_tools.append("message_send")
-        if target and not looks_like_phone(target):
-            _append_unique(required_original_tools, "contact_lookup")
-    if action == "location_lookup" and "location_lookup" not in required_original_tools:
-        required_original_tools.append("location_lookup")
-    if not required_original_tools and _looks_like_personal_location_lookup(
-        user_request_lower
-    ):
-        action = "location_lookup"
-        required_original_tools.append("location_lookup")
-    relative_time_search_request = bool(
-        any(
-            token in user_request_lower
-            for token in ("reminder", "todo", "to-do", "message")
-        )
-        and re.search(
-            r"\b(?:yesterday|today|tomorrow|tonight|upcoming|later(?:\s+today)?|"
-            r"next\s+(?:reminder|todo|to-do|message))\b",
-            user_request_lower,
-        )
-        and not re.search(
-            r"\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}" r"(?:[/-]\d{2,4})?)\b",
-            user_request_lower,
-        )
-        and not re.search(
-            r"\b(?:january|february|march|april|may|june|july|august|"
-            r"september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?"
-            r"(?:,?\s+\d{4})?\b",
-            user_request_lower,
-        )
-    )
-    if relative_time_search_request:
-        if any(token in user_request_lower for token in ("reminder", "todo", "to-do")):
-            _append_unique(required_original_tools, "reminder_lookup")
-        elif "message" in user_request_lower:
-            _append_unique(required_original_tools, "message_lookup")
-        _append_unique(required_original_tools, "current_time")
-    missing_required_tools = [
-        tool for tool in required_original_tools if tool not in available_original_tools
-    ]
-    for tool in missing_required_tools:
-        _append_unique(missing_information, tool)
-    try:
-        visible_records_count = int((inputs or {}).get("visible_records_count") or 0)
-    except (TypeError, ValueError):
-        visible_records_count = 0
-    stable_id_pattern = re.compile(
-        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
-        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-    )
-    id_required_actions = {
-        "contact_removal",
-        "contact_update",
-        "reminder_removal",
-        "reminder_update",
-        "remove_contact",
-        "modify_contact",
-        "remove_reminder",
-        "modify_reminder",
-    }
-    if action in id_required_actions:
-        target_is_stable_id = bool(stable_id_pattern.match(target))
-        if not missing_required_tools and (
-            not target or (visible_records_count <= 0 and not target_is_stable_id)
-        ):
-            _append_unique(missing_information, "target_identifier")
-    normalized["missing_information"] = missing_information
-    normalized["required_original_tools"] = required_original_tools
-
-    should_abstain = bool(normalized.get("should_abstain"))
-    missing_lower = {item.lower() for item in missing_information}
-    if missing_information:
-        should_abstain = True
-    normalized["should_abstain"] = should_abstain
-
-    if should_abstain:
-        reason = str(normalized.get("abstain_reason") or "").strip()
-        final_answer_recommendation = str(
-            normalized.get("final_answer_recommendation") or ""
-        ).strip()
-        if missing_required_tools:
-            reason = "missing_required_original_tool"
-        elif "target_identifier" in missing_lower or "target" in missing_lower:
-            reason = "missing_target_identifier"
-        elif missing_information:
-            reason = "missing_required_original_tool"
-        normalized["safe_next_action"] = "ask_user_or_abstain"
-        normalized["abstain_reason"] = reason or "insufficient_information"
-        if action == "location_lookup" and "location_lookup" in missing_lower:
-            final_answer_recommendation = (
-                "I cannot determine what city you are in because I do not have "
-                "access to your current location, GPS, or latitude and longitude "
-                "coordinates."
-            )
-        elif message_send_request and "contact_lookup" in missing_lower:
-            final_answer_recommendation = (
-                "The recipient cannot be resolved to a phone number with the "
-                "available information/tools."
-            )
-        elif "current_time" in missing_lower:
-            final_answer_recommendation = (
-                "I need the current date and time, or an explicit date, to "
-                "resolve the relative time in that request."
-            )
-        normalized["final_answer_recommendation"] = (
-            final_answer_recommendation
-            or "I do not have enough information to complete the action."
-        )
-    else:
-        normalized["missing_information"] = []
-        normalized["safe_next_action"] = "continue_with_original_tool"
-        normalized["final_answer_recommendation"] = ""
-        normalized["abstain_reason"] = ""
     return normalized
 
 
@@ -1434,7 +1209,11 @@ def normalize_generated_tool_output(
             return _normalize_composite_workflow_output(value, inputs=inputs)
         return value
     if tool.spec.family == ToolFamily.VALIDATION_ABSTENTION_HELPER:
-        return _normalize_validation_abstention_output(value, inputs=inputs)
+        # A validation helper's semantic decision is the generated tool's result.
+        # Rewriting it here can conceal a faulty tool from the actor and falsely
+        # attribute framework-authored behavior to tool generation. Shape and
+        # semantics are enforced by the unchanged pre-promotion validator instead.
+        return value
     if tool.spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR:
         return _normalize_derived_value_output(value, inputs=inputs)
     if tool.spec.family != ToolFamily.SEARCH_FILTER_RANKING_HELPER:

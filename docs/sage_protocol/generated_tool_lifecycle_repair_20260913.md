@@ -56,27 +56,35 @@ matched policy-wrapper-without-generated-tools control, not the untouched
 upstream ToolSandbox actor. Protocol and per-arm manifests record this runtime
 identity, and strict verification rejects either arm if it drifts.
 
-Generation prompts use synthetic contract examples. The cases labeled held-out
-are internal validation and model-selection data, not an unseen test set. Their
-values and expected outputs are removed before prompt construction, and the
-exact prompt is audited immediately before model inference. Repair queues are reduced to public
+Generation prompts use synthetic contract examples. The public examples cover
+each declared decision branch: missing capability, named-recipient dependency,
+missing target, ambiguous target, read-only target exemption, and safe
+continuation. They are task-independent developer-authored contract cases, not
+benchmark answers. The separate cases labeled held-out are internal validation
+and model-selection data, not an unseen test set. Their values and expected
+outputs are removed before prompt construction, and the exact prompt is audited
+immediately before model inference. Repair queues are reduced to public
 operational counts and task-independent reason codes; recursive guards reject
 scenario/task identifiers, expected or reference answers, target state,
 evaluator traces, outcome values, and success-flip values at persistence,
 request-construction, and prompt boundaries.
 
-For structured validation helpers, each bounded repair attempt uses a compact,
-counterexample-guided two-stage prompt. A separate model call first traces the
-current best implementation against labeled, model-visible synthetic cases and
-returns a schema-checked decision plan. A second call writes one complete
-replacement. Both stages receive the same minimal executable specification,
-current code, public input/output contract, public cases, and public validation
-frontier. Held-out and blind checks appear only as value-free invariant labels.
-The plan must order normalization, inferred public prerequisites,
-missing-capability checks, read-only versus mutating classification, target
-checks, and ambiguity checks before code is authored. Later attempts use the
-best validation frontier observed so far. This replaces the earlier duplicated
-general repair prompt; it does not relax or change the full acceptance validator.
+For structured validation helpers, bounded repair uses compact public
+counterexample-guided synthesis. Each ordinary attempt first traces the current
+best implementation against labeled, model-visible synthetic cases and returns
+a schema-checked decision plan; a second model call writes one complete
+replacement. The prompt identifies one unresolved public case to fix first and
+lists already-passing public cases as regression guards. Both stages receive the
+same minimal executable specification, current code, public input/output
+contract, public cases, and public validation frontier. Held-out and blind
+checks appear only as value-free invariant labels. The plan must order
+normalization, inferred public prerequisites, missing-capability checks,
+read-only versus mutating classification, target checks, and ambiguity checks
+before code is authored. Later attempts use the best validation frontier
+observed so far. If both code and frontier repeat, the next attempt omits the
+rejected code and asks the model for a clean-room implementation from the public
+contract in one call, avoiding deterministic anchoring on the same failed
+predicates. This does not relax or change the full acceptance validator.
 
 Every returned repair candidate is persisted before any lifecycle action in the
 append-only `post_deployment_repair_candidates.jsonl` journal. Each record binds
@@ -108,15 +116,19 @@ dispatch the chosen visible name, never to choose, filter, or force a tool.
 `prepare_safe_action_or_abstain` is the historical motivating failure. Its
 public contract already required the tool to distinguish a missing search
 capability from a missing target identifier. The historical implementation
-returned a fixed missing-search answer, and an old validator could normalize
-that wrong raw output before checking it.
+returned a fixed missing-search answer. A runtime semantic normalizer then
+rewrote some incorrect decisions before the actor observed them, concealing the
+generated tool's failure and falsely attributing framework-authored behavior to
+the tool. Validation-helper output is now preserved exactly; the independent
+pre-promotion validator, not runtime rewriting, is responsible for rejecting
+bad semantics.
 
 During disclosed development, the public missing-target example was aligned to
 name `target_identifier` explicitly, as the existing raw semantic gate already
 required. This is a developer-authored consistency repair to the synthetic
 contract, not benchmark feedback or a benchmark-specific answer.
 
-The current validation gate checks raw semantic behavior before normalization,
+The current validation gate checks raw semantic behavior,
 including held-out and negative-applicability cases. That historical candidate
 is now rejected before deployment. A deterministic prospective lifecycle test
 also loads the historical accepted version, detects its public-contract

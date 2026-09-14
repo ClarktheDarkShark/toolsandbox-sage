@@ -508,7 +508,7 @@ def test_generated_kwargs_normalization_removes_null_optional_values() -> None:
     }
 
 
-def test_safe_abstention_normalization_rejects_unresolved_side_effect_target() -> None:
+def test_safe_abstention_normalization_preserves_raw_unsafe_decision() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(
             tool_name="prepare_safe_action_or_abstain",
@@ -556,14 +556,10 @@ def test_safe_abstention_normalization_rejects_unresolved_side_effect_target() -
         },
     )
 
-    assert normalized["should_abstain"] is True
-    assert normalized["missing_information"] == ["target_identifier"]
-    assert normalized["abstain_reason"] == "missing_target_identifier"
+    assert normalized == raw
 
 
-def test_safe_abstention_normalization_preserves_missing_original_tool_priority() -> (
-    None
-):
+def test_safe_abstention_normalization_preserves_raw_missing_tool_decision() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(
             tool_name="prepare_safe_action_or_abstain",
@@ -616,16 +612,10 @@ def test_safe_abstention_normalization_preserves_missing_original_tool_priority(
         },
     )
 
-    assert normalized["should_abstain"] is True
-    assert normalized["missing_information"] == ["contact_lookup"]
-    assert normalized["abstain_reason"] == "missing_required_original_tool"
-    assert normalized["final_answer_recommendation"] == (
-        "I do not have enough information to identify the contact because "
-        "contact search is unavailable."
-    )
+    assert normalized == raw
 
 
-def test_safe_abstention_normalization_forces_current_city_location_lookup() -> None:
+def test_safe_abstention_normalization_preserves_raw_location_decision() -> None:
     tool = GeneratedTool(
         spec=ToolSpec(
             tool_name="prepare_safe_action_or_abstain",
@@ -676,14 +666,7 @@ def test_safe_abstention_normalization_forces_current_city_location_lookup() -> 
         },
     )
 
-    assert normalized["should_abstain"] is True
-    assert normalized["missing_information"] == ["location_lookup"]
-    assert normalized["required_original_tools"] == ["location_lookup"]
-    assert normalized["abstain_reason"] == "missing_required_original_tool"
-    assert normalized["final_answer_recommendation"] == (
-        "I cannot determine what city you are in because I do not have access "
-        "to your current location, GPS, or latitude and longitude coordinates."
-    )
+    assert normalized == raw
 
 
 def _relative_time_safe_abstention_tool() -> GeneratedTool:
@@ -723,17 +706,18 @@ def _relative_time_safe_abstention_tool() -> GeneratedTool:
     )
 
 
-def test_safe_abstention_normalization_requires_clock_for_relative_search() -> None:
+def test_safe_abstention_normalization_does_not_invent_clock_requirement() -> None:
+    raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
     normalized = normalize_generated_tool_output(
         _relative_time_safe_abstention_tool(),
-        {
-            "should_abstain": False,
-            "missing_information": [],
-            "required_original_tools": [],
-            "safe_next_action": "continue_with_original_tool",
-            "final_answer_recommendation": "",
-            "abstain_reason": "",
-        },
+        raw,
         inputs={
             "user_request": "Which reminder was due yesterday?",
             "requested_action": "relative_time_search",
@@ -744,30 +728,21 @@ def test_safe_abstention_normalization_requires_clock_for_relative_search() -> N
         },
     )
 
-    assert normalized["should_abstain"] is True
-    assert normalized["required_original_tools"] == [
-        "reminder_lookup",
-        "current_time",
-    ]
-    assert normalized["missing_information"] == ["current_time"]
-    assert normalized["abstain_reason"] == "missing_required_original_tool"
-    assert normalized["final_answer_recommendation"] == (
-        "I need the current date and time, or an explicit date, to resolve the "
-        "relative time in that request."
-    )
+    assert normalized == raw
 
 
-def test_safe_abstention_normalization_requires_clock_for_standalone_later() -> None:
+def test_safe_abstention_normalization_preserves_raw_standalone_later() -> None:
+    raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
     normalized = normalize_generated_tool_output(
         _relative_time_safe_abstention_tool(),
-        {
-            "should_abstain": False,
-            "missing_information": [],
-            "required_original_tools": [],
-            "safe_next_action": "continue_with_original_tool",
-            "final_answer_recommendation": "",
-            "abstain_reason": "",
-        },
+        raw,
         inputs={
             "user_request": "What's on my todo later?",
             "requested_action": "relative_time_search",
@@ -778,25 +753,21 @@ def test_safe_abstention_normalization_requires_clock_for_standalone_later() -> 
         },
     )
 
-    assert normalized["should_abstain"] is True
-    assert normalized["missing_information"] == ["current_time"]
-    assert normalized["final_answer_recommendation"] == (
-        "I need the current date and time, or an explicit date, to resolve the "
-        "relative time in that request."
-    )
+    assert normalized == raw
 
 
 def test_safe_abstention_allows_blank_target_when_relative_search_has_clock() -> None:
+    raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
     normalized = normalize_generated_tool_output(
         _relative_time_safe_abstention_tool(),
-        {
-            "should_abstain": False,
-            "missing_information": [],
-            "required_original_tools": [],
-            "safe_next_action": "continue_with_original_tool",
-            "final_answer_recommendation": "",
-            "abstain_reason": "",
-        },
+        raw,
         inputs={
             "user_request": "Which reminder was due yesterday?",
             "requested_action": "relative_time_search",
@@ -810,14 +781,7 @@ def test_safe_abstention_allows_blank_target_when_relative_search_has_clock() ->
         },
     )
 
-    assert normalized["should_abstain"] is False
-    assert normalized["missing_information"] == []
-    assert normalized["required_original_tools"] == [
-        "reminder_lookup",
-        "current_time",
-    ]
-    assert normalized["safe_next_action"] == "continue_with_original_tool"
-    assert normalized["final_answer_recommendation"] == ""
+    assert normalized == raw
 
 
 def test_generic_composite_abstention_clears_downstream_action() -> None:

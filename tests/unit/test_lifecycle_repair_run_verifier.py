@@ -679,9 +679,9 @@ def _promoted_registry_manifest() -> dict[str, object]:
             "validation": {
                 "accepted": True,
                 "errors": [],
-                "source_example_count": 2,
+                "source_example_count": 5,
                 "held_out_check_count": 2,
-                "negative_applicability_count": 2,
+                "negative_applicability_count": 3,
                 "runtime_smoke_passed": True,
             },
         }

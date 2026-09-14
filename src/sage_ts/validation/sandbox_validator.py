@@ -171,22 +171,46 @@ _FACT_PHRASE_GROUPS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("recipient", "phone number"),
         ("recipient", "resolve"),
     ),
-    "contact_removal": (("remove", "contact"), ("delete", "contact")),
-    "contact_update": (("update", "contact"), ("modify", "contact")),
+    "contact_removal": (
+        ("remove", "contact"),
+        ("delete", "contact"),
+        ("contact", "removal"),
+    ),
+    "contact_update": (
+        ("update", "contact"),
+        ("modify", "contact"),
+        ("contact", "update"),
+    ),
     "message_lookup": (
         ("message", "lookup"),
         ("message", "search"),
         ("message", "history"),
     ),
-    "message_send": (("send", "message"), ("text", "recipient")),
+    "message_send": (
+        ("send", "message"),
+        ("text", "recipient"),
+        ("message", "send"),
+    ),
     "reminder_lookup": (
         ("reminder", "lookup"),
         ("reminder", "search"),
         ("find", "reminder"),
     ),
-    "reminder_removal": (("remove", "reminder"), ("delete", "reminder")),
-    "reminder_update": (("update", "reminder"), ("modify", "reminder")),
-    "reminder_creation": (("create", "reminder"), ("add", "reminder")),
+    "reminder_removal": (
+        ("remove", "reminder"),
+        ("delete", "reminder"),
+        ("reminder", "removal"),
+    ),
+    "reminder_update": (
+        ("update", "reminder"),
+        ("modify", "reminder"),
+        ("reminder", "update"),
+    ),
+    "reminder_creation": (
+        ("create", "reminder"),
+        ("add", "reminder"),
+        ("reminder", "creation"),
+    ),
     "current_time": (
         ("current", "time"),
         ("current", "date"),
@@ -330,11 +354,15 @@ def _recommendation_expresses_deficit(recommendation: str) -> bool:
         r"(?:successfully )?complete\b",
         normalized,
     )
+    necessity_before_completion = re.search(
+        r"\b(?:is|are|was|were) (?:needed|required) (?:before|to)\b",
+        normalized,
+    )
     if (
         negated_deficit
         or contradicted_deficit
         or contradicted_complete_state
-        or contradicted_modal_completion
+        or (contradicted_modal_completion and not necessity_before_completion)
     ):
         return False
     tokens = set(ordered_tokens)

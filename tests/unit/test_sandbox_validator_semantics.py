@@ -17,6 +17,7 @@ from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
     _action_requires_target,
+    _recommendation_mentions_fact,
     validate_generated_tool,
 )
 
@@ -265,6 +266,17 @@ def test_validator_accepts_required_to_complete_as_deficit_recommendation() -> N
     assert result.accepted, result.errors
 
 
+def test_validator_accepts_required_before_actor_can_complete() -> None:
+    code = _GENERAL_IMPLEMENTATION.replace(
+        "'A target identifier is required.'",
+        "'A target identifier is required before I can complete the action.'",
+    )
+
+    result = validate_generated_tool(_abstention_tool(code), _examples())
+
+    assert result.accepted, result.errors
+
+
 @pytest.mark.parametrize("modal", ["can", "will"])
 def test_validator_rejects_required_lookup_completion_claim(modal: str) -> None:
     code = _GENERAL_IMPLEMENTATION.replace(
@@ -444,6 +456,24 @@ def test_canonical_read_only_action_aliases_do_not_require_targets(
     action: str,
 ) -> None:
     assert not _action_requires_target(action)
+
+
+@pytest.mark.parametrize(
+    "fact",
+    (
+        "contact_removal",
+        "contact_update",
+        "message_send",
+        "reminder_removal",
+        "reminder_update",
+        "reminder_creation",
+    ),
+)
+def test_canonical_capability_name_is_valid_recommendation_fact(fact: str) -> None:
+    assert _recommendation_mentions_fact(
+        f"The {fact} capability is unavailable.",
+        fact,
+    )
 
 
 def test_validator_exercises_remove_contact_target_and_ambiguity_properties() -> None:
