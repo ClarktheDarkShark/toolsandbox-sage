@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from sage_ts.adequacy.inadequacy_classifier import (
+    _next_weekday_timestamp_observation,
     _safe_action_or_abstain_observation,
 )
 from sage_ts.registry.store import RegistryStore
@@ -304,6 +305,18 @@ def _promoted_registry_manifest() -> dict[str, object]:
         }
     )
     tools[verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL] = target
+    working_path_evidence = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "docs"
+            / "sage_protocol"
+            / "fixtures"
+            / "paper_rep01_working_path_evidence.json"
+        ).read_text(encoding="utf-8")
+    )
+    tools[verify_lifecycle_repair_run.NEXT_WEEKDAY_TOOL_NAME] = working_path_evidence[
+        "tool_entries"
+    ][verify_lifecycle_repair_run.NEXT_WEEKDAY_TOOL_NAME]
     return {"tools": tools}
 
 
@@ -396,6 +409,7 @@ def _development_artifacts(
     order = tuple(spec["order"])
     safe_names = tuple(spec["roles"][spec["safe_role"]])
     working_overlap_names = tuple(spec["roles"]["working_generated_overlap"])
+    working_tool_paths = dict(spec["working_overlap_expected_tool_paths"])
     unrelated_preservation_names = tuple(spec["roles"]["unrelated_native_preservation"])
     trigger_name = safe_names[0]
     request_id = "prepare-safe-v1-after-1"
@@ -431,16 +445,15 @@ def _development_artifacts(
         if safe:
             visible = [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
         elif name in working_overlap_names:
-            visible = list(verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES)
+            visible = list(working_tool_paths[name])
         else:
             visible = []
         versions = {
             tool_name: (
-                1
-                if tool_name in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                2
+                if tool_name == verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                and name != trigger_name
                 else 1
-                if name == trigger_name
-                else 2
             )
             for tool_name in visible
         }
@@ -505,7 +518,7 @@ def _development_artifacts(
             generated_tools=(
                 (verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,)
                 if name in safe_names
-                else verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                else tuple(working_tool_paths[name])
                 if name in working_overlap_names
                 else ()
             ),
@@ -619,6 +632,18 @@ def _development_artifacts(
         final_entry,
         final_observation,
         validation_examples=final_observation.validation_examples,
+    )
+    successor_entry = RegistryStore(registry_dir).get(
+        verify_lifecycle_repair_run.NEXT_WEEKDAY_TOOL_NAME
+    )
+    assert successor_entry is not None
+    successor_observation = _next_weekday_timestamp_observation(
+        "development_synthetic_validation_contract"
+    )
+    ValidationContractBindingStore(registry_dir).persist(
+        successor_entry,
+        successor_observation,
+        validation_examples=successor_observation.validation_examples,
     )
     acceptance_event["validation_contract_hash"] = final_binding.contract_hash
     # Keep the historical local stream as a compatibility decoy. New manifests
@@ -833,6 +858,7 @@ def _transfer_artifacts(
     order = tuple(spec["order"])
     safe_names = tuple(spec["roles"][spec["safe_role"]])
     working_overlap_names = tuple(spec["roles"]["working_generated_overlap"])
+    working_tool_paths = dict(spec["working_overlap_expected_tool_paths"])
     unrelated_preservation_names = tuple(spec["roles"]["unrelated_native_preservation"])
 
     _write_json(
@@ -852,7 +878,7 @@ def _transfer_artifacts(
         if name in safe_names:
             visible = [verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL]
         elif name in working_overlap_names:
-            visible = list(verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES)
+            visible = list(working_tool_paths[name])
         else:
             visible = []
         selection_rows.append(
@@ -865,10 +891,10 @@ def _transfer_artifacts(
                 "generated_tool_contract_failures": [],
                 "generated_tool_versions": {
                     tool_name: (
-                        1
+                        2
                         if tool_name
-                        in verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
-                        else 2
+                        == verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL
+                        else 1
                     )
                     for tool_name in visible
                 },
@@ -889,7 +915,7 @@ def _transfer_artifacts(
             generated_tools=(
                 (verify_lifecycle_repair_run.LIFECYCLE_USE_CASE_TOOL,)
                 if name in safe_names
-                else verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+                else tuple(working_tool_paths[name])
                 if name in working_overlap_names
                 else ()
             ),
@@ -1190,6 +1216,126 @@ def test_predeclared_development_cohort_passes_with_real_artifact_fields(
     assert report["historical_v1_observed_failure_proved"] is True
     assert report["repaired_version_future_success_flip_count"] >= 1
     assert report["actor_followthrough_closure"]["derived_obligation_count"] == 0
+    expected_paths = verify_lifecycle_repair_run.COHORT_SPECS[
+        f"development_diagnostic_lifecycle_repair_{cohort}"
+    ]["working_overlap_expected_tool_paths"]
+    assert {
+        row["scenario"]: tuple(row["expected_tools"])
+        for row in report["working_generated_overlap_paths"]
+    } == expected_paths
+    assert all(
+        row["exact_nonregressing_outcome"]
+        and row["contract_bound_and_replayed"]
+        and row["passed"]
+        for row in report["working_generated_overlap_paths"]
+    )
+    assert report["preserved_working_tools_exercised_across_overlap"] == list(
+        verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+    )
+    source_evidence = report["working_path_source_evidence"]
+    assert len(source_evidence["task_paths"]) == 4
+    assert len(source_evidence["tool_entry_sha256"]) == 3
+
+
+def test_working_path_source_evidence_rejects_tampered_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = (
+        REPOSITORY_ROOT / verify_lifecycle_repair_run.WORKING_PATH_EVIDENCE["artifact"]
+    )
+    tampered = tmp_path / "tampered_working_path_evidence.json"
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["source_campaign"] = "tampered"
+    _write_json(tampered, payload)
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "WORKING_PATH_EVIDENCE",
+        {"artifact": str(tampered), "sha256": "0" * 64},
+    )
+
+    _, reasons = verify_lifecycle_repair_run._working_path_source_evidence_report(
+        run_root=tmp_path
+    )
+
+    assert "working_path_evidence_digest_mismatch" in reasons
+
+
+def test_working_path_source_evidence_rejects_malformed_task_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = (
+        REPOSITORY_ROOT / verify_lifecycle_repair_run.WORKING_PATH_EVIDENCE["artifact"]
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[7]
+    payload["task_paths"][scenario_name]["called_tools"].reverse()
+    malformed = tmp_path / "malformed_working_path_evidence.json"
+    _write_json(malformed, payload)
+    digest = hashlib.sha256(malformed.read_bytes()).hexdigest()
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run,
+        "WORKING_PATH_EVIDENCE",
+        {"artifact": str(malformed), "sha256": digest},
+    )
+
+    _, reasons = verify_lifecycle_repair_run._working_path_source_evidence_report(
+        run_root=tmp_path
+    )
+
+    assert f"working_path_evidence_task_mismatch:{scenario_name}" in reasons
+
+
+def test_working_tool_provenance_is_hermetic_without_ignored_source_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, run_root, _, manifest_path = _development_artifacts(tmp_path, "dev10")
+    benchmark = json.loads(manifest_path.read_text(encoding="utf-8"))
+    protocol = json.loads((run_root / "protocol_manifest.json").read_text())
+    registry_snapshot = protocol["registry_gate_snapshot"]
+    original_resolver = (
+        verify_lifecycle_repair_run._strict_run_verifier._resolve_declared_path
+    )
+    ignored_source = verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_PROVENANCE[
+        "source_artifact"
+    ]
+
+    def resolve_without_ignored_source(
+        run_root_arg: Path,
+        value: object,
+        label: str,
+        **kwargs: object,
+    ) -> Path:
+        if value == ignored_source:
+            return tmp_path / "clean_clone_has_no_ignored_source.json"
+        return original_resolver(run_root_arg, value, label, **kwargs)
+
+    monkeypatch.setattr(
+        verify_lifecycle_repair_run._strict_run_verifier,
+        "_resolve_declared_path",
+        resolve_without_ignored_source,
+    )
+
+    report, reasons = verify_lifecycle_repair_run._working_tool_provenance_report(
+        run_root=run_root,
+        benchmark_manifest=benchmark,
+        registry_snapshot=registry_snapshot,
+        initial_manifest_path=Path(registry_snapshot["snapshot_path"]),
+    )
+
+    assert reasons == []
+    assert set(report["tools"]) == set(
+        verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+    )
+    assert (
+        report["declared_source_registry_sha256"]
+        == (
+            verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_PROVENANCE[
+                "source_registry_sha256"
+            ]
+        )
+    )
+    assert report["observed_source_registry_sha256"] is None
+    assert report["source_registry_verified"] is False
 
 
 def test_followthrough_closure_orders_repeated_actions_and_binds_supersession(
@@ -1509,6 +1655,15 @@ def test_frozen_dev30_transfer_passes_with_exact_promoted_registry(
     assert report["fresh_control_success_flip_count"] >= 1
     assert report["working_generated_overlap_pass_count"] == 2
     assert report["unrelated_native_preservation_pass_count"] == 2
+    assert all(
+        row["exact_nonregressing_outcome"]
+        and row["contract_bound_and_replayed"]
+        and row["passed"]
+        for row in report["working_generated_overlap_paths"]
+    )
+    assert report["preserved_working_tools_exercised_across_overlap"] == list(
+        verify_lifecycle_repair_run.PRESERVED_WORKING_TOOL_NAMES
+    )
 
 
 def test_development_cohort_requires_complete_trajectory_artifacts(
@@ -1659,6 +1814,184 @@ def test_development_cohort_rejects_failure_of_preserved_working_tool(
     report = verify_lifecycle_repair_run.verify(search_root, 10)
 
     assert report["status"] == "fail"
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_missing_expected_successor_path(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[8]
+    successor = verify_lifecycle_repair_run.NEXT_WEEKDAY_TOOL_NAME
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        row = next(item for item in rows if item["scenario"] == scenario_name)
+        for field in (
+            "generated_tools_visible",
+            "generated_tools_attempted",
+            "generated_tools_called",
+        ):
+            row[field].remove(successor)
+        del row["generated_tool_versions"][successor]
+        _write_jsonl(path, rows)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    evidence = next(
+        row
+        for row in report["working_generated_overlap_paths"]
+        if row["scenario"] == scenario_name
+    )
+    assert report["status"] == "fail"
+    assert evidence["selection_path_present"] is False
+    assert evidence["passed"] is False
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_extra_working_path_tool(tmp_path: Path) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[8]
+    expected = verify_lifecycle_repair_run.DEV10_WORKING_TOOL_PATHS[scenario_name]
+    extra_tool = "relative_day_time_to_timestamp"
+    observed = (*expected, extra_tool)
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        row = next(item for item in rows if item["scenario"] == scenario_name)
+        for field in (
+            "generated_tools_visible",
+            "generated_tools_attempted",
+            "generated_tools_called",
+        ):
+            row[field] = list(observed)
+        row["generated_tool_versions"][extra_tool] = 1
+        _write_jsonl(path, rows)
+    _write_synthetic_trajectory(
+        candidate_dir,
+        scenario_name=scenario_name,
+        outcome=1.0,
+        generated_tools=observed,
+    )
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    evidence = next(
+        row
+        for row in report["working_generated_overlap_paths"]
+        if row["scenario"] == scenario_name
+    )
+    assert report["status"] == "fail"
+    assert evidence["selection_path_present"] is False
+    assert evidence["trajectory_path_present"] is False
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_reversed_working_call_order(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[7]
+    reversed_path = tuple(
+        reversed(verify_lifecycle_repair_run.DEV10_WORKING_TOOL_PATHS[scenario_name])
+    )
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        row = next(item for item in rows if item["scenario"] == scenario_name)
+        row["generated_tools_visible"] = list(reversed_path)
+        row["generated_tools_attempted"] = list(reversed_path)
+        row["generated_tools_called"] = list(reversed_path)
+        _write_jsonl(path, rows)
+    _write_synthetic_trajectory(
+        candidate_dir,
+        scenario_name=scenario_name,
+        outcome=1.0,
+        generated_tools=reversed_path,
+    )
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    evidence = next(
+        row
+        for row in report["working_generated_overlap_paths"]
+        if row["scenario"] == scenario_name
+    )
+    assert report["status"] == "fail"
+    assert evidence["selection_path_present"] is False
+    assert evidence["trajectory_path_present"] is False
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_unexpected_working_version_key(
+    tmp_path: Path,
+) -> None:
+    search_root, _, candidate_dir, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[8]
+    extra_tool = "relative_day_time_to_timestamp"
+    for filename in (
+        "scenario_tool_selection.jsonl",
+        "self_evolution_task_feedback.jsonl",
+    ):
+        path = candidate_dir / filename
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        row = next(item for item in rows if item["scenario"] == scenario_name)
+        row["generated_tool_versions"][extra_tool] = 1
+        _write_jsonl(path, rows)
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    evidence = next(
+        row
+        for row in report["working_generated_overlap_paths"]
+        if row["scenario"] == scenario_name
+    )
+    assert report["status"] == "fail"
+    assert evidence["selection_path_present"] is False
+    assert "working_generated_overlap_gate_failed" in report["reasons"]
+
+
+def test_development_cohort_rejects_unbound_successor_contract(
+    tmp_path: Path,
+) -> None:
+    search_root, run_root, _, _ = _development_artifacts(tmp_path, "dev10")
+    scenario_name = verify_lifecycle_repair_run.DEV10_ORDER[8]
+    checkpoint_dir = (
+        run_root
+        / "candidate"
+        / "registry_checkpoints"
+        / (
+            "after_0009_"
+            f"{verify_lifecycle_repair_run._safe_checkpoint_name(scenario_name)}"
+        )
+    )
+    index = json.loads(
+        (checkpoint_dir / "validation_contract_bindings.json").read_text()
+    )
+    contract_hash = index["bindings"][
+        verify_lifecycle_repair_run.NEXT_WEEKDAY_TOOL_NAME
+    ]["1"]["contract_hash"]
+    (checkpoint_dir / "validation_contracts" / f"{contract_hash}.json").unlink()
+
+    report = verify_lifecycle_repair_run.verify(search_root, 10)
+
+    evidence = next(
+        row
+        for row in report["working_generated_overlap_paths"]
+        if row["scenario"] == scenario_name
+    )
+    assert report["status"] == "fail"
+    assert evidence["contract_bound_and_replayed"] is False
+    assert evidence["passed"] is False
     assert "working_generated_overlap_gate_failed" in report["reasons"]
 
 

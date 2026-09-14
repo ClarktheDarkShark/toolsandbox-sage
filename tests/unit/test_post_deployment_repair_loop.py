@@ -20,7 +20,7 @@ from sage_ts.generation.tool_spec import (
     ToolSpec,
 )
 from sage_ts.orchestration.online_birth import OnlineBirthController
-from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.registry.manifest import RegistryEntry, code_hash
 from sage_ts.registry.store import RegistryStore
 from sage_ts.registry.validation_contracts import ValidationContractBindingStore
 from sage_ts.validation.sandbox_validator import ToolExample, ValidationResult
@@ -524,6 +524,13 @@ def test_post_deployment_repair_selects_accepted_candidate_from_portfolio(
     )
     assert repair_event["candidate_count"] == 3
     assert repair_event["selected_candidate_index"] == 1
+    assert repair_event["selected_candidate_code_hash"] == code_hash(accepted.code)
+    assert [
+        row["candidate_code_hash"] for row in repair_event["candidate_validations"]
+    ] == [code_hash(tool.code) for tool in (rejected_a, accepted, rejected_b)]
+    assert [
+        row["error_frontier_count"] for row in repair_event["candidate_validations"]
+    ] == [1, 0, 1]
     assert repair_event["candidate_validations"][1]["accepted"] is True
 
 

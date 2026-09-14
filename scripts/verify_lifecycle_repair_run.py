@@ -46,6 +46,16 @@ PRESERVED_WORKING_TOOL_NAMES = (
     "relative_day_time_to_timestamp",
     "prepare_reminder_creation_args",
 )
+NEXT_WEEKDAY_TOOL_NAME = "next_weekday_time_to_timestamp"
+WORKING_PATH_CANONICAL_KEYS = {
+    "relative_day_time_to_timestamp": "canonicalizer:relative_day_time_timestamp",
+    "prepare_reminder_creation_args": "composite:prepare_reminder_creation_args",
+    NEXT_WEEKDAY_TOOL_NAME: "canonicalizer:next_weekday_time_to_timestamp",
+}
+WORKING_PATH_EVIDENCE = {
+    "artifact": ("docs/sage_protocol/fixtures/paper_rep01_working_path_evidence.json"),
+    "sha256": "840dcfeacd00dadea8e2ea54676326b51f12457af66317eef3e30ef5837d8a3f",
+}
 FIXTURE_TOOL_NAMES = (LIFECYCLE_USE_CASE_TOOL, *PRESERVED_WORKING_TOOL_NAMES)
 PRESERVED_WORKING_TOOL_PROVENANCE: dict[str, Any] = {
     "claim_boundary": (
@@ -189,6 +199,45 @@ DEV30_ORDER = (
     "search_phone_number_with_name_3_distraction_tools_tool_description_scrambled",
 )
 
+DEV10_WORKING_TOOL_PATHS = {
+    DEV10_ORDER[7]: (
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args",
+    ),
+    DEV10_ORDER[8]: (
+        NEXT_WEEKDAY_TOOL_NAME,
+        "prepare_reminder_creation_args",
+    ),
+}
+DEV30_WORKING_TOOL_PATHS = {
+    DEV30_ORDER[26]: (
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args",
+    ),
+    DEV30_ORDER[27]: (
+        NEXT_WEEKDAY_TOOL_NAME,
+        "prepare_reminder_creation_args",
+    ),
+}
+
+
+def _working_overlap_gate_contract(
+    *, role: str, expected_paths: dict[str, tuple[str, ...]]
+) -> dict[str, Any]:
+    return {
+        "role": role,
+        "expected_tool_paths": {
+            scenario_name: list(tool_names)
+            for scenario_name, tool_names in expected_paths.items()
+        },
+        "preserved_tools_exercised_across_cohort": list(PRESERVED_WORKING_TOOL_NAMES),
+        "successor_contracts": {
+            NEXT_WEEKDAY_TOOL_NAME: WORKING_PATH_CANONICAL_KEYS[NEXT_WEEKDAY_TOOL_NAME]
+        },
+        "minimum": len(expected_paths),
+        "total": len(expected_paths),
+    }
+
 
 def _order_sha256(names: tuple[str, ...] | list[str]) -> str:
     return hashlib.sha256(("\n".join(names) + "\n").encode("utf-8")).hexdigest()
@@ -209,6 +258,7 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "safe_exact_minimum": 6,
         "contact_exact_no_remove_minimum": 6,
         "working_overlap_minimum": 2,
+        "working_overlap_expected_tool_paths": DEV10_WORKING_TOOL_PATHS,
         "unrelated_preservation_minimum": 1,
         "overall_exact_minimum": 9,
         "future_v2_exact_minimum": 6,
@@ -224,12 +274,12 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 6,
                 "total": 7,
             },
-            "working_generated_overlap_visible_called_exact_failure_free": {
-                "role": "working_generated_overlap",
-                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
-                "minimum": 2,
-                "total": 2,
-            },
+            "working_generated_overlap_visible_called_exact_failure_free": (
+                _working_overlap_gate_contract(
+                    role="working_generated_overlap",
+                    expected_paths=DEV10_WORKING_TOOL_PATHS,
+                )
+            ),
             "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
                 "role": "unrelated_native_preservation",
                 "minimum": 1,
@@ -263,6 +313,7 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "safe_exact_minimum": 21,
         "contact_exact_no_remove_minimum": 8,
         "working_overlap_minimum": 2,
+        "working_overlap_expected_tool_paths": DEV30_WORKING_TOOL_PATHS,
         "unrelated_preservation_minimum": 2,
         "overall_exact_minimum": 25,
         "future_v2_exact_minimum": 21,
@@ -283,12 +334,12 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 21,
                 "total": 26,
             },
-            "working_generated_overlap_visible_called_exact_failure_free": {
-                "role": "working_generated_overlap",
-                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
-                "minimum": 2,
-                "total": 2,
-            },
+            "working_generated_overlap_visible_called_exact_failure_free": (
+                _working_overlap_gate_contract(
+                    role="working_generated_overlap",
+                    expected_paths=DEV30_WORKING_TOOL_PATHS,
+                )
+            ),
             "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
                 "role": "unrelated_native_preservation",
                 "minimum": 2,
@@ -320,6 +371,7 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
         "safe_exact_minimum": 21,
         "contact_exact_no_remove_minimum": 8,
         "working_overlap_minimum": 2,
+        "working_overlap_expected_tool_paths": DEV30_WORKING_TOOL_PATHS,
         "unrelated_preservation_minimum": 2,
         "overall_exact_minimum": 25,
         "future_v2_success_flip_minimum": 1,
@@ -346,12 +398,12 @@ COHORT_SPECS: dict[str, dict[str, Any]] = {
                 "minimum": 1,
                 "total": 26,
             },
-            "working_generated_overlap_visible_called_exact_failure_free": {
-                "role": "working_generated_overlap",
-                "tools": list(PRESERVED_WORKING_TOOL_NAMES),
-                "minimum": 2,
-                "total": 2,
-            },
+            "working_generated_overlap_visible_called_exact_failure_free": (
+                _working_overlap_gate_contract(
+                    role="working_generated_overlap",
+                    expected_paths=DEV30_WORKING_TOOL_PATHS,
+                )
+            ),
             "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {
                 "role": "unrelated_native_preservation",
                 "minimum": 2,
@@ -626,6 +678,19 @@ def _working_tool_failure_free(
     *,
     include_actor_followthrough: bool,
 ) -> bool:
+    return _tools_failure_free(
+        row,
+        tool_names=PRESERVED_WORKING_TOOL_NAMES,
+        include_actor_followthrough=include_actor_followthrough,
+    )
+
+
+def _tools_failure_free(
+    row: dict[str, Any],
+    *,
+    tool_names: tuple[str, ...],
+    include_actor_followthrough: bool,
+) -> bool:
     fields = ["generated_tools_failed", "generated_tool_contract_failures"]
     if include_actor_followthrough:
         fields.append("actor_followthrough_failures")
@@ -633,9 +698,291 @@ def _working_tool_failure_free(
         values = row.get(field)
         if not isinstance(values, list):
             return False
-        if set(values) & set(PRESERVED_WORKING_TOOL_NAMES):
+        if set(values) & set(tool_names):
             return False
     return True
+
+
+def _checkpoint_contract_identity(
+    *,
+    candidate_dir: Path,
+    completed_count: int,
+    scenario_name: str,
+    tool_name: str,
+    expected_version: int,
+) -> dict[str, Any] | None:
+    """Return replayed call-time contract evidence for one expected path tool."""
+
+    canonical_key = WORKING_PATH_CANONICAL_KEYS.get(tool_name)
+    if canonical_key is None:
+        return None
+    checkpoint_dir = _checkpoint_directory(
+        candidate_dir,
+        completed_count=completed_count,
+        scenario_name=scenario_name,
+    )
+    try:
+        store = RegistryStore(checkpoint_dir)
+        entry = store.get(tool_name)
+        if (
+            entry is None
+            or entry.retired
+            or entry.version != expected_version
+            or not entry.code_hash_verified
+        ):
+            return None
+        binding_store = ValidationContractBindingStore(checkpoint_dir)
+        binding, _error = binding_store.resolve(entry)
+        if binding is None or binding.canonical_key != canonical_key:
+            return None
+        replay = validate_generated_tool(
+            entry.tool,
+            binding.observation.validation_examples,
+        )
+        if not replay.accepted or replay != entry.validation:
+            return None
+        return {
+            "tool_name": binding.tool_name,
+            "tool_version": binding.tool_version,
+            "canonical_key": binding.canonical_key,
+            "contract_hash": binding.contract_hash,
+            "tool_code_hash": binding.tool_code_hash,
+            "tool_spec_hash": binding.tool_spec_hash,
+            "validation_replayed": True,
+        }
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def _working_overlap_path_evidence(
+    *,
+    candidate_dir: Path,
+    scenario_order: tuple[str, ...],
+    scenario_name: str,
+    expected_tools: tuple[str, ...],
+    candidate_by_name: dict[str, dict[str, Any]],
+    control_by_name: dict[str, dict[str, Any]],
+    selection_by_name: dict[str, dict[str, Any]],
+    feedback_by_name: dict[str, dict[str, Any]] | None,
+    trajectory_row: dict[str, tuple[str, ...]] | None,
+    side_effect_failures: set[str] | None = None,
+) -> dict[str, Any]:
+    """Audit one historically pinned working-tool path without redundant calls."""
+
+    candidate = candidate_by_name.get(scenario_name)
+    control = control_by_name.get(scenario_name)
+    selection = selection_by_name.get(scenario_name)
+    feedback = (
+        feedback_by_name.get(scenario_name)
+        if isinstance(feedback_by_name, dict)
+        else None
+    )
+    require_feedback = feedback_by_name is not None
+    selection_versions = (
+        selection.get("generated_tool_versions")
+        if isinstance(selection, dict)
+        else None
+    )
+    expected_versions: dict[str, int] = {}
+    versions_valid = bool(
+        isinstance(selection_versions, dict)
+        and set(selection_versions) == set(expected_tools)
+    )
+    if isinstance(selection_versions, dict):
+        for tool_name in expected_tools:
+            version = selection_versions.get(tool_name)
+            if (
+                isinstance(version, bool)
+                or not isinstance(version, int)
+                or version < 1
+                or (tool_name in PRESERVED_WORKING_TOOL_NAMES and version != 1)
+            ):
+                versions_valid = False
+                continue
+            expected_versions[tool_name] = version
+
+    def _unique_string_list(row: Any, field: str) -> list[str] | None:
+        values = row.get(field) if isinstance(row, dict) else None
+        if (
+            not isinstance(values, list)
+            or any(not isinstance(item, str) or not item for item in values)
+            or len(values) != len(set(values))
+        ):
+            return None
+        return values
+
+    def _row_has_expected_path(row: Any) -> bool:
+        visible = _unique_string_list(row, "generated_tools_visible")
+        attempted = _unique_string_list(row, "generated_tools_attempted")
+        called = _unique_string_list(row, "generated_tools_called")
+        versions = row.get("generated_tool_versions") if isinstance(row, dict) else None
+        return bool(
+            isinstance(row, dict)
+            and row.get("exception_type") is None
+            and visible is not None
+            and set(visible) == set(expected_tools)
+            and attempted == list(expected_tools)
+            and called == list(expected_tools)
+            and isinstance(versions, dict)
+            and set(versions) == set(expected_tools)
+        )
+
+    trajectory_path_present = bool(
+        isinstance(trajectory_row, dict)
+        and set(trajectory_row.get("generated_tools_visible", ()))
+        == set(expected_tools)
+        and tuple(trajectory_row.get("generated_tools_attempted", ())) == expected_tools
+        and tuple(trajectory_row.get("generated_tools_called", ())) == expected_tools
+    )
+
+    selection_path_present = _row_has_expected_path(selection)
+    feedback_path_present = (
+        _row_has_expected_path(feedback) if require_feedback else True
+    )
+    feedback_versions_match = True
+    if require_feedback:
+        feedback_versions = (
+            feedback.get("generated_tool_versions")
+            if isinstance(feedback, dict)
+            else None
+        )
+        feedback_versions_match = bool(
+            isinstance(feedback_versions, dict)
+            and set(feedback_versions) == set(expected_tools)
+            and all(
+                feedback_versions.get(tool_name) == expected_versions.get(tool_name)
+                for tool_name in expected_tools
+            )
+        )
+    selection_failure_free = bool(
+        isinstance(selection, dict)
+        and selection.get("generated_tools_failed") == []
+        and selection.get("generated_tool_contract_failures") == []
+    )
+    feedback_failure_free = bool(
+        not require_feedback
+        or (
+            isinstance(feedback, dict)
+            and feedback.get("generated_tools_failed") == []
+            and feedback.get("generated_tool_contract_failures") == []
+            and feedback.get("actor_followthrough_failures") == []
+        )
+    )
+    safe_fixture_hidden = bool(
+        isinstance(selection, dict)
+        and not _selection_has_tool(
+            selection, "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+        )
+        and not _selection_has_tool(
+            selection, "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+        )
+        and (
+            not require_feedback
+            or (
+                isinstance(feedback, dict)
+                and not _selection_has_tool(
+                    feedback, "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
+                )
+                and not _selection_has_tool(
+                    feedback, "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
+                )
+            )
+        )
+    )
+    exact_nonregressing = bool(
+        isinstance(candidate, dict)
+        and isinstance(control, dict)
+        and _exact_outcome(candidate)
+        and (_outcome(candidate) or 0.0) >= (_outcome(control) or 0.0)
+    )
+    contract_evidence: dict[str, dict[str, Any]] = {}
+    if scenario_name in scenario_order and versions_valid:
+        completed_count = scenario_order.index(scenario_name) + 1
+        for tool_name, version in expected_versions.items():
+            identity = _checkpoint_contract_identity(
+                candidate_dir=candidate_dir,
+                completed_count=completed_count,
+                scenario_name=scenario_name,
+                tool_name=tool_name,
+                expected_version=version,
+            )
+            if identity is not None:
+                contract_evidence[tool_name] = identity
+    contracts_valid = set(contract_evidence) == set(expected_tools)
+    side_effect_failure_free = not bool(
+        (side_effect_failures or set()) & set(expected_tools)
+    )
+    passed = all(
+        (
+            exact_nonregressing,
+            versions_valid,
+            selection_path_present,
+            feedback_path_present,
+            trajectory_path_present,
+            feedback_versions_match,
+            selection_failure_free,
+            feedback_failure_free,
+            safe_fixture_hidden,
+            contracts_valid,
+            side_effect_failure_free,
+        )
+    )
+    return {
+        "scenario": scenario_name,
+        "expected_tools": list(expected_tools),
+        "candidate_outcome": _outcome(candidate)
+        if isinstance(candidate, dict)
+        else None,
+        "control_outcome": _outcome(control) if isinstance(control, dict) else None,
+        "exact_nonregressing_outcome": exact_nonregressing,
+        "selection_path_present": selection_path_present,
+        "feedback_path_present": feedback_path_present,
+        "trajectory_path_present": trajectory_path_present,
+        "failure_free": selection_failure_free
+        and feedback_failure_free
+        and side_effect_failure_free,
+        "safe_fixture_hidden": safe_fixture_hidden,
+        "contract_bound_and_replayed": contracts_valid,
+        "contract_evidence": contract_evidence,
+        "passed": passed,
+    }
+
+
+def _preserved_tools_exercised_across_overlap(
+    *,
+    expected_paths: dict[str, tuple[str, ...]],
+    selection_by_name: dict[str, dict[str, Any]],
+    feedback_by_name: dict[str, dict[str, Any]] | None,
+) -> list[str]:
+    exercised: list[str] = []
+    for tool_name in PRESERVED_WORKING_TOOL_NAMES:
+        for scenario_name, expected_tools in expected_paths.items():
+            if tool_name not in expected_tools:
+                continue
+            selection = selection_by_name.get(scenario_name, {})
+            feedback = (
+                feedback_by_name.get(scenario_name, {})
+                if feedback_by_name is not None
+                else None
+            )
+            if (
+                _selection_has_tool(selection, "generated_tools_visible", tool_name)
+                and _selection_has_tool(selection, "generated_tools_called", tool_name)
+                and (
+                    feedback is None
+                    or (
+                        _selection_has_tool(
+                            feedback, "generated_tools_visible", tool_name
+                        )
+                        and _selection_has_tool(
+                            feedback, "generated_tools_called", tool_name
+                        )
+                    )
+                )
+            ):
+                exercised.append(tool_name)
+                break
+    return exercised
 
 
 def _exact_outcome(row: dict[str, Any]) -> bool:
@@ -1531,14 +1878,23 @@ def _working_tool_provenance_report(
             PRESERVED_WORKING_TOOL_PROVENANCE["source_artifact"],
             "preserved working-tool source registry",
         )
-        if not source_path.is_file() or source_path.is_symlink():
-            raise ValueError("working-tool source registry is not a regular file")
-        source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
-        if source_digest != PRESERVED_WORKING_TOOL_PROVENANCE["source_registry_sha256"]:
-            reasons.append("working_tool_source_registry_digest_mismatch")
-        source_manifest = _load_json(source_path)
+        if source_path.exists():
+            if not source_path.is_file() or source_path.is_symlink():
+                raise ValueError("working-tool source registry is not a regular file")
+            source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+            if (
+                source_digest
+                != PRESERVED_WORKING_TOOL_PROVENANCE["source_registry_sha256"]
+            ):
+                reasons.append("working_tool_source_registry_digest_mismatch")
+        evidence_path = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            WORKING_PATH_EVIDENCE["artifact"],
+            "tracked working-tool source evidence",
+        )
+        evidence = _load_json(evidence_path)
         source_tools = (
-            source_manifest.get("tools") if isinstance(source_manifest, dict) else None
+            evidence.get("tool_entries") if isinstance(evidence, dict) else None
         )
         initial_tools = (
             initial_manifest.get("tools")
@@ -1584,8 +1940,196 @@ def _working_tool_provenance_report(
         {
             "claim_boundary": PRESERVED_WORKING_TOOL_PROVENANCE["claim_boundary"],
             "source_registry_path": str(source_path) if source_path else None,
-            "source_registry_sha256": source_digest,
+            "declared_source_registry_sha256": PRESERVED_WORKING_TOOL_PROVENANCE[
+                "source_registry_sha256"
+            ],
+            "observed_source_registry_sha256": source_digest,
+            "source_registry_verified": bool(
+                source_digest
+                and source_digest
+                == PRESERVED_WORKING_TOOL_PROVENANCE["source_registry_sha256"]
+            ),
             "tools": identities,
+        },
+        reasons,
+    )
+
+
+def _working_path_source_evidence_report(
+    *, run_root: Path
+) -> tuple[dict[str, Any], list[str]]:
+    """Verify the tracked, content-addressed distillation of paper rep01 paths."""
+
+    reasons: list[str] = []
+    evidence_path: Path | None = None
+    evidence_digest: str | None = None
+    evidence: dict[str, Any] = {}
+    try:
+        evidence_path = _strict_run_verifier._resolve_declared_path(
+            run_root,
+            WORKING_PATH_EVIDENCE["artifact"],
+            "working-path evidence fixture",
+        )
+        if not evidence_path.is_file() or evidence_path.is_symlink():
+            raise ValueError("working-path evidence is not a regular file")
+        evidence_digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        if evidence_digest != WORKING_PATH_EVIDENCE["sha256"]:
+            reasons.append("working_path_evidence_digest_mismatch")
+        loaded = _load_json(evidence_path)
+        if not isinstance(loaded, dict) or loaded.get("schema_version") != 1:
+            raise ValueError("working-path evidence schema is invalid")
+        evidence = loaded
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        reasons.append("working_path_evidence_unverifiable")
+        return (
+            {
+                "artifact": str(evidence_path) if evidence_path else None,
+                "sha256": evidence_digest,
+                "task_paths": {},
+                "tool_entry_sha256": {},
+                "original_source_artifacts_verified": [],
+            },
+            reasons,
+        )
+
+    tool_entries = evidence.get("tool_entries")
+    entry_hashes = evidence.get("tool_entry_sha256")
+    expected_tool_names = {
+        *PRESERVED_WORKING_TOOL_NAMES,
+        NEXT_WEEKDAY_TOOL_NAME,
+    }
+    verified_entry_hashes: dict[str, str] = {}
+    if (
+        not isinstance(tool_entries, dict)
+        or set(tool_entries) != expected_tool_names
+        or not isinstance(entry_hashes, dict)
+        or set(entry_hashes) != expected_tool_names
+    ):
+        reasons.append("working_path_evidence_tool_entries_invalid")
+    else:
+        for tool_name in sorted(expected_tool_names):
+            raw_entry = tool_entries.get(tool_name)
+            declared_hash = entry_hashes.get(tool_name)
+            actual_hash = _canonical_json_sha256(raw_entry)
+            identity = _registry_entry_identity(raw_entry, expected_name=tool_name)
+            expected_preserved_hash = (
+                PRESERVED_WORKING_TOOL_PROVENANCE["tools"]
+                .get(tool_name, {})
+                .get("source_entry_sha256")
+            )
+            if (
+                not isinstance(declared_hash, str)
+                or declared_hash != actual_hash
+                or identity is None
+                or identity.get("retired") is not False
+                or identity.get("version") != 1
+                or (
+                    expected_preserved_hash is not None
+                    and actual_hash != expected_preserved_hash
+                )
+            ):
+                reasons.append(f"working_path_evidence_tool_entry_mismatch:{tool_name}")
+            else:
+                verified_entry_hashes[tool_name] = actual_hash
+
+    expected_paths = {**DEV10_WORKING_TOOL_PATHS, **DEV30_WORKING_TOOL_PATHS}
+    task_paths = evidence.get("task_paths")
+    verified_task_paths: dict[str, Any] = {}
+    if not isinstance(task_paths, dict) or set(task_paths) != set(expected_paths):
+        reasons.append("working_path_evidence_task_set_mismatch")
+    else:
+        for scenario_name, expected_tools in expected_paths.items():
+            row = task_paths.get(scenario_name)
+            valid = bool(
+                isinstance(row, dict)
+                and isinstance(row.get("visible_tools"), list)
+                and set(row["visible_tools"]) == set(expected_tools)
+                and row.get("attempted_tools") == list(expected_tools)
+                and row.get("called_tools") == list(expected_tools)
+                and row.get("failed_tools") == []
+                and row.get("exception_type") is None
+                and row.get("outcome_similarity") == 1.0
+            )
+            if not valid:
+                reasons.append(f"working_path_evidence_task_mismatch:{scenario_name}")
+            else:
+                verified_task_paths[scenario_name] = row
+
+    aggregates = evidence.get("aggregate_evidence")
+    if not isinstance(aggregates, dict) or set(aggregates) != expected_tool_names:
+        reasons.append("working_path_evidence_aggregate_set_mismatch")
+    else:
+        for tool_name in sorted(expected_tool_names):
+            aggregate = aggregates.get(tool_name)
+            if not bool(
+                isinstance(aggregate, dict)
+                and isinstance(aggregate.get("called_count"), int)
+                and aggregate["called_count"] > 0
+                and aggregate.get("failed_attempt_count") == 0
+                and aggregate.get("outcome_regressions") == 0
+                and aggregate.get("side_effect_incident_count") == 0
+                and aggregate.get("runtime_incident_count") == 0
+            ):
+                reasons.append(f"working_path_evidence_aggregate_mismatch:{tool_name}")
+
+    original_sources_verified: list[str] = []
+    source_artifacts = evidence.get("source_artifacts")
+    expected_source_labels = {"registry", "selection", "result", "contribution"}
+    if (
+        not isinstance(source_artifacts, dict)
+        or set(source_artifacts) != expected_source_labels
+    ):
+        reasons.append("working_path_evidence_source_artifacts_invalid")
+    else:
+        registry_source = source_artifacts.get("registry")
+        if not isinstance(registry_source, dict) or any(
+            (
+                registry_source.get("path")
+                != PRESERVED_WORKING_TOOL_PROVENANCE["source_artifact"],
+                registry_source.get("sha256")
+                != PRESERVED_WORKING_TOOL_PROVENANCE["source_registry_sha256"],
+            )
+        ):
+            reasons.append("working_path_evidence_registry_source_mismatch")
+        for label, source in source_artifacts.items():
+            if not isinstance(source, dict):
+                reasons.append(f"working_path_evidence_source_invalid:{label}")
+                continue
+            source_path_value = source.get("path")
+            source_sha256 = source.get("sha256")
+            if not isinstance(source_path_value, str) or not isinstance(
+                source_sha256, str
+            ):
+                reasons.append(f"working_path_evidence_source_invalid:{label}")
+                continue
+            try:
+                source_path = _strict_run_verifier._resolve_declared_path(
+                    run_root,
+                    source_path_value,
+                    f"working-path original source {label}",
+                )
+            except ValueError:
+                # The tracked, hashed distillation is sufficient in a clean clone.
+                continue
+            if source_path.exists():
+                if (
+                    not source_path.is_file()
+                    or source_path.is_symlink()
+                    or hashlib.sha256(source_path.read_bytes()).hexdigest()
+                    != source_sha256
+                ):
+                    reasons.append(f"working_path_original_source_mismatch:{label}")
+                else:
+                    original_sources_verified.append(str(label))
+
+    return (
+        {
+            "artifact": str(evidence_path),
+            "sha256": evidence_digest,
+            "task_paths": verified_task_paths,
+            "tool_entry_sha256": verified_entry_hashes,
+            "aggregate_evidence": aggregates,
+            "original_source_artifacts_verified": original_sources_verified,
         },
         reasons,
     )
@@ -2225,6 +2769,15 @@ def _verify_frozen_transfer(
         != PRESERVED_WORKING_TOOL_PROVENANCE
     ):
         reasons.append("transfer_working_tool_provenance_contract_mismatch")
+    if benchmark_manifest.get("working_path_evidence") != WORKING_PATH_EVIDENCE:
+        reasons.append("transfer_working_path_evidence_contract_mismatch")
+    (
+        working_path_source_evidence,
+        working_path_source_evidence_reasons,
+    ) = _working_path_source_evidence_report(run_root=run_root)
+    reasons.extend(
+        f"transfer_{reason}" for reason in working_path_source_evidence_reasons
+    )
     observed_roles = benchmark_manifest.get("validation_roles")
     if not isinstance(observed_roles, dict) or set(observed_roles) != set(roles):
         reasons.append("transfer_validation_role_set_mismatch")
@@ -2605,42 +3158,38 @@ def _verify_frozen_transfer(
         )
         for row in side_effect_failure_rows
     }
-    working_overlap_pass_names = [
-        name
+    working_tool_paths = dict(spec["working_overlap_expected_tool_paths"])
+    if tuple(working_tool_paths) != working_overlap_names:
+        reasons.append("transfer_working_generated_overlap_path_contract_mismatch")
+    working_overlap_path_evidence = [
+        _working_overlap_path_evidence(
+            candidate_dir=candidate_dir,
+            scenario_order=expected_order,
+            scenario_name=name,
+            expected_tools=tuple(working_tool_paths.get(name, ())),
+            candidate_by_name=candidate_by_name,
+            control_by_name=control_by_name,
+            selection_by_name=selection_by_name,
+            feedback_by_name=None,
+            trajectory_row=trajectory_evidence.get("candidate", {}).get(name),
+            side_effect_failures=side_effect_failures_by_name.get(name, set()),
+        )
         for name in working_overlap_names
-        if name in candidate_by_name
-        and name in control_by_name
-        and _exact_outcome(candidate_by_name[name])
-        and (_outcome(candidate_by_name[name]) or 0.0)
-        >= (_outcome(control_by_name[name]) or 0.0)
-        and name in selection_by_name
-        and all(
-            _selection_has_tool(
-                selection_by_name[name], "generated_tools_visible", tool
-            )
-            and _selection_has_tool(
-                selection_by_name[name], "generated_tools_called", tool
-            )
-            and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
-            and selection_by_name[name]["generated_tool_versions"].get(tool) == 1
-            for tool in PRESERVED_WORKING_TOOL_NAMES
-        )
-        and not _selection_has_tool(
-            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
-        )
-        and not _selection_has_tool(
-            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
-        )
-        and _working_tool_failure_free(
-            selection_by_name[name], include_actor_followthrough=False
-        )
-        and not (
-            side_effect_failures_by_name.get(name, set())
-            & set(PRESERVED_WORKING_TOOL_NAMES)
-        )
+    ]
+    working_overlap_pass_names = [
+        str(item["scenario"])
+        for item in working_overlap_path_evidence
+        if item["passed"] is True
     ]
     if len(working_overlap_pass_names) < int(spec["working_overlap_minimum"]):
         reasons.append("transfer_working_generated_overlap_gate_failed")
+    preserved_working_tools_exercised = _preserved_tools_exercised_across_overlap(
+        expected_paths=working_tool_paths,
+        selection_by_name=selection_by_name,
+        feedback_by_name=None,
+    )
+    if set(preserved_working_tools_exercised) != set(PRESERVED_WORKING_TOOL_NAMES):
+        reasons.append("transfer_preserved_working_tools_not_exercised_across_overlap")
     unrelated_preservation_pass_names = [
         name
         for name in unrelated_preservation_names
@@ -2709,6 +3258,7 @@ def _verify_frozen_transfer(
         "preserved_working_tool_provenance": source_report.get(
             "preserved_working_tool_provenance"
         ),
+        "working_path_source_evidence": working_path_source_evidence,
         "preserved_working_tool_integrity": working_tool_preservation,
         "parallel_arm_execution": parallel_execution,
         "matched_policy_runtimes": matched_runtimes,
@@ -2723,6 +3273,10 @@ def _verify_frozen_transfer(
         "fresh_control_success_flip_count": len(success_flip_names),
         "working_generated_overlap_task_count": len(working_overlap_names),
         "working_generated_overlap_pass_count": len(working_overlap_pass_names),
+        "working_generated_overlap_paths": working_overlap_path_evidence,
+        "preserved_working_tools_exercised_across_overlap": (
+            preserved_working_tools_exercised
+        ),
         "unrelated_native_preservation_task_count": len(unrelated_preservation_names),
         "unrelated_native_preservation_pass_count": len(
             unrelated_preservation_pass_names
@@ -2798,6 +3352,13 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         != PRESERVED_WORKING_TOOL_PROVENANCE
     ):
         reasons.append("working_tool_provenance_contract_mismatch")
+    if benchmark_manifest.get("working_path_evidence") != WORKING_PATH_EVIDENCE:
+        reasons.append("working_path_evidence_contract_mismatch")
+    (
+        working_path_source_evidence,
+        working_path_source_evidence_reasons,
+    ) = _working_path_source_evidence_report(run_root=run_root)
+    reasons.extend(working_path_source_evidence_reasons)
     observed_roles = benchmark_manifest.get("validation_roles")
     expected_roles = spec["roles"]
     if not isinstance(observed_roles, dict) or set(observed_roles) != set(
@@ -3044,56 +3605,37 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         spec["contact_exact_no_remove_minimum"]
     ):
         reasons.append("contact_exact_without_forbidden_remove_gate_failed")
-    working_overlap_pass_names = [
-        name
+    working_tool_paths = dict(spec["working_overlap_expected_tool_paths"])
+    if tuple(working_tool_paths) != working_overlap_names:
+        reasons.append("working_generated_overlap_path_contract_mismatch")
+    working_overlap_path_evidence = [
+        _working_overlap_path_evidence(
+            candidate_dir=candidate_dir,
+            scenario_order=expected_order,
+            scenario_name=name,
+            expected_tools=tuple(working_tool_paths.get(name, ())),
+            candidate_by_name=candidate_by_name,
+            control_by_name=control_by_name,
+            selection_by_name=selection_by_name,
+            feedback_by_name=feedback_by_name,
+            trajectory_row=trajectory_evidence.get("candidate", {}).get(name),
+        )
         for name in working_overlap_names
-        if name in candidate_by_name
-        and name in control_by_name
-        and _exact_outcome(candidate_by_name[name])
-        and (_outcome(candidate_by_name[name]) or 0.0)
-        >= (_outcome(control_by_name[name]) or 0.0)
-        and name in selection_by_name
-        and name in feedback_by_name
-        and all(
-            _selection_has_tool(
-                selection_by_name[name], "generated_tools_visible", tool
-            )
-            and _selection_has_tool(
-                selection_by_name[name], "generated_tools_called", tool
-            )
-            and _selection_has_tool(
-                feedback_by_name[name], "generated_tools_visible", tool
-            )
-            and _selection_has_tool(
-                feedback_by_name[name], "generated_tools_called", tool
-            )
-            and isinstance(selection_by_name[name].get("generated_tool_versions"), dict)
-            and selection_by_name[name]["generated_tool_versions"].get(tool) == 1
-            and isinstance(feedback_by_name[name].get("generated_tool_versions"), dict)
-            and feedback_by_name[name]["generated_tool_versions"].get(tool) == 1
-            for tool in PRESERVED_WORKING_TOOL_NAMES
-        )
-        and not _selection_has_tool(
-            selection_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
-        )
-        and not _selection_has_tool(
-            selection_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
-        )
-        and not _selection_has_tool(
-            feedback_by_name[name], "generated_tools_visible", LIFECYCLE_USE_CASE_TOOL
-        )
-        and not _selection_has_tool(
-            feedback_by_name[name], "generated_tools_called", LIFECYCLE_USE_CASE_TOOL
-        )
-        and _working_tool_failure_free(
-            selection_by_name[name], include_actor_followthrough=False
-        )
-        and _working_tool_failure_free(
-            feedback_by_name[name], include_actor_followthrough=True
-        )
+    ]
+    working_overlap_pass_names = [
+        str(item["scenario"])
+        for item in working_overlap_path_evidence
+        if item["passed"] is True
     ]
     if len(working_overlap_pass_names) < int(spec["working_overlap_minimum"]):
         reasons.append("working_generated_overlap_gate_failed")
+    preserved_working_tools_exercised = _preserved_tools_exercised_across_overlap(
+        expected_paths=working_tool_paths,
+        selection_by_name=selection_by_name,
+        feedback_by_name=feedback_by_name,
+    )
+    if set(preserved_working_tools_exercised) != set(PRESERVED_WORKING_TOOL_NAMES):
+        reasons.append("preserved_working_tools_not_exercised_across_overlap")
     unrelated_preservation_pass_names = [
         name
         for name in unrelated_preservation_names
@@ -3434,11 +3976,16 @@ def verify(search_root: Path, expected_tasks: int) -> dict[str, Any]:
         ),
         "working_generated_overlap_task_count": len(working_overlap_names),
         "working_generated_overlap_pass_count": len(working_overlap_pass_names),
+        "working_generated_overlap_paths": working_overlap_path_evidence,
+        "preserved_working_tools_exercised_across_overlap": (
+            preserved_working_tools_exercised
+        ),
         "unrelated_native_preservation_task_count": len(unrelated_preservation_names),
         "unrelated_native_preservation_pass_count": len(
             unrelated_preservation_pass_names
         ),
         "preserved_working_tool_provenance": working_tool_provenance,
+        "working_path_source_evidence": working_path_source_evidence,
         "preserved_working_tool_integrity": working_tool_preservation,
         "historical_fault_fixture_sha256": LIFECYCLE_FAULT_FIXTURE_SHA256,
         "use_case_tool": LIFECYCLE_USE_CASE_TOOL,

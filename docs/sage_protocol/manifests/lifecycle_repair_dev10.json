@@ -24,10 +24,24 @@
       }
     }
   },
+  "working_path_evidence": {
+    "artifact": "docs/sage_protocol/fixtures/paper_rep01_working_path_evidence.json",
+    "sha256": "840dcfeacd00dadea8e2ea54676326b51f12457af66317eef3e30ef5837d8a3f"
+  },
   "predeclared_gates": {
     "safe_abstain_visible_and_called": {"role": "repair_target", "minimum": 7, "total": 7},
     "safe_abstain_exact_without_forbidden_remove": {"role": "repair_target", "minimum": 6, "total": 7},
-    "working_generated_overlap_visible_called_exact_failure_free": {"role": "working_generated_overlap", "tools": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"], "minimum": 2, "total": 2},
+    "working_generated_overlap_visible_called_exact_failure_free": {
+      "role": "working_generated_overlap",
+      "expected_tool_paths": {
+        "add_reminder_content_and_week_delta_and_time": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+        "add_reminder_content_and_weekday_delta_and_time": ["next_weekday_time_to_timestamp", "prepare_reminder_creation_args"]
+      },
+      "preserved_tools_exercised_across_cohort": ["relative_day_time_to_timestamp", "prepare_reminder_creation_args"],
+      "successor_contracts": {"next_weekday_time_to_timestamp": "canonicalizer:next_weekday_time_to_timestamp"},
+      "minimum": 2,
+      "total": 2
+    },
     "unrelated_native_preservation_exact_nonregressing_fixture_hidden": {"role": "unrelated_native_preservation", "minimum": 1, "total": 1},
     "working_generated_entries_unchanged": {"required": true},
     "overall_exact_outcomes": {"minimum": 9, "total": 10},

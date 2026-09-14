@@ -21,6 +21,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
     _plan_device_state_action_sequence_observation,
     _reminder_creation_finalizer_observation,
     _resolve_search_window_or_bounds_observation,
+    _safe_action_or_abstain_observation,
     _stock_symbol_extraction_observation,
     _temperature_answer_extraction_observation,
 )
@@ -33,6 +34,7 @@ from sage_ts.generation.tool_generator import (
     _model_authored_final_repair_directive,
     _model_authored_generation_prompt,
     _normalize_model_authored_tool,
+    _validated_validation_helper_contract_analysis,
     public_input_contract_from_example_inputs,
     public_output_contract_from_example_outputs,
 )
@@ -682,11 +684,28 @@ def test_validation_abstention_repair_final_directive() -> None:
 
         def complete(self, chat_request: ChatRequest) -> str:
             self.requests.append(chat_request)
+            if "analyze public deterministic-helper" in chat_request.system:
+                return json.dumps(
+                    {
+                        "algorithm_steps": [
+                            "normalize capabilities",
+                            "infer public prerequisites",
+                            "check missing capabilities",
+                            "classify the action",
+                            "apply target and ambiguity gates",
+                        ],
+                        "capability_aliases": {},
+                        "inferred_prerequisites": [],
+                        "read_only_actions": ["lookup"],
+                        "mutating_actions": ["update"],
+                        "target_exceptions": ["read-only lookup"],
+                        "case_coverage": {},
+                        "invariants": ["return exactly six keys"],
+                    }
+                )
             return json.dumps(
                 {
                     "candidates": [
-                        rejected.to_json(),
-                        rejected.to_json(),
                         rejected.to_json(),
                     ]
                 }
@@ -701,13 +720,16 @@ def test_validation_abstention_repair_final_directive() -> None:
 
     repaired = generator.repair_candidates(request, rejected, errors)
 
-    assert len(repaired) == 3
-    assert len(completer.requests) == 1
-    prompt = completer.requests[0].user
+    assert len(repaired) == 1
+    assert len(completer.requests) == 2
+    analysis_prompt = completer.requests[0].user
+    prompt = completer.requests[1].user
     directive = _model_authored_final_repair_directive(request, errors)
     assert prompt.endswith(directive)
-    assert '"candidate_count": 3' in prompt
-    assert "candidates array with exactly 3 independently authored" in directive
+    assert '"candidate_count": 1' in prompt
+    assert "candidates array with exactly 1 independently authored" in directive
+    assert "capability normalization" in analysis_prompt
+    assert "read-only versus mutating" in analysis_prompt
     assert "exactly these six keys" in directive
     assert "names every missing capability" in directive
     assert "explicitly says target identifier" in directive
@@ -715,8 +737,8 @@ def test_validation_abstention_repair_final_directive() -> None:
     step_positions = [directive.index(f"STEP {index}:") for index in range(1, 7)]
     assert step_positions == sorted(step_positions)
     assert len(request.validation_examples) == 1
-    assert hidden_task not in prompt
-    assert hidden_answer not in prompt
+    assert hidden_task not in analysis_prompt + prompt
+    assert hidden_answer not in analysis_prompt + prompt
 
 
 @pytest.mark.parametrize(
@@ -765,6 +787,75 @@ def test_post_deployment_repair_audits_exact_prompt_before_inference(
         generator.repair_candidates(repair_request, rejected, errors)
 
     assert all("PRIVATE_SENTINEL" not in request.user for request in completer.requests)
+
+
+def test_validation_helper_repair_restates_public_semantic_exceptions_last() -> None:
+    observation = _safe_action_or_abstain_observation("public_contract_probe")
+    model_visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    request = ToolGenerationRequest(
+        scenario_name="post_deployment_repair(kind=implementation;family=safety)",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in model_visible_examples
+        )
+        + (
+            {
+                "inputs": {"user_request": "PRIVATE_HELD_OUT_SENTINEL"},
+                "expected": {"missing_information": ["private_capability"]},
+                "held_out": True,
+                "negative_applicability": False,
+            },
+        ),
+        suggested_tool_name="prepare_safe_action_or_abstain",
+    )
+
+    directive = _model_authored_final_repair_directive(
+        request,
+        ("public_contract_failure",),
+    )
+
+    assert "PUBLIC NAMED-RECIPIENT RULE" in directive
+    assert "PUBLIC RELATIVE-TIME RULE" in directive
+    assert "PRIVATE_HELD_OUT_SENTINEL" not in directive
+    assert "private_capability" not in directive
+    assert directive.endswith(
+        "every read-only exception must be tested before any generic "
+        "blank-target guard."
+    )
+
+
+def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:
+    valid = {
+        "algorithm_steps": ["normalize", "infer", "validate"],
+        "capability_aliases": {},
+        "inferred_prerequisites": [],
+        "read_only_actions": ["search"],
+        "mutating_actions": ["send"],
+        "target_exceptions": ["read-only search"],
+        "case_coverage": {},
+        "invariants": ["do not guess"],
+    }
+
+    normalized = _validated_validation_helper_contract_analysis(json.dumps(valid))
+
+    assert json.loads(normalized) == valid
+    with pytest.raises(ValueError, match="algorithm_steps"):
+        _validated_validation_helper_contract_analysis(
+            json.dumps(
+                {key: value for key, value in valid.items() if key != "algorithm_steps"}
+            )
+        )
+    with pytest.raises(ValueError, match="not valid JSON"):
+        _validated_validation_helper_contract_analysis("not-json")
 
 
 def test_generation_request_includes_reusable_name_hint() -> None:

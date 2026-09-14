@@ -65,6 +65,18 @@ scenario/task identifiers, expected or reference answers, target state,
 evaluator traces, outcome values, and success-flip values at persistence,
 request-construction, and prompt boundaries.
 
+For structured validation helpers, repair begins with a separately
+model-authored decision plan built only from the public observation and
+model-visible synthetic cases. The plan must order normalization, inferred
+public prerequisites, missing-capability checks, read-only versus mutating
+classification, target checks, and ambiguity checks before code is authored.
+Each repair attempt emits one complete candidate so the seven bounded model
+calls are separate rather than three correlated functions in one response. The
+first five calls have distinct repair strategies; later calls iteratively use the
+best public validation frontier. The analysis response is schema-checked before
+it can guide repair. Candidate code hashes and error-frontier sizes are logged so
+diversity and convergence can be audited without exposing held-out values.
+
 Tool-name scrambling is also an information boundary. Classification, routing,
 and policy selection consume the same actor-visible names, descriptions, and
 parameter schemas that ToolSandbox sends to the model. A native capability is
@@ -94,7 +106,20 @@ repair. The seeded historical-version test demonstrates the post-deployment
 actuator without pretending that a newly generated invalid tool passed the
 strengthened validator.
 
+The contact-lookup and relative-time ordering rules used in this prospective
+repair are developer-authored meta-repair guidance derived from the public
+contract during disclosed development. This use case tests whether SAGE detects,
+repairs or retires, validates, canaries, and promotes correctly; it is not
+evidence that SAGE autonomously discovered those two semantic rules.
+
 ## Validation ladder and claim boundary
+
+The historically successful working-tool paths are preserved in the tracked,
+content-addressed fixture
+`docs/sage_protocol/fixtures/paper_rep01_working_path_evidence.json`. It records
+the original artifact hashes, exact ordered calls and successful outcomes, and
+the three complete registry entries. Original ignored run artifacts are checked
+when present; the tracked fixture keeps clean-clone verification hermetic.
 
 1. Run deterministic lifecycle and semantic-validator tests, including a
    failing replacement, a successful replacement, non-adoption retirement,
@@ -104,13 +129,19 @@ strengthened validator.
 3. Transfer the complete content-addressed registry from the passing 10-task
    run into the disjoint 30-task cohort with generation and repair disabled.
    Require the exact promoted tool to generalize and the registry to remain
-   byte-identical. The preservation check is deliberately narrow: the two
-   historically successful generated tools must remain visible, called,
-   failure-free, and byte-identical on two overlapping reminder routes, while
-   two unrelated native-only tasks remain exact with no negative outcome delta.
-   It demonstrates those two working tools plus the disjoint cohort; it is not a
-   universal no-harm claim. An independently seeded 30-task repair run is a separate
-   repair-process replication and cannot substitute for this transfer check.
+   byte-identical. The preservation check is deliberately narrow and follows
+   the tool paths observed in the pinned successful paper run: the day-offset
+   reminder calls `relative_day_time_to_timestamp` and
+   `prepare_reminder_creation_args`; the weekday reminder calls the validated
+   `next_weekday_time_to_timestamp` successor and
+   `prepare_reminder_creation_args`. Both preserved entries must be exercised
+   across the cohort and remain failure-free. Their immutable code, spec,
+   validation, and provenance identities must be unchanged at every checkpoint;
+   only usage counters may advance. Two unrelated native-only tasks must remain
+   exact with no negative outcome delta. This demonstrates those working paths
+   plus the disjoint cohort; it is not a universal no-harm claim. An independently
+   seeded 30-task repair run is a separate repair-process replication and cannot
+   substitute for this transfer check.
 4. Freeze the code, then run a fresh-control, no-cache 1,032-task validation.
 5. Apply the content-addressed schema-v4 adaptive technical-readiness gate. The
    audited-v9 SAGE mean over all 1,032 tasks must be strictly greater than

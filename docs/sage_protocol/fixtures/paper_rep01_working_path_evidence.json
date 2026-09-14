@@ -1,0 +1,540 @@
+{
+  "aggregate_evidence": {
+    "next_weekday_time_to_timestamp": {
+      "called_count": 32,
+      "failed_attempt_count": 0,
+      "mean_outcome_delta": 0.96875,
+      "outcome_gains": 31,
+      "outcome_preserved": 1,
+      "outcome_regressions": 0,
+      "runtime_incident_count": 0,
+      "side_effect_incident_count": 0,
+      "visible_count": 50
+    },
+    "prepare_reminder_creation_args": {
+      "called_count": 96,
+      "failed_attempt_count": 0,
+      "mean_outcome_delta": 0.8854166666666666,
+      "outcome_gains": 85,
+      "outcome_preserved": 11,
+      "outcome_regressions": 0,
+      "runtime_incident_count": 0,
+      "side_effect_incident_count": 0,
+      "visible_count": 104
+    },
+    "relative_day_time_to_timestamp": {
+      "called_count": 80,
+      "failed_attempt_count": 0,
+      "mean_outcome_delta": 0.775,
+      "outcome_gains": 62,
+      "outcome_preserved": 18,
+      "outcome_regressions": 0,
+      "runtime_incident_count": 0,
+      "side_effect_incident_count": 0,
+      "visible_count": 112
+    }
+  },
+  "schema_version": 1,
+  "source_artifacts": {
+    "contribution": {
+      "path": "artifacts/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action_artifacts/summaries/online_build_full_20260909_134700/helper_contribution_summary.json",
+      "sha256": "378b5621dfc110982878852d49f36bef695237be3038a1f40899472a467dfa29"
+    },
+    "registry": {
+      "path": "artifacts/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action_registry/registry_manifest.json",
+      "sha256": "5fe8323c69cb17b3c0e45f3ccf2bc3708583ab9d01a48e5ca2d4b5082686d653"
+    },
+    "result": {
+      "path": "outputs/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action/online_build_full_20260909_134700/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_09_2026_13_47_13/result_summary.json",
+      "sha256": "e4737270673071ed6d322c54413ebd644ee8fc6105b47eca909b1518ebdfee7f"
+    },
+    "selection": {
+      "path": "outputs/publication_validation/paper_policy_final10_20260909_134651/rep01/native_action/online_build_full_20260909_134700/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_09_2026_13_47_13/scenario_tool_selection.jsonl",
+      "sha256": "e200d8de675522f7277a21b9a2db0db0d3f24498358a9fabdc5fe97ecc75c394"
+    }
+  },
+  "source_campaign": "paper_policy_final10_20260909_134651/rep01",
+  "task_paths": {
+    "add_reminder_content_and_week_delta_and_time": {
+      "attempted_tools": [
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "called_tools": [
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "exception_type": null,
+      "failed_tools": [],
+      "outcome_similarity": 1.0,
+      "visible_tools": [
+        "prepare_reminder_creation_args",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    "add_reminder_content_and_week_delta_and_time_3_distraction_tools_arg_description_scrambled": {
+      "attempted_tools": [
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "called_tools": [
+        "relative_day_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "exception_type": null,
+      "failed_tools": [],
+      "outcome_similarity": 1.0,
+      "visible_tools": [
+        "prepare_reminder_creation_args",
+        "relative_day_time_to_timestamp"
+      ]
+    },
+    "add_reminder_content_and_weekday_delta_and_time": {
+      "attempted_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "called_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "exception_type": null,
+      "failed_tools": [],
+      "outcome_similarity": 1.0,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ]
+    },
+    "add_reminder_content_and_weekday_delta_and_time_alt_3_distraction_tools": {
+      "attempted_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "called_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ],
+      "exception_type": null,
+      "failed_tools": [],
+      "outcome_similarity": 1.0,
+      "visible_tools": [
+        "next_weekday_time_to_timestamp",
+        "prepare_reminder_creation_args"
+      ]
+    }
+  },
+  "tool_entries": {
+    "next_weekday_time_to_timestamp": {
+      "accepted_at": "2026-09-09T18:16:10.137767+00:00",
+      "birth_scenario": "visible_task_context(family=reminder_create; signals=reminder,reminder_create,relative_time,weekday_time,explicit_time; request='Remind me to buy chocolate milk next Friday 5PM')",
+      "code_hash": "c017b6d9ec79072fbdc32efc31a1c340e6d91bbf49bef95ef80ef1d80fa5b920",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 32,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def next_weekday_time_to_timestamp(current_timestamp: float, target_isoweekday: int, hour: int, minute: int, local_utc_offset_hours: int, current_datetime_info: dict):\n    if not isinstance(current_datetime_info, dict) or not current_datetime_info:\n        return 0.0\n    current_hour = current_datetime_info.get('hour', 0)\n    current_minute = current_datetime_info.get('minute', 0)\n    current_second = current_datetime_info.get('second', 0)\n    current_isoweekday = current_datetime_info.get('isoweekday', 0)\n    if target_isoweekday < 1 or target_isoweekday > 7:\n        return 0.0\n    if hour < 0 or hour > 23 or minute < 0 or (minute > 59):\n        return 0.0\n    local_midnight_timestamp = int(current_timestamp) - (current_hour * 3600 + current_minute * 60 + current_second)\n    days_ahead = (target_isoweekday - current_isoweekday) % 7\n    if days_ahead == 0 and (hour < current_hour or (hour == current_hour and minute <= current_minute)):\n        days_ahead = 7\n    return float(local_midnight_timestamp + days_ahead * 86400 + hour * 3600 + minute * 60)\n",
+        "spec": {
+          "abstain_behavior": "",
+          "applicable_task_families": [
+            "weekday_time",
+            "reminder_create",
+            "reminder_modify"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Calculates the next occurrence of a specified weekday and time after the current timestamp.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "canonicalizer",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Generated from recurring public validation examples and visible task evidence so the same deterministic transformation can be reused.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "actor invented day offset or reused current timestamp as reminder time"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform"
+            ],
+            "summary": "Reminder creation tasks with phrases like 'next Friday at 5 PM' require converting the current timestamp plus a target ISO weekday and local time into the next matching local Unix timestamp before calling add_reminder. Generate a deterministic canonicalizer named next_weekday_time_to_timestamp. Inputs: current_timestamp, target_isoweekday where Monday=1 and Sunday=7, hour, minute, and current_datetime_info from timestamp_to_datetime_info(current_timestamp). Keep local_utc_offset_hours only as a deprecated compatibility input; do not trust a guessed offset. Return a float Unix timestamp for the next occurrence of that weekday/time strictly after the current local timestamp; if the target weekday is today and the target time is still in the future, use today, otherwise use seven days later. Derive the sandbox local offset from current_timestamp and current_datetime_info, and return 0.0 if that visible local datetime context is missing or inconsistent. The helper must not call add_reminder; the actor must still call the original ToolSandbox add_reminder with the returned reminder_timestamp.",
+            "visible_data_gaps": [
+              "next weekday phrase must become exact local reminder timestamp"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "The current Unix timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "int",
+              "description": "The target ISO weekday (1=Monday, 7=Sunday).",
+              "name": "target_isoweekday"
+            },
+            {
+              "annotation": "int",
+              "description": "The target hour of the day.",
+              "name": "hour"
+            },
+            {
+              "annotation": "int",
+              "description": "The target minute of the hour.",
+              "name": "minute"
+            },
+            {
+              "annotation": "int",
+              "description": "Visible input local_utc_offset_hours.",
+              "name": "local_utc_offset_hours"
+            },
+            {
+              "annotation": "dict",
+              "description": "A dictionary containing current date and time information.",
+              "name": "current_datetime_info"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "next_weekday_time_to_timestamp"
+          ],
+          "native_action_delegation": false,
+          "negative_triggers": [
+            "insufficient_visible_information",
+            "ambiguous_visible_match",
+            "missing_required_input"
+          ],
+          "output_annotation": "float",
+          "output_schema": null,
+          "positive_triggers": [
+            "visible_raw_data_lacking_deterministic_transform",
+            "weekday_time",
+            "reminder_create",
+            "reminder_modify"
+          ],
+          "preserves_side_effect_tools": [
+            "get_current_timestamp",
+            "timestamp_to_datetime_info",
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "reason_tool_is_decisive": "The tool turns visible task constraints into deterministic arguments or abstention signals before the actor chooses the preserved action.",
+          "required_original_tool_calls": [
+            "get_current_timestamp",
+            "timestamp_to_datetime_info",
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "canonicalizer:next_weekday_time_to_timestamp",
+            "diagnostic_only_near_duplicate_or_single_family_cluster"
+          ],
+          "tool_name": "next_weekday_time_to_timestamp"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 3,
+        "negative_applicability_count": 2,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    },
+    "prepare_reminder_creation_args": {
+      "accepted_at": "2026-09-09T17:54:50.456556+00:00",
+      "birth_scenario": "visible_task_context(family=reminder_create; signals=reminder,reminder_create,relative_time,explicit_time; request='Remind me to buy chocolate milk tomorrow 5PM')",
+      "code_hash": "6aef8c1674e35bc274a75512399dfbc35809af6522a57800f129f6e4ec599292",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 97,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def prepare_reminder_creation_args(content: str, reminder_timestamp: float, location_requested: bool, location_required: bool, location_available: bool, latitude: float, longitude: float, location_lookup_failed: bool):\n    if not content:\n        return {'status': 'abstain', 'confirmation': '', 'abstain_reason': 'Content is missing.', 'native_action': '', 'native_result': None}\n    if reminder_timestamp <= 0:\n        return {'status': 'abstain', 'confirmation': '', 'abstain_reason': 'Invalid reminder timestamp.', 'native_action': '', 'native_result': None}\n    if location_required and (not location_available):\n        return {'status': 'abstain', 'confirmation': '', 'abstain_reason': 'Required location is unavailable.', 'native_action': '', 'native_result': None}\n    if location_requested and (not location_lookup_failed) and (not location_available):\n        return {'status': 'abstain', 'confirmation': '', 'abstain_reason': 'Location lookup is pending.', 'native_action': '', 'native_result': None}\n    if location_available:\n        native_result = add_reminder(content=content, reminder_timestamp=reminder_timestamp, latitude=latitude, longitude=longitude)\n    else:\n        native_result = add_reminder(content=content, reminder_timestamp=reminder_timestamp, latitude=None, longitude=None)\n    return {'status': 'success', 'confirmation': 'Reminder created successfully.', 'abstain_reason': '', 'native_action': 'add_reminder', 'native_result': native_result}\n",
+        "spec": {
+          "abstain_behavior": "",
+          "applicable_task_families": [
+            "reminder_create",
+            "relative_time",
+            "weekday_time",
+            "location_phrase"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Prepares arguments for creating a reminder.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "composite_workflow_helper",
+          "final_state_preservation_plan": "Delegate exactly one approved action to the preserved native ToolSandbox implementation; negative cases call no native action.",
+          "generalization_rationale": "Generated from recurring public validation examples and visible task evidence so the same deterministic transformation can be reused.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "add_reminder"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "final_action_argument_preparation",
+              "visible_normalized_fields_ready"
+            ],
+            "summary": "Reminder creation can fail after upstream tools have already resolved the visible reminder content, timestamp, and optional coordinates. Generate a reusable final-action tool named prepare_reminder_creation_args. Inputs are normalized content, a concrete reminder_timestamp, location_requested, location_required, location_available, latitude, longitude, and location_lookup_failed. When content and time are concrete and location safety requirements are satisfied, invoke the preserved add_reminder action exactly once. Never invent content, time, or coordinates. Abstain when content or time is missing, when required location is unresolved, or while an optional location lookup is still pending. A failed optional lookup may omit coordinates and still create the reminder.",
+            "visible_data_gaps": []
+          },
+          "inputs": [
+            {
+              "annotation": "str",
+              "description": "The content of the reminder.",
+              "name": "content"
+            },
+            {
+              "annotation": "float",
+              "description": "The timestamp for the reminder.",
+              "name": "reminder_timestamp"
+            },
+            {
+              "annotation": "bool",
+              "description": "Indicates if location is requested.",
+              "name": "location_requested"
+            },
+            {
+              "annotation": "bool",
+              "description": "Indicates if location is required.",
+              "name": "location_required"
+            },
+            {
+              "annotation": "bool",
+              "description": "Indicates if location data is available.",
+              "name": "location_available"
+            },
+            {
+              "annotation": "float",
+              "description": "The latitude for the reminder location.",
+              "name": "latitude"
+            },
+            {
+              "annotation": "float",
+              "description": "The longitude for the reminder location.",
+              "name": "longitude"
+            },
+            {
+              "annotation": "bool",
+              "description": "Indicates if the location lookup failed.",
+              "name": "location_lookup_failed"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "prepare_reminder_creation_args"
+          ],
+          "native_action_delegation": true,
+          "negative_triggers": [
+            "insufficient_visible_information",
+            "ambiguous_visible_match",
+            "missing_required_input"
+          ],
+          "output_annotation": "dict",
+          "output_schema": {
+            "additionalProperties": true,
+            "properties": {
+              "abstain_reason": {
+                "type": "string"
+              },
+              "confirmation": {
+                "type": "string"
+              },
+              "native_action": {
+                "type": "string"
+              },
+              "native_result": {},
+              "status": {
+                "enum": [
+                  "success",
+                  "abstain"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "confirmation",
+              "abstain_reason",
+              "native_action"
+            ],
+            "type": "object"
+          },
+          "positive_triggers": [
+            "final_action_argument_preparation",
+            "visible_normalized_fields_ready",
+            "reminder_create",
+            "relative_time",
+            "weekday_time",
+            "location_phrase"
+          ],
+          "preserves_side_effect_tools": [
+            "add_reminder"
+          ],
+          "reason_tool_is_decisive": "The generated tool maps visible inputs to one validated native action or a validation-proven abstention.",
+          "required_original_tool_calls": [
+            "add_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "composite:prepare_reminder_creation_args",
+            "diagnostic_only_near_duplicate_or_single_family_cluster"
+          ],
+          "tool_name": "prepare_reminder_creation_args"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 2,
+        "negative_applicability_count": 4,
+        "runtime_smoke_passed": true,
+        "source_example_count": 2
+      },
+      "version": 1
+    },
+    "relative_day_time_to_timestamp": {
+      "accepted_at": "2026-09-09T17:55:01.498442+00:00",
+      "birth_scenario": "visible_task_context(family=reminder_create; signals=reminder,reminder_create,relative_time,explicit_time; request='Remind me to buy chocolate milk tomorrow 5PM')",
+      "code_hash": "960acb0cd81a216c31e8ad3fe7f67cd4b4ec5436873615aea6d708089cf1d5ab",
+      "legacy_diagnostic": false,
+      "retired": false,
+      "reuse_count": 96,
+      "schema_version": 2,
+      "success_flips": 0,
+      "tool": {
+        "code": "def relative_day_time_to_timestamp(current_timestamp: float=None, day_offset: int=None, hour: int=None, minute: int=None, local_utc_offset_hours: int=None, current_datetime_info: dict=None):\n    if not isinstance(current_datetime_info, dict) or not current_datetime_info or 'hour' not in current_datetime_info or ('minute' not in current_datetime_info) or ('second' not in current_datetime_info):\n        return 0.0\n    current_hour = current_datetime_info.get('hour')\n    current_minute = current_datetime_info.get('minute')\n    current_second = current_datetime_info.get('second')\n    if hour is None or minute is None or hour < 0 or (hour > 23) or (minute < 0) or (minute > 59):\n        return 0.0\n    local_midnight_timestamp = int(current_timestamp) - (current_hour * 3600 + current_minute * 60 + current_second)\n    return float(local_midnight_timestamp + int(day_offset) * 86400 + hour * 3600 + minute * 60)\n",
+        "spec": {
+          "abstain_behavior": "",
+          "applicable_task_families": [
+            "relative_time",
+            "reminder_create",
+            "reminder_modify"
+          ],
+          "canonical_route_substitution_risk": "none",
+          "cross_task_applicability_count": 2,
+          "description": "Calculates a Unix timestamp for a specified day and time relative to the current timestamp.",
+          "diagnostic_only": true,
+          "estimated_step_compression": 3,
+          "expected_milestone_calls_replaced": [],
+          "family": "canonicalizer",
+          "final_state_preservation_plan": "",
+          "generalization_rationale": "Generated from recurring public validation examples and visible task evidence so the same deterministic transformation can be reused.",
+          "grading_accounting_note": "",
+          "inadequacy_evidence": {
+            "failed_tool_calls": [
+              "add_reminder",
+              "modify_reminder"
+            ],
+            "final_answer_route_mismatch": false,
+            "planner_failures": [
+              "compute relative timestamp before reminder side effect"
+            ],
+            "repeated_failed_tool_calls": [],
+            "signals": [
+              "visible_raw_data_lacking_deterministic_transform"
+            ],
+            "summary": "Reminder creation/modification tasks require turning a visible relative date/time such as 'tomorrow 5 PM' into the exact local Unix timestamp passed to the original add_reminder or modify_reminder ToolSandbox call. Generate a deterministic canonicalizer named relative_day_time_to_timestamp with inputs current_timestamp, day_offset, hour, minute, current_datetime_info, and optional local_utc_offset_hours. current_datetime_info must be the visible dict returned by timestamp_to_datetime_info(current_timestamp), so the helper preserves ToolSandbox local time without hard-coding a timezone. Return only the timestamp; never create or modify the reminder inside the helper.",
+            "visible_data_gaps": [
+              "relative local day/time must become exact benchmark timestamp"
+            ]
+          },
+          "inputs": [
+            {
+              "annotation": "float",
+              "description": "The current Unix timestamp.",
+              "name": "current_timestamp"
+            },
+            {
+              "annotation": "int",
+              "description": "The number of days to offset from the current date.",
+              "name": "day_offset"
+            },
+            {
+              "annotation": "int",
+              "description": "The target hour for the timestamp.",
+              "name": "hour"
+            },
+            {
+              "annotation": "int",
+              "description": "The target minute for the timestamp.",
+              "name": "minute"
+            },
+            {
+              "annotation": "int",
+              "description": "The local UTC offset in hours.",
+              "name": "local_utc_offset_hours"
+            },
+            {
+              "annotation": "dict",
+              "description": "A dictionary containing the current local date and time information.",
+              "name": "current_datetime_info"
+            }
+          ],
+          "known_failure_mechanisms_addressed": [
+            "relative_day_time_to_timestamp"
+          ],
+          "native_action_delegation": false,
+          "negative_triggers": [
+            "insufficient_visible_information",
+            "ambiguous_visible_match",
+            "missing_required_input"
+          ],
+          "output_annotation": "float",
+          "output_schema": null,
+          "positive_triggers": [
+            "visible_raw_data_lacking_deterministic_transform",
+            "relative_time",
+            "reminder_create",
+            "reminder_modify"
+          ],
+          "preserves_side_effect_tools": [
+            "get_current_timestamp",
+            "timestamp_to_datetime_info",
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "reason_tool_is_decisive": "The tool turns visible task constraints into deterministic arguments or abstention signals before the actor chooses the preserved action.",
+          "required_original_tool_calls": [
+            "get_current_timestamp",
+            "timestamp_to_datetime_info",
+            "add_reminder",
+            "modify_reminder"
+          ],
+          "schema_version": 2,
+          "shortfall_cluster_evidence": [
+            "canonicalizer:relative_day_time_timestamp",
+            "diagnostic_only_near_duplicate_or_single_family_cluster"
+          ],
+          "tool_name": "relative_day_time_to_timestamp"
+        }
+      },
+      "validation": {
+        "accepted": true,
+        "errors": [],
+        "held_out_check_count": 1,
+        "negative_applicability_count": 3,
+        "runtime_smoke_passed": true,
+        "source_example_count": 1
+      },
+      "version": 1
+    }
+  },
+  "tool_entry_sha256": {
+    "next_weekday_time_to_timestamp": "bdd9f8d36e77283cf35696bfe32d19d068f3bb27054421f1daeff3db2e9adb82",
+    "prepare_reminder_creation_args": "68ed674b51cd5b434417be9f5c727b8c65d2dd7b032c78bee5a4567be33179a9",
+    "relative_day_time_to_timestamp": "34a186250638fe21c62dde6baef1af34381f9ce0d867e1e41f97d84362edbd0b"
+  }
+}

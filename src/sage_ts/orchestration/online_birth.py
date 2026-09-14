@@ -3002,6 +3002,7 @@ class OnlineBirthController:
                         "attempt": attempt,
                         "candidate_count": len(candidate_results),
                         "selected_candidate_index": selected_candidate_index,
+                        "selected_candidate_code_hash": code_hash(candidate.code),
                         "accepted": validation.accepted,
                         "validation_score": validation_score,
                         "best_validation_score": best_partial_score,
@@ -3015,14 +3016,18 @@ class OnlineBirthController:
                         "candidate_validations": [
                             {
                                 "candidate_index": index,
+                                "candidate_code_hash": code_hash(candidate_tool.code),
                                 "accepted": candidate_validation.accepted,
                                 "validation_score": candidate_score,
+                                "error_frontier_count": len(
+                                    _repair_prompt_errors(candidate_validation.errors)
+                                ),
                                 "errors": list(
                                     _repair_prompt_errors(candidate_validation.errors)
                                 ),
                             }
                             for index, (
-                                _candidate,
+                                candidate_tool,
                                 candidate_validation,
                                 candidate_score,
                             ) in enumerate(candidate_results)

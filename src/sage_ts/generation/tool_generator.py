@@ -488,16 +488,24 @@ class ToolGenerator:
         return normalized
 
     def _contract_analysis_suffix(self, request: ToolGenerationRequest) -> str:
-        if not _request_complete_tools_enabled(request):
+        if not (
+            _request_complete_tools_enabled(request)
+            or _request_is_validation_abstention_helper(request)
+        ):
             return ""
         analysis_prompt = _model_authored_contract_analysis_prompt(request)
         analysis = self._contract_analyses.get(analysis_prompt)
         if analysis is None:
+            analysis_subject = (
+                "public deterministic-helper validation contracts"
+                if _request_is_validation_abstention_helper(request)
+                else "public generated-tool validation contracts"
+            )
             analysis = self._complete(
                 request,
                 ChatRequest(
                     system=(
-                        "You analyze public generated-tool validation contracts. "
+                        f"You analyze {analysis_subject}. "
                         "Return valid JSON only and do not write code."
                     ),
                     user=analysis_prompt,
@@ -505,6 +513,8 @@ class ToolGenerator:
                     response_format_json=True,
                 ),
             )
+            if _request_is_validation_abstention_helper(request):
+                analysis = _validated_validation_helper_contract_analysis(analysis)
             self._contract_analyses[analysis_prompt] = analysis
         return (
             " A separate model-authored contract analysis follows. Use it as a "
@@ -560,8 +570,13 @@ def _request_is_validation_abstention_helper(
 
 
 def _model_authored_repair_candidate_count(_request: ToolGenerationRequest) -> int:
-    """Use the same independent-candidate portfolio for every repair family."""
+    """Keep complex pure-helper repairs focused across independent model calls."""
 
+    if _request_is_validation_abstention_helper(_request):
+        # The controller already makes seven independently prompted repair calls.
+        # Asking a small model for three complete implementations in each response
+        # produced correlated, truncated semantic patches rather than diversity.
+        return 1
     return _model_authored_candidate_count()
 
 
@@ -1464,6 +1479,53 @@ def _native_action_coverage_guidance(
 def _model_authored_contract_analysis_prompt(
     request: ToolGenerationRequest,
 ) -> str:
+    if _request_is_validation_abstention_helper(request):
+        public_cases: list[dict[str, object]] = []
+        source_index = 0
+        negative_index = 0
+        for item in request.validation_examples:
+            if not isinstance(item, dict) or bool(item.get("held_out")):
+                continue
+            inputs = item.get("inputs")
+            expected = item.get("expected")
+            if not isinstance(inputs, dict) or not isinstance(expected, dict):
+                continue
+            negative = bool(item.get("negative_applicability"))
+            if negative:
+                case_label = f"negative_{negative_index}"
+                negative_index += 1
+            else:
+                case_label = f"source_{source_index}"
+                source_index += 1
+            public_cases.append(
+                {
+                    "case_label": case_label,
+                    "inputs": inputs,
+                    "expected": expected,
+                    "negative_applicability": negative,
+                }
+            )
+        return (
+            "Analyze this public deterministic validation-helper contract before "
+            "repair code is written. Use only the public observation and the "
+            "model-visible cases below. Derive one ordered, reusable decision "
+            "procedure rather than memorizing values. In particular, separate "
+            "capability normalization, prerequisites inferred by the public "
+            "contract, missing-capability checks, read-only versus mutating action "
+            "classification, target requirements, ambiguity checks, and the safe "
+            "continue result. An exception to a general guard must be applied before "
+            "that guard. Return a JSON object with keys algorithm_steps, "
+            "capability_aliases, inferred_prerequisites, read_only_actions, "
+            "mutating_actions, target_exceptions, case_coverage, and invariants. "
+            "For case_coverage, state why every expected branch is reached. Do not "
+            "output Python and do not invent requirements absent from the public "
+            "contract. Required tool name: "
+            + str(request.suggested_tool_name or "infer_from_contract")
+            + ". Public observation: "
+            + request.observation
+            + ". Model-visible public cases: "
+            + json.dumps(public_cases, sort_keys=True)
+        )
     examples = _native_action_validation_examples(request)
     native_actions = _request_native_action_names(request)
     role_analysis = (
@@ -1536,6 +1598,61 @@ def _model_authored_repair_analysis_prompt(
     )
 
 
+def _normalize_public_capability_names(value: object) -> set[str]:
+    """Normalize public contract capability fields without inspecting private data."""
+
+    if isinstance(value, str):
+        raw_names = (value,)
+    elif isinstance(value, (list, tuple, set)):
+        raw_names = tuple(item for item in value if isinstance(item, str))
+    else:
+        return set()
+    aliases = {
+        "search_contacts": "contact_lookup",
+        "send_message_with_phone_number": "message_send",
+        "get_current_timestamp": "current_time",
+    }
+    return {
+        aliases.get(name.strip().lower(), name.strip().lower())
+        for name in raw_names
+        if name.strip()
+    }
+
+
+def _validated_validation_helper_contract_analysis(raw_analysis: str) -> str:
+    """Require the separately authored helper repair plan to be auditable JSON."""
+
+    try:
+        analysis = json.loads(raw_analysis)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "validation helper contract analysis is not valid JSON"
+        ) from exc
+    if not isinstance(analysis, dict):
+        raise ValueError("validation helper contract analysis must be a JSON object")
+    list_fields = (
+        "algorithm_steps",
+        "inferred_prerequisites",
+        "read_only_actions",
+        "mutating_actions",
+        "target_exceptions",
+        "invariants",
+    )
+    for field in list_fields:
+        if not isinstance(analysis.get(field), list):
+            raise ValueError(
+                f"validation helper contract analysis field {field} must be a list"
+            )
+    if not analysis["algorithm_steps"]:
+        raise ValueError("validation helper contract analysis needs algorithm steps")
+    for field in ("capability_aliases", "case_coverage"):
+        if not isinstance(analysis.get(field), dict):
+            raise ValueError(
+                f"validation helper contract analysis field {field} must be an object"
+            )
+    return json.dumps(analysis, sort_keys=True)
+
+
 def _model_authored_final_repair_directive(
     request: ToolGenerationRequest,
     errors: tuple[str, ...],
@@ -1544,6 +1661,64 @@ def _model_authored_final_repair_directive(
 
     if _request_is_validation_abstention_helper(request):
         repair_candidate_count = _model_authored_repair_candidate_count(request)
+        public_examples = tuple(
+            item
+            for item in request.validation_examples
+            if isinstance(item, dict) and not bool(item.get("held_out"))
+        )
+        public_observation = " ".join(request.observation.lower().split())
+        named_recipient_prerequisite_is_public = any(
+            isinstance(item.get("inputs"), dict)
+            and isinstance(item.get("expected"), dict)
+            and any(
+                token in str(item["inputs"].get("requested_action") or "").lower()
+                for token in ("send", "text", "message")
+            )
+            and bool(str(item["inputs"].get("target_identifier") or "").strip())
+            and "message_send"
+            in _normalize_public_capability_names(
+                item["inputs"].get("required_original_tools")
+            )
+            and "contact_lookup"
+            in (
+                _normalize_public_capability_names(
+                    item["expected"].get("required_original_tools")
+                )
+                | _normalize_public_capability_names(
+                    item["expected"].get("missing_information")
+                )
+            )
+            for item in public_examples
+        )
+        named_recipient_rule = (
+            " PUBLIC NAMED-RECIPIENT RULE: the model-visible public contract shows "
+            "that a send, text, or message action whose nonblank target is not "
+            "already a concrete phone number must add "
+            "contact_lookup before missing capabilities are computed. Insert that "
+            "inferred capability into required_original_tools before message_send, "
+            "preserve first-seen order for the remaining capabilities, and abstain "
+            "when contact_lookup is unavailable. "
+            if named_recipient_prerequisite_is_public
+            else ""
+        )
+        relative_time_exception_is_public = all(
+            token in public_observation
+            for token in (
+                "relative_time_search",
+                "current_time",
+                "blank target_identifier is valid",
+            )
+        )
+        relative_time_rule = (
+            " PUBLIC RELATIVE-TIME RULE: the public contract states that a "
+            "relative-time search depends on current_time. Infer current_time before the "
+            "missing-capability check whenever the visible request uses a relative "
+            "time anchor without an absolute date. A blank target is not itself a "
+            "blocker for that read-only search. Continue only after every other "
+            "public capability, ambiguity, and safety gate also passes. "
+            if relative_time_exception_is_public
+            else ""
+        )
         return (
             " FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE. This directive "
             "is authoritative and must be followed after every earlier instruction. "
@@ -1577,7 +1752,13 @@ def _model_authored_final_repair_directive(
             "final_answer_recommendation that names every missing capability. A fixed "
             "generic sentence such as 'not enough information' is invalid. STEP 4: "
             "only when no capability is missing, apply the public contract's "
-            "mutating-action target rule. If that rule requires a target and the "
+            "mutating-action target rule. Normalize requested_action into lowercase "
+            "semantic tokens first. An action containing search, lookup, find, list, "
+            "read, inspect, or check is read-only; never apply the blank-target rule "
+            "to it unless the public contract explicitly requires a target for that "
+            "read-only action. An action containing add, create, update, modify, "
+            "remove, delete, send, text, or message is mutating when no read-only "
+            "token is present. If that mutating rule requires a target and the "
             "visible target_identifier is blank, abstain with target_identifier in "
             "missing_information, abstain_reason missing_target_identifier, and a "
             "dynamic recommendation that explicitly says target identifier. Do not "
@@ -1594,7 +1775,12 @@ def _model_authored_final_repair_directive(
             "mentally execute every model-visible public example and every invariant "
             "named by a held-out or blind-property error. Generalize the algorithm; "
             "do not embed task ids, scenario names, benchmark answers, contact names, "
-            "phone numbers, dates, or other example-specific constants in code."
+            "phone numbers, dates, or other example-specific constants in code. "
+            + named_recipient_rule
+            + relative_time_rule
+            + "FINAL CHECK: inferred prerequisites must be inserted before missing "
+            "capabilities are computed, and every read-only exception must be tested "
+            "before any generic blank-target guard."
         )
     if not _request_complete_tools_enabled(request):
         return ""
