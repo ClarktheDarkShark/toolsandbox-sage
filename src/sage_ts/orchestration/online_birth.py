@@ -95,10 +95,7 @@ BROADER_HELPER_OVERLAPS = {
 
 
 PLACEHOLDER_ORIGINAL_TOOL_TOKENS = ("payload", "service", "lookup")
-# Keep one bounded synthesis slot after a final ordinary attempt can first prove
-# exact candidate/frontier stagnation. That last slot receives the clean-room
-# prompt instead of ending immediately after the stagnation signal is recorded.
-CANDIDATE_REPAIR_ATTEMPTS = 8
+CANDIDATE_REPAIR_ATTEMPTS = 7
 REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL = "repair_stagnation_duplicate_candidate"
 MAX_REJECTIONS_PER_TOOL_KEY = 2
 POST_DEPLOYMENT_CANARY_REQUIRED_ATTRIBUTABLE_OBSERVATIONS = 3
@@ -3060,6 +3057,7 @@ class OnlineBirthController:
                     )
                 )
             )
+            clean_room_frontiers_attempted: set[tuple[str, tuple[str, ...]]] = set()
             for attempt in range(1, CANDIDATE_REPAIR_ATTEMPTS + 1):
                 best_candidate_code_hash_before_attempt = code_hash(
                     best_partial_tool.code
@@ -3105,7 +3103,22 @@ class OnlineBirthController:
                         bool,
                     ]
                 ] = []
-                for candidate_index, raw_candidate in enumerate(candidates):
+
+                def evaluate_repair_candidate(
+                    raw_candidate: GeneratedTool,
+                    candidate_index: int,
+                ) -> (
+                    tuple[
+                        int,
+                        GeneratedTool,
+                        GeneratedTool,
+                        ValidationResult,
+                        int,
+                        bool,
+                    ]
+                    | None
+                ):
+                    nonlocal model_authored_code_change_discarded
                     generator_candidate = raw_candidate
                     candidate: GeneratedTool | None = None
                     try:
@@ -3201,7 +3214,7 @@ class OnlineBirthController:
                                 ),
                             },
                         )
-                        continue
+                        return None
                     candidate_frontier = _repair_prompt_errors(validation.errors)
                     candidate_duplicates_best = bool(
                         not validation.accepted
@@ -3209,16 +3222,88 @@ class OnlineBirthController:
                         == best_candidate_code_hash_before_attempt
                         and candidate_frontier == best_error_labels_before_attempt
                     )
-                    candidate_results.append(
-                        (
-                            candidate_index,
-                            generator_candidate,
-                            candidate,
-                            validation,
-                            _validation_failure_score(validation),
-                            candidate_duplicates_best,
+                    return (
+                        candidate_index,
+                        generator_candidate,
+                        candidate,
+                        validation,
+                        _validation_failure_score(validation),
+                        candidate_duplicates_best,
+                    )
+
+                for candidate_index, raw_candidate in enumerate(candidates):
+                    result = evaluate_repair_candidate(raw_candidate, candidate_index)
+                    if result is not None:
+                        candidate_results.append(result)
+
+                # A duplicate can first appear on the final bounded attempt. Run
+                # one independently authored clean-room candidate immediately so
+                # the stagnation signal is actionable instead of being stranded
+                # as feedback for an iteration that will never exist.
+                current_best_frontier = (
+                    best_candidate_code_hash_before_attempt,
+                    best_error_labels_before_attempt,
+                )
+                clean_room_fallback_requested = bool(
+                    candidate_results
+                    and all(result[5] for result in candidate_results)
+                    and current_best_frontier not in clean_room_frontiers_attempted
+                )
+                clean_room_candidate_count = 0
+                if clean_room_fallback_requested:
+                    clean_room_errors = tuple(
+                        dict.fromkeys(
+                            (
+                                *attempt_errors,
+                                REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,
+                            )
                         )
                     )
+                    try:
+                        if callable(candidates_method):
+                            clean_room_candidates = tuple(
+                                candidates_method(
+                                    request,
+                                    seed_tool,
+                                    clean_room_errors,
+                                )
+                            )
+                        elif callable(repair_method):
+                            clean_room_candidates = (
+                                repair_method(
+                                    request,
+                                    seed_tool,
+                                    clean_room_errors,
+                                ),
+                            )
+                        else:
+                            clean_room_candidates = (self.generator.generate(request),)
+                    except Exception as exc:
+                        self._event(
+                            "post_deployment_tool_repair_attempt_failed",
+                            {
+                                "request_id": request_id,
+                                "tool_name": tool_name,
+                                "attempt": attempt,
+                                "stage": "clean_room_candidate_generation",
+                                "error": f"{type(exc).__name__}:{exc}",
+                            },
+                        )
+                        clean_room_candidates = ()
+                    clean_room_candidate_count = len(clean_room_candidates)
+                    if clean_room_candidates:
+                        clean_room_frontiers_attempted.add(current_best_frontier)
+                    # Preserve the generator portfolio's index space even when
+                    # an earlier candidate failed normalization and therefore
+                    # was not added to ``candidate_results``.
+                    first_clean_room_index = len(candidates)
+                    for offset, raw_candidate in enumerate(clean_room_candidates):
+                        result = evaluate_repair_candidate(
+                            raw_candidate,
+                            first_clean_room_index + offset,
+                        )
+                        if result is not None:
+                            candidate_results.append(result)
                 if not candidate_results:
                     continue
                 selected_result_index = min(
@@ -3323,6 +3408,10 @@ class OnlineBirthController:
                         "tool_name": tool_name,
                         "attempt": attempt,
                         "candidate_count": len(candidate_results),
+                        "clean_room_fallback_requested": (
+                            clean_room_fallback_requested
+                        ),
+                        "clean_room_candidate_count": clean_room_candidate_count,
                         "selected_candidate_index": selected_candidate_index,
                         "selected_candidate_code_hash": code_hash(candidate.code),
                         "accepted": validation.accepted,
@@ -3373,6 +3462,8 @@ class OnlineBirthController:
                             *(
                                 (REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,)
                                 if duplicate_of_best
+                                and current_best_frontier
+                                not in clean_room_frontiers_attempted
                                 else ()
                             ),
                         )

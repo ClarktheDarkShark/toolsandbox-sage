@@ -551,24 +551,25 @@ def test_duplicate_repair_keeps_best_seed_and_adds_stagnation_feedback(
         for event, payload in events
         if event == "post_deployment_tool_repair_attempted"
     ]
-    duplicate_event = repair_events[1]
-    assert duplicate_event["duplicate_of_best"] is True
-    assert duplicate_event["retained_equal_score"] is False
-    assert duplicate_event["next_seed_source"] == "best_previous_candidate"
-    assert duplicate_event["best_candidate_code_hash_before_attempt"] == code_hash(
+    fallback_event = repair_events[1]
+    assert fallback_event["clean_room_fallback_requested"] is True
+    assert fallback_event["clean_room_candidate_count"] == 1
+    assert fallback_event["duplicate_of_best"] is False
+    assert fallback_event["retained_equal_score"] is False
+    assert fallback_event["next_seed_source"] == "selected_candidate"
+    assert fallback_event["best_candidate_code_hash_before_attempt"] == code_hash(
         candidate_a.code
     )
-    assert duplicate_event["best_error_labels_before_attempt"] == list(candidate_errors)
-    assert duplicate_event["stagnation_feedback_label"] == (
-        online_birth.REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL
-    )
+    assert fallback_event["best_error_labels_before_attempt"] == list(candidate_errors)
+    assert fallback_event["stagnation_feedback_label"] is None
     artifact_rows = _repair_candidate_rows(controller)
     assert [row["disposition"] for row in artifact_rows] == [
         "validator_rejected_selected_for_next_seed",
         "validator_rejected_duplicate_of_best",
         "validator_accepted_selected",
     ]
-    assert artifact_rows[1]["selected_for_attempt"] is True
+    assert artifact_rows[1]["selected_for_attempt"] is False
+    assert artifact_rows[2]["selected_for_attempt"] is True
 
 
 def test_repair_portfolio_prefers_novel_equal_score_over_duplicate(
@@ -1034,17 +1035,19 @@ def test_failed_bounded_repair_leaves_known_bad_tool_retired(tmp_path: Path) -> 
     assert retired.version == 1
     assert retired.retired is True
     # Candidate diversity and best-partial retention do not weaken the binding
-    # acceptance threshold or extend the bounded repair budget.
-    assert generator.repair_calls == online_birth.CANDIDATE_REPAIR_ATTEMPTS
+    # acceptance threshold. One immediate clean-room candidate is allowed for
+    # the repeated best frontier without adding another lifecycle iteration.
+    assert generator.repair_calls == online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1
     assert all(generator.retired_during_calls)
     assert acknowledgements == [(TOOL_NAME, 1, "repair-request-1", "rejected")]
     assert controller.pending_repair_requests == []
     assert "repair-request-1" in controller.handled_repair_request_ids
     artifact_rows = _repair_candidate_rows(controller)
-    assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS
-    assert [row["attempt"] for row in artifact_rows] == list(
-        range(1, online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1)
-    )
+    assert len(artifact_rows) == online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1
+    assert [row["attempt"] for row in artifact_rows] == [
+        1,
+        *range(1, online_birth.CANDIDATE_REPAIR_ATTEMPTS + 1),
+    ]
     assert all(
         row["disposition"].startswith("validator_rejected") for row in artifact_rows
     )
@@ -1054,10 +1057,12 @@ def test_failed_bounded_repair_leaves_known_bad_tool_retired(tmp_path: Path) -> 
         for event, payload in events
         if event == "post_deployment_tool_repair_attempted"
     ]
-    assert [
-        event["candidate_validations"][0]["candidate_artifact_record_sha256"]
+    event_record_hashes = [
+        candidate["candidate_artifact_record_sha256"]
         for event in attempt_events
-    ] == [row["record_sha256"] for row in artifact_rows]
+        for candidate in event["candidate_validations"]
+    ]
+    assert event_record_hashes == [row["record_sha256"] for row in artifact_rows]
 
 
 def test_candidate_evidence_write_failure_aborts_before_repair_activation(

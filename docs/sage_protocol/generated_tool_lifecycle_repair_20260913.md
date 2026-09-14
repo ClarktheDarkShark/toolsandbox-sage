@@ -73,18 +73,21 @@ For structured validation helpers, bounded repair uses compact public
 counterexample-guided synthesis. Each ordinary attempt first traces the current
 best implementation against labeled, model-visible synthetic cases and returns
 a schema-checked decision plan; a second model call writes one complete
-replacement. The prompt identifies one unresolved public case to fix first and
-lists already-passing public cases as regression guards. Both stages receive the
+replacement. The first unresolved public case remains the explicit final gate
+until it passes; the prompt also lists already-passing public cases as regression
+guards. Only then does focus advance to the next public failure. Both stages receive the
 same minimal executable specification, current code, public input/output
 contract, public cases, and public validation frontier. Held-out and blind
 checks appear only as value-free invariant labels. The plan must order
 normalization, inferred public prerequisites, missing-capability checks,
 read-only versus mutating classification, target checks, and ambiguity checks
 before code is authored. Later attempts use the best validation frontier
-observed so far. If both code and frontier repeat, the next attempt omits the
-rejected code and asks the model for a clean-room implementation from the public
-contract in one call, avoiding deterministic anchoring on the same failed
-predicates. This does not relax or change the full acceptance validator.
+observed so far. If both code and frontier repeat, the same bounded lifecycle
+attempt immediately adds one independently model-authored clean-room candidate:
+it omits the rejected code and synthesizes from the public contract in one call.
+The controller evaluates both candidates and keeps the stronger result. This
+avoids stranding a stagnation signal on the final iteration and does not relax
+or change the full acceptance validator.
 
 Every returned repair candidate is persisted before any lifecycle action in the
 append-only `post_deployment_repair_candidates.jsonl` journal. Each record binds

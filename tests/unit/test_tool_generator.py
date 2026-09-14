@@ -38,6 +38,7 @@ from sage_ts.generation.tool_generator import (
     _normalize_model_authored_tool,
     _validated_validation_helper_contract_analysis,
     _validated_validation_helper_repair_analysis,
+    _validation_helper_public_failure_focus,
     public_input_contract_from_example_inputs,
     public_output_contract_from_example_outputs,
 )
@@ -963,6 +964,7 @@ def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
     final_directive = _model_authored_final_repair_directive(request, errors)
     assert "REPAIR STRATEGY 4" in final_directive
     assert "smallest clean implementation" in final_directive
+    assert "FINAL FOCUSED PUBLIC GATE" in final_directive
 
     stagnant_directive = _model_authored_final_repair_directive(
         request,
@@ -983,6 +985,40 @@ def test_safe_action_repair_prompt_is_compact_labeled_and_values_safe() -> None:
     assert '"repair_mode": "clean_room_after_duplicate"' in stagnant_prompt
     assert rejected.code not in stagnant_prompt
     assert '"focused_public_failure"' in stagnant_prompt
+
+
+def test_validation_helper_public_focus_stays_on_first_failure() -> None:
+    observation = _safe_action_or_abstain_observation("synthetic")
+    visible_examples = _model_visible_generation_examples(
+        observation.validation_examples
+    )
+    request = ToolGenerationRequest(
+        scenario_name="post_deployment_repair(kind=implementation;family=safety)",
+        observation=observation.observation,
+        allowed_families=observation.allowed_families,
+        validation_examples=tuple(
+            {
+                "inputs": item.inputs,
+                "expected": item.expected,
+                "held_out": False,
+                "negative_applicability": item.negative_applicability,
+            }
+            for item in visible_examples
+        ),
+        suggested_tool_name="prepare_safe_action_or_abstain",
+    )
+
+    focused = _validation_helper_public_failure_focus(
+        request,
+        (
+            "source_1_raw_should_abstain:False!=True",
+            "negative_0_raw_should_abstain:False!=True",
+            "repair_strategy:7",
+        ),
+    )
+
+    assert focused is not None
+    assert focused["case_label"] == "source_1"
 
 
 def test_validation_helper_contract_analysis_requires_a_structured_plan() -> None:

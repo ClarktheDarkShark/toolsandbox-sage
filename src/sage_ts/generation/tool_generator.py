@@ -1673,10 +1673,8 @@ def _minimal_validation_helper_candidate(
 def _validation_helper_public_failure_focus(
     request: ToolGenerationRequest,
     errors: tuple[str, ...],
-    *,
-    strategy_number: int,
 ) -> dict[str, object] | None:
-    """Select one model-visible failed case without exposing held-out values."""
+    """Keep the first unresolved public case in focus until it passes."""
 
     public_cases = _model_visible_validation_helper_cases(request)
     case_by_label = {
@@ -1693,7 +1691,7 @@ def _validation_helper_public_failure_focus(
                 failed_labels.append(label)
     if not failed_labels:
         return None
-    focused_label = failed_labels[(max(1, strategy_number) - 1) % len(failed_labels)]
+    focused_label = failed_labels[0]
     return {
         "case_label": focused_label,
         "case": case_by_label[focused_label],
@@ -1735,7 +1733,6 @@ def _validation_helper_repair_payload(
         "focused_public_failure": _validation_helper_public_failure_focus(
             request,
             errors,
-            strategy_number=strategy_number,
         ),
         "repair_mode": (
             "clean_room_after_duplicate" if stagnating else "incremental_cegis"
@@ -2097,6 +2094,29 @@ def _model_authored_final_repair_directive(
                 "validator feedback."
             ),
         }.get(strategy_number, "Rewrite from the complete public contract.")
+        focused_public_failure = _validation_helper_public_failure_focus(
+            request,
+            errors,
+        )
+        focused_public_gate = ""
+        if focused_public_failure is not None:
+            focused_public_gate = (
+                " FINAL FOCUSED PUBLIC GATE: this exact model-visible synthetic "
+                "case must pass before any other improvement counts. Trace the "
+                "candidate against its input and expected output immediately before "
+                "responding: "
+                + json.dumps(
+                    {
+                        "case_label": focused_public_failure["case_label"],
+                        "case": focused_public_failure["case"],
+                        "case_validator_feedback": focused_public_failure[
+                            "case_validator_feedback"
+                        ],
+                    },
+                    sort_keys=True,
+                )
+                + "."
+            )
         return (
             " FINAL BINDING VALIDATION-ABSTENTION REPAIR DIRECTIVE. This directive "
             "is authoritative and must be followed after every earlier instruction. "
@@ -2168,7 +2188,7 @@ def _model_authored_final_repair_directive(
             + " "
             + "FINAL CHECK: inferred prerequisites must be inserted before missing "
             "capabilities are computed, and every read-only exception must be tested "
-            "before any generic blank-target guard."
+            "before any generic blank-target guard." + focused_public_gate
         )
     if not _request_complete_tools_enabled(request):
         return ""
