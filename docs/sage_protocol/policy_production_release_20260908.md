@@ -109,12 +109,14 @@ not a total production-application count. It also omitted behavior-changing
 feedback/strata code and the audited reporting evaluator, so it must not be
 reported as total SAGE.
 
-## Remaining execution gate
+## Completed execution gate
 
-The completed strict live pair predates the final v9 evaluator correction; its
-v9 result is an exact offline replay, not a clean final-tree v9 execution. After
-this tree is committed, clean, packaged, and passes the publication environment,
-input, unit, integration, and no-secret checks, one fresh fully uncached
-1,032-task pair from that exact tree remains the last execution gate. The final
-ten-pair campaign should be prepared only after that pair passes the frozen v3
-dual-endpoint gates. Both live execution stages require researcher approval.
+The clean publication tree completed ten online-build and ten paired
+frozen-registry runs with fresh controls, full 1,032-task coverage, zero runtime
+exceptions, and passing v3 dual-endpoint campaign-inclusion gates. Audited v9
+online outcome was `0.586176 -> 0.783543`; the exact paper-comparable v1 subset
+was `0.497535 -> 0.800336`. The selected cohort uses integrity-only technical
+replacements for online replication 4 and frozen replication 5 while preserving
+both failed originals. Final values, replacement disclosures, and artifact
+hashes are recorded in
+[`policy_production_final_evidence_20260916.md`](policy_production_final_evidence_20260916.md).

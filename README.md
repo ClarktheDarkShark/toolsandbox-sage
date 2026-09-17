@@ -10,37 +10,32 @@ This release intentionally restores the **policy-directed** SAGE studied in the
 paper. It does not claim that the base model naturally chooses generated tools.
 The later natural-selection experiments are not part of this branch.
 
-## What was restored
+## Publication release and evidence
 
-The ten paper runs all identified Git commit
-`25466400ae48b4520a3d7cf914d9c85d3a512755`, but they were executed from dirty
-working trees. The online runs record two distinct source-tree hashes:
+The publication runtime is pinned to commit
+`4ce1c6de0ab36dd59e1a319f4e56e298133f4a79` and tree
+`4640019c7a054d4af6a500e7327ebbd0a507bfc5`. Every selected run records that
+exact clean identity, the same locked environment, benchmark order, frozen
+clock, evaluator hashes, and read-only external-service fixture.
 
-- replications 1–5:
-  `d6aad9bc350a3e6ba7389298d7ed66deaacdff54064fa4f4db5c15fd1463a928`
-- replications 6–10:
-  `39214520a16a8d3273c8b91f3d0c41163d33d9ae6cd538839a2c31715ceb07bd`
+The completed evidence cohort contains ten online-build runs and ten paired
+frozen-registry runs. Each run includes all 1,032 tasks, a fresh matched
+control, no application-level response or result cache, and zero runtime
+exceptions. Two original executions failed the zero-exception integrity gate
+and remain preserved: online `rep04` and frozen `rep05`. They were replaced by
+`rep04r1` and `rep05r1`, respectively. Replacement eligibility depended only
+on the predeclared integrity gate, never on observed performance.
 
-The corresponding patches were not preserved, so no Git checkout can honestly
-be described as a byte-for-byte reconstruction of all ten executions. The code
-in this branch instead uses commit
-`5bf1a1a3377bb913cb11fdcd1228f18003300714` (tree
-`718ef02a85f0490d7e4dbbec4192567a1bd10b9d`) as its algorithm donor. That is the
-first clean, policy-only reconstruction validated against the paper runtime. Its
-complete 1,032-task validation produced a paper-era-evaluator SAGE outcome of
-0.7900, within the paper campaign's 0.7761–0.8095 range. That establishes
-that the restored behavior is consistent with the historical range in one
-engineering spot check; it does not establish replicated distributional
-equivalence and is not presented as a current audited outcome. New runs report
-two explicitly scoped outcome measurements: audited v9 over all 1,032 tasks and
-the unchanged paper-era v1 evaluator over the exact ordered 800-task subset.
-Only the latter is compared with historical paper values.
+Across the ten online-build runs, audited v9 outcome was `0.586176` for the
+matched control and `0.783543` for SAGE, an absolute difference of `+0.197368`
+and relative lift of `+33.67%`. On the exact paper-comparable 800-task v1
+subset, the means were `0.497535` and `0.800336`; SAGE ranged from `0.784749`
+to `0.814361`. The ten frozen-registry runs produced a v9 SAGE mean of
+`0.776195` and retained `96.28%` of the online-build gain.
 
-The accurate description for this release is therefore:
-
-> Clean policy-runtime reconstruction validated by an in-range engineering
-> spot check, with separately audited measurement and fail-closed run
-> provenance.
+The selected cohort, replacement disclosures, endpoint identities, hashes,
+and paper-ready values are recorded in
+[`docs/sage_protocol/policy_production_final_evidence_20260916.md`](docs/sage_protocol/policy_production_final_evidence_20260916.md).
 
 The detailed historical audit is in
 [`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
@@ -103,14 +98,11 @@ before or during that task. Both evaluator identities and hashes are written to
 the run artifacts. This split preserves the studied policy behavior without
 comparing incompatible task sets or evaluator versions.
 
-The latest complete strict pair, executed immediately before the v9 selector
-correction, produced `0.586240 -> 0.780362` on audited v8. Exact offline v9
-replay of all potentially affected message-recency trajectories changed one
-SAGE task from `1` to `0`, giving `0.586240 -> 0.779393` across 1,032 tasks
-(`+0.193152` absolute; `+32.95%` relative). On the exact paper-comparable 800
-tasks, the unchanged v1 endpoint was `0.503964 -> 0.799612`, above both the
-historical mean (`0.795407`) and minimum (`0.776052`). This is a successful
-engineering sample, not a substitute for the final ten-run inference.
+The completed ten-run online cohort is the primary current result. Audited v9
+uses all 10,320 matched task observations and paper-comparable v1 uses 8,000.
+The v1 SAGE mean of `0.800336` is above the archived paper mean of `0.795407`.
+Endpoint values are never mixed: v9 supports current same-run inference, while
+v1 is used only for the apples-to-apples historical comparison.
 
 ## Historical cache limitation
 
@@ -122,8 +114,8 @@ not clean fresh-control causal evidence.
 
 The legacy cache reader remains in the source only to preserve historical
 behavior and artifact compatibility. It is ineligible for new publication
-runs. The canonical launcher enforces a fresh control and records zero cached
-task/control/result reuse.
+runs. All 20 selected publication runs used fresh controls and recorded zero
+cached task, control, or response reuse.
 
 ## Installation
 
@@ -181,7 +173,7 @@ make paper-online
 The canonical launcher:
 
 - requires a clean Git tree and the exact publication environment;
-- starts the non-learning control and policy-directed SAGE in isolated,
+- starts the matched control and policy-directed SAGE in isolated,
   concurrent child processes;
 - streams each uncached control row to SAGE at the matching task boundary;
 - starts SAGE from an empty run-local registry;
@@ -191,6 +183,12 @@ The canonical launcher:
   bytes, and opens it in the external browser before either model process; and
 - verifies task order, complete one-to-one coverage, process overlap, evaluator
   identity, reflection provenance, cache state, and runtime exceptions.
+
+The matched control is not the stock ToolSandbox agent. It uses the same model
+settings, task order, execution harness, and configurable policy-aware actor
+wrapper as SAGE, but it has no generated-tool registry, cannot generate or
+learn tools, and receives only the native ToolSandbox inventory. This isolates
+the contribution of the SAGE tool system within the studied production setup.
 
 OpenAI may still report provider-managed prompt-prefix cached input tokens. That
 does not replay a response or task outcome and is recorded separately.
@@ -207,14 +205,14 @@ expected to reproduce an identical trajectory. The no-regression target is the
 audited outcome metric and complete integrity checks, not byte-identical model
 output.
 
-## Prepare the final ten-run campaign
+## Reproduce the completed ten-run campaign
 
 Preparation writes a plan and does not make model calls:
 
 ```bash
 make prepare-paper-rerun \
   SAMPLE_REPORT=outputs/publication_validation/<sample>/native_action/<run>/publication_validation_report.json \
-  CAMPAIGN_ARGS='--campaign-id chapter4_policy_10x_<date> --scope online-only --expected-online-runs 10'
+  CAMPAIGN_ARGS='--campaign-id chapter4_policy_10x_<date> --scope online-and-frozen --expected-online-runs 10'
 ```
 
 Execution remains explicitly gated:
@@ -226,13 +224,12 @@ PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py run \
   --approve-execution
 ```
 
-The publication default launches ten isolated online-build pairs concurrently;
-inside every pair, the non-learning control and policy-directed SAGE processes
-also run concurrently. Every pair receives a distinct preflighted dashboard
-port and opens Task Compare in the external browser. The aggregate campaign
-dashboard is opened externally before jobs start. Frozen-registry reuse is an
-optional, explicitly requested second scope and is not part of the default
-ten-pair run. Verify and analyze completed campaign artifacts with
+The runner launches ten isolated online-build pairs concurrently; inside every
+pair, the matched control and policy-directed SAGE processes also run
+concurrently. Every pair receives a distinct preflighted dashboard port and
+opens Task Compare in the external browser. With `online-and-frozen`, the
+second wave evaluates each independently learned registry with generation and
+repair disabled. Verify and analyze completed campaign artifacts with
 `make verify-campaign`, `make analyze`, and `make render-paper`.
 
 ## Source layout
