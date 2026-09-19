@@ -43,6 +43,12 @@ from sage_ts.runtime.toolsandbox_integration import (
 )
 from tool_sandbox.common.scenario import Scenario
 
+ONLINE_FEEDBACK_AUDITED = "audited"
+ONLINE_FEEDBACK_ACTOR_VISIBLE = "actor-visible-only"
+ONLINE_FEEDBACK_MODES = frozenset(
+    {ONLINE_FEEDBACK_AUDITED, ONLINE_FEEDBACK_ACTOR_VISIBLE}
+)
+
 
 def _online_birth_feedback_result(result: dict[str, object]) -> dict[str, object]:
     """Expose only the audited outcome as prospective tool-birth reward."""
@@ -59,6 +65,20 @@ def _online_birth_feedback_result(result: dict[str, object]) -> dict[str, object
         trace_result["outcome_similarity"] = None
         trace_result["online_birth_outcome_source"] = "unavailable"
     return trace_result
+
+
+def _actor_visible_birth_feedback_result() -> dict[str, object]:
+    """Return a score-free trace shell for deployment-like online adaptation.
+
+    The caller adds the transcript fields that were visible to the actor.  In
+    particular, this payload contains neither ToolSandbox similarity nor the
+    custom outcome evaluator, so neither signal can affect later tool birth.
+    """
+
+    return {
+        "outcome_similarity": None,
+        "online_birth_outcome_source": "withheld_actor_visible_only",
+    }
 
 
 def _reuse_log_tools(output_directory: Path, scenario_name: str) -> list[str]:
@@ -835,6 +855,9 @@ class SageRunConfig:
     reflection_control_channel: Any | None = None
     failure_memory_path: Path | None = None
     fail_on_scenario_transform_error: bool = False
+    online_feedback_mode: str = ONLINE_FEEDBACK_AUDITED
+    registry_masked_scenarios: frozenset[str] = frozenset()
+    registry_assignment_id: str | None = None
 
 
 def _frozen_registry_contract_failures(
@@ -876,6 +899,21 @@ def run_sage_with_registry(
     event_hook: EventHook | None = None,
 ) -> Path:
     """Run ToolSandbox scenarios with accepted generated tools available."""
+    if config.online_feedback_mode not in ONLINE_FEEDBACK_MODES:
+        raise ValueError(
+            f"Unknown online feedback mode: {config.online_feedback_mode}."
+        )
+    unknown_masked = set(config.registry_masked_scenarios) - set(config.scenario_names)
+    if unknown_masked:
+        raise ValueError(
+            "Registry mask contains scenarios outside the run cohort: "
+            f"{sorted(unknown_masked)[:5]}."
+        )
+    if generator is not None and config.registry_masked_scenarios:
+        raise ValueError(
+            "Randomized registry masking is defined only for a frozen registry "
+            "run with generation disabled."
+        )
     store = RegistryStore(config.registry_dir)
     if generator is None:
         frozen_binding_failures = _frozen_registry_contract_failures(store)
@@ -929,7 +967,11 @@ def run_sage_with_registry(
                 event_hook=birth_event_hook,
                 failure_memory_path=config.failure_memory_path,
             )
-        if generator is not None and reflection_controller is None:
+        if (
+            generator is not None
+            and config.online_feedback_mode == ONLINE_FEEDBACK_AUDITED
+            and reflection_controller is None
+        ):
             reflection_controller = SelfEvolutionReflectionController.from_env(
                 store=store,
                 output_dir=output_directory,
@@ -996,6 +1038,11 @@ def run_sage_with_registry(
                     "registry_size": len(registry_tools),
                     "base_tool_policy": config.base_tool_policy,
                     "generation_enabled": generator is not None,
+                    "online_feedback_mode": config.online_feedback_mode,
+                    "registry_assignment_id": config.registry_assignment_id,
+                    "registry_masked_scenario_count": len(
+                        config.registry_masked_scenarios
+                    ),
                 },
             )
             if event_hook is not None:
@@ -1008,6 +1055,11 @@ def run_sage_with_registry(
                         "registry_size": len(registry_tools),
                         "base_tool_policy": config.base_tool_policy,
                         "generation_enabled": generator is not None,
+                        "online_feedback_mode": config.online_feedback_mode,
+                        "registry_assignment_id": config.registry_assignment_id,
+                        "registry_masked_scenario_count": len(
+                            config.registry_masked_scenarios
+                        ),
                     },
                 )
             registry_load_logged = True
@@ -1041,6 +1093,65 @@ def run_sage_with_registry(
 
         loaded_entries = store.load_entries()
         retained_tools_loaded = sorted(loaded_entries)
+        registry_condition = (
+            "masked" if name in config.registry_masked_scenarios else "available"
+        )
+        if registry_condition == "masked":
+            visible_generated_by_scenario[name] = []
+            selection_context_by_scenario[name] = {
+                "retained_tools_loaded": retained_tools_loaded,
+                "filtered_out_generated_tools": retained_tools_loaded,
+                "filtered_out_reasons": {
+                    tool_name: "randomized_registry_mask"
+                    for tool_name in retained_tools_loaded
+                },
+                "shortlisted_generated_tools": [],
+                "task_context_label": routing_context_label,
+                "task_family_key": routing_family_key,
+                "priority_injection_changed_tool_order": False,
+                "relevance_gating_hid_retained_tool": bool(retained_tools_loaded),
+                "generated_tool_versions": {},
+                "experimental_registry_condition": registry_condition,
+                "registry_assignment_id": config.registry_assignment_id,
+            }
+            append_jsonl(
+                output_directory / "scenario_tool_visibility.jsonl",
+                {
+                    "scenario": name,
+                    "base_tool_policy": config.base_tool_policy,
+                    "experimental_registry_condition": registry_condition,
+                    "registry_assignment_id": config.registry_assignment_id,
+                    "retained_tools_loaded": retained_tools_loaded,
+                    "filtered_out_generated_tools": retained_tools_loaded,
+                    "filtered_out_reasons": {
+                        tool_name: "randomized_registry_mask"
+                        for tool_name in retained_tools_loaded
+                    },
+                    "shortlisted_generated_tools": [],
+                    "priority_injection_changed_tool_order": False,
+                    "relevance_gating_hid_retained_tool": bool(retained_tools_loaded),
+                    "routing_decisions": {},
+                    "tool_allow_list": list(
+                        scenario.starting_context.tool_allow_list or []
+                    ),
+                    "available_tools": sorted(
+                        scenario.starting_context.get_available_tools(
+                            scrambling_allowed=True
+                        )
+                    ),
+                    "generated_tools": [],
+                },
+            )
+            append_jsonl(
+                output_directory / "sage_run_events.jsonl",
+                {
+                    "event": "randomized_registry_mask_applied",
+                    "scenario": name,
+                    "registry_assignment_id": config.registry_assignment_id,
+                    "retained_registry_size": len(retained_tools_loaded),
+                },
+            )
+            return scenario
         # Routing sees only capabilities inferred from the same actor-facing
         # schemas used above.  In particular, opaque ToolSandbox aliases are not
         # reversed into hidden native names for selection decisions.
@@ -1121,12 +1232,16 @@ def run_sage_with_registry(
                 for tool_name in generated_tools
                 if tool_name in loaded_entries
             },
+            "experimental_registry_condition": registry_condition,
+            "registry_assignment_id": config.registry_assignment_id,
         }
         append_jsonl(
             output_directory / "scenario_tool_visibility.jsonl",
             {
                 "scenario": name,
                 "base_tool_policy": config.base_tool_policy,
+                "experimental_registry_condition": registry_condition,
+                "registry_assignment_id": config.registry_assignment_id,
                 "retained_tools_loaded": retained_tools_loaded,
                 "filtered_out_generated_tools": filtered_out_generated_tools,
                 "filtered_out_reasons": filtered_out_reasons,
@@ -1213,8 +1328,15 @@ def run_sage_with_registry(
         generated_not_attempted = [
             tool for tool in generated_visible if tool not in set(generated_attempted)
         ]
+        registry_condition = str(
+            selection_context_by_scenario.get(name, {}).get(
+                "experimental_registry_condition", "available"
+            )
+        )
         selection_status = (
-            "generated_tool_called"
+            "registry_masked_by_random_assignment"
+            if registry_condition == "masked"
+            else "generated_tool_called"
             if generated_called
             else "generated_tool_attempt_failed"
             if generated_failed
@@ -1224,7 +1346,9 @@ def run_sage_with_registry(
             if generated_visible
             else "no_visible_generated_tools"
         )
-        if generated_called:
+        if registry_condition == "masked":
+            selection_reason = "registry_masked_by_random_assignment"
+        elif generated_called:
             selection_reason = "retained_tool_invoked"
         elif generated_failed:
             selection_reason = "retained_tool_call_failed"
@@ -1243,6 +1367,10 @@ def run_sage_with_registry(
         selection_record = {
             "scenario": name,
             "base_tool_policy": config.base_tool_policy,
+            "experimental_registry_condition": registry_condition,
+            "registry_assignment_id": context.get(
+                "registry_assignment_id", config.registry_assignment_id
+            ),
             "retained_tools_loaded": context.get("retained_tools_loaded", []),
             "filtered_out_generated_tools": context.get(
                 "filtered_out_generated_tools", []
@@ -1296,6 +1424,10 @@ def run_sage_with_registry(
             selection_record,
         )
         append_jsonl(output_directory / "selection_trace.jsonl", selection_record)
+        result["experimental_registry_condition"] = registry_condition
+        result["registry_assignment_id"] = context.get(
+            "registry_assignment_id", config.registry_assignment_id
+        )
         # Side-effect preservation check: for helpers with required_original_tool_calls,
         # verify those tool names appear in the downstream conversation trajectory.
         side_effect_failures: list[str] = []
@@ -1453,13 +1585,46 @@ def run_sage_with_registry(
         # Prefer the validated paper-era feedback when it exists. New explicit
         # contracts may not have that legacy signal, so fall back to their
         # audited outcome instead of making those failures invisible to birth.
-        trace_result = _online_birth_feedback_result(result)
+        trace_result = (
+            _online_birth_feedback_result(result)
+            if config.online_feedback_mode == ONLINE_FEEDBACK_AUDITED
+            else _actor_visible_birth_feedback_result()
+        )
         visible_messages = _visible_conversation_messages_for_observation(
             output_directory,
             name,
         )
         if visible_messages:
             trace_result["messages"] = visible_messages
+        score_fields_with_values = sorted(
+            key
+            for key in ("similarity", "outcome_similarity")
+            if trace_result.get(key) is not None
+        )
+        evaluator_private_fields = sorted(
+            key
+            for key in (
+                "outcome_checks",
+                "target_state",
+                "milestone_mapping",
+                "minefield_mapping",
+                "control_outcome_similarity",
+            )
+            if key in trace_result
+        )
+        append_jsonl(
+            output_directory / "online_birth_feedback_receipts.jsonl",
+            {
+                "scenario": name,
+                "online_feedback_mode": config.online_feedback_mode,
+                "online_birth_outcome_source": trace_result.get(
+                    "online_birth_outcome_source"
+                ),
+                "score_fields_with_values": score_fields_with_values,
+                "evaluator_private_fields_present": evaluator_private_fields,
+                "visible_message_count": len(visible_messages),
+            },
+        )
         visible_task_context_processed = (
             name in birth_controller.pre_scenario_visible_observations
         )
@@ -1581,6 +1746,9 @@ def run_sage_with_registry(
             "final_registry_tools": final_registry_tools,
             "final_registry_size": len(final_registry_tools),
             "lifecycle_finalization_count": len(lifecycle_finalization),
+            "online_feedback_mode": config.online_feedback_mode,
+            "registry_assignment_id": config.registry_assignment_id,
+            "registry_masked_scenario_count": len(config.registry_masked_scenarios),
         },
     )
     selection_rows = _selection_log_rows(output_directory)

@@ -18,6 +18,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
     _safe_action_or_abstain_observation,
     _send_message_contact_lookup_observation,
     _visible_task_signals,
+    _visible_trace_indicates_failure,
     classify_visible_task_observations,
     visible_task_context_from_scenario,
 )
@@ -49,6 +50,41 @@ _RELATIVE_TIME_TOOL_NAME = "relative_day_time_to_timestamp"
 _RECORD_SELECTOR_TOOL_NAME = "select_record_by_timestamp_extreme"
 _RESOLVE_WINDOW_TOOL_NAME = "resolve_search_window_or_bounds"
 _CONTACT_LOOKUP_TOOL_NAME = "plan_contact_lookup_query"
+
+
+def test_withheld_scores_do_not_create_failure_evidence() -> None:
+    result = {
+        "outcome_similarity": None,
+        "online_birth_outcome_source": "withheld_actor_visible_only",
+        "messages": [
+            {
+                "role": "user",
+                "content": "The old reminder failed; remind me next Monday at 5 PM.",
+            },
+            {
+                "role": "assistant",
+                "content": "I created the reminder for next Monday at 5 PM.",
+            },
+        ],
+    }
+
+    assert _visible_trace_indicates_failure(result) is False
+
+
+def test_withheld_scores_preserve_explicit_visible_tool_failure() -> None:
+    result = {
+        "outcome_similarity": None,
+        "online_birth_outcome_source": "withheld_actor_visible_only",
+        "messages": [
+            {"role": "tool", "content": "Error: invalid reminder timestamp"},
+            {
+                "role": "assistant",
+                "content": "I could not create the reminder.",
+            },
+        ],
+    }
+
+    assert _visible_trace_indicates_failure(result) is True
 
 
 def test_contact_update_counterparty_helper_does_not_route_to_answer_only_sender_lookup() -> (

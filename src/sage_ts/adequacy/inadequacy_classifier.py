@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -54,12 +55,22 @@ class VisibleTaskContext:
         )
 
 
-def _similarity(result: dict[str, Any]) -> float:
-    value = result.get("similarity", 0.0)
+def _optional_score(result: dict[str, Any], key: str) -> float | None:
+    """Return a real score when one was supplied, otherwise ``None``.
+
+    Actor-visible-only adaptation deliberately withholds both evaluator scores.
+    Treating a missing score as zero would turn every otherwise successful
+    transcript into failure evidence.
+    """
+
+    value = result.get(key)
+    if value is None or isinstance(value, bool):
+        return None
     try:
-        return float(value) if isinstance(value, (int, float, str)) else 0.0
+        score = float(value) if isinstance(value, (int, float, str)) else None
     except ValueError:
-        return 0.0
+        return None
+    return score if score is not None and math.isfinite(score) else None
 
 
 def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObservation:
@@ -6726,6 +6737,40 @@ def _result_visible_trace_text(result: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+_VISIBLE_FAILURE_PATTERN = re.compile(
+    r"(?:\b(?:error|exception|traceback|failed|failure)\b|"
+    r"\b(?:unable|could\s+not|cannot|can't)\s+to\b)",
+    flags=re.IGNORECASE,
+)
+
+
+def _visible_trace_indicates_failure(result: dict[str, Any]) -> bool:
+    """Detect explicit actor-visible failure evidence without evaluator scores.
+
+    User and system text are intentionally ignored: a request may itself use
+    words such as "failed" or "error" without proving that the execution
+    failed.  Tool errors and an assistant's explicit inability are observable
+    to the actor and can therefore support online adaptation.
+    """
+
+    exception_type = result.get("exception_type")
+    if isinstance(exception_type, str) and exception_type.strip():
+        return True
+    messages = result.get("messages")
+    if not isinstance(messages, list):
+        return False
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "").strip().lower()
+        if role not in {"assistant", "agent", "tool"}:
+            continue
+        content = str(message.get("content") or "")
+        if _VISIBLE_FAILURE_PATTERN.search(content):
+            return True
+    return False
+
+
 def classify_visible_trace_observations(
     scenario_name: str,
     scenario: Scenario,
@@ -6740,12 +6785,15 @@ def classify_visible_trace_observations(
     trace = _result_visible_trace_text(result).lower()
     if not trace:
         return ()
-    try:
-        outcome_similarity = float(result.get("outcome_similarity"))
-    except (TypeError, ValueError):
-        outcome_similarity = None
-    trace_failed = _similarity(result) < 1.0 or (
-        outcome_similarity is not None and outcome_similarity < 1.0
+    similarity = _optional_score(result, "similarity")
+    outcome_similarity = _optional_score(result, "outcome_similarity")
+    supplied_scores = tuple(
+        score for score in (similarity, outcome_similarity) if score is not None
+    )
+    trace_failed = (
+        any(score < 1.0 for score in supplied_scores)
+        if supplied_scores
+        else _visible_trace_indicates_failure(result)
     )
     reminder_creation_trace = "reminder_create" in signals
     if (

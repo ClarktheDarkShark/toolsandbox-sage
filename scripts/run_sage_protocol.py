@@ -20,7 +20,13 @@ from typing import Any, Callable, cast
 
 from sage_ts.adapters.openai_agent_adapter import OpenAIChatAdapter
 from sage_ts.adapters.role_factory import SAGE_WRAPPED_AGENT_RUNTIME
-from sage_ts.adapters.sage_run_adapter import SageRunConfig, run_sage_with_registry
+from sage_ts.adapters.sage_run_adapter import (
+    ONLINE_FEEDBACK_ACTOR_VISIBLE,
+    ONLINE_FEEDBACK_AUDITED,
+    ONLINE_FEEDBACK_MODES,
+    SageRunConfig,
+    run_sage_with_registry,
+)
 from sage_ts.adapters.toolsandbox_adapter import ToolSandboxRunConfig, run_toolsandbox
 from sage_ts.campaign.artifacts import (
     append_event,
@@ -199,6 +205,9 @@ SELF_EVOLVING_PRAXIS_ENV_DEFAULTS = {
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLICATION_FIXED_TOOLSANDBOX_TIMESTAMP = 1784832588
 PUBLICATION_ENVIRONMENT_LOCK = "requirements-publication-lock.txt"
+HYPOTHESIS_PILOT_BENCHMARK_SHA256 = (
+    "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec"
+)
 PUBLICATION_EXECUTION_ENV = {
     "TZ": "America/New_York",
     "SAGE_OPENAI_MAX_RETRIES": "5",
@@ -692,6 +701,86 @@ def _clean_source_identity(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     ):
         raise ValueError("Publication Git commit or tree identity is malformed.")
     return {"git_commit": commit, "git_tree": tree, "git_clean": True}
+
+
+def _validate_hypothesis_pilot_h2_invocation(args: argparse.Namespace) -> None:
+    """Fail closed on direct invocations that would bypass the H2 launcher."""
+
+    pilot_path = args.hypothesis_pilot_manifest.resolve()
+    try:
+        pilot = json.loads(pilot_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Hypothesis-pilot manifest is unreadable.") from exc
+    if not isinstance(pilot, dict):
+        raise ValueError("Hypothesis-pilot manifest must be a JSON object.")
+    required = {
+        "mode": (args.mode, "online_build_full"),
+        "agent": (args.agent, DEFAULT_MODEL),
+        "user": (args.user, DEFAULT_MODEL),
+        "generation_model": (args.generation_model, DEFAULT_MODEL),
+        "generation": (args.generation, "on"),
+        "sage_policy": (args.sage_policy, SAGE_POLICY_SELF_EVOLVING_PRAXIS),
+        "recurrence_threshold": (args.recurrence_threshold, 2),
+        "online_feedback_mode": (
+            args.online_feedback_mode,
+            ONLINE_FEEDBACK_ACTOR_VISIBLE,
+        ),
+        "control_cache": (args.control_cache, "off"),
+        "publication_gate_purpose": (
+            args.publication_gate_purpose,
+            PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
+        ),
+    }
+    mismatches = [
+        f"{name}={observed!r} (expected {expected!r})"
+        for name, (observed, expected) in required.items()
+        if observed != expected
+    ]
+    required_true = {
+        "require_fresh_control": args.require_fresh_control,
+        "parallel_arms": args.parallel_arms,
+        "freeze_toolsandbox_clock": args.freeze_toolsandbox_clock,
+    }
+    mismatches.extend(
+        name for name, value in required_true.items() if value is not True
+    )
+    forbidden_true = {
+        "diagnostic_force_allowed": args.diagnostic_force_allowed,
+        "allow_empty_birth_preflight": args.allow_empty_birth_preflight,
+        "allow_contaminated_preflight": args.allow_contaminated_preflight,
+        "allow_low_quality_cohort": args.allow_low_quality_cohort,
+        "no_dashboard_open": args.no_dashboard_open,
+    }
+    mismatches.extend(name for name, value in forbidden_true.items() if value is True)
+    if args.resume_run_root is not None or args.resume_completed_limit is not None:
+        mismatches.append("resume")
+    if args.registry_dir is None:
+        mismatches.append("registry_dir")
+    if _digest_file(args.manifest.resolve()) != HYPOTHESIS_PILOT_BENCHMARK_SHA256:
+        mismatches.append("benchmark_manifest_sha256")
+    if mismatches:
+        raise ValueError(
+            "Hypothesis-pilot H2 invocation differs from the locked design: "
+            + ", ".join(mismatches)
+        )
+    h2 = pilot.get("h2")
+    if (
+        pilot.get("status") != "running"
+        or not isinstance(h2, dict)
+        or h2.get("status") != "running"
+    ):
+        raise ValueError("Hypothesis-pilot H2 is not the active running phase.")
+    if any(
+        not isinstance(pilot.get(name), dict) or pilot[name].get("status") != "pending"
+        for name in ("h1", "h3", "h4")
+    ):
+        raise ValueError("Hypothesis-pilot later phases must remain pending for H2.")
+    provenance = pilot.get("provenance")
+    current = _clean_source_identity()
+    if not isinstance(provenance, dict) or any(
+        provenance.get(key) != current[key] for key in ("git_commit", "git_tree")
+    ):
+        raise ValueError("Hypothesis-pilot source identity differs from the checkout.")
 
 
 def _active_publication_environment(
@@ -1896,7 +1985,9 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 manifest_path=Path(params["manifest"]),
                 reflection_control_channel=params.get("reflection_control_channel"),
                 require_fresh_reflection_control=(
-                    require_fresh_control and generation_enabled
+                    require_fresh_control
+                    and generation_enabled
+                    and str(params["online_feedback_mode"]) == ONLINE_FEEDBACK_AUDITED
                 ),
                 failure_memory_path=(
                     None
@@ -1904,6 +1995,7 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                     else Path("artifacts/summaries/failure_memory.json")
                 ),
                 fail_on_scenario_transform_error=require_fresh_control,
+                online_feedback_mode=str(params["online_feedback_mode"]),
             ),
             generator=generator,
             progress_hook=progress,
@@ -2086,6 +2178,15 @@ def main() -> None:
     )
     parser.add_argument("--dashboard-port", type=int, default=5520)
     parser.add_argument("--no-dashboard-open", action="store_true")
+    parser.add_argument(
+        "--hypothesis-pilot-manifest",
+        type=Path,
+        help=(
+            "Optional mutable one-registry H1/H2/H3 pilot manifest. When set, "
+            "the pilot dashboard is rendered into and linked from every run "
+            "dashboard view."
+        ),
+    )
     parser.add_argument("--artifact-root", type=Path, default=Path("artifacts"))
     parser.add_argument(
         "--parallel-arms",
@@ -2142,6 +2243,16 @@ def main() -> None:
         help="Override candidate-side helper generation. Use off for frozen-registry validation.",
     )
     parser.add_argument(
+        "--online-feedback-mode",
+        choices=tuple(sorted(ONLINE_FEEDBACK_MODES)),
+        default=ONLINE_FEEDBACK_AUDITED,
+        help=(
+            "Choose whether online tool adaptation may consume audited outcome "
+            "and matched-control feedback, or only actor-visible task context "
+            "and transcript fields."
+        ),
+    )
+    parser.add_argument(
         "--diagnostic-force-allowed",
         action="store_true",
         help="Allow SAGE_DIAGNOSTIC_FORCE_* env vars for explicit diagnostic runs only.",
@@ -2194,6 +2305,20 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    if (
+        args.hypothesis_pilot_manifest is not None
+        and not args.hypothesis_pilot_manifest.is_file()
+    ):
+        raise SystemExit(
+            "Hypothesis pilot manifest does not exist: "
+            f"{args.hypothesis_pilot_manifest}"
+        )
+    if args.hypothesis_pilot_manifest is not None:
+        try:
+            _validate_hypothesis_pilot_h2_invocation(args)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
 
     if args.require_fresh_control and args.control_cache != "off":
         raise SystemExit(
@@ -2450,11 +2575,19 @@ def main() -> None:
     effective_parallel_arms = args.parallel_arms and not (
         control_cache_plan is not None and control_cache_plan["cached_scenarios"]
     )
+    audited_online_feedback = (
+        generation_enabled and args.online_feedback_mode == ONLINE_FEEDBACK_AUDITED
+    )
     reflection_control_delivery = (
         "task_synchronous_stream"
-        if args.require_fresh_control and generation_enabled and effective_parallel_arms
+        if args.require_fresh_control
+        and audited_online_feedback
+        and effective_parallel_arms
         else "preloaded_complete_map"
-        if args.require_fresh_control and generation_enabled
+        if args.require_fresh_control and audited_online_feedback
+        else "withheld_actor_visible_only"
+        if generation_enabled
+        and args.online_feedback_mode == ONLINE_FEEDBACK_ACTOR_VISIBLE
         else "not_applicable_generation_disabled"
         if args.require_fresh_control
         else "legacy_control_cache"
@@ -2497,6 +2630,7 @@ def main() -> None:
             "candidate_generated_tools_enabled": generation_enabled,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+            "online_feedback_mode": args.online_feedback_mode,
             "parallel_arms": effective_parallel_arms,
             "reflection_control_delivery": reflection_control_delivery,
             "timezone": os.environ.get("TZ"),
@@ -2630,6 +2764,7 @@ def main() -> None:
         scenario_count=len(scenario_names),
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
+        hypothesis_pilot_manifest=args.hypothesis_pilot_manifest,
     )
     # Dashboard visibility is part of the experiment surface. Keep it on by
     # default for every run; only the explicit CLI flag should suppress it.
@@ -2706,6 +2841,7 @@ def main() -> None:
             candidate_dir=candidate_dir,
             registry_dir=registry_dir,
             artifact_root=args.artifact_root,
+            hypothesis_pilot_manifest=args.hypothesis_pilot_manifest,
         )
 
     def campaign_event(
@@ -2739,7 +2875,9 @@ def main() -> None:
         )
         ctx = get_context("spawn")
         reflection_control_channel = (
-            ctx.Queue() if args.require_fresh_control and generation_enabled else None
+            ctx.Queue()
+            if args.require_fresh_control and audited_online_feedback
+            else None
         )
         base_params: dict[str, Any] = {
             "mode": args.mode,
@@ -2762,6 +2900,7 @@ def main() -> None:
             "resume_completed_limit": resume_completed_limit,
             "require_fresh_control": args.require_fresh_control,
             "reflection_control_channel": reflection_control_channel,
+            "online_feedback_mode": args.online_feedback_mode,
         }
         control_process = ctx.Process(
             target=_run_control_arm_worker,
@@ -3053,7 +3192,7 @@ def main() -> None:
                 manifest_path=args.manifest,
                 reflection_control_rows=reflection_control_rows,
                 require_fresh_reflection_control=(
-                    args.require_fresh_control and generation_enabled
+                    args.require_fresh_control and audited_online_feedback
                 ),
                 # Publication runs must not inherit conclusions from earlier
                 # campaigns. Non-publication runs retain the historical
@@ -3062,6 +3201,7 @@ def main() -> None:
                 if args.require_fresh_control
                 else Path("artifacts/summaries/failure_memory.json"),
                 fail_on_scenario_transform_error=args.require_fresh_control,
+                online_feedback_mode=args.online_feedback_mode,
             ),
             generator=generator,
             progress_hook=candidate_progress,
@@ -3222,6 +3362,7 @@ def main() -> None:
         "candidate_generated_tools_enabled": generation_enabled,
         "reporting_outcome_evaluator": reporting_outcome_evaluator,
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+        "online_feedback_mode": args.online_feedback_mode,
         "timezone": os.environ.get("TZ"),
         "scenario_count": len(scenario_names),
         "benchmark_manifest_path": str(benchmark_manifest_path),
@@ -3271,7 +3412,10 @@ def main() -> None:
         ),
         "reflection_control_source": (
             "same_run_fresh"
-            if args.require_fresh_control and generation_enabled
+            if args.require_fresh_control and audited_online_feedback
+            else "withheld_actor_visible_only"
+            if generation_enabled
+            and args.online_feedback_mode == ONLINE_FEEDBACK_ACTOR_VISIBLE
             else "not_applicable"
             if not generation_enabled
             else "legacy_control_cache"
@@ -3313,6 +3457,9 @@ def main() -> None:
         "dashboard_open_required": args.require_fresh_control,
         "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
         if dashboard_open_receipt_path
+        else None,
+        "hypothesis_pilot_manifest": str(args.hypothesis_pilot_manifest.resolve())
+        if args.hypothesis_pilot_manifest
         else None,
         "parallel_arms": effective_parallel_arms,
         "parallel_arm_execution": parallel_arm_execution,
@@ -3387,6 +3534,7 @@ def main() -> None:
             "candidate_generated_tools_enabled": generation_enabled,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
+            "online_feedback_mode": args.online_feedback_mode,
             "timezone": os.environ.get("TZ"),
             "helper_contribution_summary_path": str(helper_contribution_path),
             "helper_contribution_artifact_path": str(helper_contribution_artifact_path),

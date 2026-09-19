@@ -9,7 +9,9 @@ import pytest
 
 import sage_ts.adapters.sage_run_adapter as sage_run_adapter
 from sage_ts.adapters.sage_run_adapter import (
+    ONLINE_FEEDBACK_ACTOR_VISIBLE,
     SageRunConfig,
+    _actor_visible_birth_feedback_result,
     _online_birth_feedback_result,
     _side_effect_followup_failures,
     _side_effect_followup_failures_from_trace_events,
@@ -106,6 +108,13 @@ def test_online_birth_feedback_result_drops_evaluator_private_payloads() -> None
         "outcome_similarity": 0.75,
         "exception_type": None,
         "online_birth_outcome_source": "audited_outcome",
+    }
+
+
+def test_actor_visible_birth_feedback_contains_no_evaluator_signal() -> None:
+    assert _actor_visible_birth_feedback_result() == {
+        "outcome_similarity": None,
+        "online_birth_outcome_source": "withheld_actor_visible_only",
     }
 
 
@@ -752,6 +761,89 @@ def test_sage_runner_logs_frozen_registry_reuse_without_mutating_manifest(
 
     summary = json.loads((output_dir / "selection_summary.json").read_text())
     assert summary["generated_tool_called_scenarios"] == 1
+
+
+def test_randomized_registry_mask_preserves_native_inventory_and_hides_registry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+    manifest_before = (store.root / "registry_manifest.json").read_bytes()
+
+    def fake_sequence(
+        config: ToolSandboxRunConfig,
+        *,
+        scenario_transform: ScenarioTransform,
+        result_hook: Optional[ResultHook] = None,
+        **_kwargs: object,
+    ) -> Path:
+        output_dir = tmp_path / "run"
+        output_dir.mkdir()
+        scenario = Scenario(
+            starting_context=ExecutionContext(tool_allow_list=["end_conversation"])
+        )
+        native_before = set(
+            scenario.starting_context.get_available_tools(scrambling_allowed=True)
+        )
+        enhanced = scenario_transform("toy_birth", scenario, output_dir)
+        available = set(
+            enhanced.starting_context.get_available_tools(scrambling_allowed=True)
+        )
+        assert available == native_before
+        assert "canonicalize_connectivity_label" not in available
+        assert result_hook is not None
+        result = result_hook(
+            "toy_birth",
+            enhanced,
+            {"similarity": 1.0, "outcome_similarity": 1.0},
+            output_dir,
+        )
+        assert result["experimental_registry_condition"] == "masked"
+        assert result["registry_assignment_id"] == "assignment-sha"
+        return output_dir
+
+    monkeypatch.setattr(sage_run_adapter, "run_scenario_sequence", fake_sequence)
+
+    output_dir = run_sage_with_registry(
+        SageRunConfig(
+            agent="Unhelpful",
+            user="GPT_4_o_2024_05_13",
+            scenario_names=("toy_birth",),
+            output_dir=tmp_path / "outputs",
+            registry_dir=store.root,
+            registry_masked_scenarios=frozenset({"toy_birth"}),
+            registry_assignment_id="assignment-sha",
+        )
+    )
+
+    assert (store.root / "registry_manifest.json").read_bytes() == manifest_before
+    visibility = json.loads((output_dir / "scenario_tool_visibility.jsonl").read_text())
+    assert visibility["experimental_registry_condition"] == "masked"
+    assert visibility["generated_tools"] == []
+    assert visibility["filtered_out_reasons"] == {
+        "canonicalize_connectivity_label": "randomized_registry_mask"
+    }
+    selection = json.loads((output_dir / "scenario_tool_selection.jsonl").read_text())
+    assert selection["selection_status"] == "registry_masked_by_random_assignment"
+    assert selection["generated_tools_visible"] == []
+    assert selection["generated_tools_attempted"] == []
+    assert selection["generated_tools_called"] == []
+
+
+def test_registry_mask_rejects_online_generation(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="frozen registry"):
+        run_sage_with_registry(
+            SageRunConfig(
+                agent="Unhelpful",
+                user="GPT_4_o_2024_05_13",
+                scenario_names=("toy_birth",),
+                output_dir=tmp_path / "outputs",
+                registry_dir=tmp_path / "registry",
+                online_feedback_mode=ONLINE_FEEDBACK_ACTOR_VISIBLE,
+                registry_masked_scenarios=frozenset({"toy_birth"}),
+            ),
+            generator=object(),  # type: ignore[arg-type]
+        )
 
 
 def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(

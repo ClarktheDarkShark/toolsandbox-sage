@@ -41,6 +41,7 @@ from sage_ts.evaluation.outcome_score import (
 from sage_ts.generation.complete_tools import native_action_tool_enabled
 from sage_ts.generation.tool_spec import GeneratedTool
 from sage_ts.orchestration.online_birth import (
+    POST_DEPLOYMENT_REPAIR_STATE_FILENAME,
     REPAIR_STAGNATION_DUPLICATE_CANDIDATE_LABEL,
     _repair_prompt_errors,
     _validation_error_distance,
@@ -5309,6 +5310,90 @@ def _verify_reflection(
         )
 
 
+def _verify_actor_visible_only_feedback(candidate_dir: Path) -> dict[str, Any]:
+    """Prove that a score-free online build emitted no reflection artifacts."""
+
+    forbidden = (
+        "self_evolution_task_feedback.jsonl",
+        "self_evolution_tool_repair_requests.jsonl",
+        "self_evolution_tool_repair_acknowledgements.jsonl",
+        "self_evolution_tool_lifecycle.jsonl",
+    )
+    nonempty = [
+        name
+        for name in forbidden
+        if (candidate_dir / name).is_file()
+        and (candidate_dir / name).read_text(encoding="utf-8").strip()
+    ]
+    if nonempty:
+        raise ValueError(
+            "Actor-visible-only run contains evaluator/reflection artifacts: "
+            f"{nonempty}."
+        )
+    repair_state_path = candidate_dir / POST_DEPLOYMENT_REPAIR_STATE_FILENAME
+    repair_state_status = "absent"
+    if repair_state_path.exists():
+        repair_state = _read_json(repair_state_path)
+        expected_repair_state = {
+            "schema_version": 1,
+            "pending_repair_requests": [],
+            "handled_repair_request_ids": [],
+            "canary_state_by_tool": {},
+            "repair_transactions_by_tool": {},
+            "last_completed_count": 0,
+        }
+        if repair_state != expected_repair_state:
+            raise ValueError(
+                "Actor-visible-only run contains nonempty post-deployment repair state."
+            )
+        repair_state_status = "present_empty_disabled_receipt"
+    summary = _read_json(candidate_dir / "result_summary.json")
+    result_rows = summary.get("per_scenario_results")
+    if not isinstance(result_rows, list):
+        raise ValueError("Actor-visible-only result summary has no scenario rows.")
+    expected_order = [
+        str(row.get("name") or "") for row in result_rows if isinstance(row, dict)
+    ]
+    receipt_path = candidate_dir / "online_birth_feedback_receipts.jsonl"
+    if not receipt_path.is_file():
+        raise ValueError("Actor-visible-only feedback receipt journal is missing.")
+    receipts = [
+        json.loads(line)
+        for line in receipt_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    if not all(isinstance(row, dict) for row in receipts):
+        raise ValueError("Actor-visible-only feedback receipt journal is malformed.")
+    receipt_order = [str(row.get("scenario") or "") for row in receipts]
+    if receipt_order != expected_order:
+        raise ValueError(
+            "Actor-visible-only feedback receipts do not match the task order."
+        )
+    for row in receipts:
+        if (
+            row.get("online_feedback_mode") != "actor-visible-only"
+            or row.get("online_birth_outcome_source") != "withheld_actor_visible_only"
+            or row.get("score_fields_with_values") != []
+            or row.get("evaluator_private_fields_present") != []
+            or isinstance(row.get("visible_message_count"), bool)
+            or not isinstance(row.get("visible_message_count"), int)
+            or int(row["visible_message_count"]) < 0
+        ):
+            raise ValueError(
+                "Actor-visible-only feedback receipt contains evaluator evidence."
+            )
+    return {
+        "status": "pass",
+        "online_feedback_mode": "actor-visible-only",
+        "nonempty_forbidden_artifacts": [],
+        "repair_state_status": repair_state_status,
+        "score_free_feedback_receipt_count": len(receipts),
+        "score_free_feedback_receipt_sha256": hashlib.sha256(
+            receipt_path.read_bytes()
+        ).hexdigest(),
+    }
+
+
 def _verify_paired_outcome_aggregates(
     comparison: dict[str, Any],
     *,
@@ -5431,14 +5516,14 @@ def verify_run(
             raise ValueError(
                 f"Protocol field {model_field!r} is not {PUBLICATION_MODEL}."
             )
-    expected_mode = (
-        "online_build_full"
-        if expect_reflection == "same-run-fresh"
-        else "full_benchmark"
-    )
+    online_generation = expect_reflection in {
+        "same-run-fresh",
+        "actor-visible-only",
+    }
+    expected_mode = "online_build_full" if online_generation else "full_benchmark"
     if protocol.get("mode") != expected_mode:
         raise ValueError(f"Protocol mode is not {expected_mode!r}.")
-    expected_generation = expect_reflection == "same-run-fresh"
+    expected_generation = online_generation
     if protocol.get("generation_enabled") is not expected_generation:
         raise ValueError(
             "Protocol generation_enabled does not match the publication arm."
@@ -5508,7 +5593,9 @@ def verify_run(
         "parallel_arms": True,
         "reflection_control_delivery": (
             "task_synchronous_stream"
-            if expected_generation
+            if expect_reflection == "same-run-fresh"
+            else "withheld_actor_visible_only"
+            if expect_reflection == "actor-visible-only"
             else "not_applicable_generation_disabled"
         ),
         "dashboard_open_required": True,
@@ -5519,6 +5606,25 @@ def verify_run(
                 f"Protocol field {field!r} is {protocol.get(field)!r}; "
                 f"expected {expected!r}."
             )
+    recorded_feedback_mode = protocol.get("online_feedback_mode")
+    if expect_reflection == "actor-visible-only":
+        if recorded_feedback_mode != "actor-visible-only":
+            raise ValueError(
+                "Actor-visible-only run did not record its online feedback mode."
+            )
+        pilot_manifest_value = protocol.get("hypothesis_pilot_manifest")
+        if not isinstance(pilot_manifest_value, str) or not pilot_manifest_value:
+            raise ValueError(
+                "Actor-visible-only campaign did not bind a hypothesis-pilot manifest."
+            )
+        pilot_manifest_path = Path(pilot_manifest_value).resolve()
+        if not pilot_manifest_path.is_file():
+            raise ValueError("Bound hypothesis-pilot manifest is missing.")
+    elif recorded_feedback_mode not in {None, "audited"}:
+        raise ValueError(
+            "Publication run records an unexpected online feedback mode: "
+            f"{recorded_feedback_mode!r}."
+        )
     if comparison.get("protocol_gate_passed") is not True:
         raise ValueError("Paired comparison protocol gate did not pass.")
     if comparison.get("protocol_gate_reasons") != []:
@@ -5635,6 +5741,11 @@ def verify_run(
         if protocol.get("reflection_control_source") != "same_run_fresh":
             raise ValueError(
                 "Online reflection did not declare same-run fresh control."
+            )
+    elif expect_reflection == "actor-visible-only":
+        if protocol.get("reflection_control_source") != "withheld_actor_visible_only":
+            raise ValueError(
+                "Actor-visible-only run did not declare evaluator feedback withheld."
             )
     elif protocol.get("reflection_control_source") != "not_applicable":
         raise ValueError(
@@ -5778,9 +5889,9 @@ def verify_run(
         registry_dir,
         scenario_order=candidate_order,
         trajectory_evidence=candidate_trajectory_evidence,
-        require_lifecycle_feedback=expected_generation,
+        require_lifecycle_feedback=expect_reflection == "same-run-fresh",
     )
-    if expected_generation:
+    if expect_reflection == "same-run-fresh":
         lifecycle_integrity = _verify_lifecycle_closed(
             candidate_dir,
             registry_dir,
@@ -5797,6 +5908,15 @@ def verify_run(
                 protocol_events=protocol_events,
             )
         )
+    elif expect_reflection == "actor-visible-only":
+        lifecycle_integrity = {
+            "lifecycle_mutation_expected": False,
+            "online_registry_birth_expected": True,
+            "evaluator_feedback_withheld": _verify_actor_visible_only_feedback(
+                candidate_dir
+            ),
+            **checkpoint_integrity,
+        }
     else:
         lifecycle_integrity = {
             "lifecycle_mutation_expected": False,
@@ -5893,7 +6013,7 @@ def main() -> None:
     parser.add_argument("--expected-tasks", type=int, default=PUBLICATION_TASK_COUNT)
     parser.add_argument(
         "--expect-reflection",
-        choices=("same-run-fresh", "not-applicable"),
+        choices=("same-run-fresh", "actor-visible-only", "not-applicable"),
         required=True,
     )
     parser.add_argument(

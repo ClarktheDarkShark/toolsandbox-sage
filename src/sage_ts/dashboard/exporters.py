@@ -19,6 +19,10 @@ from urllib.parse import quote
 from urllib.request import urlopen
 
 from sage_ts.campaign.artifacts import ARTIFACT_ROOT, read_jsonl
+from sage_ts.dashboard.hypothesis_pilot import (
+    HYPOTHESIS_PILOT_HTML_NAME,
+    write_hypothesis_pilot_dashboard,
+)
 from sage_ts.dashboard.server import (
     DASHBOARD_SERVER_IDENTITY_PATH,
     DASHBOARD_SERVER_PROTOCOL,
@@ -2261,12 +2265,19 @@ def write_protocol_dashboard(
     registry_dir: Path | None = None,
     model_metadata: dict[str, Any] | None = None,
     artifact_root: Path = ARTIFACT_ROOT,
+    hypothesis_pilot_manifest: Path | None = None,
 ) -> Path:
     """Write dashboard HTML and data for a paired protocol run."""
     control_dir = _resolve_run_dir(control_dir)
     candidate_dir = _resolve_run_dir(candidate_dir)
     dashboard_dir = run_root / "dashboard"
     dashboard_dir.mkdir(parents=True, exist_ok=True)
+    pilot_payload: dict[str, Any] | None = None
+    if hypothesis_pilot_manifest is not None:
+        pilot_payload = write_hypothesis_pilot_dashboard(
+            manifest_path=hypothesis_pilot_manifest,
+            output_dir=dashboard_dir,
+        )
     started_at_path = run_root / "dashboard_started_at.txt"
     if started_at_path.exists():
         started_at = started_at_path.read_text(encoding="utf-8").strip()
@@ -2320,11 +2331,33 @@ def write_protocol_dashboard(
         "registry_manifest": _read_json(registry_dir / "registry_manifest.json")
         if registry_dir
         else {},
+        "hypothesis_pilot": pilot_payload,
     }
     (dashboard_dir / "data.json").write_text(
         json.dumps(data, indent=2) + "\n", encoding="utf-8"
     )
-    (dashboard_dir / "index.html").write_text(DASHBOARD_HTML, encoding="utf-8")
+
+    def with_pilot_navigation(template: str) -> str:
+        if pilot_payload is None:
+            return template
+        option = (
+            f'<option value="{HYPOTHESIS_PILOT_HTML_NAME}">H1/H2/H3/H4 Pilot</option>'
+        )
+        marker = '<option value="task_compare.html">Task Compare</option>'
+        rendered = template.replace(marker, f"{marker}\n        {option}", 1)
+        links_marker = '<div class="links">'
+        if links_marker in rendered:
+            rendered = rendered.replace(
+                links_marker,
+                links_marker + f'<a class="btn" href="{HYPOTHESIS_PILOT_HTML_NAME}">'
+                "H1/H2/H3/H4 Pilot</a>",
+                1,
+            )
+        return rendered
+
+    (dashboard_dir / "index.html").write_text(
+        with_pilot_navigation(DASHBOARD_HTML), encoding="utf-8"
+    )
     task_focus_payload = _write_task_focus_dashboard(
         dashboard_dir,
         run_root,
@@ -2333,6 +2366,13 @@ def write_protocol_dashboard(
         candidate_dir,
     )
     _write_task_compare_dashboard(dashboard_dir, run_root, data, task_focus_payload)
+    if pilot_payload is not None:
+        for name in ("task_focus.html", "task_compare.html"):
+            path = dashboard_dir / name
+            path.write_text(
+                with_pilot_navigation(path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
     _write_latest_pointer(
         dashboard_dir / "task_compare.html",
         name="latest_sage_ts.html",

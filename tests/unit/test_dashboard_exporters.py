@@ -1023,6 +1023,52 @@ def test_task_focus_exports_required_check_from_database_update(tmp_path: Path) 
     ]
 
 
+def test_protocol_dashboard_links_embedded_hypothesis_pilot(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    registry = run_root / "registry"
+    registry.mkdir(parents=True)
+    pilot_manifest = tmp_path / "pilot_manifest.json"
+    pilot_manifest.write_text(
+        json.dumps(
+            {
+                "pilot_id": "h123_test",
+                "status": "running",
+                "progress_stage": 1,
+                "h1": {},
+                "h2": {},
+                "h3": {},
+                "h4": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    index = write_protocol_dashboard(
+        run_root,
+        mode="online_build_full",
+        status="running",
+        phase="control",
+        agent="gpt-4o-mini",
+        user="gpt-4o-mini",
+        generation_enabled=True,
+        base_tool_policy="all_tools",
+        scenario_count=1032,
+        registry_dir=registry,
+        hypothesis_pilot_manifest=pilot_manifest,
+    )
+
+    for name in ("index.html", "task_focus.html", "task_compare.html"):
+        rendered = (index.parent / name).read_text(encoding="utf-8")
+        assert (
+            '<option value="hypothesis_pilot.html">H1/H2/H3/H4 Pilot</option>'
+            in rendered
+        )
+    assert (index.parent / "hypothesis_pilot.html").is_file()
+    data = json.loads((index.parent / "data.json").read_text(encoding="utf-8"))
+    assert data["hypothesis_pilot"]["pilot_id"] == "h123_test"
+
+
 def test_task_focus_shows_missed_state_update_values_from_later_tool(
     tmp_path: Path,
 ) -> None:

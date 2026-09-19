@@ -8,6 +8,7 @@ SIZE="${1:-full}"
 DASHBOARD_PORT="${2:-63105}"
 EXECUTION_MODE="${3:-native-only}"
 PUBLICATION_GATE_PURPOSE="${4:-release-sample}"
+ONLINE_FEEDBACK_MODE="${SAGE_ONLINE_FEEDBACK_MODE:-audited}"
 if [[ "$SIZE" != "full" && "$SIZE" != "dev10" && "$SIZE" != "dev30" ]]; then
   echo "Run size must be full, dev10, or dev30." >&2
   exit 2
@@ -37,6 +38,26 @@ fi
 if [[ "$PUBLICATION_GATE_PURPOSE" != "release-sample" && "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" && "$PUBLICATION_GATE_PURPOSE" != "development-diagnostic" ]]; then
   echo "Gate purpose must be release-sample, campaign-inclusion, or development-diagnostic." >&2
   exit 2
+fi
+if [[ "$ONLINE_FEEDBACK_MODE" != "audited" && "$ONLINE_FEEDBACK_MODE" != "actor-visible-only" ]]; then
+  echo "SAGE_ONLINE_FEEDBACK_MODE must be audited or actor-visible-only." >&2
+  exit 2
+fi
+if [[ "$ONLINE_FEEDBACK_MODE" == "actor-visible-only" && "$EXECUTION_MODE" != "native-only" ]]; then
+  echo "actor-visible-only feedback is valid only for generation-enabled native-only runs." >&2
+  exit 2
+fi
+if [[ -n "${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}" ]]; then
+  if [[ "$SIZE" != "full" || "$EXECUTION_MODE" != "native-only" || "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" || "$ONLINE_FEEDBACK_MODE" != "actor-visible-only" ]]; then
+    echo "Hypothesis-pilot H2 requires: full, native-only, campaign-inclusion, and SAGE_ONLINE_FEEDBACK_MODE=actor-visible-only." >&2
+    exit 2
+  fi
+fi
+if [[ "$SIZE" == "full" && "$EXECUTION_MODE" == "native-only" && "$PUBLICATION_GATE_PURPOSE" == "campaign-inclusion" && "$ONLINE_FEEDBACK_MODE" == "actor-visible-only" ]]; then
+  if [[ -z "${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}" || ! -f "$SAGE_HYPOTHESIS_PILOT_MANIFEST" ]]; then
+    echo "Actor-visible H2 campaign inclusion requires SAGE_HYPOTHESIS_PILOT_MANIFEST." >&2
+    exit 2
+  fi
 fi
 if [[ ( "$EXECUTION_MODE" == "development-only" || "$EXECUTION_MODE" == "development-transfer" ) && "$PUBLICATION_GATE_PURPOSE" != "development-diagnostic" ]]; then
   echo "Development cohorts require gate purpose development-diagnostic." >&2
@@ -106,6 +127,37 @@ PUBLICATION_GIT_COMMIT="$(git rev-parse --verify HEAD)"
 PUBLICATION_GIT_TREE="$(git rev-parse "${PUBLICATION_GIT_COMMIT}^{tree}")"
 readonly PUBLICATION_GIT_COMMIT
 readonly PUBLICATION_GIT_TREE
+
+if [[ -n "${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}" ]]; then
+  "$PYTHON_EXECUTABLE" - "$SAGE_HYPOTHESIS_PILOT_MANIFEST" \
+    "$PUBLICATION_GIT_COMMIT" "$PUBLICATION_GIT_TREE" <<'PY'
+import json
+import pathlib
+import sys
+
+manifest_path = pathlib.Path(sys.argv[1]).resolve()
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+provenance = payload.get("provenance")
+h2 = payload.get("h2")
+if not isinstance(provenance, dict) or not isinstance(h2, dict):
+    raise SystemExit("Hypothesis-pilot manifest provenance/state is malformed.")
+if provenance.get("git_commit") != sys.argv[2] or provenance.get("git_tree") != sys.argv[3]:
+    raise SystemExit("Hypothesis-pilot Git identity differs from the H2 source checkout.")
+if provenance.get("git_status") != "clean":
+    raise SystemExit("Hypothesis-pilot manifest does not lock a clean Git source.")
+if payload.get("status") != "running" or h2.get("status") != "running":
+    raise SystemExit("Hypothesis-pilot H2 must be marked running before launch.")
+for hypothesis in ("h1", "h3", "h4"):
+    state = payload.get(hypothesis)
+    if not isinstance(state, dict) or state.get("status") != "pending":
+        raise SystemExit(
+            "Hypothesis-pilot H2 requires all later phases to remain pending."
+        )
+if not str(payload.get("pilot_id") or "").strip():
+    raise SystemExit("Hypothesis-pilot manifest has no pilot ID.")
+PY
+  echo "hypothesis_pilot_git_binding=pass"
+fi
 
 # Verify the tracked release chain: immutable P0 inputs, checkpoint policy
 # amendment, benchmark, fixture, thresholds, and historical analysis references.
@@ -236,7 +288,11 @@ if [[ "$EXECUTION_MODE" == "native-only" ]]; then
   RUN_MODE="online_build_full"
   GENERATION="on"
   SAGE_POLICY="self-evolving-praxis"
-  REFLECTION_EXPECTATION="same-run-fresh"
+  if [[ "$ONLINE_FEEDBACK_MODE" == "actor-visible-only" ]]; then
+    REFLECTION_EXPECTATION="actor-visible-only"
+  else
+    REFLECTION_EXPECTATION="same-run-fresh"
+  fi
 elif [[ "$EXECUTION_MODE" == "frozen-only" ]]; then
   ARM="frozen_registry"
   RUN_MODE="full_benchmark"
@@ -345,6 +401,7 @@ CMD=(
   --user gpt-4o-mini
   --generation-model gpt-4o-mini
   --generation "$GENERATION"
+  --online-feedback-mode "$ONLINE_FEEDBACK_MODE"
   --control-cache off
   --require-fresh-control
   --publication-gate-purpose "$PUBLICATION_GATE_PURPOSE"
@@ -356,6 +413,9 @@ CMD=(
   --output-root "$ARM_OUTPUT"
   --artifact-root "$ARM_ARTIFACTS"
 )
+if [[ -n "${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}" ]]; then
+  CMD+=(--hypothesis-pilot-manifest "$SAGE_HYPOTHESIS_PILOT_MANIFEST")
+fi
 if [[ "$EXECUTION_MODE" == "development-only" ]]; then
   CMD+=(
     --allow-low-quality-cohort
@@ -400,6 +460,8 @@ fi
   echo "fresh_control_required=true"
   echo "publication_gate_purpose=$PUBLICATION_GATE_PURPOSE"
   echo "reflection_control=$REFLECTION_EXPECTATION"
+  echo "online_feedback_mode=$ONLINE_FEEDBACK_MODE"
+  echo "hypothesis_pilot_manifest=${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}"
   echo "openai_response_cache=off"
   echo "openai_response_cache_scope=persistent_repository_whole_response_replay"
   echo "persistent_generation_output_cache=off"

@@ -347,6 +347,25 @@ def test_reflection_verifier_uses_null_aware_outcome_fallback(
 ) -> None:
     candidate_dir = tmp_path / "candidate"
     candidate_dir.mkdir()
+    _write_json(
+        candidate_dir / "result_summary.json",
+        {"per_scenario_results": [{"name": "task_one"}]},
+    )
+    receipt_path = candidate_dir / "online_birth_feedback_receipts.jsonl"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "scenario": "task_one",
+                "online_feedback_mode": "actor-visible-only",
+                "online_birth_outcome_source": "withheld_actor_visible_only",
+                "score_fields_with_values": [],
+                "evaluator_private_fields_present": [],
+                "visible_message_count": 2,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     control = {
         "name": "task_a",
         "similarity": 0.25,
@@ -3357,6 +3376,51 @@ def test_verifier_rejects_tampered_candidate_reflection_signal(
             expect_reflection="same-run-fresh",
             **_verification_pins(run_root),
         )
+
+
+def test_actor_visible_only_feedback_forbids_evaluator_reflection_artifacts(
+    tmp_path: Path,
+) -> None:
+    candidate_dir = tmp_path / "candidate"
+    candidate_dir.mkdir()
+    _write_json(
+        candidate_dir / "result_summary.json",
+        {"per_scenario_results": [{"name": "task_one"}]},
+    )
+    receipt_path = candidate_dir / "online_birth_feedback_receipts.jsonl"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "scenario": "task_one",
+                "online_feedback_mode": "actor-visible-only",
+                "online_birth_outcome_source": "withheld_actor_visible_only",
+                "score_fields_with_values": [],
+                "evaluator_private_fields_present": [],
+                "visible_message_count": 2,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = publication_verifier._verify_actor_visible_only_feedback(candidate_dir)
+
+    assert report == {
+        "status": "pass",
+        "online_feedback_mode": "actor-visible-only",
+        "nonempty_forbidden_artifacts": [],
+        "repair_state_status": "absent",
+        "score_free_feedback_receipt_count": 1,
+        "score_free_feedback_receipt_sha256": hashlib.sha256(
+            receipt_path.read_bytes()
+        ).hexdigest(),
+    }
+
+    (candidate_dir / "self_evolution_task_feedback.jsonl").write_text(
+        '{"outcome_similarity": 1.0}\n', encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="evaluator/reflection artifacts"):
+        publication_verifier._verify_actor_visible_only_feedback(candidate_dir)
 
 
 def test_verifier_rejects_reflection_completed_count_drift(tmp_path: Path) -> None:
