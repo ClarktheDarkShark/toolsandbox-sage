@@ -2254,6 +2254,7 @@ def _job_command(
                 manifest["fixed_toolsandbox_timestamp"]
             ),
             "SAGE_BENCHMARK_MANIFEST": str(repo_root / manifest["benchmark_manifest"]),
+            "SAGE_ONLINE_FEEDBACK_MODE": "audited",
             "CONTROL_CACHE": "off",
             "TOOLSANDBOX_RAPID_CACHE_MODE": "read_only",
             "TOOLSANDBOX_RAPID_CACHE_PATH": str(
@@ -2271,6 +2272,7 @@ def _job_command(
         "RESUME_RUN_ROOT",
         "RESUME_COMPLETED_LIMIT",
         "RESUME_REGISTRY_CHECKPOINT",
+        "SAGE_HYPOTHESIS_PILOT_MANIFEST",
         *DIAGNOSTIC_FORCE_ENV_VARS,
     ):
         env.pop(stale_name, None)

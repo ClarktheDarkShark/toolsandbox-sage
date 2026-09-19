@@ -469,9 +469,10 @@ def run_scenario_sequence(
     random.seed(42)
     pl.Config.set_tbl_rows(-1).set_tbl_cols(-1).set_fmt_str_lengths(10000)
     pl.Config.set_tbl_formatting("ASCII_FULL")
-    write_run_manifest(config)
     output_directory = _output_directory(config)
     output_directory.mkdir(parents=True, exist_ok=True)
+    manifest_path = write_run_manifest(config)
+    shutil.copy2(manifest_path, output_directory / manifest_path.name)
     install_llm_usage_tracking()
     reset_llm_usage(run_dir=output_directory, arm=config.run_type)
     _copy_resume_artifacts(

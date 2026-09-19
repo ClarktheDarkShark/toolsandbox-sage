@@ -1539,6 +1539,7 @@ def test_job_command_exports_provenance_and_exact_interpreter_path(
     assert env["SAGE_TS_RUNTIME_DIGEST"] == "runtime"
     assert env["SAGE_TS_GENERATION_SETTINGS_DIGEST"] == "generation"
     assert env["SAGE_TS_PROMPT_POLICY_DIGEST"] == "sage_ts_protocol_v1"
+    assert env["SAGE_ONLINE_FEEDBACK_MODE"] == "audited"
     assert "SAGE_BATCH_NO_DASHBOARD_OPEN" not in env
 
 

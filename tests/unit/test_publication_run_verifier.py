@@ -745,7 +745,7 @@ def _fresh_run(tmp_path: Path) -> Path:
             "external_browser_opened": True,
             "http_verified_before_open": True,
             "dashboard_server_protocol": (
-                publication_verifier.DASHBOARD_SERVER_PROTOCOL  # type: ignore[attr-defined]
+                publication_verifier.DASHBOARD_SERVER_PROTOCOL
             ),
             "dashboard_server_root": str(run_root.resolve()),
             "opened_before_model_processes": True,
@@ -4336,6 +4336,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
         "RESUME_RUN_ROOT",
         "RESUME_COMPLETED_LIMIT",
         "RESUME_REGISTRY_CHECKPOINT",
+        "SAGE_HYPOTHESIS_PILOT_MANIFEST",
         *protocol_runner.DIAGNOSTIC_FORCE_ENV_VARS,
     ):
         monkeypatch.setenv(name, "should-not-survive")
@@ -4393,6 +4394,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
     assert env["SAGE_TS_RUNTIME_DIGEST"] == "runtime-sha"
     assert env["SAGE_TS_GENERATION_SETTINGS_DIGEST"] == "generation-sha"
     assert env["SAGE_TS_PROMPT_POLICY_DIGEST"] == "prompt-policy-sha"
+    assert env["SAGE_ONLINE_FEEDBACK_MODE"] == "audited"
     assert env["PATH"].split(os.pathsep)[0] == str(publication_python.parent)
     assert "SAGE_BATCH_NO_DASHBOARD_OPEN" not in env
     for name, expected in publication_verifier.PUBLICATION_EXECUTION_ENV.items():
@@ -4407,6 +4409,7 @@ def test_campaign_job_removes_every_baseline_cache_env(
             "RESUME_RUN_ROOT",
             "RESUME_COMPLETED_LIMIT",
             "RESUME_REGISTRY_CHECKPOINT",
+            "SAGE_HYPOTHESIS_PILOT_MANIFEST",
             *protocol_runner.DIAGNOSTIC_FORCE_ENV_VARS,
         )
     )

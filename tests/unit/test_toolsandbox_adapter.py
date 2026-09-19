@@ -122,6 +122,10 @@ def test_run_scenario_sequence_continues_after_transform_failure(
     assert output_directory.name.startswith(
         "baseline_agent_Unhelpful_user_GPT_4_o_2024_05_13"
     )
+    parent_manifest = output_dir / "sage_ts_run_manifest.json"
+    run_manifest = output_directory / "sage_ts_run_manifest.json"
+    assert parent_manifest.is_file()
+    assert run_manifest.read_bytes() == parent_manifest.read_bytes()
 
     assert ("scenario_transform_failed", scenario_name) in events
     assert (output_directory / "scenario_transform_failures.jsonl").is_file()
@@ -180,6 +184,9 @@ def test_run_scenario_sequence_aborts_after_transform_failure_when_strict(
     failure = json.loads(failure_files[0].read_text(encoding="utf-8"))
     assert failure["event"] == "scenario_transform_failed"
     assert failure["scenario"] == scenario_name
+    run_dirs = [path for path in (tmp_path / "outputs").iterdir() if path.is_dir()]
+    assert len(run_dirs) == 1
+    assert (run_dirs[0] / "sage_ts_run_manifest.json").is_file()
 
 
 def test_run_scenario_sequence_resume_completed_limit(
