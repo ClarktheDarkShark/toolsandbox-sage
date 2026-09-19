@@ -713,6 +713,15 @@ def _validate_hypothesis_pilot_h2_invocation(args: argparse.Namespace) -> None:
         raise ValueError("Hypothesis-pilot manifest is unreadable.") from exc
     if not isinstance(pilot, dict):
         raise ValueError("Hypothesis-pilot manifest must be a JSON object.")
+    locked_design = pilot.get("locked_design")
+    if not isinstance(locked_design, dict):
+        raise ValueError("Hypothesis-pilot locked design is malformed.")
+    expected_feedback_mode = locked_design.get(
+        "h2_online_feedback_mode",
+        locked_design.get("online_feedback_mode"),
+    )
+    if expected_feedback_mode not in ONLINE_FEEDBACK_MODES:
+        raise ValueError("Hypothesis-pilot H2 feedback mode is invalid.")
     required = {
         "mode": (args.mode, "online_build_full"),
         "agent": (args.agent, DEFAULT_MODEL),
@@ -723,7 +732,7 @@ def _validate_hypothesis_pilot_h2_invocation(args: argparse.Namespace) -> None:
         "recurrence_threshold": (args.recurrence_threshold, 2),
         "online_feedback_mode": (
             args.online_feedback_mode,
-            ONLINE_FEEDBACK_ACTOR_VISIBLE,
+            expected_feedback_mode,
         ),
         "control_cache": (args.control_cache, "off"),
         "publication_gate_purpose": (

@@ -48,8 +48,8 @@ if [[ "$ONLINE_FEEDBACK_MODE" == "actor-visible-only" && "$EXECUTION_MODE" != "n
   exit 2
 fi
 if [[ -n "${SAGE_HYPOTHESIS_PILOT_MANIFEST:-}" ]]; then
-  if [[ "$SIZE" != "full" || "$EXECUTION_MODE" != "native-only" || "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" || "$ONLINE_FEEDBACK_MODE" != "actor-visible-only" ]]; then
-    echo "Hypothesis-pilot H2 requires: full, native-only, campaign-inclusion, and SAGE_ONLINE_FEEDBACK_MODE=actor-visible-only." >&2
+  if [[ "$SIZE" != "full" || "$EXECUTION_MODE" != "native-only" || "$PUBLICATION_GATE_PURPOSE" != "campaign-inclusion" ]]; then
+    echo "Hypothesis-pilot H2 requires: full, native-only, and campaign-inclusion." >&2
     exit 2
   fi
 fi

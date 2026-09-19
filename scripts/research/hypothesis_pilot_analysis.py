@@ -106,6 +106,7 @@ def _strict_verification_receipt(
     run_root: Path,
     control_summary_path: Path,
     candidate_summary_path: Path,
+    expect_reflection: str,
 ) -> dict[str, Any]:
     """Re-run the publication verifier and bind it to the analyzed files."""
 
@@ -114,7 +115,7 @@ def _strict_verification_receipt(
     verification = verify_run(
         run_root,
         expected_tasks=EXPECTED_SCENARIO_COUNT,
-        expect_reflection="actor-visible-only",
+        expect_reflection=expect_reflection,
         gate_purpose="campaign-inclusion",
     )
     verified_root = Path(str(verification["run_root"])).resolve()
@@ -496,6 +497,7 @@ def analyze_h2_pilot(
     control_summary_path: Path,
     candidate_summary_path: Path,
     strict_run_root: Path,
+    expect_reflection: str = "same-run-fresh",
 ) -> dict[str, Any]:
     """Load, validate, and analyze one complete H2 control/candidate pair."""
 
@@ -509,6 +511,7 @@ def analyze_h2_pilot(
             run_root=strict_run_root,
             control_summary_path=control_summary_path,
             candidate_summary_path=candidate_summary_path,
+            expect_reflection=expect_reflection,
         )
     except (OSError, KeyError, TypeError, ValueError) as exc:
         errors.append(
@@ -834,6 +837,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--candidate-summary", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--expect-reflection",
+        choices=("same-run-fresh", "actor-visible-only"),
+        default="same-run-fresh",
+    )
     return parser
 
 
@@ -843,6 +851,7 @@ def main() -> int:
         control_summary_path=args.control_summary,
         candidate_summary_path=args.candidate_summary,
         strict_run_root=args.run_root,
+        expect_reflection=args.expect_reflection,
     )
     write_h2_pilot_report(report, args.output)
     print(json.dumps(report, sort_keys=True, allow_nan=False))
