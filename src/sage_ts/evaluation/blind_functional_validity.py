@@ -36,6 +36,12 @@ from sage_ts.generation.complete_tools import (
     native_side_effect_tools,
 )
 from sage_ts.generation.tool_spec import GeneratedTool
+from sage_ts.registry.legacy_admission_binding import (
+    file_sha256 as legacy_file_sha256,
+)
+from sage_ts.registry.legacy_admission_binding import (
+    verify_legacy_admission_binding,
+)
 from sage_ts.registry.manifest import (
     RegistryEntry,
     code_hash,
@@ -776,6 +782,8 @@ def audit_blind_functional_validity(
     case_bank_path: Path,
     expected_case_bank_sha256: str,
     confidence_level: float = 0.95,
+    legacy_admission_binding_path: Path | None = None,
+    legacy_admission_binding_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Run the fail-closed post-freeze H1 audit and return its JSON report."""
 
@@ -829,9 +837,32 @@ def audit_blind_functional_validity(
         if unexpected_tools:
             global_errors.append("case_bank_contains_nonactive_tools")
 
-        resolved, contract_failures = ValidationContractBindingStore(
-            registry_dir
-        ).restore(entries)
+        legacy_admission_inputs: dict[str, set[str]] | None = None
+        if legacy_admission_binding_path is not None:
+            if legacy_admission_binding_sha256 is None:
+                raise BlindFunctionalValidityError(
+                    "legacy_admission_binding_sha256_missing"
+                )
+            try:
+                legacy_admission_inputs = verify_legacy_admission_binding(
+                    binding_path=legacy_admission_binding_path,
+                    expected_sha256=legacy_admission_binding_sha256,
+                    registry_dir=registry_dir,
+                )
+            except ValueError as exc:
+                raise BlindFunctionalValidityError(
+                    f"legacy_admission_binding_invalid:{exc}"
+                ) from exc
+            resolved: dict[str, Any] = {}
+            contract_failures: dict[str, str] = {}
+        else:
+            if legacy_admission_binding_sha256 is not None:
+                raise BlindFunctionalValidityError(
+                    "legacy_admission_binding_path_missing"
+                )
+            resolved, contract_failures = ValidationContractBindingStore(
+                registry_dir
+            ).restore(entries)
         minimum_cases = int(case_bank["minimum_oracle_cases_per_tool"])
         tool_results: dict[str, dict[str, Any]] = {}
         total_cases = 0
@@ -867,18 +898,23 @@ def audit_blind_functional_validity(
                         f"insufficient_oracle_cases:{len(cases)}<{minimum_cases}"
                     )
 
-            contract = resolved.get(name)
             admission_input_hashes: set[str] = set()
-            if contract is None:
-                integrity_errors.append(
-                    f"admission_contract_unverifiable:"
-                    f"{contract_failures.get(name, 'binding_missing')}"
-                )
+            if legacy_admission_inputs is not None:
+                admission_input_hashes = legacy_admission_inputs.get(name, set())
+                if not admission_input_hashes:
+                    integrity_errors.append("legacy_admission_inputs_missing")
             else:
-                admission_input_hashes = {
-                    _json_sha256(example.inputs)
-                    for example in contract.observation.validation_examples
-                }
+                contract = resolved.get(name)
+                if contract is None:
+                    integrity_errors.append(
+                        f"admission_contract_unverifiable:"
+                        f"{contract_failures.get(name, 'binding_missing')}"
+                    )
+                else:
+                    admission_input_hashes = {
+                        _json_sha256(example.inputs)
+                        for example in contract.observation.validation_examples
+                    }
 
             seen_case_input_hashes: set[str] = set()
             case_results: list[dict[str, Any]] = []
@@ -995,6 +1031,26 @@ def audit_blind_functional_validity(
         "fatal_error": None,
         "bank_id": case_bank["bank_id"],
         "construction_method": case_bank["construction_method"],
+        "admission_binding": {
+            "method": (
+                "external_legacy_paper_evidence"
+                if legacy_admission_binding_path is not None
+                else "durable_registry_validation_contracts"
+            ),
+            "path": (
+                str(legacy_admission_binding_path.resolve())
+                if legacy_admission_binding_path is not None
+                else None
+            ),
+            "sha256": (
+                legacy_file_sha256(legacy_admission_binding_path)
+                if legacy_admission_binding_path is not None
+                else None
+            ),
+            "hash_verified": legacy_admission_binding_path is None
+            or legacy_file_sha256(legacy_admission_binding_path)
+            == legacy_admission_binding_sha256,
+        },
         "case_bank": {
             "expected_sha256": expected_case_bank_sha256,
             "observed_sha256": observed_case_bank_sha256,

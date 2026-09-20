@@ -159,7 +159,7 @@ HYPOTHESIS_PILOT_HTML = r"""<!doctype html>
 
       <article class="card" id="h2-card">
         <div class="card-head">
-          <div><div class="h-label">H2</div><h2>Integrated SAGE improves mean outcome score over control</h2></div>
+          <div><div class="h-label">H2</div><h2>Ten independently evolved SAGE registries outperform control</h2></div>
           <div class="status pending" id="h2-status">Pending</div>
         </div>
         <div class="card-body">
@@ -284,9 +284,9 @@ HYPOTHESIS_PILOT_HTML = r"""<!doctype html>
         metric('Integrated SAGE mean', score(h2.integrated_sage_mean), 'mean outcome score'),
         metric('Raw mean difference', signed(h2.mean_difference), 'SAGE − control'),
         metric('Relative lift', pct(h2.relative_lift, true), 'relative to control'),
-        metric('95% cluster CI', ci(h2.cluster_ci_95), `${count(h2.stem_clusters)} task-stem clusters`),
-        metric('Intention-to-treat tasks', count(h2.tasks), 'all assigned benchmark tasks'),
-        metric('H2 pilot gate outcome', words(h2.pilot_gate_outcome), h2.pilot_gate_label || 'PENDING')
+        metric('95% two-way run/task CI', ci(h2.cluster_ci_95), 'mean score difference'),
+        metric('Independent registry runs', count(h2.independent_registry_runs), `${count(h2.tasks)} matched task observations`),
+        metric('Paper decision', h2.paper_decision ? words(h2.paper_decision) : words(h2.pilot_gate_outcome), h2.pilot_gate_label || 'PENDING')
       ].join('');
       q('h2-method').textContent = h2.method_note || 'The primary pilot estimand is the intention-to-treat difference in mean outcome score, integrated SAGE minus fresh control. The confidence interval clusters the benchmark variants by original task stem.';
       renderIntegrity('h2-integrity', h2.integrity);

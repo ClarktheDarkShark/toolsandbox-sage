@@ -61,6 +61,32 @@ _PREDECESSORS = {
     "h4": ("h2", "h1", "h3"),
 }
 _RUNNING_PROGRESS = {"h2": 1, "h1": 2, "h3": 3, "h4": 4}
+SEQUENTIAL_STUDY_MODE = "sequential_h1_h2_h3_h4"
+STANDALONE_H4_STUDY_MODE = "standalone_h4_parallel"
+_STUDY_MODES = frozenset({SEQUENTIAL_STUDY_MODE, STANDALONE_H4_STUDY_MODE})
+
+# Immutable Chapter 4 evidence adopted by ``bind-paper-h2``. These hashes are
+# pinned so a similarly shaped but different campaign cannot be substituted.
+_PAPER_H2_SELECTED_MANIFEST_SHA256 = (
+    "8cd359bebdc0f3576643d6d4850f0abe09fd3c05dafd50a62fc07d62c6425192"
+)
+_PAPER_H2_VERIFICATION_SHA256 = (
+    "b1f563452b404b21949cae6c4783bc6777cdad5ba0a471b7bd16f250e8dd0b90"
+)
+_PAPER_H2_DASHBOARD_DATA_SHA256 = (
+    "e1512f8ea256a7654c3a8e1ade31d495065ef783b60d1a97599f6f52620d2813"
+)
+_PAPER_H2_RUNTIME_COMMIT = "4ce1c6de0ab36dd59e1a319f4e56e298133f4a79"
+_PAPER_H2_RUNTIME_TREE = "4640019c7a054d4af6a500e7327ebbd0a507bfc5"
+_PAPER_H2_REP01_REGISTRY_CONTENT_SHA256 = (
+    "7943225668a3dba1a0e5b24e387adf37fe1d9c5de6e22a6e020dc6c59b531011"
+)
+_PAPER_H2_REP01_REGISTRY_MANIFEST_SHA256 = (
+    "58d7d6b2eca6b908bb78da736e69b4553d9f4c9e600fe3ac30d3ae00bd595bfc"
+)
+_PAPER_H2_REP01_CONTROL_SHA256 = (
+    "8e988f0c55892ce884b12872af4e6e89c06f7aeac49ec337bca5d67aa1037af8"
+)
 
 
 def _utc_now() -> str:
@@ -177,7 +203,17 @@ def _require_phase_ready(
 ) -> None:
     if manifest.get("status") != "running":
         raise ValueError("Pilot must be running before a hypothesis phase can execute.")
-    for predecessor in _PREDECESSORS[hypothesis]:
+    study_mode = str(manifest.get("study_mode") or SEQUENTIAL_STUDY_MODE)
+    if study_mode not in _STUDY_MODES:
+        raise ValueError(f"Unknown pilot study mode: {study_mode!r}.")
+    if study_mode == STANDALONE_H4_STUDY_MODE and hypothesis != "h4":
+        raise ValueError("A standalone H4 pilot may execute only H4.")
+    predecessors = (
+        ()
+        if study_mode == STANDALONE_H4_STUDY_MODE and hypothesis == "h4"
+        else _PREDECESSORS[hypothesis]
+    )
+    for predecessor in predecessors:
         predecessor_state = _mapping(
             manifest.get(predecessor), f"{predecessor.upper()} pilot state"
         )
@@ -1079,6 +1115,7 @@ def create_manifest(
     protocol_path: Path,
     output_root: Path,
     artifact_root: Path,
+    study_mode: str = SEQUENTIAL_STUDY_MODE,
 ) -> dict[str, Any]:
     """Create the pre-model manifest; existing targets are never overwritten."""
 
@@ -1086,6 +1123,8 @@ def create_manifest(
         raise FileExistsError(f"Pilot manifest already exists: {manifest_path}")
     if not pilot_id.strip():
         raise ValueError("Pilot ID must be nonempty.")
+    if study_mode not in _STUDY_MODES:
+        raise ValueError(f"Unknown pilot study mode: {study_mode!r}.")
     for path, label in ((benchmark_path, "benchmark"), (protocol_path, "protocol")):
         if not path.is_file():
             raise FileNotFoundError(f"Pilot {label} is missing: {path}")
@@ -1096,7 +1135,17 @@ def create_manifest(
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "pilot_id": pilot_id,
-        "study_label": "one complete H1-H3 core run plus exploratory H4 split run",
+        "study_label": (
+            "standalone exploratory H4 split-registry viability run"
+            if study_mode == STANDALONE_H4_STUDY_MODE
+            else "one complete H1-H3 core run plus exploratory H4 split run"
+        ),
+        "study_mode": study_mode,
+        "execution_topology": (
+            "independent_manifest_and_registry_parallel_to_external_h2"
+            if study_mode == STANDALONE_H4_STUDY_MODE
+            else "single_manifest_sequential_phases"
+        ),
         "status": "running",
         "progress_stage": 0,
         "current_phase": "preflight",
@@ -1299,6 +1348,323 @@ def bind_frozen_registry(
             "phase": "h2_registry_frozen_for_h1_h3",
             "status": manifest.get("status"),
             "registry_content_sha256": binding["content_sha256"],
+        }
+    )
+    _atomic_write(manifest_path, manifest)
+    _refresh(manifest_path, manifest)
+    return manifest
+
+
+def bind_paper_h2(
+    *,
+    manifest_path: Path,
+    selected_manifest_path: Path,
+    verification_path: Path,
+    dashboard_data_path: Path,
+    bridge_report_path: Path,
+    replication: int = 1,
+) -> dict[str, Any]:
+    """Adopt the completed paper H2 and bind deterministic rep01 for H1/H3.
+
+    This validates archival evidence only; it executes no model or benchmark.
+    """
+
+    if replication != 1:
+        raise ValueError("The single-run viability protocol locks paper replication 1.")
+    manifest = _read_object(manifest_path)
+    _require_manifest_git_identity(manifest, label="paper-H2 evidence binding source")
+    if manifest.get("status") != "running":
+        raise ValueError("Pilot must be running before paper H2 can be bound.")
+    if _mapping(manifest.get("h2"), "H2 pilot state").get("status") != "pending":
+        raise ValueError("Paper H2 may only replace a pending H2 state.")
+    for hypothesis in ("h1", "h3", "h4"):
+        if _mapping(manifest.get(hypothesis), hypothesis).get("status") != "pending":
+            raise ValueError("Paper H2 must be bound before H1, H3, or H4 starts.")
+
+    selected_manifest_path = selected_manifest_path.resolve()
+    verification_path = verification_path.resolve()
+    dashboard_data_path = dashboard_data_path.resolve()
+    for path, expected, label in (
+        (
+            selected_manifest_path,
+            _PAPER_H2_SELECTED_MANIFEST_SHA256,
+            "selected-cohort manifest",
+        ),
+        (verification_path, _PAPER_H2_VERIFICATION_SHA256, "verification receipt"),
+        (
+            dashboard_data_path,
+            _PAPER_H2_DASHBOARD_DATA_SHA256,
+            "dashboard evidence data",
+        ),
+    ):
+        if not path.is_file() or _file_sha256(path) != expected:
+            raise ValueError(f"Canonical paper H2 {label} is missing or changed.")
+
+    selected = _read_object(selected_manifest_path)
+    verification = _read_object(verification_path)
+    dashboard = _read_object(dashboard_data_path)
+    provenance = _mapping(manifest.get("provenance"), "Pilot provenance")
+    if (
+        selected.get("status") != "complete"
+        or selected.get("expected_online_runs") != 10
+        or selected.get("expected_frozen_runs") != 10
+        or selected.get("benchmark_sha256") != provenance.get("benchmark_sha256")
+    ):
+        raise ValueError("Canonical paper H2 cohort identity is invalid.")
+    run_pairs = selected.get("run_pairs")
+    if not isinstance(run_pairs, list) or len(run_pairs) != 10:
+        raise ValueError("Canonical paper H2 must contain exactly ten run pairs.")
+    replications = [
+        pair.get("replication") for pair in run_pairs if isinstance(pair, Mapping)
+    ]
+    if replications != list(range(1, 11)):
+        raise ValueError("Canonical paper H2 replication roster is malformed.")
+    for pair in run_pairs:
+        pair = _mapping(pair, "Paper H2 run pair")
+        for arm_name in ("online", "frozen"):
+            arm = _mapping(pair.get(arm_name), f"Paper H2 {arm_name} arm")
+            strict = _mapping(
+                arm.get("strict_verification"),
+                f"Paper H2 {arm_name} strict verification",
+            )
+            if (
+                arm.get("execution_status") != "completed"
+                or arm.get("verification_status") != "pass"
+                or strict.get("status") != "pass"
+                or strict.get("scenario_count") != 1032
+                or strict.get("git_commit") != _PAPER_H2_RUNTIME_COMMIT
+                or strict.get("git_tree") != _PAPER_H2_RUNTIME_TREE
+            ):
+                raise ValueError("A canonical paper H2 run is not strictly verified.")
+
+    for key, expected in {
+        "status": "pass",
+        "runtime_commit": _PAPER_H2_RUNTIME_COMMIT,
+        "runtime_tree": _PAPER_H2_RUNTIME_TREE,
+        "selected_online_count": 10,
+        "selected_frozen_count": 10,
+        "all_selected_runs_strictly_verified": True,
+        "all_selected_runs_zero_exceptions": True,
+        "all_frozen_registries_immutable": True,
+        "selected_cohort_manifest_sha256": _PAPER_H2_SELECTED_MANIFEST_SHA256,
+    }.items():
+        if verification.get(key) != expected:
+            raise ValueError(f"Paper H2 verification field {key} is not canonical.")
+
+    hypothesis_rows = dashboard.get("hypotheses")
+    if not isinstance(hypothesis_rows, list):
+        raise ValueError("Paper H2 dashboard has no hypothesis roster.")
+    h2_row = _mapping(
+        next(
+            (
+                row
+                for row in hypothesis_rows
+                if isinstance(row, Mapping) and row.get("id") == "Hypothesis 2"
+            ),
+            None,
+        ),
+        "Paper H2 dashboard result",
+    )
+    exact_h2: dict[str, Any] = {
+        "decision": "supported",
+        "sample_size": 10,
+        "matched_task_observations": 10320,
+        "baseline_mean": 0.5861757105943152,
+        "sage_mean": 0.7835432816537468,
+        "estimate_percent": 33.670376901035944,
+        "run_threshold_sign_flip_p": 0.001953125,
+    }
+    for key, expected in exact_h2.items():
+        value = h2_row.get(key)
+        if isinstance(expected, float):
+            if not isinstance(value, (int, float)) or not math.isclose(
+                float(value), expected, rel_tol=0.0, abs_tol=1e-15
+            ):
+                raise ValueError(f"Paper H2 dashboard field {key} changed.")
+        elif value != expected:
+            raise ValueError(f"Paper H2 dashboard field {key} changed.")
+
+    selected_rep = _mapping(run_pairs[replication - 1], "Selected paper replication")
+    online = _mapping(selected_rep.get("online"), "Selected online replication")
+    frozen = _mapping(selected_rep.get("frozen"), "Selected frozen replication")
+    run_root = (REPO_ROOT / str(online.get("run_root") or "")).resolve()
+    protocol_path = run_root / "protocol_manifest.json"
+    protocol = _read_object(protocol_path)
+    control_path = (
+        Path(str(protocol.get("control_dir") or "")).resolve() / "result_summary.json"
+    )
+    if (
+        not control_path.is_file()
+        or _file_sha256(control_path) != _PAPER_H2_REP01_CONTROL_SHA256
+    ):
+        raise ValueError("Paper replication 1 control summary is missing or changed.")
+    registry_dir = (REPO_ROOT / str(frozen.get("registry_dir") or "")).resolve()
+    identity = _registry_content_identity(registry_dir)
+    if (
+        identity["content_sha256"] != _PAPER_H2_REP01_REGISTRY_CONTENT_SHA256
+        or identity["manifest_sha256"] != _PAPER_H2_REP01_REGISTRY_MANIFEST_SHA256
+    ):
+        raise ValueError("Paper replication 1 frozen registry is missing or changed.")
+
+    statistics = _mapping(dashboard.get("statistics"), "Paper H2 statistics")
+    delta_ci = _mapping(
+        statistics.get("two_way_run_task_bootstrap_delta_ci"),
+        "Paper H2 two-way delta interval",
+    )
+    target_ci = _mapping(
+        statistics.get("two_way_run_task_bootstrap_threshold_contrast_ci"),
+        "Paper H2 target-contrast interval",
+    )
+    bridge_report_path = bridge_report_path.resolve()
+    if bridge_report_path.exists() or bridge_report_path.is_symlink():
+        raise FileExistsError(
+            f"Paper H2 bridge report already exists: {bridge_report_path}"
+        )
+    bound_at = _utc_now()
+    mean_difference = exact_h2["sage_mean"] - exact_h2["baseline_mean"]
+    bridge_report: dict[str, Any] = {
+        "schema_version": 1,
+        "report_type": "canonical_paper_h2_evidence_bridge",
+        "status": "complete",
+        "created_at": bound_at,
+        "evidence_role": "archival_confirmatory_reference",
+        "statement": "Ten independently evolved SAGE registries outperform control.",
+        "inputs": {
+            "selected_cohort_manifest": {
+                "path": str(selected_manifest_path),
+                "sha256": _PAPER_H2_SELECTED_MANIFEST_SHA256,
+            },
+            "selected_cohort_verification": {
+                "path": str(verification_path),
+                "sha256": _PAPER_H2_VERIFICATION_SHA256,
+            },
+            "dashboard_data": {
+                "path": str(dashboard_data_path),
+                "sha256": _PAPER_H2_DASHBOARD_DATA_SHA256,
+            },
+            "control": {
+                "path": str(control_path),
+                "sha256": _PAPER_H2_REP01_CONTROL_SHA256,
+                "selection_rule": "replication_1_first_verified_not_outcome_selected",
+            },
+            "registry": identity,
+        },
+        "paper_h2": {
+            "decision": "supported",
+            "independent_registry_runs": 10,
+            "matched_task_observations": 10320,
+            "control_mean": exact_h2["baseline_mean"],
+            "integrated_sage_mean": exact_h2["sage_mean"],
+            "mean_difference": mean_difference,
+            "relative_lift": exact_h2["estimate_percent"] / 100.0,
+            "two_way_delta_ci_95": [delta_ci.get("lower"), delta_ci.get("upper")],
+            "two_way_target_contrast_ci_95": [
+                target_ci.get("lower"),
+                target_ci.get("upper"),
+            ],
+            "exact_two_sided_run_sign_flip_p": exact_h2["run_threshold_sign_flip_p"],
+        },
+        "viability_registry_selection": {
+            "replication": replication,
+            "rule": "first strictly verified paper replication; outcome-blind",
+            "purpose": "single-registry H1/H3 viability only",
+        },
+        "integrity": {
+            "status": "pass",
+            "checks": [
+                {"name": "canonical hashes pinned", "passed": True},
+                {"name": "ten paired runs strictly verified", "passed": True},
+                {"name": "zero run exceptions", "passed": True},
+                {"name": "frozen registries immutable", "passed": True},
+                {
+                    "name": "replication 1 selected without outcome screening",
+                    "passed": True,
+                },
+            ],
+        },
+    }
+    _atomic_write(bridge_report_path, bridge_report)
+    bridge_sha256 = _file_sha256(bridge_report_path)
+
+    manifest["study_label"] = (
+        "single-run H1/H3/H4 viability anchored to completed paper H2"
+    )
+    manifest["h2"] = {
+        "status": "observed",
+        "evidence_role": "archival_confirmatory_reference",
+        "paper_decision": "supported",
+        "control_mean": exact_h2["baseline_mean"],
+        "integrated_sage_mean": exact_h2["sage_mean"],
+        "mean_difference": mean_difference,
+        "relative_lift": exact_h2["estimate_percent"] / 100.0,
+        "cluster_ci_95": [delta_ci.get("lower"), delta_ci.get("upper")],
+        "independent_registry_runs": 10,
+        "tasks": 10320,
+        "pilot_gate_outcome": "paper_complete",
+        "pilot_gate_label": "CANONICAL_PAPER_EVIDENCE",
+        "method_note": (
+            "Existing paper H2; no H2 run was executed for this pilot. Ten "
+            "independently evolved registries: control 0.5862, SAGE 0.7835, "
+            "+33.7%, exact run-level p=.001953125."
+        ),
+        "integrity": {"status": "pass", "checks": bridge_report["integrity"]["checks"]},
+        "source_report_path": str(bridge_report_path),
+        "source_report_sha256": bridge_sha256,
+    }
+    manifest["paper_h2_anchor"] = {
+        "selected_cohort_manifest_path": str(selected_manifest_path),
+        "selected_cohort_manifest_sha256": _PAPER_H2_SELECTED_MANIFEST_SHA256,
+        "verification_path": str(verification_path),
+        "verification_sha256": _PAPER_H2_VERIFICATION_SHA256,
+        "runtime_commit": _PAPER_H2_RUNTIME_COMMIT,
+        "runtime_tree": _PAPER_H2_RUNTIME_TREE,
+        "bound_at": bound_at,
+    }
+    manifest["frozen_h123_registry"] = {
+        **identity,
+        "paper_replication": replication,
+        "selection_rule": "first_strictly_verified_replication",
+        "source_selected_cohort_manifest": str(selected_manifest_path),
+        "source_selected_cohort_manifest_sha256": _PAPER_H2_SELECTED_MANIFEST_SHA256,
+        "h2_run_root": str(run_root),
+        "h2_protocol_manifest_path": str(protocol_path),
+        "h2_protocol_manifest_sha256": _file_sha256(protocol_path),
+        "bound_at": bound_at,
+    }
+    artifacts = manifest.setdefault("artifacts", [])
+    if not isinstance(artifacts, list):
+        raise ValueError("Pilot artifact list is malformed.")
+    artifacts.extend(
+        [
+            _artifact(
+                bridge_report_path, "Canonical paper H2 evidence bridge", "analysis"
+            ),
+            _artifact(
+                selected_manifest_path, "Canonical paper H2 selected cohort", "evidence"
+            ),
+            _artifact(
+                verification_path,
+                "Canonical paper H2 strict verification",
+                "verification",
+            ),
+        ]
+    )
+    manifest["current_phase"] = "paper_h2_anchored"
+    manifest["progress_stage"] = 1
+    manifest["updated_at"] = bound_at
+    events = manifest.setdefault("events", [])
+    if not isinstance(events, list):
+        raise ValueError("Pilot event journal is malformed.")
+    events.append(
+        {
+            "at": bound_at,
+            "phase": "paper_h2_anchored",
+            "status": manifest.get("status"),
+            "hypothesis": "h2",
+            "hypothesis_status": "observed",
+            "evidence_role": "archival_confirmatory_reference",
+            "source_report_sha256": bridge_sha256,
+            "registry_content_sha256": identity["content_sha256"],
         }
     )
     _atomic_write(manifest_path, manifest)
@@ -1674,6 +2040,11 @@ def _parser() -> argparse.ArgumentParser:
     initialize.add_argument("--protocol", type=Path, required=True)
     initialize.add_argument("--output-root", type=Path, required=True)
     initialize.add_argument("--artifact-root", type=Path, required=True)
+    initialize.add_argument(
+        "--study-mode",
+        choices=sorted(_STUDY_MODES),
+        default=SEQUENTIAL_STUDY_MODE,
+    )
 
     phase = subparsers.add_parser("phase")
     phase.add_argument("--manifest", type=Path, required=True)
@@ -1691,6 +2062,14 @@ def _parser() -> argparse.ArgumentParser:
     registry.add_argument("--manifest", type=Path, required=True)
     registry.add_argument("--registry-dir", type=Path, required=True)
     registry.add_argument("--h2-run-root", type=Path, required=True)
+
+    paper_h2 = subparsers.add_parser("bind-paper-h2")
+    paper_h2.add_argument("--manifest", type=Path, required=True)
+    paper_h2.add_argument("--selected-manifest", type=Path, required=True)
+    paper_h2.add_argument("--verification", type=Path, required=True)
+    paper_h2.add_argument("--dashboard-data", type=Path, required=True)
+    paper_h2.add_argument("--bridge-report", type=Path, required=True)
+    paper_h2.add_argument("--replication", type=int, default=1)
 
     artifact = subparsers.add_parser("add-artifact")
     artifact.add_argument("--manifest", type=Path, required=True)
@@ -1719,6 +2098,7 @@ def main() -> int:
             protocol_path=args.protocol,
             output_root=args.output_root,
             artifact_root=args.artifact_root,
+            study_mode=args.study_mode,
         )
     elif args.command == "phase":
         manifest = update_phase(
@@ -1738,6 +2118,15 @@ def main() -> int:
             manifest_path=args.manifest,
             registry_dir=args.registry_dir,
             h2_run_root=args.h2_run_root,
+        )
+    elif args.command == "bind-paper-h2":
+        manifest = bind_paper_h2(
+            manifest_path=args.manifest,
+            selected_manifest_path=args.selected_manifest,
+            verification_path=args.verification,
+            dashboard_data_path=args.dashboard_data,
+            bridge_report_path=args.bridge_report,
+            replication=args.replication,
         )
     elif args.command == "add-artifact":
         manifest = add_artifact(

@@ -33,6 +33,9 @@ from sage_ts.orchestration.online_birth import (
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
 )
+from sage_ts.registry.legacy_admission_binding import (
+    verify_legacy_admission_binding,
+)
 from sage_ts.registry.store import RegistryStore
 from sage_ts.registry.validation_contracts import ValidationContractBindingStore
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
@@ -858,10 +861,15 @@ class SageRunConfig:
     online_feedback_mode: str = ONLINE_FEEDBACK_AUDITED
     registry_masked_scenarios: frozenset[str] = frozenset()
     registry_assignment_id: str | None = None
+    legacy_admission_binding_path: Path | None = None
+    legacy_admission_binding_sha256: str | None = None
 
 
 def _frozen_registry_contract_failures(
     store: RegistryStore,
+    *,
+    legacy_admission_binding_path: Path | None = None,
+    legacy_admission_binding_sha256: str | None = None,
 ) -> list[dict[str, object]]:
     """Return audit-safe binding failures for active frozen registry entries."""
 
@@ -887,7 +895,27 @@ def _frozen_registry_contract_failures(
                     "raw_hidden_case_values_logged": False,
                 }
             )
-    return failures
+    if not failures or legacy_admission_binding_path is None:
+        return failures
+    # The archival bridge is deliberately narrow: it may replace only the
+    # absent-index failure of a verified legacy paper registry. Any malformed
+    # or present-but-invalid durable contract remains terminal.
+    if any(item.get("binding_error") != "binding_index_missing" for item in failures):
+        return failures
+    if not legacy_admission_binding_sha256:
+        return failures
+    try:
+        recovered = verify_legacy_admission_binding(
+            binding_path=legacy_admission_binding_path,
+            expected_sha256=legacy_admission_binding_sha256,
+            registry_dir=store.root,
+        )
+    except ValueError:
+        return failures
+    active_names = {
+        name for name, entry in store.load_entries().items() if not entry.retired
+    }
+    return [] if set(recovered) == active_names else failures
 
 
 def run_sage_with_registry(
@@ -916,7 +944,11 @@ def run_sage_with_registry(
         )
     store = RegistryStore(config.registry_dir)
     if generator is None:
-        frozen_binding_failures = _frozen_registry_contract_failures(store)
+        frozen_binding_failures = _frozen_registry_contract_failures(
+            store,
+            legacy_admission_binding_path=config.legacy_admission_binding_path,
+            legacy_admission_binding_sha256=config.legacy_admission_binding_sha256,
+        )
         if frozen_binding_failures:
             config.output_dir.mkdir(parents=True, exist_ok=True)
             failure_path = (

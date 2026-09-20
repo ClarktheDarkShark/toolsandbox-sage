@@ -307,7 +307,12 @@ def _normalise_h2(value: Any) -> dict[str, Any]:
         "relative_lift": lift if lift is not None else _relative_lift(sage, control),
         "cluster_ci_95": _ci_pair(raw.get("cluster_ci_95")),
         "stem_clusters": _nonnegative_int(raw.get("stem_clusters")),
+        "independent_registry_runs": _nonnegative_int(
+            raw.get("independent_registry_runs")
+        ),
         "tasks": _nonnegative_int(raw.get("tasks")),
+        "evidence_role": str(raw.get("evidence_role") or "pilot_observation"),
+        "paper_decision": str(raw.get("paper_decision") or ""),
         "pilot_gate_outcome": pilot_gate_outcome,
         "pilot_gate_label": pilot_gate_label,
         "descriptive_canonical_similarity": (

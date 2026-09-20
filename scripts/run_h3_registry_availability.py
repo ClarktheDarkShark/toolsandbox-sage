@@ -38,6 +38,12 @@ from sage_ts.adapters.toolsandbox_adapter import DEFAULT_TOOL_BACKEND
 from sage_ts.config.models import DEFAULT_MODEL
 from sage_ts.config.splits import load_split_names
 from sage_ts.evaluation.outcome_score import outcome_evaluator_manifest
+from sage_ts.registry.legacy_admission_binding import (
+    file_sha256 as legacy_binding_file_sha256,
+)
+from sage_ts.registry.legacy_admission_binding import (
+    verify_legacy_admission_binding,
+)
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from scripts.manage_hypothesis_pilot import seal_phase_inputs
 from scripts.research.h3_registry_ablation import (
@@ -902,6 +908,8 @@ def run_h3_registry_availability(
     registry_source: Path,
     pilot_manifest_path: Path,
     run_root: Path,
+    legacy_admission_binding_path: Path | None = None,
+    legacy_admission_binding_sha256: str | None = None,
     agent: str = DEFAULT_MODEL,
     user: str = DEFAULT_MODEL,
     randomization_iterations: int = DEFAULT_RANDOMIZATION_ITERATIONS,
@@ -916,6 +924,12 @@ def run_h3_registry_availability(
     h2_control_path = h2_control_path.resolve()
     registry_source = registry_source.resolve()
     pilot_manifest_path = pilot_manifest_path.resolve()
+    if legacy_admission_binding_path is not None:
+        legacy_admission_binding_path = legacy_admission_binding_path.resolve()
+    if (legacy_admission_binding_path is None) != (
+        legacy_admission_binding_sha256 is None
+    ):
+        raise ValueError("H3 legacy admission binding path and hash are both required.")
     run_root = run_root.resolve()
     if run_root == registry_source or run_root.is_relative_to(registry_source):
         raise ValueError("H3 run root may not be inside the frozen registry source.")
@@ -969,6 +983,12 @@ def run_h3_registry_availability(
             "h2_control_path": str(h2_control_path),
             "registry_source": str(registry_source),
             "pilot_manifest_path": str(pilot_manifest_path),
+            "legacy_admission_binding_path": (
+                str(legacy_admission_binding_path)
+                if legacy_admission_binding_path is not None
+                else None
+            ),
+            "legacy_admission_binding_sha256": legacy_admission_binding_sha256,
         },
         "execution": {
             "agent": agent,
@@ -1051,6 +1071,16 @@ def run_h3_registry_availability(
             )
 
         source_registry_before = _tree_hash(registry_source)
+        legacy_binding_verified = False
+        if legacy_admission_binding_path is not None:
+            recovered = verify_legacy_admission_binding(
+                binding_path=legacy_admission_binding_path,
+                expected_sha256=str(legacy_admission_binding_sha256),
+                registry_dir=registry_source,
+            )
+            if set(recovered) != set(_registry_tool_roster(registry_source)["active"]):
+                raise ValueError("H3 legacy binding active-tool roster differs.")
+            legacy_binding_verified = True
         pilot_manifest = _load_json_object(
             pilot_manifest_path, "Central hypothesis-pilot manifest"
         )
@@ -1128,6 +1158,8 @@ def run_h3_registry_availability(
             online_feedback_mode=ONLINE_FEEDBACK_ACTOR_VISIBLE,
             registry_masked_scenarios=masked_scenarios,
             registry_assignment_id=assignment_id,
+            legacy_admission_binding_path=legacy_admission_binding_path,
+            legacy_admission_binding_sha256=legacy_admission_binding_sha256,
         )
         result["provenance"] = {
             "benchmark_manifest_sha256": _file_sha256(benchmark_manifest_path),
@@ -1137,6 +1169,15 @@ def run_h3_registry_availability(
             "registry_source_before": source_registry_before,
             "registry_copy_before": copied_registry_before,
             "registry_tools": source_registry_tools,
+            "legacy_admission_binding": {
+                "path": (
+                    str(legacy_admission_binding_path)
+                    if legacy_admission_binding_path is not None
+                    else None
+                ),
+                "sha256": legacy_admission_binding_sha256,
+                "verified": legacy_binding_verified,
+            },
         }
         _atomic_write_json(result_path, result)
         seal_phase_inputs(
@@ -1146,6 +1187,11 @@ def run_h3_registry_availability(
                 "assignment": assignment_path,
                 "benchmark": benchmark_manifest_path,
                 "h2_control": h2_control_path,
+                **(
+                    {"legacy_admission_binding": legacy_admission_binding_path}
+                    if legacy_admission_binding_path is not None
+                    else {}
+                ),
             },
             declarations={
                 "run_root": str(run_root),
@@ -1155,6 +1201,7 @@ def run_h3_registry_availability(
                 "scenario_order_sha256": _ordered_names_sha256(scenario_names),
                 "model": agent,
                 "preflight_complete": True,
+                "legacy_admission_binding_sha256": legacy_admission_binding_sha256,
             },
         )
         result["phase_inputs_sealed_before_model_execution"] = True
@@ -1236,6 +1283,19 @@ def run_h3_registry_availability(
                     "registry_copy_before": copied_registry_before,
                     "registry_copy_after": copied_registry_after,
                     "registry_tools": source_registry_tools,
+                    "legacy_admission_binding": {
+                        "path": (
+                            str(legacy_admission_binding_path)
+                            if legacy_admission_binding_path is not None
+                            else None
+                        ),
+                        "sha256": (
+                            legacy_binding_file_sha256(legacy_admission_binding_path)
+                            if legacy_admission_binding_path is not None
+                            else None
+                        ),
+                        "verified": legacy_binding_verified,
+                    },
                     "runtime_manifest": runtime_manifest,
                 },
                 "integrity": {
@@ -1253,6 +1313,7 @@ def run_h3_registry_availability(
                     "generator_disabled": True,
                     "online_evaluator_feedback_consumed": False,
                     "reflection_repair_lifecycle_disabled": True,
+                    "legacy_admission_binding_verified": legacy_binding_verified,
                 },
             }
         )
@@ -1316,6 +1377,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--registry-source", type=Path, required=True)
     parser.add_argument("--pilot-manifest", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True)
+    parser.add_argument("--legacy-admission-binding", type=Path)
+    parser.add_argument("--legacy-admission-binding-sha256")
     parser.add_argument("--agent", default=DEFAULT_MODEL)
     parser.add_argument("--user", default=DEFAULT_MODEL)
     parser.add_argument(
@@ -1345,6 +1408,8 @@ def main() -> int:
             registry_source=args.registry_source,
             pilot_manifest_path=args.pilot_manifest,
             run_root=args.run_root,
+            legacy_admission_binding_path=args.legacy_admission_binding,
+            legacy_admission_binding_sha256=args.legacy_admission_binding_sha256,
             agent=args.agent,
             user=args.user,
             randomization_iterations=args.randomization_iterations,

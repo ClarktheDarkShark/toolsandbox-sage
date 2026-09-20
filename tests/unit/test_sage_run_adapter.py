@@ -951,6 +951,42 @@ def test_frozen_registry_fails_before_injecting_tool_with_invalid_contract(
     assert failure["failures"][0]["entry_injected"] is False
 
 
+def test_legacy_binding_bypasses_only_missing_frozen_contract_index(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    store = _registry_with_canonicalizer(tmp_path / "registry")
+    (store.root / "validation_contract_bindings.json").unlink()
+    receipt = tmp_path / "legacy.json"
+    receipt.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sage_run_adapter,
+        "verify_legacy_admission_binding",
+        lambda **_kwargs: {"canonicalize_connectivity_label": {"a" * 64}},
+    )
+
+    assert (
+        sage_run_adapter._frozen_registry_contract_failures(
+            store,
+            legacy_admission_binding_path=receipt,
+            legacy_admission_binding_sha256="b" * 64,
+        )
+        == []
+    )
+
+    monkeypatch.setattr(
+        sage_run_adapter,
+        "verify_legacy_admission_binding",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("changed")),
+    )
+    failures = sage_run_adapter._frozen_registry_contract_failures(
+        store,
+        legacy_admission_binding_path=receipt,
+        legacy_admission_binding_sha256="b" * 64,
+    )
+    assert failures[0]["binding_error"] == "binding_index_missing"
+
+
 def test_sage_runner_selection_summary_includes_resumed_rows(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

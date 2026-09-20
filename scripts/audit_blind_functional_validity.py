@@ -153,6 +153,8 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--assessor-receipt", type=Path, required=True)
     audit.add_argument("--case-bank", type=Path, required=True)
     audit.add_argument("--case-bank-sha256", required=True)
+    audit.add_argument("--legacy-admission-binding", type=Path)
+    audit.add_argument("--legacy-admission-binding-sha256")
     audit.add_argument("--output", type=Path, required=True)
     audit.add_argument("--confidence-level", type=float, default=0.95)
     return parser
@@ -207,12 +209,22 @@ def main() -> int:
             "case_bank": args.case_bank,
             "assessor_receipt": args.assessor_receipt,
             **receipt_files,
+            **(
+                {"legacy_admission_binding": args.legacy_admission_binding}
+                if args.legacy_admission_binding is not None
+                else {}
+            ),
         },
         declarations={
             "registry_path": str(args.registry_dir.resolve()),
             "registry_content_sha256": identity["content_sha256"],
             "case_bank_sha256": args.case_bank_sha256,
             "blinding": "spec_only_procedural_not_cryptographic_isolation",
+            "legacy_admission_binding_sha256": (
+                args.legacy_admission_binding_sha256
+                if args.legacy_admission_binding is not None
+                else None
+            ),
         },
     )
     report = audit_blind_functional_validity(
@@ -220,6 +232,8 @@ def main() -> int:
         case_bank_path=args.case_bank,
         expected_case_bank_sha256=args.case_bank_sha256,
         confidence_level=args.confidence_level,
+        legacy_admission_binding_path=args.legacy_admission_binding,
+        legacy_admission_binding_sha256=args.legacy_admission_binding_sha256,
     )
     write_audit_report(report, args.output)
     print(json.dumps(report, sort_keys=True))

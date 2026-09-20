@@ -9,6 +9,7 @@ import pytest
 
 import scripts.manage_hypothesis_pilot as pilot_manager
 from scripts.manage_hypothesis_pilot import (
+    STANDALONE_H4_STUDY_MODE,
     add_artifact,
     bind_frozen_registry,
     bind_h4_frozen_registry,
@@ -123,6 +124,44 @@ def test_manifest_refuses_overwrite_and_invalid_stage(tmp_path: Path) -> None:
             manifest_path=manifest_path,
             phase="bad",
             progress_stage=6,
+        )
+
+
+def test_standalone_h4_mode_allows_only_h4_without_predecessors(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "pilot.json"
+    manifest = create_manifest(
+        manifest_path=manifest_path,
+        pilot_id="h4_parallel_test",
+        dashboard_dir=tmp_path / "dashboard",
+        latest_pointer=tmp_path / "latest.html",
+        git_commit="1" * 40,
+        git_tree="2" * 40,
+        benchmark_path=_file(tmp_path / "benchmark.json", "{}\n"),
+        protocol_path=_file(tmp_path / "protocol.md", "# Locked H4\n"),
+        output_root=tmp_path / "output",
+        artifact_root=tmp_path / "artifact",
+        study_mode=STANDALONE_H4_STUDY_MODE,
+    )
+    assert manifest["execution_topology"] == (
+        "independent_manifest_and_registry_parallel_to_external_h2"
+    )
+    updated = update_phase(
+        manifest_path=manifest_path,
+        phase="h4_split",
+        progress_stage=4,
+        hypothesis="h4",
+        hypothesis_status="running",
+    )
+    assert updated["h4"]["status"] == "running"
+    with pytest.raises(ValueError, match="only H4"):
+        update_phase(
+            manifest_path=manifest_path,
+            phase="h2_online",
+            progress_stage=1,
+            hypothesis="h2",
+            hypothesis_status="running",
         )
 
 
