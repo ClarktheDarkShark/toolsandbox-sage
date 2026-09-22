@@ -644,6 +644,337 @@
       line-height: 1.5;
     }
 
+    .paper-figure {
+      display: none;
+    }
+
+    body.paper-mode {
+      width: 1600px;
+      height: 900px;
+      min-width: 1600px;
+      overflow: hidden;
+    }
+
+    body.paper-mode .topbar,
+    body.paper-mode .page,
+    body.paper-mode .drawer-overlay {
+      display: none;
+    }
+
+    body.paper-mode .paper-figure {
+      width: 1600px;
+      height: 900px;
+      padding: 42px 50px 40px;
+      display: grid;
+      grid-template-rows: auto 1fr 192px;
+      gap: 22px;
+      background:
+        radial-gradient(circle at 13% 0%, rgba(103, 183, 238, .09), transparent 32%),
+        var(--bg);
+    }
+
+    .paper-figure-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 38px;
+      padding-bottom: 19px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+
+    .paper-kicker {
+      color: var(--blue);
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .paper-figure-header h1 {
+      margin: 8px 0 0;
+      font-size: 40px;
+      line-height: 1.05;
+      letter-spacing: -.02em;
+    }
+
+    .paper-subtitle {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 21px;
+      line-height: 1.35;
+    }
+
+    .paper-campaign-summary {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, auto));
+      gap: 10px;
+    }
+
+    .paper-campaign-stat {
+      min-width: 128px;
+      padding: 12px 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(13, 24, 35, .92);
+      text-align: right;
+    }
+
+    .paper-campaign-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-campaign-stat strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 27px;
+      line-height: 1;
+    }
+
+    .paper-hypothesis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .paper-hypothesis-card {
+      min-width: 0;
+      padding: 24px 26px 22px;
+      border: 1px solid var(--line-strong);
+      border-top: 5px solid var(--green);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(18, 33, 49, .98), rgba(13, 24, 35, .98));
+      display: flex;
+      flex-direction: column;
+    }
+
+    .paper-card-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .paper-card-id {
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .paper-card-status {
+      flex: 0 0 auto;
+      padding: 5px 10px;
+      border: 1px solid rgba(64, 212, 147, .55);
+      border-radius: 999px;
+      background: rgba(64, 212, 147, .1);
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .paper-hypothesis-card h2 {
+      min-height: 64px;
+      margin: 10px 0 0;
+      color: var(--white-soft);
+      font-size: 29px;
+      line-height: 1.18;
+    }
+
+    .paper-primary-row {
+      margin-top: 22px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .paper-primary-value {
+      color: var(--green);
+      font-size: 59px;
+      font-weight: 900;
+      line-height: .94;
+      letter-spacing: -.035em;
+    }
+
+    .paper-primary-context {
+      padding-bottom: 4px;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: right;
+    }
+
+    .paper-primary-label {
+      min-height: 52px;
+      margin: 15px 0 0;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.42;
+    }
+
+    .paper-card-divider {
+      margin: auto 0 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .paper-card-facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .paper-card-fact {
+      min-width: 0;
+    }
+
+    .paper-card-fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-card-fact strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 21px;
+      line-height: 1.22;
+    }
+
+    .paper-footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.34fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .paper-footer-panel {
+      min-width: 0;
+      padding: 18px 22px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(13, 24, 35, .95);
+    }
+
+    .paper-footer-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .paper-footer-heading strong {
+      font-size: 21px;
+    }
+
+    .paper-footer-heading span {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .paper-run-bars {
+      height: 108px;
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    .paper-run-bar-wrap {
+      height: 100%;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 5px;
+      align-items: end;
+    }
+
+    .paper-run-bar-track {
+      position: relative;
+      height: 100%;
+      border-radius: 5px 5px 2px 2px;
+      background: #182838;
+      overflow: hidden;
+    }
+
+    .paper-run-bar-target {
+      position: absolute;
+      z-index: 2;
+      left: 0;
+      right: 0;
+      bottom: 25%;
+      border-top: 2px dashed rgba(241, 189, 87, .9);
+    }
+
+    .paper-run-bar-value {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--height);
+      min-height: 2px;
+      background: linear-gradient(180deg, var(--green), #2da877);
+    }
+
+    .paper-run-value-label {
+      position: absolute;
+      z-index: 3;
+      top: 5px;
+      left: 0;
+      right: 0;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .paper-run-label {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .paper-evidence-facts {
+      margin-top: 13px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .paper-evidence-fact {
+      min-height: 55px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--blue);
+      background: var(--surface-soft);
+    }
+
+    .paper-evidence-fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-evidence-fact strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
     .metric-button {
       width: 100%;
       margin: 0;
@@ -1033,9 +1364,39 @@
     </aside>
   </div>
 
+  <section class="paper-figure" id="paperFigure" aria-label="Chapter 4 evidence summary for print">
+    <header class="paper-figure-header">
+      <div>
+        <div class="paper-kicker">Chapter 4 evidence dashboard</div>
+        <h1>SAGE self-evolution: ten-run evidence summary</h1>
+        <p class="paper-subtitle" id="paperSubtitle">Loading matched benchmark evidence...</p>
+      </div>
+      <div class="paper-campaign-summary" id="paperCampaignSummary"></div>
+    </header>
+    <section class="paper-hypothesis-grid" id="paperHypothesisGrid"></section>
+    <section class="paper-footer-grid">
+      <article class="paper-footer-panel">
+        <div class="paper-footer-heading">
+          <strong>H1 outcome lift across independent registry runs</strong>
+          <span id="paperRunSummary">Loading run-level evidence...</span>
+        </div>
+        <div class="paper-run-bars" id="paperRunBars"></div>
+      </article>
+      <article class="paper-footer-panel">
+        <div class="paper-footer-heading">
+          <strong>Evidence basis</strong>
+          <span>Preserved campaign artifacts</span>
+        </div>
+        <div class="paper-evidence-facts" id="paperEvidenceFacts"></div>
+      </article>
+    </section>
+  </section>
+
   <script>
     const DATA_URL = "chapter4_evidence_data.json";
     const EMBEDDED_EVIDENCE_BASE64 = "__CHAPTER4_EVIDENCE_BASE64__";
+    const PAPER_MODE = new URLSearchParams(window.location.search).get("view") === "paper";
+    if (PAPER_MODE) document.body.classList.add("paper-mode");
     let evidence = null;
     let detailIndex = {};
 
@@ -1372,6 +1733,116 @@
         <div class="footer-note">G / R reports called-task gains and regressions on the post-treatment subset where the production actor policy called a generated tool. This is descriptive association, not causal attribution. Select a row for validation, reuse, and provenance details.</div>`;
     }
 
+    function detailValue(item, label) {
+      for (const section of item?.detail?.sections || []) {
+        const row = (section.rows || []).find((candidate) => candidate.label === label);
+        if (row) return row.value;
+      }
+      return "-";
+    }
+
+    const mathLabel = (value) => String(value ?? "-")
+      .replaceAll(">=", "≥")
+      .replaceAll("<=", "≤");
+
+    function renderPaperFigure(data) {
+      const campaign = data.campaign || {};
+      const hypotheses = data.hypotheses || [];
+      const h1 = hypotheses[0] || {};
+      const h2 = hypotheses[1] || {};
+      const h3 = hypotheses[2] || {};
+      const runs = (data.runs || []).filter((run) =>
+        run.online_inference_eligible === true &&
+        run.audited_current_outcome_lift_percent !== null
+      );
+      const statistics = data.statistics || {};
+
+      document.getElementById("paperSubtitle").textContent =
+        `${campaign.model || "Model"} · ${Number(campaign.tasks_per_run || 0).toLocaleString()} matched tasks per run · route-independent outcome scoring`;
+      document.getElementById("paperCampaignSummary").innerHTML = `
+        <div class="paper-campaign-stat"><span>Registries</span><strong>${campaign.completed_online_runs || 0}</strong></div>
+        <div class="paper-campaign-stat"><span>Task pairs</span><strong>${Number(campaign.audited_current_matched_observations || 0).toLocaleString()}</strong></div>
+        <div class="paper-campaign-stat"><span>Decisions</span><strong>${hypotheses.filter((item) => item.status === "supported").length} / ${hypotheses.length}</strong></div>`;
+
+      const cards = [
+        {
+          item: h1,
+          value: h1.value_label,
+          context: `${detailValue(h1, "Baseline outcome")} → ${detailValue(h1, "SAGE outcome")}`,
+          label: "Improvement in mean route-independent outcome score.",
+          fact1Label: "95% confidence interval",
+          fact1Value: detailValue(h1, "Lift 95% two-way run/task bootstrap CI"),
+          fact2Label: "Decision threshold",
+          fact2Value: mathLabel(detailValue(h1, "Decision threshold")),
+        },
+        {
+          item: h2,
+          value: h2.value_label,
+          context: `${detailValue(h2, "Corrected and admitted")} / ${detailValue(h2, "Repair entrants")}`,
+          label: "Initially invalid candidates repaired and admitted to the registry.",
+          fact1Label: "Repair 95% CI (target > 50%)",
+          fact1Value: detailValue(h2, "Run-cluster bootstrap 95% CI"),
+          fact2Label: "Later reuse (target ≥ 90%)",
+          fact2Value: `${detailValue(h2, "Repaired tools invoked on a later task")} · ${detailValue(h2, "Later-reuse rate")}`,
+        },
+        {
+          item: h3,
+          value: h3.value_label,
+          context: `${detailValue(h3, "Used in a different task family")} / ${detailValue(h3, "Accepted generated-tool instances")}`,
+          label: "Accepted tools invoked in a semantic family different from their birth family.",
+          fact1Label: "95% confidence interval",
+          fact1Value: detailValue(h3, "Run-cluster bootstrap 95% CI"),
+          fact2Label: "Decision threshold",
+          fact2Value: mathLabel(detailValue(h3, "Decision threshold")),
+        },
+      ];
+
+      document.getElementById("paperHypothesisGrid").innerHTML = cards.map((card) => `
+        <article class="paper-hypothesis-card">
+          <div class="paper-card-top">
+            <div>
+              <div class="paper-card-id">${escapeHtml(card.item.id || "Hypothesis")}</div>
+              <h2>${escapeHtml(card.item.title || "Evidence pending")}</h2>
+            </div>
+            <span class="paper-card-status">${escapeHtml(statusLabel(card.item.status))}</span>
+          </div>
+          <div class="paper-primary-row">
+            <div class="paper-primary-value">${escapeHtml(card.value || "-")}</div>
+            <div class="paper-primary-context">${escapeHtml(card.context)}</div>
+          </div>
+          <p class="paper-primary-label">${escapeHtml(card.label)}</p>
+          <div class="paper-card-divider"></div>
+          <div class="paper-card-facts">
+            <div class="paper-card-fact"><span>${escapeHtml(card.fact1Label)}</span><strong>${escapeHtml(card.fact1Value)}</strong></div>
+            <div class="paper-card-fact"><span>${escapeHtml(card.fact2Label)}</span><strong>${escapeHtml(card.fact2Value)}</strong></div>
+          </div>
+        </article>`).join("");
+
+      const runValues = runs.map((run) => Number(run.audited_current_outcome_lift_percent));
+      const runMin = runValues.length ? Math.min(...runValues) : 0;
+      const runMax = runValues.length ? Math.max(...runValues) : 0;
+      document.getElementById("paperRunSummary").textContent =
+        `${runs.length} / ${runs.length} above 10% · range ${pct(runMin, true)}–${pct(runMax, true)}`;
+      document.getElementById("paperRunBars").innerHTML = runs.map((run) => {
+        const height = Math.max(0, Math.min(100, Number(run.audited_current_outcome_lift_percent) / 40 * 100));
+        return `<div class="paper-run-bar-wrap" title="${escapeHtml(run.short_label)}: ${pct(run.audited_current_outcome_lift_percent, true)}">
+          <div class="paper-run-bar-track">
+            <span class="paper-run-value-label">${pct(run.audited_current_outcome_lift_percent, true)}</span>
+            <div class="paper-run-bar-target"></div>
+            <div class="paper-run-bar-value" style="--height:${height}%"></div>
+          </div>
+          <div class="paper-run-label">${escapeHtml(run.short_label)}</div>
+        </div>`;
+      }).join("");
+
+      document.getElementById("paperEvidenceFacts").innerHTML = `
+        <div class="paper-evidence-fact"><span>H1 two-way 95% CI</span><strong>${escapeHtml(detailValue(h1, "Lift 95% two-way run/task bootstrap CI"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Run-level sign-flip test</span><strong>${escapeHtml(detailValue(h1, "Run-level target-contrast sign flip"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Repaired-tool reuse</span><strong>${escapeHtml(detailValue(h2, "Repaired tools invoked on a later task"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Matched task observations</span><strong>${Number(campaign.audited_current_matched_observations || 0).toLocaleString()}</strong></div>`;
+      document.documentElement.dataset.paperFigureStatus = "ready";
+    }
+
     function bindDetails() {
       document.querySelectorAll("[data-detail]").forEach((element) => {
         element.addEventListener("click", () => openDetail(element.dataset.detail));
@@ -1393,6 +1864,7 @@
       renderToolMetrics(data);
       renderChart(data);
       renderTools(data);
+      renderPaperFigure(data);
       bindDetails();
     }
 
@@ -1428,7 +1900,9 @@
     });
 
     loadEvidence();
-    if (window.location.protocol === "file:") {
+    if (PAPER_MODE) {
+      // A paper export is a fixed evidence view; do not refresh during capture.
+    } else if (window.location.protocol === "file:") {
       // Keep checking even after a Complete render. A later fail-closed
       // verification can archive the canonical file, so a stale in-memory final
       // view must not remain silently displayed for the rest of the browser session.
