@@ -986,7 +986,7 @@
 
     <div class="section-head">
       <h2>Hypothesis Evidence</h2>
-      <p id="hypothesisSectionDescription">H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. The called-task analysis is selection-conditioned and descriptive; v1 on the exact 800-task subset is historical comparison only.</p>
+      <p id="hypothesisSectionDescription">Hypothesis definitions and evidence load from the selected campaign artifacts.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
@@ -998,14 +998,14 @@
     <section class="tool-row" id="toolMetrics" aria-label="Generated tool metrics"></section>
 
     <div class="section-head">
-      <h2>Replication Stability And Called-Task Association</h2>
-      <p>Run-level variation remains visible instead of being hidden by the aggregate.</p>
+      <h2 id="lowerSectionTitle">Replication Stability And Called-Task Association</h2>
+      <p id="lowerSectionDescription">Run-level variation remains visible instead of being hidden by the aggregate.</p>
     </div>
     <section class="lower-grid">
       <article class="panel">
         <div class="panel-title">
           <strong>Outcome Lift Across Full Runs</strong>
-          <span>Audited v9 all-task mean and H2 threshold</span>
+          <span id="replicationChartSubtitle">Audited v9 all-task mean and primary threshold</span>
         </div>
         <div id="replicationChart"></div>
       </article>
@@ -1146,9 +1146,22 @@
       const designNotice = document.getElementById("studyDesignNotice");
       designNotice.textContent = campaign.study_design_notice || "";
       designNotice.hidden = !campaign.study_design_notice;
-      document.getElementById("hypothesisSectionDescription").textContent =
-        campaign.hypothesis_section_description ||
-        "H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks.";
+      const hypothesisSectionDescription = document.getElementById(
+        "hypothesisSectionDescription"
+      );
+      hypothesisSectionDescription.textContent =
+        campaign.hypothesis_section_description || "";
+      hypothesisSectionDescription.hidden =
+        !campaign.hypothesis_section_description;
+      document.getElementById("lowerSectionTitle").textContent =
+        campaign.lower_section_title ||
+        "Replication Stability And Called-Task Association";
+      document.getElementById("lowerSectionDescription").textContent =
+        campaign.lower_section_description ||
+        "Run-level variation remains visible instead of being hidden by the aggregate.";
+      document.getElementById("replicationChartSubtitle").textContent =
+        campaign.replication_chart_subtitle ||
+        "Audited v9 all-task mean and primary threshold";
       document.getElementById("footerNote").textContent =
         `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
 
@@ -1201,6 +1214,7 @@
       const paper = endpoints.paper_comparable_historical_subset || {};
       const statistics = data.statistics;
       const integrity = data.integrity;
+      const primaryHypothesisId = data.campaign?.primary_performance_hypothesis_id || "H2";
       [performance, audited, paper, statistics, integrity].forEach(registerDetail);
       document.getElementById("evidenceGrid").innerHTML = `
         <button class="panel metric-button" data-detail="${escapeHtml(audited.detail_id)}">
@@ -1233,7 +1247,7 @@
             <li>
               <span class="row-copy">
                 <span class="metric-name">Mean audited-v9 difference</span>
-                <span class="metric-help">Average outcome gain for SAGE over baseline; the H2 test below evaluates the 10% target directly.</span>
+                <span class="metric-help">Average outcome gain for SAGE over baseline; the ${escapeHtml(primaryHypothesisId)} test below evaluates the 10% target directly.</span>
               </span>
               <strong>${escapeHtml(statistics.mean_delta_label)}</strong>
             </li>
@@ -1308,7 +1322,10 @@
       }
       runs.forEach(registerDetail);
       const values = runs.map((run) => Number(run.audited_current_outcome_lift_percent));
-      const chartMax = Math.max(40, Math.ceil((Math.max(...values, 10) + 10) / 20) * 20);
+      const threshold = Number(data.campaign?.replication_chart_threshold_percent ?? 10);
+      const thresholdLabel = data.campaign?.replication_chart_threshold_label ||
+        `Primary threshold: ${threshold}%`;
+      const chartMax = Math.max(40, Math.ceil((Math.max(...values, threshold) + 10) / 20) * 20);
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
       const dots = runs.map((run, index) => {
         const x = runs.length === 1 ? 50 : 5 + (index / (runs.length - 1)) * 90;
@@ -1324,7 +1341,7 @@
             <span>${Math.round(chartMax * .5)}%</span><span>${Math.round(chartMax * .25)}%</span><span>0%</span>
           </div>
           <div class="plot">
-            <div class="target-line" style="bottom:${10 / chartMax * 100}%"><span>H2 threshold: 10%</span></div>
+            <div class="target-line" style="bottom:${threshold / chartMax * 100}%"><span>${escapeHtml(thresholdLabel)}</span></div>
             <div class="mean-line" style="bottom:${Math.max(0, Math.min(100, mean / chartMax * 100))}%"><span>Mean: ${pct(mean)}</span></div>
             ${dots}
           </div>
