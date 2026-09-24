@@ -107,7 +107,8 @@ hypothesis, or release gate. Minefield violations set the task outcome to zero.
   failure and at least one autonomous repair attempt, the repair-admission rate
   and its run-cluster 95% lower bound must exceed 50%, with run-level sign-flip
   `p < .05`; at least 90% of admitted repaired tools must be invoked on a later
-  task.
+  task, and the run-cluster 95% lower bound for that later-reuse rate must be at
+  least 90%.
 - **H3, cross-family use:** more than 50% of accepted generated-tool instances
   must be invoked on a later task from a semantic family different from the
   actual birth task's family; the run-cluster 95% lower bound must exceed 50%

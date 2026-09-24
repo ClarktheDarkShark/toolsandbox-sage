@@ -24,11 +24,15 @@ from typing import Any, Iterator, cast
 from scripts.research.chapter4_evidence import (
     EVIDENCE_DATA_NAME,
     EVIDENCE_HTML_NAME,
-    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
-    RESEARCHER_SAMPLE_WAIVER_STATUS,
     load_run_evidence,
     verify_run_endpoint_measurements,
     write_evidence_dashboard,
+)
+from scripts.research.chapter4_evidence import (
+    RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION as RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION,
+)
+from scripts.research.chapter4_evidence import (
+    RESEARCHER_SAMPLE_WAIVER_STATUS as RESEARCHER_SAMPLE_WAIVER_STATUS,
 )
 
 try:
@@ -140,36 +144,94 @@ def _expected_control_execution() -> dict[str, Any]:
 
 def _expected_statistical_plan() -> dict[str, Any]:
     return {
-        "primary_measure": "outcome/task-completion similarity",
-        "hypothesis_1_threshold_percent": 80,
-        "hypothesis_2_threshold_percent": 10,
-        "hypothesis_3_threshold_percent": 30,
+        "hypothesis_framework": "prospective_current_h1_h2_h3_v1",
+        "primary_measure": "route-independent outcome completion in [0,1]",
         "bootstrap_iterations": DEFAULT_BOOTSTRAP_ITERATIONS,
         "randomization_iterations": DEFAULT_RANDOMIZATION_ITERATIONS,
         "seed": DEFAULT_ANALYSIS_SEED,
         "run_level_replications": EXPECTED_REPLICATIONS,
         "matched_online_task_pairs": (EXPECTED_REPLICATIONS * EXPECTED_TASKS_PER_RUN),
-        "hypothesis_2_confirmatory_rule": {
-            "analysis_role": "confirmatory_two_way_run_task_clustered",
-            "target_contrast": "candidate_mean - 1.10 * control_mean",
-            "estimate_requirement": "audited_relative_outcome_lift_percent >= 10",
-            "two_way_uncertainty_requirement": (
-                "two_way_run_task_bootstrap_95_ci_lower_for_target_contrast > 0"
-            ),
-            "run_cluster_requirement": (
-                "run_cluster_bootstrap_95_ci_lower_for_target_contrast > 0"
-            ),
-            "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
-            "replication_unit": "independently_evolved_registry_run",
-            "task_unit": "fixed_matched_benchmark_task",
-            "iid_task_analysis_role": "descriptive_only",
+        "hypotheses": {
+            "H1": {
+                "name": "outcome_lift",
+                "analysis_role": "confirmatory_two_way_run_task_clustered",
+                "metric_field": "outcome_similarity",
+                "evaluator_version": "sage_outcome_contracts_v9",
+                "task_count_per_run": EXPECTED_TASKS_PER_RUN,
+                "expected_matched_pairs": (
+                    EXPECTED_REPLICATIONS * EXPECTED_TASKS_PER_RUN
+                ),
+                "relative_lift_threshold_percent": 10,
+                "target_contrast": "candidate_mean - 1.10 * control_mean",
+                "estimate_requirement": ("audited_relative_outcome_lift_percent >= 10"),
+                "two_way_uncertainty_requirement": (
+                    "two_way_run_task_bootstrap_95_ci_lower_for_target_contrast > 0"
+                ),
+                "run_cluster_requirement": (
+                    "run_cluster_bootstrap_95_ci_lower_for_target_contrast > 0"
+                ),
+                "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+                "replication_unit": "independently_evolved_registry_run",
+                "task_unit": "fixed_matched_benchmark_task",
+                "iid_task_analysis_role": "descriptive_only",
+            },
+            "H2": {
+                "name": "repair_and_later_reuse",
+                "analysis_role": "confirmatory_run_clustered_tool_lifecycle",
+                "population": (
+                    "candidates with recorded initial validation failure and at "
+                    "least one autonomous repair attempt"
+                ),
+                "repair_admission_threshold_percent": 50,
+                "repair_admission_requirement": (
+                    "repaired_accepted / repair_entrants > 0.50"
+                ),
+                "repair_run_cluster_requirement": (
+                    "run_cluster_bootstrap_95_ci_lower > 0.50"
+                ),
+                "repair_run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+                "later_reuse_threshold_percent": 90,
+                "later_reuse_requirement": (
+                    "repaired_reused_later / repaired_accepted >= 0.90"
+                ),
+                "later_reuse_run_cluster_requirement": (
+                    "run_cluster_bootstrap_95_ci_lower >= 0.90"
+                ),
+                "later_reuse_definition": (
+                    "invocation on a task ordered after the actual JIT birth task"
+                ),
+                "replication_unit": "independently_evolved_registry_run",
+                "tool_unit": "generated_tool_candidate_or_accepted_instance",
+            },
+            "H3": {
+                "name": "cross_family_use",
+                "analysis_role": "confirmatory_run_clustered_tool_lifecycle",
+                "population": "accepted_generated_tool_instances",
+                "threshold_percent": 50,
+                "estimate_requirement": ("cross_family_tools / accepted_tools > 0.50"),
+                "run_cluster_requirement": ("run_cluster_bootstrap_95_ci_lower > 0.50"),
+                "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+                "cross_family_definition": (
+                    "later invocation base_family differs from actual JIT birth "
+                    "task base_family"
+                ),
+                "replication_unit": "independently_evolved_registry_run",
+                "tool_unit": "accepted_generated_tool_instance",
+            },
         },
-        "hypothesis_3_analysis_rule": {
-            "analysis_role": "selection_conditioned_descriptive_only",
-            "subset": "matched_tasks_with_at_least_one_generated_tool_call",
-            "causal_attribution_allowed": False,
-            "classification": "descriptive_only_no_hypothesis_support_decision",
-            "threshold_role": "predeclared_descriptive_reference_only",
+        "supporting_analyses": {
+            "frozen_gain_retention": {
+                "analysis_role": "supporting_only_not_hypothesis",
+                "reference_threshold_percent": 80,
+            },
+            "generated_tool_called_outcome_association": {
+                "analysis_role": "selection_conditioned_descriptive_only",
+                "causal_attribution_allowed": False,
+                "reference_threshold_percent": 30,
+            },
+            "paper_comparable_historical_subset": {
+                "analysis_role": "historical_comparison_only_not_hypothesis",
+            },
         },
         "performance_endpoints": {
             "audited_current_all_tasks": {
@@ -1028,7 +1090,7 @@ def prepare_campaign(args: argparse.Namespace) -> Path:
         run_pairs.append(pair)
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "campaign_id": campaign_id,
         "created_at": _now(),
         "updated_at": _now(),
@@ -1118,8 +1180,8 @@ def _campaign_prerequisite_errors(
     except ValueError:
         errors.append("campaign_scope must be exactly online-only or online-and-frozen")
         planned_arms = ()
-    if not _exact_value(manifest.get("schema_version"), 2):
-        errors.append("schema_version must be exactly 2")
+    if not _exact_value(manifest.get("schema_version"), 3):
+        errors.append("schema_version must be exactly 3")
     if manifest.get("model") != PUBLICATION_MODEL:
         errors.append(f"model must be exactly {PUBLICATION_MODEL}")
     if not _exact_value(
@@ -1967,6 +2029,14 @@ def _execute_job(
     }
 
 
+def _write_evolution_dashboard(**kwargs: Any) -> None:
+    """Load the current-paper renderer only for complete campaign output."""
+
+    module = importlib.import_module("scripts.research.chapter4_evolution_evidence")
+    writer = cast(Any, module.write_evolution_evidence_dashboard)
+    writer(**kwargs)
+
+
 def _refresh_dashboard(
     *,
     repo_root: Path,
@@ -1976,16 +2046,20 @@ def _refresh_dashboard(
 ) -> None:
     output_dir = repo_root / manifest["paths"]["dashboard_dir"]
     plan = manifest["statistical_plan"]
-    write_evidence_dashboard(
-        repo_root=repo_root,
-        campaign_manifest_path=manifest_path,
-        output_dir=output_dir,
-        bootstrap_iterations=(int(plan["bootstrap_iterations"]) if final else 500),
-        randomization_iterations=(
+    kwargs = {
+        "repo_root": repo_root,
+        "campaign_manifest_path": manifest_path,
+        "output_dir": output_dir,
+        "bootstrap_iterations": (int(plan["bootstrap_iterations"]) if final else 500),
+        "randomization_iterations": (
             int(plan["randomization_iterations"]) if final else 1_000
         ),
-        seed=int(plan["seed"]),
-    )
+        "seed": int(plan["seed"]),
+    }
+    if final:
+        _write_evolution_dashboard(**kwargs)
+    else:
+        write_evidence_dashboard(**kwargs)
 
 
 def _archive_failed_terminal_dashboard(

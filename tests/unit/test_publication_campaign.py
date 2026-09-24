@@ -154,7 +154,7 @@ def _valid_campaign(
         run_pairs.append(pair)
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
         "campaign_id": campaign_id,
         "status": "prepared",
         "campaign_scope": scope,
@@ -415,6 +415,18 @@ def test_campaign_rejects_every_statistical_plan_mutation(
     errors = campaign._campaign_prerequisite_errors(tmp_path, manifest)
 
     assert f"statistical plan mismatch: {field}" in errors
+
+
+def test_campaign_rejects_nested_current_hypothesis_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _, _ = _valid_campaign(tmp_path, monkeypatch)
+    manifest["statistical_plan"]["hypotheses"]["H3"]["threshold_percent"] = 30
+
+    errors = campaign._campaign_prerequisite_errors(tmp_path, manifest)
+
+    assert "statistical plan mismatch: hypotheses" in errors
 
 
 @pytest.mark.parametrize("field", campaign._expected_control_execution())
@@ -1225,8 +1237,15 @@ def test_default_campaign_scope_is_one_online_wave_with_dual_v3_endpoints() -> N
     plan = campaign._expected_statistical_plan()
     audited = plan["performance_endpoints"]["audited_current_all_tasks"]
     paper = plan["performance_endpoints"]["paper_comparable_historical_subset"]
-    assert plan["hypothesis_2_confirmatory_rule"] == {
+    assert plan["hypothesis_framework"] == "prospective_current_h1_h2_h3_v1"
+    assert plan["hypotheses"]["H1"] == {
+        "name": "outcome_lift",
         "analysis_role": "confirmatory_two_way_run_task_clustered",
+        "metric_field": "outcome_similarity",
+        "evaluator_version": "sage_outcome_contracts_v9",
+        "task_count_per_run": 1032,
+        "expected_matched_pairs": 10_320,
+        "relative_lift_threshold_percent": 10,
         "target_contrast": "candidate_mean - 1.10 * control_mean",
         "estimate_requirement": "audited_relative_outcome_lift_percent >= 10",
         "two_way_uncertainty_requirement": (
@@ -1240,13 +1259,15 @@ def test_default_campaign_scope_is_one_online_wave_with_dual_v3_endpoints() -> N
         "task_unit": "fixed_matched_benchmark_task",
         "iid_task_analysis_role": "descriptive_only",
     }
-    assert plan["hypothesis_3_analysis_rule"] == {
-        "analysis_role": "selection_conditioned_descriptive_only",
-        "subset": "matched_tasks_with_at_least_one_generated_tool_call",
-        "causal_attribution_allowed": False,
-        "classification": "descriptive_only_no_hypothesis_support_decision",
-        "threshold_role": "predeclared_descriptive_reference_only",
-    }
+    h2 = plan["hypotheses"]["H2"]
+    assert h2["analysis_role"] == "confirmatory_run_clustered_tool_lifecycle"
+    assert h2["repair_admission_threshold_percent"] == 50
+    assert h2["later_reuse_threshold_percent"] == 90
+    assert h2["later_reuse_run_cluster_requirement"].endswith(">= 0.90")
+    h3 = plan["hypotheses"]["H3"]
+    assert h3["analysis_role"] == "confirmatory_run_clustered_tool_lifecycle"
+    assert h3["threshold_percent"] == 50
+    assert "selection_conditioned" not in h3["analysis_role"]
     assert audited == {
         "metric_field": "outcome_similarity",
         "evaluator_version": "sage_outcome_contracts_v9",
@@ -1272,6 +1293,41 @@ def test_default_campaign_scope_is_one_online_wave_with_dual_v3_endpoints() -> N
         ]
         is False
     )
+
+
+@pytest.mark.parametrize(
+    ("final", "expected_writer"),
+    [(False, "preview"), (True, "current")],
+)
+def test_refresh_dashboard_uses_current_hypotheses_for_terminal_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    final: bool,
+    expected_writer: str,
+) -> None:
+    calls: list[str] = []
+
+    def preview_writer(**_: object) -> None:
+        calls.append("preview")
+
+    def current_writer(**_: object) -> None:
+        calls.append("current")
+
+    monkeypatch.setattr(campaign, "write_evidence_dashboard", preview_writer)
+    monkeypatch.setattr(campaign, "_write_evolution_dashboard", current_writer)
+    manifest = {
+        "paths": {"dashboard_dir": "dashboard"},
+        "statistical_plan": campaign._expected_statistical_plan(),
+    }
+
+    campaign._refresh_dashboard(
+        repo_root=tmp_path,
+        manifest_path=tmp_path / "campaign_manifest.json",
+        manifest=manifest,
+        final=final,
+    )
+
+    assert calls == [expected_writer]
 
 
 def test_optional_frozen_scope_requires_an_explicit_second_wave() -> None:

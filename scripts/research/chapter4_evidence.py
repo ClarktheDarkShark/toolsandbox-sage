@@ -1844,9 +1844,35 @@ def build_evidence_data(
         if adaptive_sample_distribution
         else "confirmatory_two_way_run_task_clustered"
     )
-    h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
-    h2_threshold = _safe_float(statistical_plan.get("hypothesis_2_threshold_percent"))
-    h3_threshold = _safe_float(statistical_plan.get("hypothesis_3_threshold_percent"))
+    hypotheses = statistical_plan.get("hypotheses") or {}
+    supporting_analyses = statistical_plan.get("supporting_analyses") or {}
+    h1_threshold = _safe_float(
+        (supporting_analyses.get("frozen_gain_retention") or {}).get(
+            "reference_threshold_percent"
+        )
+    )
+    h2_threshold = _safe_float(
+        (hypotheses.get("H1") or {}).get("relative_lift_threshold_percent")
+    )
+    h3_threshold = _safe_float(
+        (
+            supporting_analyses.get("generated_tool_called_outcome_association") or {}
+        ).get("reference_threshold_percent")
+    )
+    # Preserved historical campaign manifests use the original flat keys. New
+    # campaigns declare the current paper hypotheses in the nested framework.
+    if h1_threshold is None:
+        h1_threshold = _safe_float(
+            statistical_plan.get("hypothesis_1_threshold_percent")
+        )
+    if h2_threshold is None:
+        h2_threshold = _safe_float(
+            statistical_plan.get("hypothesis_2_threshold_percent")
+        )
+    if h3_threshold is None:
+        h3_threshold = _safe_float(
+            statistical_plan.get("hypothesis_3_threshold_percent")
+        )
     h1_threshold = H1_THRESHOLD_PERCENT if h1_threshold is None else h1_threshold
     h2_threshold = H2_THRESHOLD_PERCENT if h2_threshold is None else h2_threshold
     h3_threshold = H3_THRESHOLD_PERCENT if h3_threshold is None else h3_threshold
