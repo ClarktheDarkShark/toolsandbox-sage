@@ -17,10 +17,16 @@ SECRET_PATTERNS = [
 SKIP_PARTS = {
     ".git",
     ".secrets",
+    ".venv",
+    ".venv-dev",
+    ".venv-publication",
+    ".ruff_cache",
     "outputs",
     "__pycache__",
     ".pytest_cache",
     ".mypy_cache",
+    "build",
+    "dist",
 }
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".pyc", ".pkl", ".parquet"}
 
