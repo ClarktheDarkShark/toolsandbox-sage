@@ -70,9 +70,23 @@ SAGE mean is `+0.004929` above the archived paper SAGE mean of `0.795407`.
 - H2 audited all-task outcome lift: `33.67%`; two-way run/task bootstrap 95% CI
   `[28.06%, 39.80%]`; run-level threshold-contrast sign-flip `p = .001953`;
   predeclared threshold `10%`; supported.
-- Generated-tool-called task association: `47.17%` relative lift on 8,225
-  observations. This is selection-conditioned and descriptive, not a causal
-  attribution claim.
+- H3 generated-tool-invoked task association: `47.17%` relative lift on 8,225
+  observations; paired-bootstrap 95% CI `[44.28%, 50.19%]`; paper-stated
+  threshold `30%`; supported for the stated selection-conditioned association.
+  Generated-tool invocation remains post-treatment and was not randomized, so
+  this decision is not a causal attribution claim.
+
+## H3 reporting interpretation
+
+The preserved selected-cohort manifest retains the campaign-time H3 rule
+`selection_conditioned_descriptive_only`. The paper's explicit 30 percent H3
+association statement predates the final campaign in paper commit
+`7ab3da61597ff50d9c73cf7939f8a81f81bad635`. On 2026-09-17, the researcher
+directed the reporting layer to evaluate that paper-stated threshold. The
+reporting-only amendment is documented in
+`docs/sage_protocol/h3_reporting_interpretation_amendment_20260917.md`. No run,
+cohort, raw metric, or confidence interval was changed, and
+`causal_attribution_allowed` remains false.
 
 ## Evidence artifacts
 
@@ -88,11 +102,13 @@ Key local artifacts and hashes:
 - `selected_cohort_verification.json`:
   `b1f563452b404b21949cae6c4783bc6777cdad5ba0a471b7bd16f250e8dd0b90`
 - `dashboard/chapter4_evidence_data.json`:
-  `927fc879d342a557a9304812905ce6852d4684cf445ee2334d0a9aead61325e6`
+  `e1512f8ea256a7654c3a8e1ade31d495065ef783b60d1a97599f6f52620d2813`
 - `dashboard/chapter4_evidence.html`:
-  `daee976d84e52a76087d6260b9efa40aa95ff7ec9e929018367ceff6c728ab77`
+  `ffa2458133b0f617bd96a98a855b88cd97677acb7589987f079a7505e439ef2c`
 - `paper_tables/index.html`:
   `42eb6adfa4d3ae9ad365bfb65288188dfcccf09c208595e3e940dfaf880d4f14`
+- `paper_tables/chapter4_evidence_tables_contact_sheet.png`:
+  `5cb1eb2cd673f46ce82951d9220f36b237327f58c46aa843e5439b2da340a80a`
 
 The dashboard reports 20 of 20 verified runs, ten online and ten frozen,
 `inference_complete=true`, zero excluded selected artifacts, and zero runtime

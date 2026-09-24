@@ -1821,6 +1821,7 @@ def build_evidence_data(
         else declared_expected_frozen
     )
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
+    source_h3_analysis_rule = statistical_plan.get("hypothesis_3_analysis_rule") or {}
     h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
     h2_threshold = _safe_float(statistical_plan.get("hypothesis_2_threshold_percent"))
     h3_threshold = _safe_float(statistical_plan.get("hypothesis_3_threshold_percent"))
@@ -2209,7 +2210,12 @@ def build_evidence_data(
         complete=online_complete,
         alpha=0.05,
     )
-    h3_status = "descriptive_only" if called_lift is not None else "pending"
+    h3_status = _hypothesis_status(
+        value=called_lift,
+        threshold=h3_threshold,
+        ci=called_lift_ci,
+        complete=online_complete,
+    )
 
     tools, tool_totals = _tool_records(completed_online)
     tool_totals["gains"] = called_unique_gains
@@ -2608,15 +2614,45 @@ def build_evidence_data(
         {
             "id": "Hypothesis 3",
             "title": "Outcome lift among generated-tool-called tasks",
-            "analysis_role": "selection_conditioned_descriptive_only",
+            "analysis_role": "selection_conditioned_association_threshold",
             "causal_attribution_allowed": False,
             "decision_rule": {
-                "classification": "descriptive_only_no_hypothesis_support_decision",
+                "classification": "paper_hypothesis_noncausal_association_threshold",
                 "reason": (
-                    "generated-tool-called status is selected after treatment and "
-                    "there is no randomized tool-use ablation"
+                    "the paper-defined hypothesis tests association on the "
+                    "generated-tool-called subset; generated-tool-called status "
+                    "remains post-treatment"
                 ),
-                "threshold_role": "predeclared_descriptive_reference_only",
+                "estimate_requirement": (
+                    f"called_task_relative_outcome_lift_percent >= {h3_threshold:g}"
+                ),
+                "uncertainty_requirement": (
+                    f"paired_bootstrap_95_ci_lower >= {h3_threshold:g}"
+                ),
+                "threshold_role": "hypothesis_association_decision_threshold",
+                "source_campaign_analysis_rule": source_h3_analysis_rule,
+            },
+            "reporting_interpretation": {
+                "amendment_id": "h3_paper_association_interpretation_20260917",
+                "date": "2026-09-17",
+                "scope": "reporting_interpretation_only",
+                "paper_hypothesis_commit": ("7ab3da61597ff50d9c73cf7939f8a81f81bad635"),
+                "campaign_analysis_commit": (
+                    "984a14ca4fe608513842add906eb4c6bbc820661"
+                ),
+                "protocol_analysis_role_at_run_time": source_h3_analysis_rule.get(
+                    "analysis_role"
+                ),
+                "reporting_decision_basis": (
+                    "Supported for the paper-stated selection-conditioned "
+                    "association; causal attribution is not established."
+                ),
+                "raw_metrics_changed": False,
+                "causal_attribution_allowed": False,
+                "amendment_path": (
+                    "docs/sage_protocol/"
+                    "h3_reporting_interpretation_amendment_20260917.md"
+                ),
             },
             "estimate_percent": called_lift,
             "confidence_interval": _confidence_interval(
@@ -2630,10 +2666,10 @@ def build_evidence_data(
             "decision": h3_status,
             "decision_label": _decision_label(h3_status),
             "value_label": _percent(called_lift, signed=True),
-            "primary_label": "Lift is measured on tasks where the SAGE actor policy called generated tools.",
+            "primary_label": "Lift is measured on tasks where the SAGE actor policy invoked generated tools.",
             "claim_label": (
-                "This is a selection-conditioned description of tasks where the "
-                "SAGE actor policy selected and called a generated tool."
+                "The paper-defined association threshold is evaluated on tasks "
+                "where the SAGE actor policy selected and called a generated tool."
             ),
             "evidence_label": (
                 "Uses audited v9 outcomes on generated-tool-called tasks under "
@@ -2642,7 +2678,7 @@ def build_evidence_data(
                 "It does not establish causal attribution."
             ),
             "observed_label": f"Observed {_percent(called_lift, signed=True)}",
-            "threshold_label": f"Descriptive reference: {h3_threshold:g}%",
+            "threshold_label": f"Target >= {h3_threshold:g}%",
             "fill_position": min(max(called_lift or 0.0, 0.0), 100.0),
             "target_position": h3_threshold,
             "status": h3_status,
@@ -2656,7 +2692,7 @@ def build_evidence_data(
                             [
                                 (
                                     "Subset",
-                                    "matched tasks with at least one recorded generated-tool call",
+                                    "matched tasks with at least one recorded generated-tool invocation, including failed attempts",
                                 ),
                                 (
                                     "Baseline outcome on subset",
@@ -2682,10 +2718,7 @@ def build_evidence_data(
                                     "Mean absolute-difference CI",
                                     _interval(called_delta_ci),
                                 ),
-                                (
-                                    "Descriptive reference",
-                                    f"{h3_threshold:g}% (not a causal gate)",
-                                ),
+                                ("Association threshold", f">= {h3_threshold:g}%"),
                                 ("Called-task observations", len(called_rows)),
                             ]
                         ),
@@ -2697,7 +2730,7 @@ def build_evidence_data(
                         ),
                     }
                 ],
-                eyebrow="Selection-conditioned descriptive analysis",
+                eyebrow="Selection-conditioned association analysis",
             ),
         },
     ]
@@ -2740,7 +2773,7 @@ def build_evidence_data(
                     "note": (
                         "This complete-benchmark endpoint supplies the current "
                         "same-run lift, confirmatory H1/H2 analyses, and the "
-                        "selection-conditioned descriptive called-task analysis."
+                        "selection-conditioned H3 association analysis."
                     ),
                 },
                 {
@@ -3118,31 +3151,31 @@ def build_evidence_data(
         ),
         (
             "calls",
-            "Policy-directed tool calls",
+            "Successful generated-tool scenarios",
             f"{tool_totals['policy_directed_calls']:,}",
             "",
-            "Matched task scenarios containing a generated-tool call selected by the production actor policy, with diagnostic overrides disabled.",
+            "Matched task scenarios with at least one successfully executed generated tool selected by the production actor policy. Failed-only invocation scenarios are excluded from this count.",
         ),
         (
             "gains",
             "Called-task gains",
             f"{tool_totals['gains']:,}",
             "green",
-            "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only.",
+            "Generated-tool-invoked scenarios with positive matched outcome difference in the H3 association subset.",
         ),
         (
             "preserved",
             "Preserved outcomes",
             f"{tool_totals['preserved']:,}",
             "",
-            "Called generated-tool scenarios with zero matched outcome difference.",
+            "Generated-tool-invoked scenarios with zero matched outcome difference in the H3 association subset.",
         ),
         (
             "regressions",
             "Called-task regressions",
             f"{tool_totals['regressions']:,}",
             "amber",
-            "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only.",
+            "Generated-tool-invoked scenarios with negative matched outcome difference in the H3 association subset.",
         ),
         (
             "failures",

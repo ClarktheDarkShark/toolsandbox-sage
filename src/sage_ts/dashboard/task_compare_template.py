@@ -1664,6 +1664,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
 
     function chooseCurrentToolLifecycleEvent({current, liveStatus, latestRunEvent, latestBirth, latestReuse}) {
+      if (payload?.status === "complete") {
+        return {event: {event: "run_finished"}, state: "complete"};
+      }
       if (latestRunEvent?.event === "run_finished") {
         return {event: latestRunEvent, state: "complete"};
       }
@@ -1697,6 +1700,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
     }
 
     function chooseToolTileLifecycleEvent({liveStatus, latestRunEvent, latestBirth, latestReuse}) {
+      if (payload?.status === "complete") {
+        return {event: {event: "run_finished"}, state: "complete"};
+      }
       if (latestRunEvent?.event === "run_finished") {
         return {event: latestRunEvent, state: "complete"};
       }

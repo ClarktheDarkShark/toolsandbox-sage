@@ -584,9 +584,20 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     assert data["hypotheses"][2]["value_label"] == "+300.0%"
     assert data["hypotheses"][2]["baseline_mean"] == pytest.approx(0.2)
     assert data["hypotheses"][2]["sage_mean"] == pytest.approx(0.8)
-    assert data["hypotheses"][2]["decision"] == "descriptive_only"
+    assert data["hypotheses"][2]["decision"] == "pending"
+    assert data["hypotheses"][2]["analysis_role"] == (
+        "selection_conditioned_association_threshold"
+    )
     assert data["hypotheses"][2]["causal_attribution_allowed"] is False
-    assert data["hypotheses"][2]["decision_label"] == "Descriptive only"
+    assert data["hypotheses"][2]["decision_label"] == "Pending"
+    assert (
+        data["hypotheses"][2]["reporting_interpretation"]["scope"]
+        == "reporting_interpretation_only"
+    )
+    assert (
+        data["hypotheses"][2]["reporting_interpretation"]["raw_metrics_changed"]
+        is False
+    )
     assert data["statistics"]["matched_task_observations"] == 2
     assert data["integrity"]["counts"]["shortcut_violations"] == 0
     assert data["tool_failure_summary"] == {
@@ -637,7 +648,7 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     assert h3_rows[0][1] == "1 observations"
     assert h3_rows[1][1] == "0.2000"
     assert h3_rows[2][1] == "0.8000"
-    assert h3_rows[3][2] == ">= +250% descriptive reference"
+    assert h3_rows[3][2] == ">= +250% association threshold"
     assert (
         "selection-conditioned"
         in tables["table_4_5_h3_generated_tool_attribution.png"]["caption"]
