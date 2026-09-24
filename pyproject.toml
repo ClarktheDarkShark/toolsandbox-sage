@@ -45,6 +45,7 @@ dependencies = [
     "numpy==1.26.4",
     "openai==2.37.0",
     "phonenumbers==9.0.29",
+    "Pillow==11.3.0",
     "pint==0.25.3",
     "polars==0.20.31",
     "pydantic==2.13.4",
@@ -59,9 +60,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-publication = [
-    "Pillow==11.3.0",
-]
 dev = [
     "build==1.2.2.post1",
     "mypy==1.11.2",

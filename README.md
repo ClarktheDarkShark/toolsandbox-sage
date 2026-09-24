@@ -151,7 +151,7 @@ editable repository metadata, and isolated imports of both `sage_ts` and
 a live run. A local `.secrets/env.sh` is supported and must not be committed.
 
 For a normal development installation, use
-`python3.12 -m pip install -e '.[dev,publication]'`. The strict publication
+`python3.12 -m pip install -e '.[dev]'`. The strict publication
 environment above is separate so adding developer tools cannot change its
 locked distribution set.
 

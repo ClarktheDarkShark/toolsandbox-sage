@@ -9,4 +9,4 @@ dependencies:
   - pip:
       # Start from the same runtime versions, then layer developer-only tools.
       - -r requirements-publication-lock.txt
-      - -e .[dev,publication]
+      - -e .[dev]
