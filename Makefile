@@ -13,7 +13,7 @@ EVIDENCE_DATA ?=
 TABLE_OUTPUT ?=
 VALIDATION_THRESHOLDS ?= docs/sage_protocol/publication_validation_thresholds_v3.json
 
-COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
+COMMON_ENV = PYTHONPATH="$(PYTHONPATH)" POLARS_MAX_THREADS=1
 
 .PHONY: \
 	compile lint test-core test package \
@@ -24,17 +24,17 @@ COMMON_ENV = PYTHONPATH=$(PYTHONPATH) POLARS_MAX_THREADS=1
 	require-evidence-data require-table-output
 
 compile:
-	$(PYTHON) -m compileall -q -x '(^|/)(__pycache__|build)/' \
+	"$(PYTHON)" -m compileall -q -x '(^|/)(__pycache__|build)/' \
 		src/sage_ts tool_sandbox scripts
 
 lint:
-	$(PYTHON) -m ruff check --exclude '*.ipynb' \
+	"$(PYTHON)" -m ruff check --exclude '*.ipynb' \
 		src/sage_ts tool_sandbox scripts tests
-	$(PYTHON) -m ruff format --check --exclude '*.ipynb' \
+	"$(PYTHON)" -m ruff format --check --exclude '*.ipynb' \
 		src/sage_ts tool_sandbox scripts tests
 
 test-core:
-	$(COMMON_ENV) $(PYTHON) -m pytest \
+	$(COMMON_ENV) "$(PYTHON)" -m pytest \
 		tests/unit/test_sage_run_adapter.py \
 		tests/unit/test_toolsandbox_adapter.py \
 		tests/unit/test_openai_toolsandbox_roles.py \
@@ -59,10 +59,10 @@ test-core:
 		-q
 
 test:
-	$(COMMON_ENV) $(PYTHON) -m pytest tests/unit tests/integration -q
+	$(COMMON_ENV) "$(PYTHON)" -m pytest tests/unit tests/integration -q
 
 package:
-	$(PYTHON) -m pip wheel --no-deps --wheel-dir $(DIST_DIR) .
+	"$(PYTHON)" -m pip wheel --no-deps --wheel-dir "$(DIST_DIR)" .
 
 # One complete 1,032-task online-build sample. The launcher starts the control
 # and policy-directed SAGE in isolated concurrent processes, streams each fresh
@@ -89,7 +89,7 @@ require-sample-report:
 		(echo "Set SAMPLE_REPORT to a passing publication_validation_report.json." >&2; exit 2)
 
 prepare-paper-rerun: require-sample-report
-	$(COMMON_ENV) $(PYTHON) scripts/run_chapter4_evidence_campaign.py prepare \
+	$(COMMON_ENV) "$(PYTHON)" scripts/run_chapter4_evidence_campaign.py prepare \
 		--repo-root . \
 		--sample-validation-report "$(SAMPLE_REPORT)" \
 		$(CAMPAIGN_ARGS)
@@ -99,13 +99,13 @@ require-run:
 		(echo "Set RUN to the publication run search root." >&2; exit 2)
 
 verify-publication: require-run
-	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_run.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/verify_publication_run.py \
 		--search-root "$(RUN)" \
 		--expected-tasks 1032 \
 		--expect-reflection "$(REFLECTION_EXPECTATION)"
 
 verify-sample: require-run
-	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_sample.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/verify_publication_sample.py \
 		--search-root "$(RUN)" \
 		--thresholds "$(VALIDATION_THRESHOLDS)"
 
@@ -114,28 +114,28 @@ require-campaign-manifest:
 		(echo "Set CAMPAIGN_MANIFEST to a prepared campaign_manifest.json." >&2; exit 2)
 
 verify-campaign: require-campaign-manifest
-	$(COMMON_ENV) $(PYTHON) scripts/run_chapter4_evidence_campaign.py verify \
+	$(COMMON_ENV) "$(PYTHON)" scripts/run_chapter4_evidence_campaign.py verify \
 		--repo-root . \
 		--campaign-manifest "$(CAMPAIGN_MANIFEST)"
 
 # Exact interpreter/platform/distribution check for strict publication runs.
 verify-environment:
-	$(PYTHON) scripts/verify_publication_environment.py
+	"$(PYTHON)" scripts/verify_publication_environment.py
 
 # Clean-clone check of only the compact inputs published in Git.
 verify-inputs:
-	$(COMMON_ENV) $(PYTHON) scripts/verify_publication_inputs.py
+	$(COMMON_ENV) "$(PYTHON)" scripts/verify_publication_inputs.py
 
 # Optional deep audit of the ignored 23 MB local recovery bundle.
 verify-freeze:
-	$(COMMON_ENV) $(PYTHON) scripts/build_publication_freeze.py verify
+	$(COMMON_ENV) "$(PYTHON)" scripts/build_publication_freeze.py verify
 
 require-analysis-output:
 	@test -n "$(ANALYSIS_OUTPUT)" || \
 		(echo "Set ANALYSIS_OUTPUT to a new, timestamped output directory." >&2; exit 2)
 
 analyze: require-campaign-manifest require-analysis-output
-	$(COMMON_ENV) $(PYTHON) scripts/build_chapter4_evidence_dashboard.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/build_chapter4_evidence_dashboard.py \
 		--repo-root . \
 		--campaign-manifest "$(CAMPAIGN_MANIFEST)" \
 		--output-dir "$(ANALYSIS_OUTPUT)"
@@ -149,6 +149,6 @@ require-table-output:
 		(echo "Set TABLE_OUTPUT to a new, timestamped table directory." >&2; exit 2)
 
 render-paper: require-evidence-data require-table-output
-	$(COMMON_ENV) $(PYTHON) scripts/render_chapter4_evidence_tables.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/render_chapter4_evidence_tables.py \
 		--data "$(EVIDENCE_DATA)" \
 		--output-dir "$(TABLE_OUTPUT)"

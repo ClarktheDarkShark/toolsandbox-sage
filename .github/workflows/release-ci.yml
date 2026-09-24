@@ -1,0 +1,131 @@
+name: Release CI
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-publication-lock.txt
+            pyproject.toml
+
+      - name: Create locked test environment
+        run: |
+          python -m venv .venv-ci
+          .venv-ci/bin/python -m pip install -r requirements-publication-lock.txt
+          .venv-ci/bin/python -m pip install --no-deps -e .
+          .venv-ci/bin/python -m pip install \
+            build==1.2.2.post1 \
+            pytest==7.4.4 \
+            ruff==0.15.13
+          .venv-ci/bin/python -m pip check
+
+      - name: Verify publication inputs
+        run: make PYTHON="$PWD/.venv-ci/bin/python" verify-inputs
+
+      - name: Compile and lint
+        run: |
+          make PYTHON="$PWD/.venv-ci/bin/python" compile
+          make PYTHON="$PWD/.venv-ci/bin/python" lint
+
+      - name: Run retained core tests
+        run: make PYTHON="$PWD/.venv-ci/bin/python" test-core
+
+      - name: Build wheel
+        run: make PYTHON="$PWD/.venv-ci/bin/python" DIST_DIR="$PWD/dist" package
+
+      - name: Inspect wheel contents
+        run: |
+          .venv-ci/bin/python - <<'PY'
+          import configparser
+          import zipfile
+          from pathlib import Path
+
+          wheels = list(Path("dist").glob("toolsandbox_sage-*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"Expected one toolsandbox-sage wheel, found {wheels}")
+          with zipfile.ZipFile(wheels[0]) as archive:
+              names = set(archive.namelist())
+              required = {
+                  "scripts/__init__.py",
+                  "scripts/run_sage_protocol.py",
+                  "scripts/run_chapter4_evidence_campaign.py",
+                  "scripts/build_chapter4_evolution_dashboard.py",
+                  "scripts/render_chapter4_evolution_tables.py",
+                  "scripts/research/chapter4_evidence_template.html",
+              }
+              missing = sorted(required - names)
+              if missing:
+                  raise SystemExit(f"Wheel is missing required files: {missing}")
+              stale = sorted(
+                  name
+                  for name in names
+                  if "__pycache__" in name
+                  or name.endswith((".pyc", ".pyo"))
+                  or name.startswith(("artifacts/", "docs/", "outputs/", "tests/"))
+              )
+              if stale:
+                  raise SystemExit(f"Wheel contains stale/non-runtime files: {stale}")
+              entry_points_name = next(
+                  name for name in names if name.endswith(".dist-info/entry_points.txt")
+              )
+              parser = configparser.ConfigParser()
+              parser.read_string(archive.read(entry_points_name).decode("utf-8"))
+              commands = set(parser["console_scripts"])
+              expected_commands = {
+                  "tool_sandbox",
+                  "sage-protocol",
+                  "sage-campaign",
+                  "sage-dashboard",
+                  "sage-build-chapter4-evolution",
+                  "sage-render-chapter4-evolution",
+              }
+              if commands != expected_commands:
+                  raise SystemExit(
+                      "Console command mismatch: "
+                      f"expected {sorted(expected_commands)}, observed {sorted(commands)}"
+                  )
+          print(f"wheel_content_verification=pass wheel={wheels[0]}")
+          PY
+
+      - name: Install wheel into a second clean environment
+        run: |
+          python -m venv .venv-wheel
+          .venv-wheel/bin/python -m pip install -r requirements-publication-lock.txt
+          .venv-wheel/bin/python -m pip install --no-deps dist/toolsandbox_sage-*.whl
+          .venv-wheel/bin/python -m pip check
+
+      - name: Smoke installed imports and command help
+        run: |
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE/.venv-wheel/bin/python" -I -c \
+            "import sage_ts, scripts, tool_sandbox; from pathlib import Path; import scripts.research.chapter4_evidence as evidence; assert evidence.EVIDENCE_TEMPLATE.is_file(); print(Path(sage_ts.__file__).resolve()); print(Path(scripts.__file__).resolve()); print(Path(tool_sandbox.__file__).resolve())"
+          for command in \
+            tool_sandbox \
+            sage-protocol \
+            sage-campaign \
+            sage-dashboard \
+            sage-build-chapter4-evolution \
+            sage-render-chapter4-evolution
+          do
+            "$GITHUB_WORKSPACE/.venv-wheel/bin/$command" --help >/dev/null
+          done

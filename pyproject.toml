@@ -81,6 +81,11 @@ dev = [
 
 [project.scripts]
 tool_sandbox = "tool_sandbox.cli:main"
+sage-protocol = "scripts.run_sage_protocol:main"
+sage-campaign = "scripts.run_chapter4_evidence_campaign:main"
+sage-dashboard = "sage_ts.dashboard.server:main"
+sage-build-chapter4-evolution = "scripts.build_chapter4_evolution_dashboard:main"
+sage-render-chapter4-evolution = "scripts.render_chapter4_evolution_tables:main"
 
 [project.urls]
 Homepage = "https://github.com/ClarktheDarkShark/toolsandbox-sage"
@@ -92,7 +97,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = [".", "src"]
-include = ["tool_sandbox*", "sage_ts*"]
+include = ["tool_sandbox*", "sage_ts*", "scripts*"]
 exclude = [
     "artifacts*",
     "cybergym_data*",
@@ -102,7 +107,6 @@ exclude = [
     "language-life-game*",
     "memory*",
     "outputs*",
-    "scripts*",
     "src*",
     "tests*",
 ]
@@ -110,6 +114,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "sage_ts.dashboard" = ["*.html"]
+"scripts.research" = ["chapter4_evidence_template.html"]
 "tool_sandbox.roles" = ["*.yaml"]
 
 [tool.pytest.ini_options]
