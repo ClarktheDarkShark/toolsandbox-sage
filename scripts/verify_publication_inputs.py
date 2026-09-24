@@ -24,9 +24,6 @@ except ModuleNotFoundError:  # Direct ``python scripts/...`` execution.
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASE_INPUT_MANIFEST = Path(
-    "docs/sage_protocol/publication_input_manifest_20260901.json"
-)
 DEFAULT_MANIFEST = Path("docs/sage_protocol/publication_release_manifest_20260910.json")
 EXPECTED_REPLACEMENT_POLICY = {
     "generator_contract_and_repair_analysis_memoization": "within_run_only",

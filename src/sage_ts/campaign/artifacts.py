@@ -205,23 +205,6 @@ def write_task_plan(*, root: Path | None = None) -> Path:
     return path
 
 
-def update_task(task: str, status: str, *, root: Path | None = None) -> None:
-    base = artifact_root(root)
-    path = write_task_plan(root=base)
-    payload = read_json(path)
-    tasks = list(payload.get("tasks", []))
-    found = False
-    for row in tasks:
-        if row.get("task") == task:
-            row["status"] = status
-            found = True
-    if not found:
-        tasks.append({"task": task, "status": status})
-    payload["tasks"] = tasks
-    payload["updated_at"] = utc_now()
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
 def record_run(run: dict[str, Any], *, root: Path | None = None) -> Path:
     base = artifact_root(root)
     path = base / "run_index.json"

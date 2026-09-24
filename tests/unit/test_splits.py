@@ -1,15 +1,15 @@
 from pathlib import Path
 
-from sage_ts.config.splits import load_split_names, write_split_manifest
+from sage_ts.config.splits import load_split_names
 
 
-def test_write_and_load_split_manifest(tmp_path: Path) -> None:
-    manifest_path = write_split_manifest(tmp_path / "splits.json", seed=7)
+def test_loads_sealed_full_benchmark_manifest() -> None:
+    manifest_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json"
+    )
 
-    smoke = load_split_names(manifest_path, "smoke_10")
-    online = load_split_names(manifest_path, "online_build_100")
+    scenarios = load_split_names(manifest_path, "full_benchmark")
 
-    assert len(smoke) == 10
-    assert len(online) == 100
-    assert len(set(smoke)) == 10
-    assert not set(smoke) & set(online)
+    assert len(scenarios) == 1032
+    assert len(set(scenarios)) == 1032
