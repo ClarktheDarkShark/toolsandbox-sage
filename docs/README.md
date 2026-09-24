@@ -1,11 +1,14 @@
 # Documentation index
 
 This release keeps the documentation needed to run, audit, and interpret the
-experiment reported in the paper. Historical development logs, abandoned
+experiment reported in the paper. Most historical development logs, abandoned
 benchmark integrations, superseded phase reports, and textual wrappers for
 stale static dashboard exports are available in Git history rather than in the
-release tree. Remaining legacy PNG/PDF snapshots are archival only: they are
-not inputs to the runtime, analysis, dashboards, or manuscript build.
+release tree. A small number of dated records remain for provenance or because
+the legacy freeze helper inventories them; each is labeled archival and is not
+current execution guidance. Remaining legacy PNG/PDF snapshots are archival
+only: they are not inputs to the runtime, analysis, dashboards, or manuscript
+build.
 
 ## Reproduce the paper experiment
 
@@ -27,19 +30,21 @@ not inputs to the runtime, analysis, dashboards, or manuscript build.
 ## Audit the method and evidence
 
 - [`sage_protocol/policy_production_release_20260908.md`](sage_protocol/policy_production_release_20260908.md)
-  identifies the restored policy-directed implementation and its claim boundary.
+  records the dated restoration rationale and policy-directed claim boundary;
+  its pre-cleanup file counts are historical.
 - [`sage_protocol/policy_production_final_evidence_20260916.md`](sage_protocol/policy_production_final_evidence_20260916.md)
   identifies the final 10 online and 10 frozen runs.
 - [`sage_protocol/h3_reporting_interpretation_amendment_20260917.md`](sage_protocol/h3_reporting_interpretation_amendment_20260917.md)
-  records the superseded H3 interpretation used before the manuscript adopted
-  its current cross-family-use hypothesis. It is retained only as provenance.
+  records an intermediate, superseded H3 reporting decision. It is retained
+  only to disclose the reporting-history chain; it is not the current H3.
 - [`sage_protocol/publication_cleanup_audit_20260901.md`](sage_protocol/publication_cleanup_audit_20260901.md)
-  documents the provenance problems corrected before the clean campaign.
-- [`sage_protocol/chapter4_evidence_correction_and_rerun_readiness_20260901.md`](sage_protocol/chapter4_evidence_correction_and_rerun_readiness_20260901.md)
-  records the clean-rerun boundary.
-- [`sage_protocol/native_action_method_validation_20260719.md`](sage_protocol/native_action_method_validation_20260719.md)
-  and the [generated-tool appendix](sage_protocol/appendix_native_action_generated_tools.md)
-  document the native-action method and representative generated tools.
+  is a dated diagnostic of the earlier hybrid-cache campaign. Its proposed
+  cleanup steps and hypothesis framing are superseded by the contract.
+- [`sage_protocol/chapter4_4omini_data_collection_plan.md`](sage_protocol/chapter4_4omini_data_collection_plan.md)
+  and [`sage_protocol/chapter4_results_completed.tex`](sage_protocol/chapter4_results_completed.tex)
+  are explicitly archival inputs still inventoried by the legacy freeze helper.
+  They describe an abandoned protocol and an obsolete manuscript draft; do not
+  use them to run or report the present experiment.
 
 The repository does not track the large raw 20-run cohort. Its immutable local
 location and hashes are recorded in the experiment contract and reference

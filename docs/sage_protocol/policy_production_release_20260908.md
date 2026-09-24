@@ -4,6 +4,13 @@ Date: 2026-09-08
 
 Branch: `codex/paper-policy-production-final`
 
+> **Historical restoration record.** This document captures the 2026-09-08
+> recovery checkpoint. Its policy-directed claim boundary and evidence pointers
+> remain useful, but its cleanup inventory, line counts, branch name, and source
+> preservation statements describe that checkpoint rather than the final public
+> release. Use [`../experiment_contract.md`](../experiment_contract.md) and the
+> repository README for the current executable contract.
+
 ## Release decision
 
 This branch restores the policy-directed SAGE configuration associated with the
@@ -70,12 +77,13 @@ expected answers, target state, or evaluator traces during the task. This is a
 reward-feedback-driven system and must not be described as globally label-free.
 
 The July campaign also used a strict hybrid control cache for both comparison
-rows and online reflection. That condition is preserved in source for archival
-replay, but it is prohibited by the canonical new-run launcher. New publication
-runs use fresh concurrent control/SAGE processes, stream one matching control
-row at each task boundary, and fail closed on cache use, missing coverage,
-runtime exceptions, source drift, wrong environment imports, or a dashboard
-that was not externally opened before either model process.
+rows and online reflection. That historical condition remains documented in
+Git and preserved artifacts, but its implementation is not part of the public
+release. New publication runs use fresh concurrent control/SAGE processes,
+stream one matching control row at each task boundary, and fail closed on cache
+use, missing coverage, runtime exceptions, source drift, wrong environment
+imports, or a dashboard that was not externally opened before either model
+process.
 
 ## Cleanup boundary
 

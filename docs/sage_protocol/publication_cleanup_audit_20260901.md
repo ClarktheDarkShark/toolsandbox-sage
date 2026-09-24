@@ -1,5 +1,11 @@
 # SAGE Publication Cleanup Audit — 2026-09-01
 
+> **Historical diagnostic; not current execution guidance.** This document
+> records repository state and proposed actions as of 2026-09-01. Its decision
+> label, line counts, cleanup plan, and hypothesis framing were superseded by
+> the completed clean campaign and the public-release work. The authoritative
+> study definition is [`../experiment_contract.md`](../experiment_contract.md).
+
 ## Decision
 
 **AUDIT COMPLETE; REMOVAL AWAITS APPROVAL.** The protected paper campaign and

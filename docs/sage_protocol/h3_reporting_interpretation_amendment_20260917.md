@@ -1,11 +1,18 @@
 # H3 Reporting Interpretation Amendment
 
+> **Historical reporting record; superseded.** This amendment documents an
+> intermediate called-task association interpretation. The current H3 is later
+> cross-family use of accepted generated tools, as defined in
+> [`../experiment_contract.md`](../experiment_contract.md). Retention of this
+> file discloses the reporting-history chain; it does not make the older H3
+> definition or support decision current.
+
 ## Purpose
 
-This amendment records the interpretation used for reporting Hypothesis 3 in
-the final paper and its derived Chapter 4 dashboard. It does not alter the
-preserved campaign manifest, run selection, outcomes, confidence intervals, or
-execution artifacts.
+This amendment records the interpretation used for reporting Hypothesis 3 at
+the 2026-09-17 checkpoint and its then-current Chapter 4 dashboard. It does not
+alter the preserved campaign manifest, run selection, outcomes, confidence
+intervals, or execution artifacts.
 
 ## Provenance
 
@@ -21,9 +28,9 @@ execution artifacts.
 - On 2026-09-17, the researcher directed that H3 be reported against the
   paper-stated association threshold.
 
-## Reporting decision
+## Historical reporting decision (superseded)
 
-H3 is reported as **Supported for the paper-stated selection-conditioned
+At that checkpoint, H3 was reported as **Supported for the paper-stated selection-conditioned
 association** because the observed relative lift was 47.17 percent and the
 paired-bootstrap 95 percent confidence interval was 44.28 to 50.19 percent,
 fully above the paper's 30 percent threshold.

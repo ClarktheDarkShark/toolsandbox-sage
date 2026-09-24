@@ -70,7 +70,7 @@ The audited online analysis contains 10,320 matched observations. The exact
 paper-comparable analysis contains 8,000 matched observations. The current v1
 SAGE mean is `+0.004929` above the archived paper SAGE mean of `0.795407`.
 
-## Hypothesis-facing values
+## Historical hypothesis-facing values (superseded framing)
 
 - H1 frozen-registry gain retention: `96.28%`; run-paired bootstrap 95% CI
   `[92.54%, 100.01%]`; predeclared threshold `80%`; supported.
@@ -83,7 +83,7 @@ SAGE mean is `+0.004929` above the archived paper SAGE mean of `0.795407`.
   Generated-tool invocation remains post-treatment and was not randomized, so
   this decision is not a causal attribution claim.
 
-## H3 reporting interpretation
+## Historical H3 reporting interpretation (superseded framing)
 
 The preserved selected-cohort manifest retains the campaign-time H3 rule
 `selection_conditioned_descriptive_only`. The paper's explicit 30 percent H3

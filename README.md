@@ -52,10 +52,12 @@ and paper-ready values are recorded in
 The portable aggregate dashboard, evidence JSON, and manuscript tables are in
 [`artifacts/publication_evidence/chapter4_current/`](artifacts/publication_evidence/chapter4_current/).
 
-The detailed historical audit is in
+The dated diagnostic of the superseded hybrid-cache campaign is in
 [`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
-The final restoration boundary, mechanism inventory, and reproducible line
-counts are recorded in
+Its proposed actions and hypothesis framing are historical, not current run
+instructions.
+The dated restoration rationale and pre-cleanup mechanism inventory are
+recorded in
 [`docs/sage_protocol/policy_production_release_20260908.md`](docs/sage_protocol/policy_production_release_20260908.md).
 
 ## Restored high-lift configuration
