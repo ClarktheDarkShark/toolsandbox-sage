@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying dissertation."
+type: software
+title: "SAGE for ToolSandbox"
+version: 0.1.0
+authors:
+  - family-names: Clark
+    given-names: Christopher D.
+repository-code: "https://github.com/ClarktheDarkShark/toolsandbox-sage"

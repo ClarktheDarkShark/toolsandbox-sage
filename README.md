@@ -26,12 +26,25 @@ and remain preserved: online `rep04` and frozen `rep05`. They were replaced by
 `rep04r1` and `rep05r1`, respectively. Replacement eligibility depended only
 on the predeclared integrity gate, never on observed performance.
 
-Across the ten online-build runs, audited v9 outcome was `0.586176` for the
-matched control and `0.783543` for SAGE, an absolute difference of `+0.197368`
-and relative lift of `+33.67%`. On the exact paper-comparable 800-task v1
-subset, the means were `0.497535` and `0.800336`; SAGE ranged from `0.784749`
-to `0.814361`. The ten frozen-registry runs produced a v9 SAGE mean of
-`0.776195` and retained `96.28%` of the online-build gain.
+The current manuscript reports three supported hypotheses:
+
+- **H1 — outcome lift:** audited v9 outcome was `0.586176` for the matched
+  control and `0.783543` for SAGE, an absolute difference of `+0.197368` and
+  relative lift of `+33.67%` (10,320 matched task pairs).
+- **H2 — repair and later reuse:** SAGE repaired and admitted `105/161`
+  initially failed candidates (`65.2%`), and all `105/105` admitted repaired
+  tools were invoked on a later task.
+- **H3 — cross-family use:** `164/285` accepted generated-tool instances
+  (`57.5%`) were invoked later for a task from a semantic family different
+  from the tool's birth task.
+
+The ten frozen-registry runs produced a v9 SAGE mean of `0.776195` and retained
+`96.28%` of the online-build gain. On the exact historical 800-task v1 subset,
+the online means were `0.497535` for control and `0.800336` for SAGE. H2 and H3
+were reconstructed exactly from immutable run ledgers, but their current
+definitions and decision rules were committed after the cohort completed.
+They are therefore retrospective analyses of the historical cohort; a new run
+under the release contract tests those fixed rules prospectively.
 
 The selected cohort, replacement disclosures, endpoint identities, hashes,
 and paper-ready values are recorded in
@@ -69,10 +82,11 @@ The other critical components are:
 - native/generated ToolSandbox injection and execution;
 - output normalization, reuse accounting, and outcome evaluation.
 
-These mechanisms remain intact. Cleanup removed obsolete reporting, cohort,
-registry-migration, cache-accounting, and dashboard patch utilities that are not
-reachable from the production runner. Chapter 4 aggregation remains available
-under `scripts/research/`, outside the installed `sage_ts` package.
+These mechanisms remain intact. Cleanup removes obsolete experiments,
+compatibility paths, cache/resume modes, and superseded reporting that are not
+reachable from the production workflow. Chapter 4 aggregation remains
+available under `scripts/research/` and is included in the source and wheel
+distributions.
 
 ## Outcome measurement and behavioral compatibility
 
@@ -104,7 +118,7 @@ The v1 SAGE mean of `0.800336` is above the archived paper mean of `0.795407`.
 Endpoint values are never mixed: v9 supports current same-run inference, while
 v1 is used only for the apples-to-apples historical comparison.
 
-## Historical cache limitation
+## Excluded historical protocol
 
 The successful July campaign used a strict hybrid control cache, and those
 cached rows also informed online reflection. The cache contained 1,182 records
@@ -112,10 +126,9 @@ for 1,032 tasks, including 75 triplicated tasks. Consequently, the archived ten
 runs are evidence of the policy system under that cache-conditioned protocol,
 not clean fresh-control causal evidence.
 
-The legacy cache reader remains in the source only to preserve historical
-behavior and artifact compatibility. It is ineligible for new publication
-runs. All 20 selected publication runs used fresh controls and recorded zero
-cached task, control, or response reuse.
+That hybrid-cache implementation is not part of this release. All 20 selected
+publication runs used fresh controls and recorded zero cached task, control, or
+response reuse.
 
 ## Installation
 
@@ -132,6 +145,11 @@ The verifier checks the Python/platform identity, exact external distributions,
 editable repository metadata, and isolated imports of both `sage_ts` and
 `tool_sandbox` from this checkout. Set `OPENAI_API_KEY` in the environment before
 a live run. A local `.secrets/env.sh` is supported and must not be committed.
+
+For a normal development installation, use
+`python3.12 -m pip install -e '.[dev,publication]'`. The strict publication
+environment above is separate so adding developer tools cannot change its
+locked distribution set.
 
 ## Verify the code and frozen inputs
 
@@ -200,10 +218,10 @@ make verify-publication \
   RUN=outputs/publication_validation/<run-stamp>/native_action
 ```
 
-Live calls are stochastic and hosted models can change, so a future run is not
-expected to reproduce an identical trajectory. The no-regression target is the
-audited outcome metric and complete integrity checks, not byte-identical model
-output.
+Live calls are stochastic and the recorded provider model identifier is an
+unversioned alias, so a future run is not expected to reproduce an identical
+trajectory. The release gates are the predeclared outcome and integrity rules,
+not byte-identical model output.
 
 ## Reproduce the completed ten-run campaign
 

@@ -1,5 +1,12 @@
 # Final Policy-Production Evidence Cohort
 
+> **Historical reporting note.** This checkpoint records the hypothesis
+> framing used on 2026-09-16. The current manuscript subsequently defines H1 as
+> audited outcome lift, H2 as failed-candidate repair plus later reuse, and H3
+> as later cross-family use. The immutable cohort is unchanged. For the current
+> definitions, decision rules, values, and the retrospective-status disclosure
+> for historical H2/H3, use [`../experiment_contract.md`](../experiment_contract.md).
+
 ## Decision
 
 **READY_FOR_PAPER_UPDATE**

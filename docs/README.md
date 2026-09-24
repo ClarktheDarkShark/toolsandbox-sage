@@ -31,7 +31,8 @@ not inputs to the runtime, analysis, dashboards, or manuscript build.
 - [`sage_protocol/policy_production_final_evidence_20260916.md`](sage_protocol/policy_production_final_evidence_20260916.md)
   identifies the final 10 online and 10 frozen runs.
 - [`sage_protocol/h3_reporting_interpretation_amendment_20260917.md`](sage_protocol/h3_reporting_interpretation_amendment_20260917.md)
-  records the H3 interpretation amendment.
+  records the superseded H3 interpretation used before the manuscript adopted
+  its current cross-family-use hypothesis. It is retained only as provenance.
 - [`sage_protocol/publication_cleanup_audit_20260901.md`](sage_protocol/publication_cleanup_audit_20260901.md)
   documents the provenance problems corrected before the clean campaign.
 - [`sage_protocol/chapter4_evidence_correction_and_rerun_readiness_20260901.md`](sage_protocol/chapter4_evidence_correction_and_rerun_readiness_20260901.md)
@@ -42,5 +43,7 @@ not inputs to the runtime, analysis, dashboards, or manuscript build.
 
 The repository does not track the large raw 20-run cohort. Its immutable local
 location and hashes are recorded in the experiment contract and reference
-manifest. Dashboard HTML and images are regenerated from that cohort by the
-maintained analysis commands in the main README.
+manifest. The source release therefore verifies the compact frozen inputs but
+cannot reconstruct the Chapter 4 aggregate without obtaining that cohort.
+Dashboard HTML and images are regenerated from the cohort by the maintained
+analysis commands in the main README.
