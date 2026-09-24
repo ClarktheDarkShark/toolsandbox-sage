@@ -3327,7 +3327,9 @@ def build_evidence_data(
             else "missing_dual_endpoint_sample_and_run_attestations"
         ),
         "thresholds_path": (
-            str(endpoint_spec.thresholds_path) if endpoint_spec is not None else ""
+            str(endpoint_spec.thresholds_path.relative_to(repo_root.resolve()))
+            if endpoint_spec is not None
+            else ""
         ),
         "thresholds_sha256": (
             endpoint_spec.thresholds_sha256 if endpoint_spec is not None else ""

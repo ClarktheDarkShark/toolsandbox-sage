@@ -984,6 +984,7 @@ def test_dual_endpoints_are_separate_and_historical_comparison_is_v1_only(
     assert data["campaign"]["endpoint_policy"] == "dual_scoped_outcome_endpoints"
     assert data["campaign"]["audited_current_matched_observations"] == 3
     assert data["campaign"]["paper_comparable_matched_observations"] == 2
+    assert data["campaign"]["thresholds_path"] == "thresholds_v3.json"
     assert audited["evaluator_version"] == "test_outcome_v9"
     assert audited["matched_task_observations"] == 3
     assert audited["baseline"] == pytest.approx(0.5)
