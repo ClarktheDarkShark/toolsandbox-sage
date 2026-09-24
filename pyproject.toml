@@ -11,8 +11,7 @@ version = "0.1.0"
 description = "Research implementation of self-evolving tool use on ToolSandbox"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-license = "LicenseRef-Apple-Sample-Code"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE.md", "ACKNOWLEDGEMENTS"]
 authors = [
     { name = "Christopher Clark" },
 ]
