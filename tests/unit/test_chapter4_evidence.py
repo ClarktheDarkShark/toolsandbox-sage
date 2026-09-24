@@ -482,6 +482,57 @@ def test_dual_endpoint_verification_accepts_explicit_hashed_sample_waiver(
     assert measurement["status"] == "pass"
 
 
+def test_dual_endpoint_verification_accepts_strict_v4_readiness_policy(
+    tmp_path: Path,
+) -> None:
+    _, manifest = _dual_endpoint_run_and_manifest(tmp_path)
+    sample_path = tmp_path / manifest["sample_validation"]["path"]
+    sample_report = json.loads(sample_path.read_text(encoding="utf-8"))
+    thresholds_path = tmp_path / sample_report["thresholds_path"]
+    thresholds = json.loads(thresholds_path.read_text(encoding="utf-8"))
+    thresholds["schema_version"] = 4
+    thresholds["required_technical_readiness"] = {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+    }
+    _write_json(thresholds_path, thresholds)
+    sample_report["thresholds_sha256"] = _sha256(thresholds_path)
+    _write_json(sample_path, sample_report)
+    manifest["sample_validation"]["sha256"] = _sha256(sample_path)
+
+    measurement = verify_run_endpoint_measurements(
+        repo_root=tmp_path,
+        campaign_manifest=manifest,
+        entry=manifest["run_pairs"][0]["online"],
+    )
+
+    assert measurement["status"] == "pass"
+
+
+def test_dual_endpoint_verification_rejects_corrupt_v4_readiness_policy(
+    tmp_path: Path,
+) -> None:
+    _, manifest = _dual_endpoint_run_and_manifest(tmp_path)
+    sample_path = tmp_path / manifest["sample_validation"]["path"]
+    sample_report = json.loads(sample_path.read_text(encoding="utf-8"))
+    thresholds_path = tmp_path / sample_report["thresholds_path"]
+    thresholds = json.loads(thresholds_path.read_text(encoding="utf-8"))
+    thresholds["schema_version"] = 4
+    thresholds["required_technical_readiness"] = {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.79,
+    }
+    _write_json(thresholds_path, thresholds)
+    sample_report["thresholds_sha256"] = _sha256(thresholds_path)
+    _write_json(sample_path, sample_report)
+    manifest["sample_validation"]["sha256"] = _sha256(sample_path)
+
+    with pytest.raises(ValueError, match="strict v4 technical-readiness gate"):
+        verify_run_endpoint_measurements(
+            repo_root=tmp_path,
+            campaign_manifest=manifest,
+            entry=manifest["run_pairs"][0]["online"],
+        )
+
+
 def test_dual_endpoint_verification_rejects_unauthorized_sample_waiver(
     tmp_path: Path,
 ) -> None:
@@ -584,20 +635,9 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     assert data["hypotheses"][2]["value_label"] == "+300.0%"
     assert data["hypotheses"][2]["baseline_mean"] == pytest.approx(0.2)
     assert data["hypotheses"][2]["sage_mean"] == pytest.approx(0.8)
-    assert data["hypotheses"][2]["decision"] == "pending"
-    assert data["hypotheses"][2]["analysis_role"] == (
-        "selection_conditioned_association_threshold"
-    )
+    assert data["hypotheses"][2]["decision"] == "descriptive_only"
     assert data["hypotheses"][2]["causal_attribution_allowed"] is False
-    assert data["hypotheses"][2]["decision_label"] == "Pending"
-    assert (
-        data["hypotheses"][2]["reporting_interpretation"]["scope"]
-        == "reporting_interpretation_only"
-    )
-    assert (
-        data["hypotheses"][2]["reporting_interpretation"]["raw_metrics_changed"]
-        is False
-    )
+    assert data["hypotheses"][2]["decision_label"] == "Descriptive only"
     assert data["statistics"]["matched_task_observations"] == 2
     assert data["integrity"]["counts"]["shortcut_violations"] == 0
     assert data["tool_failure_summary"] == {
@@ -648,7 +688,7 @@ def test_builds_hypothesis_metrics_and_drilldowns(tmp_path: Path) -> None:
     assert h3_rows[0][1] == "1 observations"
     assert h3_rows[1][1] == "0.2000"
     assert h3_rows[2][1] == "0.8000"
-    assert h3_rows[3][2] == ">= +250% association threshold"
+    assert h3_rows[3][2] == ">= +250% descriptive reference"
     assert (
         "selection-conditioned"
         in tables["table_4_5_h3_generated_tool_attribution.png"]["caption"]
@@ -967,6 +1007,46 @@ def test_dual_endpoints_are_separate_and_historical_comparison_is_v1_only(
     assert verification["paper_comparable_historical_subset"]["task_count"] == 2
     assert verification["performance_floors_applied"] is False
     assert verification["canonical_metric_checked_as_gate"] is False
+
+
+def test_sample_as_rep01_distribution_is_aggregated_but_never_confirmatory(
+    tmp_path: Path,
+) -> None:
+    _, manifest = _dual_endpoint_run_and_manifest(tmp_path)
+    notice = (
+        "Adaptive, selection-conditioned distribution: rep01 passed the release "
+        "gate; not preregistered inference."
+    )
+    manifest["replication_accounting"] = {
+        "mode": "passing_release_sample_as_online_rep01_plus_nine_new",
+        "analysis_role": "adaptive_selection_conditioned_descriptive_only",
+        "preregistered_inference_eligible": False,
+        "selection_conditioning_notice": notice,
+    }
+
+    data = build_evidence_data(
+        repo_root=tmp_path,
+        campaign_manifest=manifest,
+        bootstrap_iterations=20,
+        randomization_iterations=20,
+    )
+
+    assert data["campaign"]["distribution_complete"] is True
+    assert data["campaign"]["inference_complete"] is False
+    assert data["campaign"]["preregistered_inference_eligible"] is False
+    assert data["campaign"]["analysis_role"] == (
+        "adaptive_selection_conditioned_descriptive_only"
+    )
+    assert data["campaign"]["study_design_notice"] == notice
+    assert data["campaign"]["status_label"] == ("Complete · adaptive descriptive")
+    assert "not preregistered inference" in data["campaign"]["progress_label"]
+    assert data["hypotheses"][1]["decision"] == "descriptive_only"
+    assert data["hypotheses"][1]["analysis_role"] == (
+        "adaptive_selection_conditioned_descriptive_only"
+    )
+    assert data["statistics"]["analysis_role"] == (
+        "adaptive_selection_conditioned_descriptive_only"
+    )
 
 
 def test_extra_unverified_pair_prevents_complete_campaign_label(tmp_path: Path) -> None:

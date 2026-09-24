@@ -455,7 +455,7 @@ def build_tables(data: dict) -> list[dict]:
         )
 
     def displayed_mean(field: str) -> float:
-        values = [float(run[field]) for run in replication_runs]
+        values = [round(float(run[field]), 3) for run in replication_runs]
         return sum(values) / len(values)
 
     displayed_baseline_mean = displayed_mean("baseline_outcome")
@@ -641,8 +641,8 @@ def build_tables(data: dict) -> list[dict]:
             ],
             [
                 "H3",
-                "Outcome lift among tasks with a recorded policy-selected generated-tool invocation.",
-                f"{_threshold(h3['threshold_percent'])} association threshold",
+                "Outcome lift among tasks where the SAGE policy called a generated tool.",
+                f"{_threshold(h3['threshold_percent'])} descriptive reference",
                 (
                     f"{_percent(h3['estimate_percent'])} called-tool lift; "
                     f"{integrity['shortcut_violations']:,} shortcut violations"
@@ -652,13 +652,13 @@ def build_tables(data: dict) -> list[dict]:
         ]
     )
     hypothesis_summary_caption = (
-        "H1 and H2 use confirmatory clustered decision rules. H3 meets the "
-        "paper's selection-conditioned association threshold; its support "
-        "decision is noncausal."
+        "H1 and H2 use confirmatory clustered decision rules. H3 is a "
+        "selection-conditioned descriptive association and receives no causal "
+        "support decision."
         if h1_table is not None
-        else "H2 uses its predeclared confirmatory clustered decision rule. H3 meets "
-        "the paper's selection-conditioned association threshold; its support "
-        "decision is noncausal."
+        else "H2 uses its predeclared confirmatory clustered decision rule. H3 is "
+        "a selection-conditioned descriptive association and receives no causal "
+        "support decision."
     )
 
     return [
@@ -772,10 +772,10 @@ def build_tables(data: dict) -> list[dict]:
         },
         {
             "filename": "table_4_5_h3_generated_tool_attribution.png",
-            "title": "Table 4.5 - Generated-Tool-Invoked Task Association",
-            "subtitle": "Outcome lift among tasks where the production SAGE policy recorded a generated-tool invocation.",
+            "title": "Table 4.5 - Generated-Tool-Called Task Association",
+            "subtitle": "Outcome lift among tasks where the production SAGE policy called a generated tool.",
             "columns": [
-                "Association measure",
+                "Descriptive measure",
                 "Observed value",
                 "Reference",
                 "Interpretation boundary",
@@ -785,7 +785,7 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Called-task subset",
                     f"{h3['sample_size']:,} observations",
-                    "Recorded invocation, including failed attempts",
+                    "Generated tool selected by SAGE policy",
                     "Post-treatment, policy-selected subset; diagnostic overrides remain disabled.",
                 ],
                 [
@@ -803,17 +803,17 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Relative outcome lift",
                     _percent(h3["estimate_percent"], signed=True),
-                    f"{h3_threshold} association threshold",
-                    "Supports H3 if the estimate and 95% CI clear the threshold.",
+                    f"{h3_threshold} descriptive reference",
+                    "Association only; the subset was selected after treatment.",
                 ],
                 [
                     "95% paired bootstrap CI",
                     _percent_interval(h3["confidence_interval"]),
-                    "Association decision interval",
-                    "The support decision remains noncausal because tool use was not randomized.",
+                    "Exploratory interval",
+                    "No causal support decision is made without a randomized tool-use ablation.",
                 ],
             ],
-            "caption": "H3 is supported when the selection-conditioned association and its paired-bootstrap confidence interval exceed 30%. Because recorded generated-tool invocation is observed after the intervention, this result does not establish that the invocation caused the outcome.",
+            "caption": "Generated-tool-called status is observed after the SAGE intervention. This selection-conditioned subset is descriptive and cannot establish that the generated call caused the outcome.",
         },
         {
             "filename": "table_4_6_generated_tool_lifecycle.png",
@@ -838,24 +838,24 @@ def build_tables(data: dict) -> list[dict]:
                     "Share of accepted tools that were reused after birth.",
                 ],
                 [
-                    "Successful generated-tool scenarios",
-                    metric_value(metrics, "Successful generated-tool scenarios"),
-                    "Scenarios with at least one successful policy-selected generated-tool execution; failed-only attempts are excluded.",
+                    "Policy-directed tool calls",
+                    metric_value(metrics, "Policy-directed tool calls"),
+                    "Scenarios where the production SAGE actor policy selected and called a generated tool, without diagnostic overrides.",
                 ],
                 [
                     "Called-task gains",
                     metric_value(metrics, "Called-task gains"),
-                    "Generated-tool-invoked scenarios with positive matched outcome difference in the H3 association subset.",
+                    "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only.",
                 ],
                 [
                     "Preserved outcomes",
                     metric_value(metrics, "Preserved outcomes"),
-                    "Generated-tool-invoked scenarios with no matched outcome loss in the H3 association subset.",
+                    "Generated-tool-called scenarios with no matched outcome loss.",
                 ],
                 [
                     "Called-task regressions",
                     metric_value(metrics, "Called-task regressions"),
-                    "Generated-tool-invoked scenarios with negative matched outcome difference in the H3 association subset.",
+                    "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only.",
                 ],
                 [
                     "Tool-call failure scenarios",

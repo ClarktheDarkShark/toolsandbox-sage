@@ -189,6 +189,22 @@
       font-size: 17px;
     }
 
+    .study-design-notice {
+      margin-top: 12px;
+      border: 1px solid rgba(241, 189, 87, .5);
+      border-left: 4px solid var(--amber);
+      border-radius: 7px;
+      background: rgba(241, 189, 87, .08);
+      color: var(--white-soft);
+      padding: 12px 15px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .study-design-notice[hidden] {
+      display: none;
+    }
+
     .section-head {
       margin: 22px 0 10px;
       display: flex;
@@ -628,6 +644,337 @@
       line-height: 1.5;
     }
 
+    .paper-figure {
+      display: none;
+    }
+
+    body.paper-mode {
+      width: 1600px;
+      height: 900px;
+      min-width: 1600px;
+      overflow: hidden;
+    }
+
+    body.paper-mode .topbar,
+    body.paper-mode .page,
+    body.paper-mode .drawer-overlay {
+      display: none;
+    }
+
+    body.paper-mode .paper-figure {
+      width: 1600px;
+      height: 900px;
+      padding: 42px 50px 40px;
+      display: grid;
+      grid-template-rows: auto 1fr 192px;
+      gap: 22px;
+      background:
+        radial-gradient(circle at 13% 0%, rgba(103, 183, 238, .09), transparent 32%),
+        var(--bg);
+    }
+
+    .paper-figure-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 38px;
+      padding-bottom: 19px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+
+    .paper-kicker {
+      color: var(--blue);
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .paper-figure-header h1 {
+      margin: 8px 0 0;
+      font-size: 40px;
+      line-height: 1.05;
+      letter-spacing: -.02em;
+    }
+
+    .paper-subtitle {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 21px;
+      line-height: 1.35;
+    }
+
+    .paper-campaign-summary {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, auto));
+      gap: 10px;
+    }
+
+    .paper-campaign-stat {
+      min-width: 128px;
+      padding: 12px 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(13, 24, 35, .92);
+      text-align: right;
+    }
+
+    .paper-campaign-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-campaign-stat strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 27px;
+      line-height: 1;
+    }
+
+    .paper-hypothesis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .paper-hypothesis-card {
+      min-width: 0;
+      padding: 24px 26px 22px;
+      border: 1px solid var(--line-strong);
+      border-top: 5px solid var(--green);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(18, 33, 49, .98), rgba(13, 24, 35, .98));
+      display: flex;
+      flex-direction: column;
+    }
+
+    .paper-card-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .paper-card-id {
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .paper-card-status {
+      flex: 0 0 auto;
+      padding: 5px 10px;
+      border: 1px solid rgba(64, 212, 147, .55);
+      border-radius: 999px;
+      background: rgba(64, 212, 147, .1);
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .paper-hypothesis-card h2 {
+      min-height: 64px;
+      margin: 10px 0 0;
+      color: var(--white-soft);
+      font-size: 29px;
+      line-height: 1.18;
+    }
+
+    .paper-primary-row {
+      margin-top: 22px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .paper-primary-value {
+      color: var(--green);
+      font-size: 59px;
+      font-weight: 900;
+      line-height: .94;
+      letter-spacing: -.035em;
+    }
+
+    .paper-primary-context {
+      padding-bottom: 4px;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: right;
+    }
+
+    .paper-primary-label {
+      min-height: 52px;
+      margin: 15px 0 0;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.42;
+    }
+
+    .paper-card-divider {
+      margin: auto 0 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .paper-card-facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .paper-card-fact {
+      min-width: 0;
+    }
+
+    .paper-card-fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-card-fact strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 21px;
+      line-height: 1.22;
+    }
+
+    .paper-footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.34fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .paper-footer-panel {
+      min-width: 0;
+      padding: 18px 22px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(13, 24, 35, .95);
+    }
+
+    .paper-footer-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .paper-footer-heading strong {
+      font-size: 21px;
+    }
+
+    .paper-footer-heading span {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .paper-run-bars {
+      height: 108px;
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    .paper-run-bar-wrap {
+      height: 100%;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 5px;
+      align-items: end;
+    }
+
+    .paper-run-bar-track {
+      position: relative;
+      height: 100%;
+      border-radius: 5px 5px 2px 2px;
+      background: #182838;
+      overflow: hidden;
+    }
+
+    .paper-run-bar-target {
+      position: absolute;
+      z-index: 2;
+      left: 0;
+      right: 0;
+      bottom: 25%;
+      border-top: 2px dashed rgba(241, 189, 87, .9);
+    }
+
+    .paper-run-bar-value {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--height);
+      min-height: 2px;
+      background: linear-gradient(180deg, var(--green), #2da877);
+    }
+
+    .paper-run-value-label {
+      position: absolute;
+      z-index: 3;
+      top: 5px;
+      left: 0;
+      right: 0;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .paper-run-label {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .paper-evidence-facts {
+      margin-top: 13px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .paper-evidence-fact {
+      min-height: 55px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--blue);
+      background: var(--surface-soft);
+    }
+
+    .paper-evidence-fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .paper-evidence-fact strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
     .metric-button {
       width: 100%;
       margin: 0;
@@ -887,327 +1234,6 @@
       font-size: 11px;
     }
 
-    /* Publication summary layout: conclusions first, detail on demand. */
-    .topbar {
-      min-height: 60px;
-      padding: 12px 28px;
-    }
-
-    .brand-copy h1 {
-      font-size: 18px;
-    }
-
-    .brand-copy p {
-      margin-top: 2px;
-      font-size: 11px;
-    }
-
-    .page {
-      width: min(1320px, 100%);
-      padding: 16px 28px 28px;
-    }
-
-    .run-strip {
-      min-height: 58px;
-      display: flex;
-      gap: 22px;
-      padding: 10px 14px;
-      border-color: rgba(53, 83, 109, .72);
-    }
-
-    .campaign-identity {
-      min-width: 260px;
-      display: flex;
-      align-items: center;
-      gap: 11px;
-    }
-
-    .campaign-identity .run-name {
-      margin: 0;
-      font-size: 12px;
-    }
-
-    .campaign-facts {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(120px, 1fr));
-    }
-
-    .campaign-fact {
-      min-width: 0;
-      padding: 0 14px;
-      border-left: 1px solid var(--line);
-      display: grid;
-      align-content: center;
-      gap: 2px;
-    }
-
-    .campaign-fact strong {
-      color: var(--text);
-      font-size: 15px;
-    }
-
-    .campaign-fact span {
-      color: var(--muted);
-      font-size: 9px;
-      line-height: 1.25;
-    }
-
-    .section-head {
-      margin: 18px 0 9px;
-      align-items: center;
-    }
-
-    .section-head h2 {
-      font-size: 13px;
-    }
-
-    .section-head p {
-      font-size: 10px;
-    }
-
-    .hypothesis-grid {
-      gap: 10px;
-    }
-
-    .hypothesis {
-      min-height: 164px;
-      padding: 14px;
-      border-top-width: 2px;
-    }
-
-    .hypothesis-title {
-      margin-top: 5px;
-      max-width: 265px;
-      font-size: 12px;
-    }
-
-    .status {
-      padding: 4px 7px;
-      font-size: 9px;
-    }
-
-    .primary-value {
-      margin-top: 13px;
-      font-size: 32px;
-    }
-
-    .hypothesis-comparison {
-      margin-top: 5px;
-      color: var(--white-soft);
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .hypothesis-evidence {
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 10px;
-      line-height: 1.35;
-    }
-
-    .hypothesis-evidence .noncausal {
-      color: var(--amber);
-      font-weight: 800;
-    }
-
-    .lower-grid {
-      grid-template-columns: minmax(0, 1.35fr) minmax(360px, .85fr);
-      gap: 10px;
-    }
-
-    .panel {
-      padding: 13px;
-    }
-
-    .panel-title {
-      padding-bottom: 9px;
-    }
-
-    .replication-chart {
-      height: 165px;
-      padding-top: 10px;
-    }
-
-    .lifecycle-lead {
-      width: 100%;
-      padding: 14px 0 12px;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 12px;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    .lifecycle-lead strong {
-      display: block;
-      color: var(--green);
-      font-size: 28px;
-      line-height: 1;
-    }
-
-    .lifecycle-lead span {
-      display: block;
-      margin-top: 5px;
-      color: var(--muted);
-      font-size: 10px;
-    }
-
-    .lifecycle-rate {
-      color: var(--text);
-      font-size: 17px;
-      font-weight: 850;
-      white-space: nowrap;
-    }
-
-    .lifecycle-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
-    }
-
-    .lifecycle-stat {
-      min-width: 0;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--surface-soft);
-      padding: 9px 10px;
-      color: inherit;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    .lifecycle-stat strong {
-      display: block;
-      color: var(--text);
-      font-size: 16px;
-    }
-
-    .lifecycle-stat span {
-      display: block;
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 9px;
-    }
-
-    .outcome-split {
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--line);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px 12px;
-      color: var(--muted);
-      font-size: 9px;
-    }
-
-    .outcome-split strong {
-      color: var(--white-soft);
-    }
-
-    .outcome-split .gain strong {
-      color: var(--green);
-    }
-
-    .outcome-split .regression strong {
-      color: var(--red);
-    }
-
-    .outcome-split small {
-      width: 100%;
-      color: var(--muted);
-      font-size: 9px;
-    }
-
-    .supporting-bar {
-      margin-top: 10px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: var(--surface);
-      padding: 10px 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .supporting-copy {
-      min-width: 210px;
-    }
-
-    .supporting-copy strong,
-    .supporting-copy span {
-      display: block;
-    }
-
-    .supporting-copy strong {
-      font-size: 11px;
-    }
-
-    .supporting-copy span {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 9px;
-    }
-
-    .supporting-actions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 7px;
-    }
-
-    .supporting-action {
-      border: 1px solid var(--line-strong);
-      border-radius: 6px;
-      background: var(--surface-raised);
-      color: var(--white-soft);
-      padding: 7px 9px;
-      font-size: 9px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    .supporting-action:hover,
-    .supporting-action:focus-visible,
-    .lifecycle-stat:hover,
-    .lifecycle-stat:focus-visible {
-      border-color: var(--blue);
-      outline: 0;
-    }
-
-    .tool-details {
-      margin-top: 10px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: var(--surface);
-    }
-
-    .tool-details summary {
-      padding: 11px 13px;
-      color: var(--white-soft);
-      cursor: pointer;
-      font-size: 10px;
-      font-weight: 800;
-    }
-
-    .tool-detail-panel {
-      border: 0;
-      border-top: 1px solid var(--line);
-      border-radius: 0;
-    }
-
-    .footer-note {
-      margin-top: 9px;
-      font-size: 9px;
-    }
-
     @media (max-width: 980px) {
       .hypothesis-grid,
       .evidence-grid,
@@ -1216,30 +1242,12 @@
       }
 
       .run-strip {
-        display: grid;
         grid-template-columns: 1fr;
         gap: 12px;
       }
 
-      .campaign-facts {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .campaign-fact:nth-child(odd) {
-        border-left: 0;
-      }
-
       .paired-count {
         text-align: left;
-      }
-
-      .supporting-bar {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .supporting-actions {
-        justify-content: flex-start;
       }
     }
 
@@ -1262,18 +1270,7 @@
       }
 
       .hypothesis {
-        min-height: 155px;
-      }
-
-      .campaign-facts {
-        grid-template-columns: 1fr;
-      }
-
-      .campaign-fact,
-      .campaign-fact:nth-child(odd) {
-        padding: 7px 0;
-        border-top: 1px solid var(--line);
-        border-left: 0;
+        min-height: 195px;
       }
     }
   </style>
@@ -1281,12 +1278,14 @@
 <body>
   <header class="topbar">
     <div class="brand">
+      <div class="brand-mark">SG</div>
       <div class="brand-copy">
-        <h1>Chapter 4 Results</h1>
-        <p>Final matched evidence across the complete SAGE evaluation</p>
+        <h1>Chapter 4 Evidence</h1>
+        <p>SAGE matched performance, replication, and generated-tool evidence</p>
       </div>
     </div>
     <div class="top-actions">
+      <span class="mock-badge" id="campaignStatus">Loading</span>
       <select class="run-select" id="runSelect" aria-label="Open a Task Compare dashboard">
         <option value="">Aggregate evidence</option>
       </select>
@@ -1295,69 +1294,60 @@
 
   <main class="page">
     <section class="run-strip" aria-label="Evidence campaign progress">
-      <div class="campaign-identity">
-        <span class="mock-badge" id="campaignStatus">Loading</span>
-        <span class="run-name" id="runName">Loading campaign data...</span>
+      <div>
+        <div class="eyebrow">Evidence campaign</div>
+        <div class="run-name" id="runName">Loading campaign data...</div>
       </div>
-      <div class="campaign-facts">
-        <div class="campaign-fact">
-          <strong id="runCount">0 / 0</strong>
-          <span>verified runs</span>
+      <div>
+        <div class="progress-track" aria-hidden="true">
+          <div class="progress-value" id="progressValue" style="width:0"></div>
         </div>
-        <div class="campaign-fact">
-          <strong id="pairedCount">0</strong>
-          <span>matched audited observations</span>
+        <div class="progress-meta">
+          <span id="progressLabel">Waiting for run artifacts</span>
+          <span>Matched task order</span>
         </div>
-        <div class="campaign-fact">
-          <strong id="paperCount">0</strong>
-          <span>historical-comparison observations</span>
-        </div>
-        <div class="campaign-fact">
-          <strong id="tasksPerRun">0</strong>
-          <span>tasks per run</span>
-        </div>
+      </div>
+      <div class="paired-count">
+        <div class="eyebrow">Audited v9 / paper v1 pairs</div>
+        <strong id="pairedCount">0</strong>
       </div>
     </section>
 
+    <aside class="study-design-notice" id="studyDesignNotice" hidden></aside>
+
     <div class="section-head">
-      <h2>Hypothesis results</h2>
-      <p>Outcome is the primary endpoint.</p>
+      <h2>Hypothesis Evidence</h2>
+      <p id="hypothesisSectionDescription">Hypothesis definitions and evidence load from the selected campaign artifacts.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
     <div class="section-head">
-      <h2>Replication and lifecycle</h2>
-      <p>Consistency across runs and generated-tool reuse.</p>
+      <h2>Matched Performance And Tool Evidence</h2>
+      <p>Endpoint identities, task scopes, and evaluator versions remain separate.</p>
+    </div>
+    <section class="evidence-grid" id="evidenceGrid"></section>
+    <section class="tool-row" id="toolMetrics" aria-label="Generated tool metrics"></section>
+
+    <div class="section-head">
+      <h2 id="lowerSectionTitle">Replication Stability And Called-Task Association</h2>
+      <p id="lowerSectionDescription">Run-level variation remains visible instead of being hidden by the aggregate.</p>
     </div>
     <section class="lower-grid">
       <article class="panel">
         <div class="panel-title">
-          <strong>Run-to-run outcome lift</strong>
-          <span>All 10 online-build replications</span>
+          <strong>Outcome Lift Across Full Runs</strong>
+          <span id="replicationChartSubtitle">Audited v9 all-task mean and primary threshold</span>
         </div>
         <div id="replicationChart"></div>
       </article>
-      <article class="panel lifecycle-panel">
+      <article class="panel">
         <div class="panel-title">
-          <strong>Tool lifecycle</strong>
-          <span>Creation, reuse, outcomes, and failures</span>
-        </div>
-        <div id="lifecycleSummary"></div>
-      </article>
-    </section>
-
-    <section class="supporting-bar" id="supportingEvidence" aria-label="Supporting evidence"></section>
-
-    <details class="tool-details">
-      <summary>Per-tool results</summary>
-      <div class="panel tool-detail-panel">
-        <div class="panel-title">
-          <strong>Generated-tool called-task results</strong>
-          <span>Selection-conditioned association; noncausal</span>
+          <strong>Top Generated-Tool Called-Task Results</strong>
+          <span>Selection-conditioned; descriptive only</span>
         </div>
         <div id="toolTable"></div>
-      </div>
-    </details>
+      </article>
+    </section>
     <div class="footer-note" id="footerNote">Dashboard values refresh from preserved run artifacts.</div>
   </main>
 
@@ -1374,9 +1364,39 @@
     </aside>
   </div>
 
+  <section class="paper-figure" id="paperFigure" aria-label="Chapter 4 evidence summary for print">
+    <header class="paper-figure-header">
+      <div>
+        <div class="paper-kicker">Chapter 4 evidence dashboard</div>
+        <h1>SAGE self-evolution: ten-run evidence summary</h1>
+        <p class="paper-subtitle" id="paperSubtitle">Loading matched benchmark evidence...</p>
+      </div>
+      <div class="paper-campaign-summary" id="paperCampaignSummary"></div>
+    </header>
+    <section class="paper-hypothesis-grid" id="paperHypothesisGrid"></section>
+    <section class="paper-footer-grid">
+      <article class="paper-footer-panel">
+        <div class="paper-footer-heading">
+          <strong>H1 outcome lift across independent registry runs</strong>
+          <span id="paperRunSummary">Loading run-level evidence...</span>
+        </div>
+        <div class="paper-run-bars" id="paperRunBars"></div>
+      </article>
+      <article class="paper-footer-panel">
+        <div class="paper-footer-heading">
+          <strong>Evidence basis</strong>
+          <span>Preserved campaign artifacts</span>
+        </div>
+        <div class="paper-evidence-facts" id="paperEvidenceFacts"></div>
+      </article>
+    </section>
+  </section>
+
   <script>
     const DATA_URL = "chapter4_evidence_data.json";
     const EMBEDDED_EVIDENCE_BASE64 = "__CHAPTER4_EVIDENCE_BASE64__";
+    const PAPER_MODE = new URLSearchParams(window.location.search).get("view") === "paper";
+    if (PAPER_MODE) document.body.classList.add("paper-mode");
     let evidence = null;
     let detailIndex = {};
 
@@ -1477,17 +1497,34 @@
         String(campaign.status_label).toLowerCase() === "complete"
       );
       document.getElementById("runName").textContent =
-        `${campaign.model} · ${campaign.benchmark_label}`;
-      document.getElementById("runCount").textContent =
-        `${campaign.completed_runs} / ${campaign.expected_runs}`;
+        `${campaign.model} / ${campaign.benchmark_label}`;
+      document.getElementById("progressValue").style.width = `${campaign.progress_percent}%`;
+      document.getElementById("progressLabel").textContent =
+        campaign.progress_label ||
+        `${campaign.completed_runs} of ${campaign.expected_runs} full runs complete`;
       document.getElementById("pairedCount").textContent =
-        Number(campaign.audited_current_matched_observations || 0).toLocaleString();
-      document.getElementById("paperCount").textContent =
-        Number(campaign.paper_comparable_matched_observations || 0).toLocaleString();
-      document.getElementById("tasksPerRun").textContent =
-        Number(campaign.tasks_per_run || 0).toLocaleString();
+        `${Number(campaign.audited_current_matched_observations || 0).toLocaleString()} / ${Number(campaign.paper_comparable_matched_observations || 0).toLocaleString()}`;
+      const designNotice = document.getElementById("studyDesignNotice");
+      designNotice.textContent = campaign.study_design_notice || "";
+      designNotice.hidden = !campaign.study_design_notice;
+      const hypothesisSectionDescription = document.getElementById(
+        "hypothesisSectionDescription"
+      );
+      hypothesisSectionDescription.textContent =
+        campaign.hypothesis_section_description || "";
+      hypothesisSectionDescription.hidden =
+        !campaign.hypothesis_section_description;
+      document.getElementById("lowerSectionTitle").textContent =
+        campaign.lower_section_title ||
+        "Replication Stability And Called-Task Association";
+      document.getElementById("lowerSectionDescription").textContent =
+        campaign.lower_section_description ||
+        "Run-level variation remains visible instead of being hidden by the aggregate.";
+      document.getElementById("replicationChartSubtitle").textContent =
+        campaign.replication_chart_subtitle ||
+        "Audited v9 all-task mean and primary threshold";
       document.getElementById("footerNote").textContent =
-        `Updated ${campaign.updated_at_label}. Definitions, provenance, and complete statistics are available in the details.`;
+        `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
 
       const select = document.getElementById("runSelect");
       select.innerHTML = '<option value="">Aggregate evidence</option>';
@@ -1505,41 +1542,28 @@
       grid.innerHTML = (data.hypotheses || []).map((item) => {
         registerDetail(item);
         const klass = statusClass(item.status);
-        const interval = item.confidence_interval || {};
-        const ciLabel = Number.isFinite(Number(interval.lower)) && Number.isFinite(Number(interval.upper))
-          ? `${Number(interval.lower).toFixed(1)}–${Number(interval.upper).toFixed(1)}%`
-          : "Pending";
-        let title = item.title;
-        let comparison = item.primary_label;
-        let evidenceLine = `95% CI ${ciLabel} · target ≥${Number(item.threshold_percent || 0).toFixed(0)}%`;
-        let decisionLabel = statusLabel(item.status);
-        if (item.id === "Hypothesis 1") {
-          title = "Reusable-tool gain retention";
-          comparison = "Performance retained after generation and repair were disabled";
-          evidenceLine += ` · ${Number(item.sample_size || 0).toLocaleString()} paired runs`;
-        } else if (item.id === "Hypothesis 2") {
-          title = "All-task outcome lift";
-          comparison = `${fmt(item.baseline_mean)} baseline → ${fmt(item.sage_mean)} SAGE`;
-          evidenceLine += ` · n=${Number(item.matched_task_observations || 0).toLocaleString()}`;
-        } else if (item.id === "Hypothesis 3") {
-          title = "Generated-tool-called task association";
-          comparison = `${fmt(item.baseline_mean)} baseline → ${fmt(item.sage_mean)} SAGE`;
-          evidenceLine += ` · n=${Number(item.sample_size || 0).toLocaleString()}`;
-          if (item.status === "supported") decisionLabel = "Supported association";
-        }
         return `<button class="hypothesis metric-button ${klass}" data-detail="${escapeHtml(item.detail_id)}">
           <div>
             <div class="hypothesis-top">
               <div>
                 <div class="hypothesis-id">${escapeHtml(item.id)}</div>
-                <div class="hypothesis-title">${escapeHtml(title)}</div>
+                <div class="hypothesis-title">${escapeHtml(item.title)}</div>
               </div>
-              <span class="status ${klass}">${escapeHtml(decisionLabel)}</span>
+              <span class="status ${klass}">${escapeHtml(statusLabel(item.status))}</span>
             </div>
             <div class="primary-value">${escapeHtml(item.value_label)}</div>
-            <div class="hypothesis-comparison">${escapeHtml(comparison)}</div>
+            <div class="primary-label">${escapeHtml(item.primary_label)}</div>
           </div>
-          <div class="hypothesis-evidence">${escapeHtml(evidenceLine)}${item.id === "Hypothesis 3" ? ' · <span class="noncausal">selection-conditioned; noncausal</span>' : ""}</div>
+          <div>
+            <div class="threshold-track" style="--target:${item.target_position}%;--fill:${item.fill_position}%">
+              <div class="threshold-fill"></div>
+              <div class="threshold-mark"></div>
+            </div>
+            <div class="threshold-meta">
+              <span>${escapeHtml(item.observed_label)}</span>
+              <span>${escapeHtml(item.threshold_label)}</span>
+            </div>
+          </div>
         </button>`;
       }).join("");
     }
@@ -1551,55 +1575,100 @@
       const paper = endpoints.paper_comparable_historical_subset || {};
       const statistics = data.statistics;
       const integrity = data.integrity;
+      const primaryHypothesisId = data.campaign?.primary_performance_hypothesis_id || "H2";
       [performance, audited, paper, statistics, integrity].forEach(registerDetail);
-      const counts = integrity.counts || {};
-      document.getElementById("supportingEvidence").innerHTML = `
-        <div class="supporting-copy">
-          <strong>Supporting evidence</strong>
-          <span>Historical comparison, complete inference, and integrity audit</span>
-        </div>
-        <div class="supporting-actions">
-          <button class="supporting-action" data-detail="${escapeHtml(paper.detail_id)}">
-            Historical: ${fmt(paper.baseline)} → ${fmt(paper.sage)}
-          </button>
-          <button class="supporting-action" data-detail="${escapeHtml(statistics.detail_id)}">
-            Statistical details · ${escapeHtml(statistics.p_label)}
-          </button>
-          <button class="supporting-action" data-detail="${escapeHtml(integrity.detail_id)}">
-            Integrity · ${Number(counts.runtime_exceptions || 0)} exceptions · ${Number(counts.side_effect_flags || 0)} review flags
-          </button>
-        </div>`;
+      document.getElementById("evidenceGrid").innerHTML = `
+        <button class="panel metric-button" data-detail="${escapeHtml(audited.detail_id)}">
+          <div class="panel-title"><strong>Audited Current Outcome</strong><span>v9 · all 1,032 tasks per run</span></div>
+          <div class="outcome-pair">
+            <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(audited.baseline)}</strong></div>
+            <div class="arrow">-&gt;</div>
+            <div class="outcome-value sage"><span>SAGE</span><strong>${fmt(audited.sage)}</strong></div>
+          </div>
+          <div class="secondary-line">
+            <span>Absolute difference <strong>${escapeHtml(audited.delta_label)}</strong></span>
+            <span>Same-run lift <strong>${escapeHtml(audited.lift_label)}</strong></span>
+          </div>
+        </button>
+        <button class="panel metric-button" data-detail="${escapeHtml(paper.detail_id)}">
+          <div class="panel-title"><strong>Paper-Comparable Outcome</strong><span>v1 · exact ordered 800-task subset</span></div>
+          <div class="outcome-pair">
+            <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(paper.baseline)}</strong></div>
+            <div class="arrow">-&gt;</div>
+            <div class="outcome-value sage"><span>SAGE</span><strong>${fmt(paper.sage)}</strong></div>
+          </div>
+          <div class="secondary-line">
+            <span>Archived paper SAGE mean <strong>${fmt(paper.historical_sage_mean)}</strong></span>
+            <span>Current minus archived <strong>${escapeHtml(paper.historical_delta_label)}</strong></span>
+          </div>
+        </button>
+        <button class="panel metric-button" data-detail="${escapeHtml(statistics.detail_id)}">
+          <div class="panel-title"><strong>Cluster-Aware Statistical Evidence</strong><span>Audited v9 · all tasks</span></div>
+          <ul class="stat-list">
+            <li>
+              <span class="row-copy">
+                <span class="metric-name">Mean audited-v9 difference</span>
+                <span class="metric-help">Average outcome gain for SAGE over baseline; the ${escapeHtml(primaryHypothesisId)} test below evaluates the 10% target directly.</span>
+              </span>
+              <strong>${escapeHtml(statistics.mean_delta_label)}</strong>
+            </li>
+            <li>
+              <span class="row-copy">
+                <span class="metric-name">Two-way target-contrast 95% CI</span>
+                <span class="metric-help">Resamples independent runs and matched tasks for SAGE minus 1.10 times baseline.</span>
+              </span>
+              <strong>${escapeHtml(statistics.ci_label)}</strong>
+            </li>
+            <li>
+              <span class="row-copy">
+                <span class="metric-name">Run-level target sign-flip test</span>
+                <span class="metric-help">Tests the 10% target contrast across independent registry replications.</span>
+              </span>
+              <strong>${escapeHtml(statistics.p_label)}</strong>
+            </li>
+            <li>
+              <span class="row-copy">
+                <span class="metric-name">Audited-v9 full successes B / S</span>
+                <span class="metric-help">Count across all 1,032 tasks per run: baseline first, then SAGE.</span>
+              </span>
+              <strong>${escapeHtml(statistics.successes_label)}</strong>
+            </li>
+          </ul>
+        </button>
+        <button class="panel metric-button" data-detail="${escapeHtml(integrity.detail_id)}">
+          <div class="panel-title"><strong>Evidence Validity Checks</strong><span>Shortcut audit</span></div>
+          <ul class="integrity-list">
+            ${(integrity.items || []).map((item) =>
+              `<li>
+                <span class="row-copy">
+                  <span class="metric-name">${escapeHtml(item.label)}</span>
+                  <span class="metric-help">${escapeHtml(integrityHelp(item.label))}</span>
+                </span>
+                <span class="integrity-value ${item.value === 0 ? "" : "negative"}">${escapeHtml(item.value)}</span>
+              </li>`
+            ).join("")}
+          </ul>
+        </button>`;
+    }
+
+    function integrityHelp(label) {
+      const explanations = {
+        "Same SAGE settings across runs": "Confirms completed runs used the approved claim-grade configuration.",
+        "Benchmark-metadata shortcut checks": "Confirms SAGE did not use scenario names to create or route tools.",
+        "Code-based answer shortcut checks": "Confirms the bridge did not complete tasks using code rules.",
+        "Diagnostic tool-call override checks": "Confirms no ad hoc diagnostic override was used; named choices from the declared production actor policy remain part of SAGE.",
+        "Tool side-effect audit flags": "Reports validated tool calls flagged for side-effect review.",
+      };
+      return explanations[label] || "Validity check count for the completed claim runs.";
     }
 
     function renderToolMetrics(data) {
-      const metrics = Object.fromEntries((data.tool_metrics || []).map((item) => {
+      document.getElementById("toolMetrics").innerHTML = (data.tool_metrics || []).map((item) => {
         registerDetail(item);
-        return [item.detail_id, item];
-      }));
-      const accepted = metrics["metric:accepted"] || {};
-      const reused = metrics["metric:reused"] || {};
-      const reuseRate = metrics["metric:reuse_rate"] || {};
-      const calls = metrics["metric:calls"] || {};
-      const failures = metrics["metric:failures"] || {};
-      const gains = metrics["metric:gains"] || {};
-      const preserved = metrics["metric:preserved"] || {};
-      const regressions = metrics["metric:regressions"] || {};
-      const h3 = (data.hypotheses || []).find((item) => item.id === "Hypothesis 3") || {};
-      document.getElementById("lifecycleSummary").innerHTML = `
-        <button class="lifecycle-lead metric-button" data-detail="${escapeHtml(reuseRate.detail_id)}">
-          <span><strong>${escapeHtml(reused.value_label || "-")} / ${escapeHtml(accepted.value_label || "-")}</strong><span>accepted tools reused on later tasks</span></span>
-          <span class="lifecycle-rate">${escapeHtml(reuseRate.value_label || "-")} reuse</span>
-        </button>
-        <div class="lifecycle-grid">
-          <button class="lifecycle-stat" data-detail="${escapeHtml(calls.detail_id)}"><strong>${escapeHtml(calls.value_label || "-")}</strong><span>successful-execution scenarios</span></button>
-          <button class="lifecycle-stat" data-detail="${escapeHtml(failures.detail_id)}"><strong>${escapeHtml(failures.value_label || "-")}</strong><span>failure scenarios</span></button>
-        </div>
-        <div class="outcome-split">
-          <span class="gain"><strong>${escapeHtml(gains.value_label || "-")}</strong> improved</span>
-          <span><strong>${escapeHtml(preserved.value_label || "-")}</strong> unchanged</span>
-          <span class="regression"><strong>${escapeHtml(regressions.value_label || "-")}</strong> regressed</span>
-          <small>n=${Number(h3.sample_size || 0).toLocaleString()} generated-tool-invoked observations; selection-conditioned, noncausal.</small>
-        </div>`;
+        return `<button class="tool-stat metric-button ${escapeHtml(item.tone || "")}" data-detail="${escapeHtml(item.detail_id)}">
+          <span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value_label)}</strong>
+        </button>`;
+      }).join("");
     }
 
     function renderChart(data) {
@@ -1614,7 +1683,10 @@
       }
       runs.forEach(registerDetail);
       const values = runs.map((run) => Number(run.audited_current_outcome_lift_percent));
-      const chartMax = Math.max(40, Math.ceil((Math.max(...values, 10) + 10) / 20) * 20);
+      const threshold = Number(data.campaign?.replication_chart_threshold_percent ?? 10);
+      const thresholdLabel = data.campaign?.replication_chart_threshold_label ||
+        `Primary threshold: ${threshold}%`;
+      const chartMax = Math.max(40, Math.ceil((Math.max(...values, threshold) + 10) / 20) * 20);
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
       const dots = runs.map((run, index) => {
         const x = runs.length === 1 ? 50 : 5 + (index / (runs.length - 1)) * 90;
@@ -1630,7 +1702,7 @@
             <span>${Math.round(chartMax * .5)}%</span><span>${Math.round(chartMax * .25)}%</span><span>0%</span>
           </div>
           <div class="plot">
-            <div class="target-line" style="bottom:${10 / chartMax * 100}%"><span>H2 threshold: 10%</span></div>
+            <div class="target-line" style="bottom:${threshold / chartMax * 100}%"><span>${escapeHtml(thresholdLabel)}</span></div>
             <div class="mean-line" style="bottom:${Math.max(0, Math.min(100, mean / chartMax * 100))}%"><span>Mean: ${pct(mean)}</span></div>
             ${dots}
           </div>
@@ -1661,6 +1733,116 @@
         <div class="footer-note">G / R reports called-task gains and regressions on the post-treatment subset where the production actor policy called a generated tool. This is descriptive association, not causal attribution. Select a row for validation, reuse, and provenance details.</div>`;
     }
 
+    function detailValue(item, label) {
+      for (const section of item?.detail?.sections || []) {
+        const row = (section.rows || []).find((candidate) => candidate.label === label);
+        if (row) return row.value;
+      }
+      return "-";
+    }
+
+    const mathLabel = (value) => String(value ?? "-")
+      .replaceAll(">=", "≥")
+      .replaceAll("<=", "≤");
+
+    function renderPaperFigure(data) {
+      const campaign = data.campaign || {};
+      const hypotheses = data.hypotheses || [];
+      const h1 = hypotheses[0] || {};
+      const h2 = hypotheses[1] || {};
+      const h3 = hypotheses[2] || {};
+      const runs = (data.runs || []).filter((run) =>
+        run.online_inference_eligible === true &&
+        run.audited_current_outcome_lift_percent !== null
+      );
+      const statistics = data.statistics || {};
+
+      document.getElementById("paperSubtitle").textContent =
+        `${campaign.model || "Model"} · ${Number(campaign.tasks_per_run || 0).toLocaleString()} matched tasks per run · route-independent outcome scoring`;
+      document.getElementById("paperCampaignSummary").innerHTML = `
+        <div class="paper-campaign-stat"><span>Registries</span><strong>${campaign.completed_online_runs || 0}</strong></div>
+        <div class="paper-campaign-stat"><span>Task pairs</span><strong>${Number(campaign.audited_current_matched_observations || 0).toLocaleString()}</strong></div>
+        <div class="paper-campaign-stat"><span>Decisions</span><strong>${hypotheses.filter((item) => item.status === "supported").length} / ${hypotheses.length}</strong></div>`;
+
+      const cards = [
+        {
+          item: h1,
+          value: h1.value_label,
+          context: `${detailValue(h1, "Baseline outcome")} → ${detailValue(h1, "SAGE outcome")}`,
+          label: "Improvement in mean route-independent outcome score.",
+          fact1Label: "95% confidence interval",
+          fact1Value: detailValue(h1, "Lift 95% two-way run/task bootstrap CI"),
+          fact2Label: "Decision threshold",
+          fact2Value: mathLabel(detailValue(h1, "Decision threshold")),
+        },
+        {
+          item: h2,
+          value: h2.value_label,
+          context: `${detailValue(h2, "Corrected and admitted")} / ${detailValue(h2, "Repair entrants")}`,
+          label: "Initially invalid candidates repaired and admitted to the registry.",
+          fact1Label: "Repair 95% CI (target > 50%)",
+          fact1Value: detailValue(h2, "Run-cluster bootstrap 95% CI"),
+          fact2Label: "Later reuse (target ≥ 90%)",
+          fact2Value: `${detailValue(h2, "Repaired tools invoked on a later task")} · ${detailValue(h2, "Later-reuse rate")}`,
+        },
+        {
+          item: h3,
+          value: h3.value_label,
+          context: `${detailValue(h3, "Used in a different task family")} / ${detailValue(h3, "Accepted generated-tool instances")}`,
+          label: "Accepted tools invoked in a semantic family different from their birth family.",
+          fact1Label: "95% confidence interval",
+          fact1Value: detailValue(h3, "Run-cluster bootstrap 95% CI"),
+          fact2Label: "Decision threshold",
+          fact2Value: mathLabel(detailValue(h3, "Decision threshold")),
+        },
+      ];
+
+      document.getElementById("paperHypothesisGrid").innerHTML = cards.map((card) => `
+        <article class="paper-hypothesis-card">
+          <div class="paper-card-top">
+            <div>
+              <div class="paper-card-id">${escapeHtml(card.item.id || "Hypothesis")}</div>
+              <h2>${escapeHtml(card.item.title || "Evidence pending")}</h2>
+            </div>
+            <span class="paper-card-status">${escapeHtml(statusLabel(card.item.status))}</span>
+          </div>
+          <div class="paper-primary-row">
+            <div class="paper-primary-value">${escapeHtml(card.value || "-")}</div>
+            <div class="paper-primary-context">${escapeHtml(card.context)}</div>
+          </div>
+          <p class="paper-primary-label">${escapeHtml(card.label)}</p>
+          <div class="paper-card-divider"></div>
+          <div class="paper-card-facts">
+            <div class="paper-card-fact"><span>${escapeHtml(card.fact1Label)}</span><strong>${escapeHtml(card.fact1Value)}</strong></div>
+            <div class="paper-card-fact"><span>${escapeHtml(card.fact2Label)}</span><strong>${escapeHtml(card.fact2Value)}</strong></div>
+          </div>
+        </article>`).join("");
+
+      const runValues = runs.map((run) => Number(run.audited_current_outcome_lift_percent));
+      const runMin = runValues.length ? Math.min(...runValues) : 0;
+      const runMax = runValues.length ? Math.max(...runValues) : 0;
+      document.getElementById("paperRunSummary").textContent =
+        `${runs.length} / ${runs.length} above 10% · range ${pct(runMin, true)}–${pct(runMax, true)}`;
+      document.getElementById("paperRunBars").innerHTML = runs.map((run) => {
+        const height = Math.max(0, Math.min(100, Number(run.audited_current_outcome_lift_percent) / 40 * 100));
+        return `<div class="paper-run-bar-wrap" title="${escapeHtml(run.short_label)}: ${pct(run.audited_current_outcome_lift_percent, true)}">
+          <div class="paper-run-bar-track">
+            <span class="paper-run-value-label">${pct(run.audited_current_outcome_lift_percent, true)}</span>
+            <div class="paper-run-bar-target"></div>
+            <div class="paper-run-bar-value" style="--height:${height}%"></div>
+          </div>
+          <div class="paper-run-label">${escapeHtml(run.short_label)}</div>
+        </div>`;
+      }).join("");
+
+      document.getElementById("paperEvidenceFacts").innerHTML = `
+        <div class="paper-evidence-fact"><span>H1 two-way 95% CI</span><strong>${escapeHtml(detailValue(h1, "Lift 95% two-way run/task bootstrap CI"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Run-level sign-flip test</span><strong>${escapeHtml(detailValue(h1, "Run-level target-contrast sign flip"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Repaired-tool reuse</span><strong>${escapeHtml(detailValue(h2, "Repaired tools invoked on a later task"))}</strong></div>
+        <div class="paper-evidence-fact"><span>Matched task observations</span><strong>${Number(campaign.audited_current_matched_observations || 0).toLocaleString()}</strong></div>`;
+      document.documentElement.dataset.paperFigureStatus = "ready";
+    }
+
     function bindDetails() {
       document.querySelectorAll("[data-detail]").forEach((element) => {
         element.addEventListener("click", () => openDetail(element.dataset.detail));
@@ -1682,6 +1864,7 @@
       renderToolMetrics(data);
       renderChart(data);
       renderTools(data);
+      renderPaperFigure(data);
       bindDetails();
     }
 
@@ -1717,7 +1900,9 @@
     });
 
     loadEvidence();
-    if (window.location.protocol === "file:") {
+    if (PAPER_MODE) {
+      // A paper export is a fixed evidence view; do not refresh during capture.
+    } else if (window.location.protocol === "file:") {
       // Keep checking even after a Complete render. A later fail-closed
       // verification can archive the canonical file, so a stale in-memory final
       // view must not remain silently displayed for the rest of the browser session.

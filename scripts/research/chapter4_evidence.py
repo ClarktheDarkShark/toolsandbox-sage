@@ -32,6 +32,10 @@ PAPER_ENDPOINT_NAME = "paper_comparable_historical_subset"
 OUTCOME_EVALUATOR_SOURCE = Path("src/sage_ts/evaluation/outcome_score.py")
 RESEARCHER_SAMPLE_WAIVER_STATUS = "waived_by_researcher"
 RESEARCHER_SAMPLE_WAIVER_AUTHORIZATION = "explicit_prepare_cli"
+SAMPLE_AS_REP01_ACCOUNTING_MODE = "passing_release_sample_as_online_rep01_plus_nine_new"
+ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE = (
+    "adaptive_selection_conditioned_descriptive_only"
+)
 _DASHBOARD_WRITE_LOCK = threading.Lock()
 
 H1_THRESHOLD_PERCENT = 80.0
@@ -331,14 +335,23 @@ def _load_dual_endpoint_spec(
     ):
         raise ValueError("Sample-validation threshold bytes changed.")
     thresholds = _load_json(thresholds_path)
+    threshold_schema_version = thresholds.get("schema_version")
     if (
-        thresholds.get("schema_version") != 3
+        threshold_schema_version not in {3, 4}
         or thresholds.get("performance_endpoint_policy")
         != "dual_scoped_outcome_endpoints"
         or thresholds.get("canonical_metric_policy")
         != "descriptive_only_never_a_release_gate"
     ):
-        raise ValueError("Sample report does not pin the dual-endpoint v3 policy.")
+        raise ValueError("Sample report does not pin a dual-endpoint v3/v4 policy.")
+    if threshold_schema_version == 4 and thresholds.get(
+        "required_technical_readiness"
+    ) != {
+        "audited_current_all_tasks_candidate_outcome_minimum_exclusive": 0.8,
+    }:
+        raise ValueError(
+            "Sample report does not pin the strict v4 technical-readiness gate."
+        )
     endpoints = thresholds.get("performance_endpoints")
     historical = thresholds.get("historical_reference")
     benchmark = thresholds.get("benchmark")
@@ -1821,7 +1834,16 @@ def build_evidence_data(
         else declared_expected_frozen
     )
     statistical_plan = campaign_manifest.get("statistical_plan") or {}
-    source_h3_analysis_rule = statistical_plan.get("hypothesis_3_analysis_rule") or {}
+    replication_accounting = campaign_manifest.get("replication_accounting")
+    adaptive_sample_distribution = (
+        isinstance(replication_accounting, dict)
+        and replication_accounting.get("mode") == SAMPLE_AS_REP01_ACCOUNTING_MODE
+    )
+    campaign_analysis_role = (
+        ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE
+        if adaptive_sample_distribution
+        else "confirmatory_two_way_run_task_clustered"
+    )
     h1_threshold = _safe_float(statistical_plan.get("hypothesis_1_threshold_percent"))
     h2_threshold = _safe_float(statistical_plan.get("hypothesis_2_threshold_percent"))
     h3_threshold = _safe_float(statistical_plan.get("hypothesis_3_threshold_percent"))
@@ -2210,12 +2232,12 @@ def build_evidence_data(
         complete=online_complete,
         alpha=0.05,
     )
-    h3_status = _hypothesis_status(
-        value=called_lift,
-        threshold=h3_threshold,
-        ci=called_lift_ci,
-        complete=online_complete,
-    )
+    if adaptive_sample_distribution:
+        if retention is not None and online_complete and frozen_complete:
+            h1_status = "descriptive_only"
+        if overall_outcome_lift is not None and online_complete:
+            h2_status = "descriptive_only"
+    h3_status = "descriptive_only" if called_lift is not None else "pending"
 
     tools, tool_totals = _tool_records(completed_online)
     tool_totals["gains"] = called_unique_gains
@@ -2334,20 +2356,25 @@ def build_evidence_data(
         )
         if run is not None and run.complete and not eligible
     )
-    campaign_inference_complete = (
+    campaign_distribution_complete = (
         online_complete
         and frozen_complete
         and len(loaded_pairs) == expected_online
         and active_run_count == 0
         and excluded_completed_artifact_count == 0
     )
+    campaign_inference_complete = (
+        campaign_distribution_complete and not adaptive_sample_distribution
+    )
     manifest_status = str(campaign_manifest.get("status") or "")
     status_label = (
         "Legacy / non-confirmatory"
         if endpoint_spec is None
         and any(online or frozen for _, online, frozen in loaded_pairs)
+        else "Complete · adaptive descriptive"
+        if campaign_distribution_complete and adaptive_sample_distribution
         else "Complete"
-        if campaign_inference_complete
+        if campaign_distribution_complete
         else "Incomplete"
         if manifest_status in {"complete", "incomplete"}
         or excluded_completed_artifact_count
@@ -2369,7 +2396,11 @@ def build_evidence_data(
         {
             "id": "Hypothesis 1",
             "title": "Reusable generated tools preserve online-build gains",
-            "analysis_role": "confirmatory_run_paired",
+            "analysis_role": (
+                ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE
+                if adaptive_sample_distribution
+                else "confirmatory_run_paired"
+            ),
             "decision_rule": {
                 "estimate_requirement": f"gain_retention_percent >= {h1_threshold:g}",
                 "uncertainty_requirement": (
@@ -2447,7 +2478,7 @@ def build_evidence_data(
         {
             "id": "Hypothesis 2",
             "title": "SAGE improves audited all-task outcome over baseline",
-            "analysis_role": "confirmatory_two_way_run_task_clustered",
+            "analysis_role": campaign_analysis_role,
             "decision_rule": {
                 "target_contrast": (
                     f"candidate_mean - {h2_multiplier:.6g} * control_mean"
@@ -2614,45 +2645,15 @@ def build_evidence_data(
         {
             "id": "Hypothesis 3",
             "title": "Outcome lift among generated-tool-called tasks",
-            "analysis_role": "selection_conditioned_association_threshold",
+            "analysis_role": "selection_conditioned_descriptive_only",
             "causal_attribution_allowed": False,
             "decision_rule": {
-                "classification": "paper_hypothesis_noncausal_association_threshold",
+                "classification": "descriptive_only_no_hypothesis_support_decision",
                 "reason": (
-                    "the paper-defined hypothesis tests association on the "
-                    "generated-tool-called subset; generated-tool-called status "
-                    "remains post-treatment"
+                    "generated-tool-called status is selected after treatment and "
+                    "there is no randomized tool-use ablation"
                 ),
-                "estimate_requirement": (
-                    f"called_task_relative_outcome_lift_percent >= {h3_threshold:g}"
-                ),
-                "uncertainty_requirement": (
-                    f"paired_bootstrap_95_ci_lower >= {h3_threshold:g}"
-                ),
-                "threshold_role": "hypothesis_association_decision_threshold",
-                "source_campaign_analysis_rule": source_h3_analysis_rule,
-            },
-            "reporting_interpretation": {
-                "amendment_id": "h3_paper_association_interpretation_20260917",
-                "date": "2026-09-17",
-                "scope": "reporting_interpretation_only",
-                "paper_hypothesis_commit": ("7ab3da61597ff50d9c73cf7939f8a81f81bad635"),
-                "campaign_analysis_commit": (
-                    "984a14ca4fe608513842add906eb4c6bbc820661"
-                ),
-                "protocol_analysis_role_at_run_time": source_h3_analysis_rule.get(
-                    "analysis_role"
-                ),
-                "reporting_decision_basis": (
-                    "Supported for the paper-stated selection-conditioned "
-                    "association; causal attribution is not established."
-                ),
-                "raw_metrics_changed": False,
-                "causal_attribution_allowed": False,
-                "amendment_path": (
-                    "docs/sage_protocol/"
-                    "h3_reporting_interpretation_amendment_20260917.md"
-                ),
+                "threshold_role": "predeclared_descriptive_reference_only",
             },
             "estimate_percent": called_lift,
             "confidence_interval": _confidence_interval(
@@ -2666,10 +2667,10 @@ def build_evidence_data(
             "decision": h3_status,
             "decision_label": _decision_label(h3_status),
             "value_label": _percent(called_lift, signed=True),
-            "primary_label": "Lift is measured on tasks where the SAGE actor policy invoked generated tools.",
+            "primary_label": "Lift is measured on tasks where the SAGE actor policy called generated tools.",
             "claim_label": (
-                "The paper-defined association threshold is evaluated on tasks "
-                "where the SAGE actor policy selected and called a generated tool."
+                "This is a selection-conditioned description of tasks where the "
+                "SAGE actor policy selected and called a generated tool."
             ),
             "evidence_label": (
                 "Uses audited v9 outcomes on generated-tool-called tasks under "
@@ -2678,7 +2679,7 @@ def build_evidence_data(
                 "It does not establish causal attribution."
             ),
             "observed_label": f"Observed {_percent(called_lift, signed=True)}",
-            "threshold_label": f"Target >= {h3_threshold:g}%",
+            "threshold_label": f"Descriptive reference: {h3_threshold:g}%",
             "fill_position": min(max(called_lift or 0.0, 0.0), 100.0),
             "target_position": h3_threshold,
             "status": h3_status,
@@ -2692,7 +2693,7 @@ def build_evidence_data(
                             [
                                 (
                                     "Subset",
-                                    "matched tasks with at least one recorded generated-tool invocation, including failed attempts",
+                                    "matched tasks with at least one recorded generated-tool call",
                                 ),
                                 (
                                     "Baseline outcome on subset",
@@ -2718,7 +2719,10 @@ def build_evidence_data(
                                     "Mean absolute-difference CI",
                                     _interval(called_delta_ci),
                                 ),
-                                ("Association threshold", f">= {h3_threshold:g}%"),
+                                (
+                                    "Descriptive reference",
+                                    f"{h3_threshold:g}% (not a causal gate)",
+                                ),
                                 ("Called-task observations", len(called_rows)),
                             ]
                         ),
@@ -2730,7 +2734,7 @@ def build_evidence_data(
                         ),
                     }
                 ],
-                eyebrow="Selection-conditioned association analysis",
+                eyebrow="Selection-conditioned descriptive analysis",
             ),
         },
     ]
@@ -2773,7 +2777,7 @@ def build_evidence_data(
                     "note": (
                         "This complete-benchmark endpoint supplies the current "
                         "same-run lift, confirmatory H1/H2 analyses, and the "
-                        "selection-conditioned H3 association analysis."
+                        "selection-conditioned descriptive called-task analysis."
                     ),
                 },
                 {
@@ -2946,7 +2950,7 @@ def build_evidence_data(
     sage_successes = sum(value >= 1.0 - 1e-12 for value in candidate_outcomes)
     statistics = {
         "mean_delta": overall_outcome_delta,
-        "analysis_role": "confirmatory_two_way_run_task_clustered",
+        "analysis_role": campaign_analysis_role,
         "decision_rule": {
             "target_contrast": f"candidate_mean - {h2_multiplier:.6g} * control_mean",
             "two_way_bootstrap_lower_must_exceed": 0.0,
@@ -3151,31 +3155,31 @@ def build_evidence_data(
         ),
         (
             "calls",
-            "Successful generated-tool scenarios",
+            "Policy-directed tool calls",
             f"{tool_totals['policy_directed_calls']:,}",
             "",
-            "Matched task scenarios with at least one successfully executed generated tool selected by the production actor policy. Failed-only invocation scenarios are excluded from this count.",
+            "Matched task scenarios containing a generated-tool call selected by the production actor policy, with diagnostic overrides disabled.",
         ),
         (
             "gains",
             "Called-task gains",
             f"{tool_totals['gains']:,}",
             "green",
-            "Generated-tool-invoked scenarios with positive matched outcome difference in the H3 association subset.",
+            "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only.",
         ),
         (
             "preserved",
             "Preserved outcomes",
             f"{tool_totals['preserved']:,}",
             "",
-            "Generated-tool-invoked scenarios with zero matched outcome difference in the H3 association subset.",
+            "Called generated-tool scenarios with zero matched outcome difference.",
         ),
         (
             "regressions",
             "Called-task regressions",
             f"{tool_totals['regressions']:,}",
             "amber",
-            "Generated-tool-invoked scenarios with negative matched outcome difference in the H3 association subset.",
+            "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only.",
         ),
         (
             "failures",
@@ -3251,6 +3255,28 @@ def build_evidence_data(
         "completed_frozen_runs": len(completed_frozen),
         "excluded_completed_artifacts": excluded_completed_artifact_count,
         "inference_complete": campaign_inference_complete,
+        "distribution_complete": campaign_distribution_complete,
+        "analysis_role": campaign_analysis_role,
+        "preregistered_inference_eligible": not adaptive_sample_distribution,
+        "replication_accounting": (
+            dict(replication_accounting)
+            if isinstance(replication_accounting, dict)
+            else {}
+        ),
+        "study_design_notice": (
+            str(replication_accounting.get("selection_conditioning_notice") or "")
+            if adaptive_sample_distribution and isinstance(replication_accounting, dict)
+            else ""
+        ),
+        "hypothesis_section_description": (
+            "All ten runs are aggregated, but rep01 was selected after passing the "
+            "release gate. H1/H2 estimates and uncertainty are adaptive, "
+            "selection-conditioned descriptions—not preregistered inference."
+            if adaptive_sample_distribution
+            else "H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. "
+            "The called-task analysis is selection-conditioned and descriptive; v1 "
+            "on the exact 800-task subset is historical comparison only."
+        ),
         "manifest_status": manifest_status,
         "progress_percent": (
             min(100.0, recorded_task_progress / expected_task_progress * 100.0)
@@ -3261,7 +3287,12 @@ def build_evidence_data(
             "Legacy artifacts loaded for diagnosis only; dual-endpoint "
             "attestations are absent"
             if endpoint_spec is None
-            else f"{complete_run_count} of {expected_run_count} verified runs included"
+            else (
+                "Adaptive / selection-conditioned; not preregistered inference · "
+                if adaptive_sample_distribution
+                else ""
+            )
+            + f"{complete_run_count} of {expected_run_count} verified runs included"
             + (f" · {active_run_count} active" if active_run_count else "")
             + (
                 f" · {excluded_completed_artifact_count} completed artifact(s) excluded"
@@ -3289,7 +3320,9 @@ def build_evidence_data(
             else "legacy_single_endpoint"
         ),
         "inference_exclusion_reason": (
-            None
+            "release_sample_selected_as_rep01_after_passing_technical_readiness_gate"
+            if adaptive_sample_distribution
+            else None
             if endpoint_spec is not None
             else "missing_dual_endpoint_sample_and_run_attestations"
         ),
