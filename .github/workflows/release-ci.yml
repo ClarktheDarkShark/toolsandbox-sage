@@ -24,19 +24,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: |
-            requirements-publication-lock.txt
-            pyproject.toml
+          cache-dependency-path: pyproject.toml
 
-      - name: Create locked test environment
+      - name: Create release test environment
         run: |
           python -m venv .venv-ci
-          .venv-ci/bin/python -m pip install -r requirements-publication-lock.txt
-          .venv-ci/bin/python -m pip install --no-deps -e .
-          .venv-ci/bin/python -m pip install \
-            build==1.2.2.post1 \
-            pytest==7.4.4 \
-            ruff==0.15.13
+          .venv-ci/bin/python -m pip install -e '.[dev]'
           .venv-ci/bin/python -m pip check
 
       - name: Verify publication inputs
@@ -110,8 +103,7 @@ jobs:
       - name: Install wheel into a second clean environment
         run: |
           python -m venv .venv-wheel
-          .venv-wheel/bin/python -m pip install -r requirements-publication-lock.txt
-          .venv-wheel/bin/python -m pip install --no-deps dist/toolsandbox_sage-*.whl
+          .venv-wheel/bin/python -m pip install dist/toolsandbox_sage-*.whl
           .venv-wheel/bin/python -m pip check
 
       - name: Smoke installed imports and command help
