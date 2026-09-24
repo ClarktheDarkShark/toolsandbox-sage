@@ -76,6 +76,19 @@ jobs:
                   or name.endswith((".pyc", ".pyo"))
                   or name.startswith(("artifacts/", "docs/", "outputs/", "tests/"))
               )
+              removed_modules = {
+                  "sage_ts/evaluation/control_baseline_cache.py",
+                  "tool_sandbox/roles/anthropic_api_agent.py",
+                  "tool_sandbox/roles/anthropic_tool_utils.py",
+                  "tool_sandbox/roles/cohere_agent.py",
+                  "tool_sandbox/roles/gemini_agent.py",
+                  "tool_sandbox/roles/gorilla_api_agent.py",
+                  "tool_sandbox/roles/hermes_api_agent.py",
+                  "tool_sandbox/roles/hermes_prompts.yaml",
+                  "tool_sandbox/roles/mistral_api_agent.py",
+                  "tool_sandbox/roles/mistral_tool_utils.py",
+              }
+              stale.extend(sorted(names & removed_modules))
               if stale:
                   raise SystemExit(f"Wheel contains stale/non-runtime files: {stale}")
               entry_points_name = next(

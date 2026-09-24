@@ -61,6 +61,7 @@ test:
 	$(COMMON_ENV) "$(PYTHON)" -m pytest tests/unit tests/integration -q
 
 package:
+	rm -rf -- "$(CURDIR)/build"
 	"$(PYTHON)" -m pip wheel --no-deps --wheel-dir "$(DIST_DIR)" .
 
 # One complete 1,032-task online-build sample. The launcher starts the control
