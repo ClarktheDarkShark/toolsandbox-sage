@@ -751,11 +751,7 @@ class SageRunConfig:
     run_type: str = "sage_online"
     recurrence_threshold: int = 2
     base_tool_policy: str = UPSTREAM_POLICY
-    resume_from_dir: Path | None = None
-    resume_completed_limit: int | None = None
     manifest_path: Path = Path("")
-    reflection_control_rows: dict[str, dict[str, Any]] | None = None
-    require_fresh_reflection_control: bool = False
     reflection_control_channel: Any | None = None
     failure_memory_path: Path | None = Path("artifacts/summaries/failure_memory.json")
 
@@ -774,7 +770,6 @@ def run_sage_with_registry(
     visible_generated_by_scenario: dict[str, list[str]] = {}
     called_generated_by_scenario: dict[str, list[str]] = {}
     selection_context_by_scenario: dict[str, dict[str, object]] = {}
-    baseline_scenario_by_name: dict[str, Scenario] = {}
 
     birth_controller: OnlineBirthController | None = None
     reflection_controller: SelfEvolutionReflectionController | None = None
@@ -802,12 +797,6 @@ def run_sage_with_registry(
             reflection_controller = SelfEvolutionReflectionController.from_env(
                 store=store,
                 output_dir=output_directory,
-                agent=config.agent,
-                user=config.user,
-                base_tool_policy=config.base_tool_policy,
-                manifest_path=config.manifest_path,
-                fresh_control_rows=config.reflection_control_rows,
-                require_fresh_control=config.require_fresh_reflection_control,
                 fresh_control_channel=config.reflection_control_channel,
             )
         visible_task_context = visible_task_context_from_scenario(scenario)
@@ -861,8 +850,6 @@ def run_sage_with_registry(
                     },
                 )
             registry_load_logged = True
-
-        baseline_scenario_by_name[name] = scenario
 
         def record_reuse(tool_name: str) -> None:
             if mutate_registry_reuse_counts:
@@ -1170,7 +1157,6 @@ def run_sage_with_registry(
         if reflection_controller is not None:
             reflection_controller.assess_scenario(
                 scenario_name=name,
-                baseline_scenario=baseline_scenario_by_name.get(name, scenario),
                 result=result,
                 selection_record=selection_record,
                 side_effect_failures=side_effect_failures,
@@ -1265,8 +1251,6 @@ def run_sage_with_registry(
             processes=1,
             run_type=config.run_type,
             base_tool_policy=config.base_tool_policy,
-            resume_from_dir=config.resume_from_dir,
-            resume_completed_limit=config.resume_completed_limit,
         ),
         scenarios=scenarios,
         scenario_transform=transform,

@@ -232,11 +232,7 @@ CMD=(
   --agent gpt-4o-mini
   --user gpt-4o-mini
   --generation-model gpt-4o-mini
-  --generation "$GENERATION"
-  --control-cache off
-  --require-fresh-control
   --publication-gate-purpose "$PUBLICATION_GATE_PURPOSE"
-  --parallel-arms
   --validated-external-fixture "$TOOLSANDBOX_RAPID_CACHE_PATH"
   --validated-external-fixture-sha256 "$PINNED_RAPID_FIXTURE_SHA256"
   --freeze-toolsandbox-clock
@@ -308,4 +304,8 @@ echo "[$ARM] log: $LOG_FILE"
   --expected-tasks 1032 \
   --expect-reflection "$REFLECTION_EXPECTATION" \
   --gate-purpose "$PUBLICATION_GATE_PURPOSE" | tee -a "$LOG_FILE"
+if [[ "$PUBLICATION_GATE_PURPOSE" == "release-sample" ]]; then
+  "$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py \
+    --search-root "$ARM_OUTPUT" | tee -a "$LOG_FILE"
+fi
 echo "Strict fresh-control publication run complete: full_$RUN_STAMP"

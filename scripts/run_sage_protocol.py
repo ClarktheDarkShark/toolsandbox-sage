@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # mypy: ignore-errors
-"""Run paired ToolSandbox SAGE mechanism/transfer/extended-reuse gates."""
+"""Run the paired online-build or frozen-registry publication protocol."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ from sage_ts.campaign.artifacts import (
     initialize_campaign,
     record_run,
     snapshot_registry,
-    update_task,
 )
 from sage_ts.config.models import DEFAULT_MODEL, paired_model_metadata
 from sage_ts.config.splits import load_split_names, scenario_records
@@ -38,12 +37,6 @@ from sage_ts.dashboard.exporters import (
     write_protocol_dashboard,
 )
 from sage_ts.dashboard.server import DASHBOARD_SERVER_PROTOCOL
-from sage_ts.evaluation.control_baseline_cache import (
-    ControlBaselineCache,
-    build_control_cache_report,
-    plan_control_cache,
-    write_synthetic_control_run,
-)
 from sage_ts.evaluation.helper_contribution import write_helper_contribution_summary
 from sage_ts.evaluation.online_feedback_score import (
     ONLINE_FEEDBACK_EVALUATOR_VERSION,
@@ -59,36 +52,14 @@ from sage_ts.orchestration.self_evolution_reflection import (
 )
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY
 
-# Run modes are also split names. Keep these explicit so bad campaign labels
-# fail early, but support campaign-sized protocol runs directly.
+# The publication protocol has exactly one online-build mode and one paired
+# frozen-registry mode. Both execute the complete sealed benchmark.
 MODES = (
-    # Smoke / wiring checks
-    "smoke_6",
-    "smoke_12",
-    # Mechanism / tool-birth checks
-    "viability_12",
-    "mechanism_12",
-    "mechanism_40",
-    "mechanism_60",
-    "online_build_100",
-    "online_build_250",
-    "online_build_500",
     "online_build_full",
-    # Frozen transfer checks
-    "transfer_40",
-    "transfer_60",
-    "transfer_100",
-    # Confirmation / validation
-    "extended_reuse_100",
-    "confirm_100",
-    "validate_100",
-    "promotion_250",
-    "validate_250",
     "full_benchmark",
 )
 
 SAGE_POLICY_NONE = "none"
-SAGE_POLICY_AUTO = "auto"
 SAGE_POLICY_SELF_EVOLVING_PRAXIS = "self-evolving-praxis"
 ACTOR_SELECTION_MODE = "policy"
 PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE = "release-sample"
@@ -98,7 +69,6 @@ PUBLICATION_GATE_PURPOSES = (
     PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
 )
 SAGE_POLICIES = (
-    SAGE_POLICY_AUTO,
     SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
 )
@@ -152,63 +122,12 @@ def _apply_sage_policy_preset(policy: str) -> dict[str, dict[str, str]]:
     return applied
 
 
-def _resolve_sage_policy_preset(
-    requested_policy: str,
-    *,
-    generation_enabled: bool,
-) -> str:
-    """Resolve auto policy without changing frozen validation behavior."""
-
-    if requested_policy != SAGE_POLICY_AUTO:
-        return requested_policy
-    if generation_enabled:
-        return SAGE_POLICY_SELF_EVOLVING_PRAXIS
-    return SAGE_POLICY_NONE
-
-
 def _manifest_type(manifest: Path) -> str:
     try:
         payload = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return ""
     return str(payload.get("manifest_type", ""))
-
-
-def _generation_enabled_by_default(mode: str, manifest_type: str) -> bool:
-    """Default live generation for build/discovery lanes, not frozen validation."""
-
-    generation_modes = {
-        "smoke_6",
-        "smoke_12",
-        "viability_12",
-        "mechanism_12",
-        "mechanism_40",
-        "mechanism_60",
-        "online_build_100",
-        "online_build_250",
-        "online_build_500",
-        "online_build_full",
-        "extended_reuse_100",
-    }
-    if mode in generation_modes:
-        return True
-    return "discovery" in manifest_type.lower()
-
-
-def _is_frozen_transfer_mode(mode: str) -> bool:
-    """Modes that should default to generation disabled."""
-
-    frozen_modes = {
-        "transfer_40",
-        "transfer_60",
-        "transfer_100",
-        "confirm_100",
-        "validate_100",
-        "promotion_250",
-        "validate_250",
-        "full_benchmark",
-    }
-    return mode in frozen_modes
 
 
 def _manifest_split_for_mode(mode: str) -> str:
@@ -219,24 +138,9 @@ def _manifest_split_for_mode(mode: str) -> str:
     manifest split.
     """
 
-    if mode in {
-        "online_build_100",
-        "online_build_250",
-        "online_build_500",
-        "online_build_full",
-    }:
+    if mode == "online_build_full":
         return "full_benchmark"
     return mode
-
-
-def _scenario_limit_for_mode(mode: str) -> int | None:
-    if mode == "online_build_100":
-        return 100
-    if mode == "online_build_250":
-        return 250
-    if mode == "online_build_500":
-        return 500
-    return None
 
 
 DIAGNOSTIC_FORCE_ENV_VARS = (
@@ -1054,12 +958,6 @@ def _publication_gate_decisions(
     raise ValueError(f"Unknown publication gate purpose: {purpose!r}")
 
 
-def _resume_arm_dir(resume_run_root: Path | None, arm: str) -> Path | None:
-    if resume_run_root is None:
-        return None
-    return _status_run_dir(resume_run_root, arm, resume_run_root / arm)
-
-
 def _protocol_event(
     *,
     event: str,
@@ -1178,10 +1076,6 @@ def _run_control_arm_worker(params: dict[str, Any]) -> None:
                 processes=1,
                 run_type=f"{params['mode']}_control",
                 base_tool_policy=str(params["base_tool_policy"]),
-                resume_from_dir=Path(params["control_resume_dir"])
-                if params.get("control_resume_dir")
-                else None,
-                resume_completed_limit=params.get("resume_completed_limit"),
             ),
             progress_hook=progress,
             event_hook=event_hook,
@@ -1243,7 +1137,6 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
     registry_dir = Path(params["registry_dir"])
     scenario_names = tuple(params["scenario_names"])
     generation_enabled = bool(params["generation_enabled"])
-    require_fresh_control = bool(params.get("require_fresh_control"))
     _write_arm_status(
         run_root,
         "candidate",
@@ -1287,20 +1180,9 @@ def _run_candidate_arm_worker(params: dict[str, Any]) -> None:
                 run_type=f"{params['mode']}_candidate",
                 recurrence_threshold=int(params["recurrence_threshold"]),
                 base_tool_policy=str(params["base_tool_policy"]),
-                resume_from_dir=Path(params["candidate_resume_dir"])
-                if params.get("candidate_resume_dir")
-                else None,
-                resume_completed_limit=params.get("resume_completed_limit"),
                 manifest_path=Path(params["manifest"]),
                 reflection_control_channel=params.get("reflection_control_channel"),
-                require_fresh_reflection_control=(
-                    require_fresh_control and generation_enabled
-                ),
-                failure_memory_path=(
-                    None
-                    if require_fresh_control
-                    else Path("artifacts/summaries/failure_memory.json")
-                ),
+                failure_memory_path=None,
             ),
             generator=generator,
             progress_hook=progress,
@@ -1431,7 +1313,7 @@ def _assert_strict_fresh_report(
     if int(report.get("fresh_control_tasks") or 0) != scenario_count:
         raise ValueError("Strict fresh-control run has incomplete fresh controls.")
     if report.get("cache_accessed") is not False:
-        raise ValueError("Strict fresh-control run accessed ControlBaselineCache.")
+        raise ValueError("Strict fresh-control run accessed a control baseline cache.")
 
 
 def main() -> None:
@@ -1445,13 +1327,10 @@ def main() -> None:
     parser.add_argument(
         "--sage-policy",
         choices=SAGE_POLICIES,
-        default=os.environ.get("SAGE_POLICY_PRESET", SAGE_POLICY_AUTO),
+        default=None,
         help=(
-            "Optional SAGE runtime policy preset. The default 'auto' resolves "
-            "to self-evolving-praxis for generation-enabled build/mechanism "
-            "runs and to none for frozen validation. 'self-evolving-praxis' "
-            "enables the audited online tool-birth, validation, registry, "
-            "routing, reflection, and contribution-accounting lifecycle."
+            "Publication policy identity. online_build_full requires "
+            "self-evolving-praxis; full_benchmark requires none."
         ),
     )
     parser.add_argument("--registry-dir", type=Path)
@@ -1462,34 +1341,7 @@ def main() -> None:
         default=Path("outputs/sage_protocol"),
     )
     parser.add_argument("--dashboard-port", type=int, default=5520)
-    parser.add_argument("--no-dashboard-open", action="store_true")
     parser.add_argument("--artifact-root", type=Path, default=Path("artifacts"))
-    parser.add_argument(
-        "--parallel-arms",
-        action="store_true",
-        help="Run the matched control and SAGE arms concurrently in isolated processes.",
-    )
-    parser.add_argument(
-        "--control-cache",
-        choices=("off", "collect", "use-if-eligible", "refresh", "strict"),
-        default=os.environ.get("CONTROL_CACHE", "off"),
-        help="Control-arm baseline cache mode. Never applies to the SAGE/candidate arm.",
-    )
-    parser.add_argument(
-        "--control-cache-root",
-        type=Path,
-        default=Path("artifacts/baselines/control_task_baselines"),
-        help="Authoritative completed-control baseline cache root.",
-    )
-    parser.add_argument(
-        "--require-fresh-control",
-        action="store_true",
-        help=(
-            "Publication fail-closed mode: require exactly one live uncached "
-            "control row per task and stream each row to SAGE at the matched task "
-            "boundary. Requires --parallel-arms and control cache off."
-        ),
-    )
     parser.add_argument(
         "--publication-gate-purpose",
         choices=PUBLICATION_GATE_PURPOSES,
@@ -1511,43 +1363,6 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--generation",
-        choices=("auto", "on", "off"),
-        default="auto",
-        help="Override candidate-side helper generation. Use off for frozen-registry validation.",
-    )
-    parser.add_argument(
-        "--diagnostic-force-allowed",
-        action="store_true",
-        help="Allow SAGE_DIAGNOSTIC_FORCE_* env vars for explicit diagnostic runs only.",
-    )
-    parser.add_argument(
-        "--resume-run-root",
-        type=Path,
-        help="Seed each arm from a prior interrupted paired protocol run root.",
-    )
-    parser.add_argument(
-        "--resume-completed-limit",
-        type=int,
-        help=(
-            "When resuming, copy only the first N completed rows from each prior "
-            "arm. This resumes before a known bad checkpoint after a framework fix."
-        ),
-    )
-    parser.add_argument(
-        "--allow-empty-birth-preflight",
-        action="store_true",
-        help=(
-            "Allow a generation-enabled run to proceed even when the cohort has "
-            "no current expected birth path and no retained-helper fit."
-        ),
-    )
-    parser.add_argument(
-        "--allow-contaminated-preflight",
-        action="store_true",
-        help="Allow stock/location/weather/API-contaminated cohorts for explicit diagnostics.",
-    )
-    parser.add_argument(
         "--validated-external-fixture",
         type=Path,
         help=(
@@ -1560,29 +1375,8 @@ def main() -> None:
         "--validated-external-fixture-sha256",
         help="Pinned SHA-256 for --validated-external-fixture.",
     )
-    parser.add_argument(
-        "--allow-low-quality-cohort",
-        action="store_true",
-        help=(
-            "Allow a cohort that fails mechanical diversity/near-duplicate checks. "
-            "Use only for explicit diagnostics, not broad claim runs."
-        ),
-    )
     args = parser.parse_args()
 
-    if args.require_fresh_control and args.control_cache != "off":
-        raise SystemExit(
-            "--require-fresh-control requires --control-cache off; cache lookup "
-            "and collection are prohibited in publication runs."
-        )
-    if (
-        args.publication_gate_purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
-        and not args.require_fresh_control
-    ):
-        raise SystemExit(
-            "--publication-gate-purpose campaign-inclusion requires "
-            "--require-fresh-control."
-        )
     if (
         args.publication_gate_purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
         and args.mode not in {"online_build_full", "full_benchmark"}
@@ -1591,31 +1385,11 @@ def main() -> None:
             "--publication-gate-purpose campaign-inclusion is restricted to "
             "complete publication benchmark modes."
         )
-    if args.require_fresh_control and not args.parallel_arms:
-        raise SystemExit(
-            "--require-fresh-control requires --parallel-arms; strict validation "
-            "streams each same-task control row to SAGE at the matched boundary."
-        )
-    if args.require_fresh_control and args.no_dashboard_open:
-        raise SystemExit(
-            "Strict publication runs require Task Compare to open before model "
-            "execution; --no-dashboard-open is forbidden."
-        )
-    if args.require_fresh_control and (
-        args.resume_run_root is not None or args.resume_completed_limit is not None
-    ):
-        raise SystemExit(
-            "--require-fresh-control forbids --resume-run-root and "
-            "--resume-completed-limit; every publication task row must execute "
-            "from the clean checkpoint."
-        )
     active_force_env = _active_diagnostic_force_env()
-    if args.require_fresh_control and active_force_env:
+    if active_force_env:
         raise SystemExit(
-            "Diagnostic force-call environment is forbidden during a strict "
-            "publication run: "
-            f"{', '.join(sorted(active_force_env))}. Unset these variables; "
-            "--diagnostic-force-allowed cannot override publication mode."
+            "Diagnostic force-call environment is forbidden during a publication "
+            f"run: {', '.join(sorted(active_force_env))}. Unset these variables."
         )
     try:
         external_fixture = _validated_external_fixture(
@@ -1630,21 +1404,16 @@ def main() -> None:
     ):
         os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(time.time())
     toolsandbox_fixed_now = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
-    publication_provenance: dict[str, Any] | None = None
-    if args.require_fresh_control:
-        try:
-            publication_provenance = _publication_provenance(
-                fixed_toolsandbox_timestamp=toolsandbox_fixed_now,
-                freeze_toolsandbox_clock=args.freeze_toolsandbox_clock,
-            )
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+    try:
+        publication_provenance = _publication_provenance(
+            fixed_toolsandbox_timestamp=toolsandbox_fixed_now,
+            freeze_toolsandbox_clock=args.freeze_toolsandbox_clock,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     split_name = _manifest_split_for_mode(args.mode)
     scenario_names = tuple(load_split_names(args.manifest, split_name))
-    scenario_limit = _scenario_limit_for_mode(args.mode)
-    if scenario_limit is not None:
-        scenario_names = scenario_names[:scenario_limit]
     benchmark_manifest_path = args.manifest.resolve()
     benchmark_manifest_sha256 = _digest_file(benchmark_manifest_path)
     scenario_order_sha256 = hashlib.sha256(
@@ -1665,34 +1434,18 @@ def main() -> None:
     registry_gate_snapshot = _snapshot_registry_for_gate(run_root, registry_dir)
     control_dir: Path | None = None
     candidate_dir: Path | None = None
-    fresh_control_dir: Path | None = None
-    control_resume_dir = _resume_arm_dir(args.resume_run_root, "control")
-    candidate_resume_dir = _resume_arm_dir(args.resume_run_root, "candidate")
-    resume_completed_limit = (
-        max(0, args.resume_completed_limit)
-        if args.resume_completed_limit is not None
-        else None
+    generation_enabled = args.mode == "online_build_full"
+    required_sage_policy = (
+        SAGE_POLICY_SELF_EVOLVING_PRAXIS if generation_enabled else SAGE_POLICY_NONE
     )
-    generation_enabled = _generation_enabled_by_default(args.mode, manifest_type)
-    if args.generation == "on":
-        generation_enabled = True
-    elif args.generation == "off":
-        generation_enabled = False
-    elif _is_frozen_transfer_mode(args.mode):
-        generation_enabled = False
-    frozen_final_run = _is_frozen_transfer_mode(args.mode) and not generation_enabled
-    effective_sage_policy = _resolve_sage_policy_preset(
-        args.sage_policy,
-        generation_enabled=generation_enabled,
-    )
+    effective_sage_policy = args.sage_policy or required_sage_policy
+    if effective_sage_policy != required_sage_policy:
+        raise SystemExit(
+            f"{args.mode} requires --sage-policy {required_sage_policy}; "
+            f"observed {effective_sage_policy}."
+        )
     sage_policy_env: dict[str, dict[str, str]] = {}
     if effective_sage_policy != SAGE_POLICY_NONE:
-        if not generation_enabled:
-            raise SystemExit(
-                "--sage-policy self-evolving-praxis requires generation-enabled "
-                "mechanism/online-build execution. Do not use it for frozen "
-                "registry validation arms."
-            )
         sage_policy_env = _apply_sage_policy_preset(effective_sage_policy)
     _preflight_openai_api_key(
         agent_model=args.agent,
@@ -1700,34 +1453,17 @@ def main() -> None:
         generation_model=args.generation_model,
         generation_enabled=generation_enabled,
     )
-    if _is_frozen_transfer_mode(args.mode) and args.generation == "on":
-        raise SystemExit(
-            "Final/frozen protocol modes must not run with --generation on. "
-            "Use a mechanism/discovery mode for tool birth diagnostics."
-        )
-    if frozen_final_run and active_force_env and not args.diagnostic_force_allowed:
-        raise SystemExit(
-            "Diagnostic force-call environment is set during a frozen final run: "
-            f"{', '.join(sorted(active_force_env))}. Unset these variables or pass "
-            "--diagnostic-force-allowed only for explicit diagnostics."
-        )
-    control_cache: ControlBaselineCache | None = None
-    if args.control_cache != "off":
-        control_cache = ControlBaselineCache(args.control_cache_root)
-    control_cache_plan: dict[str, Any] | None = None
     control_cache_report: dict[str, Any] = {
-        "mode": args.control_cache,
+        "mode": "off",
         "control_source": "fresh",
         "cached_control_tasks": 0,
         "fresh_control_tasks": len(scenario_names),
         "cached_scenarios": [],
         "fresh_scenarios": list(scenario_names),
         "cache_misses": {},
-        "cache_manifest_hash": (
-            control_cache.manifest_hash() if control_cache is not None else None
-        ),
-        "cache_accessed": control_cache is not None,
-        "fresh_control_enforced": args.require_fresh_control,
+        "cache_manifest_hash": None,
+        "cache_accessed": False,
+        "fresh_control_enforced": True,
         "baseline_count_and_variance_per_cached_task": {},
         "estimated_token_time_savings": {
             "cached_tasks_skipped": 0,
@@ -1738,44 +1474,10 @@ def main() -> None:
         "confidence_intervals_account_for_cached_control_variance": False,
         "cohort_selection_influenced_by_cache": False,
     }
-    if args.control_cache in {"use-if-eligible", "strict"}:
-        if control_cache is None:
-            raise AssertionError("Control cache was not initialized for cache mode.")
-        control_cache_plan = plan_control_cache(
-            cache=control_cache,
-            scenario_names=scenario_names,
-            agent=args.agent,
-            user=args.user,
-            base_tool_policy=UPSTREAM_POLICY,
-            manifest_path=args.manifest,
-        )
-        control_cache_report = build_control_cache_report(
-            mode=args.control_cache,
-            cache=control_cache,
-            scenario_names=scenario_names,
-            cached_scenarios=list(control_cache_plan["cached_scenarios"]),
-            fresh_scenarios=list(control_cache_plan["fresh_scenarios"]),
-            miss_reasons=dict(control_cache_plan["miss_reasons"]),
-            lookups=dict(control_cache_plan["lookups"]),
-        )
-        if args.control_cache == "strict" and control_cache_plan["fresh_scenarios"]:
-            raise SystemExit(
-                "Control cache strict mode blocked this run: ineligible control "
-                f"baselines for {len(control_cache_plan['fresh_scenarios'])} tasks."
-            )
-    effective_parallel_arms = args.parallel_arms and not (
-        control_cache_plan is not None and control_cache_plan["cached_scenarios"]
-    )
     reflection_control_delivery = (
         "task_synchronous_stream"
-        if args.require_fresh_control and generation_enabled and effective_parallel_arms
-        else "preloaded_complete_map"
-        if args.require_fresh_control and generation_enabled
-        else "not_applicable_generation_disabled"
-        if args.require_fresh_control
-        else "legacy_control_cache"
         if generation_enabled
-        else "not_applicable"
+        else "not_applicable_generation_disabled"
     )
     cohort_preflight = _write_cohort_preflight(
         run_root,
@@ -1795,7 +1497,7 @@ def main() -> None:
             "cohort_preflight_report": str(run_root / "cohort_preflight_report.json"),
             "cohort_preflight_warnings": cohort_preflight.get("warnings", []),
             "cohort_quality_gate_status": cohort_preflight.get("quality_gate_status"),
-            "control_cache_mode": args.control_cache,
+            "control_cache_mode": "off",
             "control_cache_source": control_cache_report.get("control_source"),
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
@@ -1806,7 +1508,7 @@ def main() -> None:
             "actor_selection_mode": ACTOR_SELECTION_MODE,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
-            "parallel_arms": effective_parallel_arms,
+            "parallel_arms": True,
             "reflection_control_delivery": reflection_control_delivery,
             "timezone": os.environ.get("TZ"),
             "toolsandbox_clock_policy": "frozen"
@@ -1816,7 +1518,7 @@ def main() -> None:
         },
         root=args.artifact_root,
     )
-    if cohort_preflight.get("should_block") and not args.allow_empty_birth_preflight:
+    if cohort_preflight.get("should_block"):
         append_event(
             "gate_failed",
             {
@@ -1836,7 +1538,7 @@ def main() -> None:
             f"{run_root / 'cohort_preflight_report.json'}"
         )
     contaminated = cohort_preflight.get("contaminated_external_service_scenarios", [])
-    if contaminated and not (args.allow_contaminated_preflight or external_fixture):
+    if contaminated and not external_fixture:
         append_event(
             "gate_failed",
             {
@@ -1853,14 +1555,10 @@ def main() -> None:
         )
         raise SystemExit(
             "Cohort preflight blocked this run because it contains external-service "
-            "contamination. Pass --allow-contaminated-preflight only for explicit "
-            "diagnostics, or provide a hash-pinned read-only external fixture for "
+            "contamination. Provide a hash-pinned read-only external fixture for "
             f"publication. See {run_root / 'cohort_preflight_report.json'}"
         )
-    if (
-        cohort_preflight.get("should_block_quality")
-        and not args.allow_low_quality_cohort
-    ):
+    if cohort_preflight.get("should_block_quality"):
         append_event(
             "gate_failed",
             {
@@ -1878,9 +1576,8 @@ def main() -> None:
             root=args.artifact_root,
         )
         raise SystemExit(
-            "Cohort quality gate blocked this run. Use "
-            "--allow-low-quality-cohort only for explicit diagnostics, not broad "
-            f"claim runs. See {run_root / 'cohort_preflight_report.json'}"
+            "Cohort quality gate blocked this run. See "
+            f"{run_root / 'cohort_preflight_report.json'}"
         )
     append_event(
         "gate_passed",
@@ -1913,7 +1610,7 @@ def main() -> None:
             "actor_selection_mode": ACTOR_SELECTION_MODE,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
-            "parallel_arms": effective_parallel_arms,
+            "parallel_arms": True,
             "reflection_control_delivery": reflection_control_delivery,
             "timezone": os.environ.get("TZ"),
         },
@@ -1933,64 +1630,58 @@ def main() -> None:
         registry_dir=registry_dir,
         artifact_root=args.artifact_root,
     )
-    # Dashboard visibility is part of the experiment surface. Keep it on by
-    # default for every run; only the explicit CLI flag should suppress it.
-    should_open_dashboard = not args.no_dashboard_open
     dashboard_url = dashboard_standard_url = dashboard_task_focus_url = (
         dashboard_task_compare_url
     ) = None
     dashboard_open_receipt_path: Path | None = None
-    if should_open_dashboard:
-        dashboard_task_compare_url = open_dashboard(
-            dashboard_index.with_name("task_compare.html"),
-            port=args.dashboard_port,
-            server_root=run_root,
-        )
-        dashboard_opened_monotonic_ns = time.monotonic_ns()
-        dashboard_standard_url = make_dashboard_url(
-            dashboard_index,
-            port=args.dashboard_port,
-            server_root=run_root,
-        )
-        dashboard_url = dashboard_task_compare_url
-        dashboard_task_focus_url = make_dashboard_url(
-            dashboard_index.with_name("task_focus.html"),
-            port=args.dashboard_port,
-            server_root=run_root,
-        )
-        (run_root / "dashboard_urls.json").write_text(
-            json.dumps(
-                {
-                    "dashboard_url": dashboard_task_compare_url,
-                    "dashboard_standard_url": dashboard_standard_url,
-                    "dashboard_task_focus_url": dashboard_task_focus_url,
-                    "dashboard_task_compare_url": dashboard_task_compare_url,
-                    "default_dashboard": "task_compare",
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        dashboard_open_receipt_path = run_root / "dashboard_open_receipt.json"
-        _atomic_write_json(
-            dashboard_open_receipt_path,
+    dashboard_task_compare_url = open_dashboard(
+        dashboard_index.with_name("task_compare.html"),
+        port=args.dashboard_port,
+        server_root=run_root,
+    )
+    dashboard_opened_monotonic_ns = time.monotonic_ns()
+    dashboard_standard_url = make_dashboard_url(
+        dashboard_index,
+        port=args.dashboard_port,
+        server_root=run_root,
+    )
+    dashboard_url = dashboard_task_compare_url
+    dashboard_task_focus_url = make_dashboard_url(
+        dashboard_index.with_name("task_focus.html"),
+        port=args.dashboard_port,
+        server_root=run_root,
+    )
+    (run_root / "dashboard_urls.json").write_text(
+        json.dumps(
             {
-                "dashboard": "task_compare",
-                "comparison": "fresh_control_vs_policy_sage"
-                if args.require_fresh_control
-                else "historical_control_vs_policy_sage",
-                "path": str(dashboard_index.with_name("task_compare.html").resolve()),
-                "url": dashboard_task_compare_url,
-                "external_browser_opened": True,
-                "http_verified_before_open": True,
-                "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
-                "dashboard_server_root": str(run_root.resolve()),
-                "opened_at": datetime.now().astimezone().isoformat(),
-                "opened_monotonic_ns": dashboard_opened_monotonic_ns,
-                "opened_before_model_processes": True,
+                "dashboard_url": dashboard_task_compare_url,
+                "dashboard_standard_url": dashboard_standard_url,
+                "dashboard_task_focus_url": dashboard_task_focus_url,
+                "dashboard_task_compare_url": dashboard_task_compare_url,
+                "default_dashboard": "task_compare",
             },
+            indent=2,
         )
+        + "\n",
+        encoding="utf-8",
+    )
+    dashboard_open_receipt_path = run_root / "dashboard_open_receipt.json"
+    _atomic_write_json(
+        dashboard_open_receipt_path,
+        {
+            "dashboard": "task_compare",
+            "comparison": "fresh_control_vs_policy_sage",
+            "path": str(dashboard_index.with_name("task_compare.html").resolve()),
+            "url": dashboard_task_compare_url,
+            "external_browser_opened": True,
+            "http_verified_before_open": True,
+            "dashboard_server_protocol": DASHBOARD_SERVER_PROTOCOL,
+            "dashboard_server_root": str(run_root.resolve()),
+            "opened_at": datetime.now().astimezone().isoformat(),
+            "opened_monotonic_ns": dashboard_opened_monotonic_ns,
+            "opened_before_model_processes": True,
+        },
+    )
 
     def refresh_dashboard(phase: str, status: str) -> None:
         write_protocol_dashboard(
@@ -2010,25 +1701,8 @@ def main() -> None:
             artifact_root=args.artifact_root,
         )
 
-    def campaign_event(
-        event: str,
-        run_dir: Path,
-        payload: dict[str, object],
-    ) -> None:
-        append_event(
-            event,
-            {
-                "mode": args.mode,
-                "run_root": str(run_root),
-                "run_dir": str(run_dir),
-                **payload,
-            },
-            root=args.artifact_root,
-        )
-
-    reflection_control_rows: dict[str, dict[str, Any]] | None = None
-    parallel_arm_execution: dict[str, Any] | None = None
-    if effective_parallel_arms:
+    def run_parallel_arms() -> tuple[Path, Path, dict[str, Any]]:
+        nonlocal control_dir, candidate_dir
         append_event(
             "subtask_started",
             {
@@ -2040,9 +1714,7 @@ def main() -> None:
             root=args.artifact_root,
         )
         ctx = get_context("spawn")
-        reflection_control_channel = (
-            ctx.Queue() if args.require_fresh_control and generation_enabled else None
-        )
+        reflection_control_channel = ctx.Queue() if generation_enabled else None
         base_params: dict[str, Any] = {
             "mode": args.mode,
             "run_root": str(run_root),
@@ -2055,14 +1727,6 @@ def main() -> None:
             "registry_dir": str(registry_dir),
             "scenario_names": list(scenario_names),
             "manifest": str(args.manifest),
-            "control_resume_dir": str(control_resume_dir)
-            if control_resume_dir
-            else None,
-            "candidate_resume_dir": str(candidate_resume_dir)
-            if candidate_resume_dir
-            else None,
-            "resume_completed_limit": resume_completed_limit,
-            "require_fresh_control": args.require_fresh_control,
             "reflection_control_channel": reflection_control_channel,
         }
         control_process = ctx.Process(
@@ -2189,205 +1853,33 @@ def main() -> None:
                 "control_dir": str(control_dir),
                 "candidate_dir": str(candidate_dir),
                 "parallel_arm_execution": parallel_arm_execution,
-                "control_cache_mode": args.control_cache,
+                "control_cache_mode": "off",
                 "control_cache_source": control_cache_report.get("control_source"),
             },
             root=args.artifact_root,
         )
-        fresh_control_dir = control_dir
-        if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
-            if control_cache is None:
-                raise AssertionError("Control cache collection was not initialized.")
-            collected = control_cache.collect_run(
-                run_dir=fresh_control_dir,
-                config=ToolSandboxRunConfig(
-                    agent=args.agent,
-                    user=args.user,
-                    scenario_names=scenario_names,
-                    output_dir=control_root,
-                    processes=1,
-                    run_type=f"{args.mode}_control",
-                    base_tool_policy=UPSTREAM_POLICY,
-                ),
-                manifest_path=args.manifest,
-            )
-            control_cache_report["collected_control_records"] = len(collected)
-    else:
+        return control_dir, candidate_dir, parallel_arm_execution
 
-        def control_progress(
-            run_dir: Path,
-            _rows: list[dict[str, object]],
-            status: str,
-            _scenario_count: int,
-        ) -> None:
-            nonlocal control_dir
-            control_dir = run_dir
-            refresh_dashboard("control", status)
-
-        cached_rows_by_name: dict[str, dict[str, Any]] = {}
-        fresh_control_scenarios = scenario_names
-        if control_cache_plan is not None:
-            cached_rows_by_name = {
-                name: control_cache_plan["lookups"][name].row
-                for name in control_cache_plan["cached_scenarios"]
-                if control_cache_plan["lookups"][name].row is not None
-            }
-            fresh_control_scenarios = tuple(control_cache_plan["fresh_scenarios"])
-        if fresh_control_scenarios:
-            fresh_control_dir = run_toolsandbox(
-                ToolSandboxRunConfig(
-                    agent=args.agent,
-                    user=args.user,
-                    scenario_names=fresh_control_scenarios,
-                    output_dir=control_root,
-                    processes=1,
-                    run_type=f"{args.mode}_control",
-                    base_tool_policy=UPSTREAM_POLICY,
-                    resume_from_dir=control_resume_dir
-                    if fresh_control_scenarios == scenario_names
-                    else None,
-                    resume_completed_limit=resume_completed_limit
-                    if fresh_control_scenarios == scenario_names
-                    else None,
-                ),
-                progress_hook=control_progress,
-                event_hook=campaign_event,
-            )
-            control_dir = fresh_control_dir
-            if args.control_cache in {"collect", "use-if-eligible", "refresh"}:
-                if control_cache is None:
-                    raise AssertionError(
-                        "Control cache collection was not initialized."
-                    )
-                collected = control_cache.collect_run(
-                    run_dir=fresh_control_dir,
-                    config=ToolSandboxRunConfig(
-                        agent=args.agent,
-                        user=args.user,
-                        scenario_names=fresh_control_scenarios,
-                        output_dir=control_root,
-                        processes=1,
-                        run_type=f"{args.mode}_control",
-                        base_tool_policy=UPSTREAM_POLICY,
-                    ),
-                    manifest_path=args.manifest,
-                )
-                control_cache_report["collected_control_records"] = len(collected)
-        if cached_rows_by_name:
-            control_dir = write_synthetic_control_run(
-                output_root=control_root,
-                run_type=args.mode,
-                agent=args.agent,
-                user=args.user,
-                scenario_names=scenario_names,
-                cached_rows_by_name=cached_rows_by_name,
-                fresh_run_dir=fresh_control_dir,
-                cache_report=control_cache_report,
-            )
-            control_progress(control_dir, [], "complete", len(scenario_names))
-        append_event(
-            "phase_completed",
-            {
-                "mode": args.mode,
-                "phase": "control",
-                "run_dir": str(control_dir),
-                "control_cache_mode": args.control_cache,
-                "control_cache_source": control_cache_report.get("control_source"),
-                "cached_control_tasks": control_cache_report.get(
-                    "cached_control_tasks"
-                ),
-                "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
-            },
-            root=args.artifact_root,
+    control_dir, candidate_dir, parallel_arm_execution = run_parallel_arms()
+    try:
+        _validate_uncached_result_rows(
+            control_dir,
+            expected_scenarios=scenario_names,
+            arm="control",
+            require_complete=True,
         )
-        if args.require_fresh_control:
-            if control_dir is None:
-                raise SystemExit(
-                    "Strict fresh-control run did not produce a control arm."
-                )
-            try:
-                reflection_control_rows = _validate_uncached_result_rows(
-                    control_dir,
-                    expected_scenarios=scenario_names,
-                    arm="control",
-                    require_complete=True,
-                )
-                _assert_strict_fresh_report(
-                    control_cache_report,
-                    scenario_count=len(scenario_names),
-                )
-            except ValueError as exc:
-                raise SystemExit(str(exc)) from exc
-        refresh_dashboard("candidate", "running")
-
-        generator = (
-            ToolGenerator(completer=OpenAIChatAdapter(model=args.generation_model))
-            if generation_enabled
-            else None
+        _validate_uncached_result_rows(
+            candidate_dir,
+            expected_scenarios=scenario_names,
+            arm="candidate",
+            require_complete=True,
         )
-
-        def candidate_progress(
-            run_dir: Path,
-            _rows: list[dict[str, object]],
-            status: str,
-            _scenario_count: int,
-        ) -> None:
-            nonlocal candidate_dir
-            candidate_dir = run_dir
-            refresh_dashboard("candidate", status)
-
-        candidate_dir = run_sage_with_registry(
-            SageRunConfig(
-                agent=args.agent,
-                user=args.user,
-                scenario_names=scenario_names,
-                output_dir=candidate_root,
-                registry_dir=registry_dir,
-                run_type=f"{args.mode}_candidate",
-                recurrence_threshold=args.recurrence_threshold,
-                base_tool_policy=UPSTREAM_POLICY,
-                resume_from_dir=candidate_resume_dir,
-                resume_completed_limit=resume_completed_limit,
-                manifest_path=args.manifest,
-                reflection_control_rows=reflection_control_rows,
-                require_fresh_reflection_control=(
-                    args.require_fresh_control and generation_enabled
-                ),
-                # Publication runs must not inherit conclusions from earlier
-                # campaigns. Non-publication runs retain the historical
-                # failure-memory behavior through SageRunConfig's default.
-                failure_memory_path=None
-                if args.require_fresh_control
-                else Path("artifacts/summaries/failure_memory.json"),
-            ),
-            generator=generator,
-            progress_hook=candidate_progress,
-            event_hook=campaign_event,
+        _assert_strict_fresh_report(
+            control_cache_report,
+            scenario_count=len(scenario_names),
         )
-    if args.require_fresh_control:
-        if control_dir is None:
-            raise SystemExit("Strict fresh-control run did not produce a control arm.")
-        if candidate_dir is None:
-            raise SystemExit("Strict fresh-control run did not produce a SAGE arm.")
-        try:
-            _validate_uncached_result_rows(
-                control_dir,
-                expected_scenarios=scenario_names,
-                arm="control",
-                require_complete=True,
-            )
-            _validate_uncached_result_rows(
-                candidate_dir,
-                expected_scenarios=scenario_names,
-                arm="candidate",
-                require_complete=True,
-            )
-            _assert_strict_fresh_report(
-                control_cache_report,
-                scenario_count=len(scenario_names),
-            )
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     control_cache_report_path = run_root / "control_cache_report.json"
     control_cache_report_path.write_text(
         json.dumps(control_cache_report, indent=2) + "\n", encoding="utf-8"
@@ -2419,7 +1911,7 @@ def main() -> None:
     ) = _publication_gate_decisions(
         comparison,
         scenario_count=len(scenario_names),
-        outcome_only=args.require_fresh_control,
+        outcome_only=True,
         purpose=args.publication_gate_purpose,
     )
     comparison["publication_gate_purpose"] = args.publication_gate_purpose
@@ -2482,12 +1974,6 @@ def main() -> None:
     snapshot_registry(
         registry_dir, name=f"{args.mode}_{run_root.name}", root=args.artifact_root
     )
-    if args.mode in {"viability_12", "mechanism_12", "mechanism_40", "mechanism_60"}:
-        update_task(
-            "reproduce_clean_recency_birth", "completed", root=args.artifact_root
-        )
-    elif args.mode in {"transfer_40", "transfer_60", "transfer_100"}:
-        update_task("frozen_registry_transfer", "completed", root=args.artifact_root)
     refresh_dashboard("comparison", "complete")
     if publication_provenance is not None:
         try:
@@ -2531,36 +2017,20 @@ def main() -> None:
             "quality_gate_failures", []
         ),
         "external_fixture": external_fixture,
-        "resume_run_root": str(args.resume_run_root) if args.resume_run_root else None,
-        "resume_completed_limit": resume_completed_limit,
-        "control_resume_dir": str(control_resume_dir) if control_resume_dir else None,
-        "candidate_resume_dir": str(candidate_resume_dir)
-        if candidate_resume_dir
-        else None,
         "comparison_path": str(comparison_path),
-        "control_cache_mode": args.control_cache,
+        "control_cache_mode": "off",
         "control_source": control_cache_report.get("control_source"),
         "cached_control_tasks": control_cache_report.get("cached_control_tasks"),
         "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
         "control_cache_report_path": str(control_cache_report_path),
         "control_cache_manifest_hash": control_cache_report.get("cache_manifest_hash"),
-        "fresh_control_required": args.require_fresh_control,
-        "cross_run_failure_memory_enabled": not args.require_fresh_control,
-        "cross_run_failure_memory_path": (
-            None
-            if args.require_fresh_control
-            else "artifacts/summaries/failure_memory.json"
-        ),
+        "fresh_control_required": True,
+        "cross_run_failure_memory_enabled": False,
+        "cross_run_failure_memory_path": None,
         "reflection_control_source": (
-            "same_run_fresh"
-            if args.require_fresh_control and generation_enabled
-            else "not_applicable"
-            if not generation_enabled
-            else "legacy_control_cache"
+            "same_run_fresh" if generation_enabled else "not_applicable"
         ),
-        "publication_performance_endpoint": (
-            "outcome_task_completion_similarity" if args.require_fresh_control else None
-        ),
+        "publication_performance_endpoint": "outcome_task_completion_similarity",
         "openai_response_cache_enabled": False,
         "openai_response_cache_mode": "off",
         "openai_response_cache_scope": "persistent_repository_whole_response_replay",
@@ -2576,7 +2046,7 @@ def main() -> None:
         "sage_task_cache_enabled": False,
         "helper_contribution_summary_path": str(helper_contribution_path),
         "helper_contribution_artifact_path": str(helper_contribution_artifact_path),
-        "diagnostic_force_allowed": args.diagnostic_force_allowed,
+        "diagnostic_force_allowed": False,
         "active_diagnostic_force_env": sorted(active_force_env),
         "toolsandbox_clock_policy": "frozen"
         if args.freeze_toolsandbox_clock
@@ -2592,11 +2062,11 @@ def main() -> None:
         "dashboard_standard_url": dashboard_standard_url,
         "dashboard_task_focus_url": dashboard_task_focus_url,
         "dashboard_task_compare_url": dashboard_task_compare_url,
-        "dashboard_open_required": args.require_fresh_control,
+        "dashboard_open_required": True,
         "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
         if dashboard_open_receipt_path
         else None,
-        "parallel_arms": effective_parallel_arms,
+        "parallel_arms": True,
         "parallel_arm_execution": parallel_arm_execution,
         "reflection_control_delivery": reflection_control_delivery,
         "model_authored_generation_enabled": True,
@@ -2646,7 +2116,7 @@ def main() -> None:
             ),
             "external_fixture": external_fixture,
             "comparison_path": str(comparison_path),
-            "control_cache_mode": args.control_cache,
+            "control_cache_mode": "off",
             "control_source": control_cache_report.get("control_source"),
             "cached_control_tasks": control_cache_report.get("cached_control_tasks"),
             "fresh_control_tasks": control_cache_report.get("fresh_control_tasks"),
@@ -2654,7 +2124,7 @@ def main() -> None:
             "control_cache_manifest_hash": control_cache_report.get(
                 "cache_manifest_hash"
             ),
-            "fresh_control_required": args.require_fresh_control,
+            "fresh_control_required": True,
             "actor_selection_mode": ACTOR_SELECTION_MODE,
             "reporting_outcome_evaluator": reporting_outcome_evaluator,
             "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
@@ -2669,11 +2139,11 @@ def main() -> None:
             "dashboard_standard_url": dashboard_standard_url,
             "dashboard_task_focus_url": dashboard_task_focus_url,
             "dashboard_task_compare_url": dashboard_task_compare_url,
-            "dashboard_open_required": args.require_fresh_control,
+            "dashboard_open_required": True,
             "dashboard_open_receipt_path": str(dashboard_open_receipt_path)
             if dashboard_open_receipt_path
             else None,
-            "parallel_arms": effective_parallel_arms,
+            "parallel_arms": True,
             "parallel_arm_execution": parallel_arm_execution,
             "reflection_control_delivery": reflection_control_delivery,
             "mean_similarity_delta": comparison.get("mean_similarity_delta"),

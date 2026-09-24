@@ -2,6 +2,7 @@ import copy
 import json
 import ssl
 from pathlib import Path
+from queue import Queue
 from typing import Optional
 
 import pytest
@@ -20,6 +21,10 @@ from sage_ts.adapters.toolsandbox_adapter import (
     ToolSandboxRunConfig,
 )
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput, ToolSpec
+from sage_ts.orchestration.self_evolution_reflection import (
+    FRESH_CONTROL_COMPLETE_EVENT,
+    FRESH_CONTROL_ROW_EVENT,
+)
 from sage_ts.registry.manifest import RegistryEntry
 from sage_ts.registry.store import RegistryStore
 from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
@@ -519,6 +524,22 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
         "sage_ts.adapters.sage_run_adapter.run_scenario_sequence",
         fake_sequence,
     )
+    reflection_control_channel: Queue[dict[str, object]] = Queue()
+    reflection_control_channel.put(
+        {
+            "event": FRESH_CONTROL_ROW_EVENT,
+            "scenario": "toy_birth",
+            "row": {
+                "name": "toy_birth",
+                "similarity": 1.0,
+                "outcome_similarity": 1.0,
+                "llm_cached_call_count": 0,
+            },
+        }
+    )
+    reflection_control_channel.put(
+        {"event": FRESH_CONTROL_COMPLETE_EVENT, "scenario_count": 1}
+    )
 
     run_sage_with_registry(
         SageRunConfig(
@@ -528,6 +549,7 @@ def test_generation_enabled_registry_tools_do_not_capture_unpicklable_generator(
             output_dir=tmp_path / "outputs",
             registry_dir=store.root,
             manifest_path=manifest_path,
+            reflection_control_channel=reflection_control_channel,
         ),
         generator=UnpicklableGenerator(),  # type: ignore[arg-type]
     )

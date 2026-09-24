@@ -1,8 +1,7 @@
 """Online reflection and lifecycle policy for self-evolving SAGE runs.
 
-Publication runs compare post-task evaluator-derived scalars with exact
-same-run live control rows. The legacy cache comparator remains available only
-to non-publication callers. This controller does not receive raw expected
+Each publication task compares post-task evaluator-derived scalars with its
+exact same-run live control row. This controller does not receive raw expected
 answers, target state, or evaluator traces, but its outcome signals are computed
 upstream from benchmark contracts; it is therefore reward-feedback-driven, not
 globally label-free.
@@ -11,23 +10,15 @@ globally label-free.
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Empty
 from typing import Any
 
-from sage_ts.evaluation.control_baseline_cache import (
-    CACHE_ROOT,
-    ControlBaselineCache,
-    compatibility_context,
-)
 from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.store import RegistryStore
-from tool_sandbox.common.scenario import Scenario
 
-REFLECTION_CONTROL_CACHE_ROOT_ENV = "SAGE_SELF_EVOLVING_CONTROL_CACHE_ROOT"
 FRESH_CONTROL_ROW_EVENT = "fresh_control_row"
 FRESH_CONTROL_COMPLETE_EVENT = "fresh_control_complete"
 FRESH_CONTROL_ERROR_EVENT = "fresh_control_error"
@@ -55,19 +46,6 @@ def _online_feedback_outcome_with_source(
     if audited_outcome is not None:
         return audited_outcome, "audited_outcome_fallback"
     return None, "unavailable"
-
-
-def _online_feedback_outcome(row: dict[str, Any]) -> float | None:
-    """Return the outcome signal used only by lifecycle feedback.
-
-    New runs also carry the audited reporting outcome in ``outcome_similarity``.
-    Keeping this signal separate preserves the validated policy/lifecycle behavior
-    without publishing the legacy evaluator as the final performance endpoint.
-    Rows with unavailable paper-era feedback, including historical cached rows
-    that predate the explicit field, fall back to ``outcome_similarity``.
-    """
-
-    return _online_feedback_outcome_with_source(row)[0]
 
 
 def _mean(values: list[float]) -> float | None:
@@ -130,14 +108,10 @@ class ToolLifecycleStats:
 class SelfEvolutionReflectionController:
     store: RegistryStore
     output_dir: Path
-    agent: str
-    user: str
-    base_tool_policy: str
-    manifest_path: Path
-    control_cache: ControlBaselineCache | None
-    fresh_control_rows: dict[str, dict[str, Any]] | None = None
-    require_fresh_control: bool = False
-    fresh_control_channel: Any | None = field(default=None, repr=False)
+    fresh_control_channel: Any = field(repr=False)
+    fresh_control_rows: dict[str, dict[str, Any]] = field(
+        default_factory=dict, init=False
+    )
     fresh_control_stream_complete: bool = field(default=False, init=False)
     fresh_control_consumed: set[str] = field(default_factory=set)
     pulse_interval: int = 4
@@ -158,30 +132,10 @@ class SelfEvolutionReflectionController:
     retired_this_run: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
-        if (
-            self.fresh_control_rows is not None
-            and self.fresh_control_channel is not None
-        ):
+        if self.fresh_control_channel is None:
             raise ValueError(
-                "Strict fresh-control reflection accepts either completed rows or "
-                "a streaming channel, not both."
+                "Publication reflection requires a same-run fresh-control stream."
             )
-        if self.fresh_control_channel is not None and not self.require_fresh_control:
-            raise ValueError(
-                "A fresh-control streaming channel requires strict fresh-control "
-                "reflection."
-            )
-        if (
-            self.require_fresh_control
-            and self.fresh_control_rows is None
-            and self.fresh_control_channel is None
-        ):
-            raise ValueError(
-                "Strict fresh-control reflection requires same-run control rows or "
-                "a streaming channel."
-            )
-        if self.fresh_control_channel is not None:
-            self.fresh_control_rows = {}
 
     @classmethod
     def from_env(
@@ -189,108 +143,18 @@ class SelfEvolutionReflectionController:
         *,
         store: RegistryStore,
         output_dir: Path,
-        agent: str,
-        user: str,
-        base_tool_policy: str,
-        manifest_path: Path,
-        fresh_control_rows: dict[str, dict[str, Any]] | None = None,
-        require_fresh_control: bool = False,
-        fresh_control_channel: Any | None = None,
+        fresh_control_channel: Any,
     ) -> "SelfEvolutionReflectionController":
-        if fresh_control_rows is not None and fresh_control_channel is not None:
-            raise ValueError(
-                "Strict fresh-control reflection accepts either completed rows or "
-                "a streaming channel, not both."
-            )
-        if fresh_control_channel is not None and not require_fresh_control:
-            raise ValueError(
-                "A fresh-control streaming channel requires strict fresh-control "
-                "reflection."
-            )
-        if (
-            require_fresh_control
-            and fresh_control_rows is None
-            and fresh_control_channel is None
-        ):
-            raise ValueError(
-                "Strict fresh-control reflection requires same-run control rows or "
-                "a streaming channel."
-            )
-        control_cache: ControlBaselineCache | None = None
-        if not require_fresh_control:
-            cache_root = Path(
-                os.environ.get(REFLECTION_CONTROL_CACHE_ROOT_ENV, "") or CACHE_ROOT
-            )
-            control_cache = ControlBaselineCache(cache_root)
         controller = cls(
             store=store,
             output_dir=output_dir,
-            agent=agent,
-            user=user,
-            base_tool_policy=base_tool_policy,
-            manifest_path=manifest_path,
-            control_cache=control_cache,
-            fresh_control_rows=(
-                {name: dict(row) for name, row in fresh_control_rows.items()}
-                if fresh_control_rows is not None
-                else None
-            ),
-            require_fresh_control=require_fresh_control,
             fresh_control_channel=fresh_control_channel,
             pulse_interval=4,
             min_pulse_tasks=8,
             min_score_lift_percent=8.0,
             min_outcome_delta=0.12,
         )
-        controller._hydrate_from_existing_feedback()
         return controller
-
-    def _hydrate_from_existing_feedback(self) -> None:
-        """Restore cumulative lifecycle state after a resumable run restart."""
-        path = self.output_dir / "self_evolution_task_feedback.jsonl"
-        if not path.exists():
-            return
-        by_scenario: dict[str, dict[str, Any]] = {}
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if row.get("event") != "self_evolution_task_assessed":
-                continue
-            scenario = row.get("scenario")
-            if isinstance(scenario, str) and scenario:
-                by_scenario[scenario] = row
-
-        for row in by_scenario.values():
-            self._consume_resumed_fresh_control(row)
-            self._record_feedback_row(row)
-        if by_scenario:
-            self._write_current_state()
-
-    def _consume_resumed_fresh_control(self, feedback: dict[str, Any]) -> None:
-        if not self.require_fresh_control:
-            return
-        scenario_name = str(feedback.get("scenario") or "")
-        row = self._fresh_control_row(scenario_name, consume=False)
-        if feedback.get("control_source") != "same_run_fresh":
-            raise ValueError(
-                "Cannot resume strict fresh-control reflection from feedback "
-                f"without same-run provenance: {scenario_name!r}."
-            )
-        expected_score = _optional_float(row.get("similarity"))
-        expected_outcome = _online_feedback_outcome(row)
-        if _optional_float(feedback.get("control_score")) != expected_score:
-            raise ValueError(
-                f"Resumed fresh control score changed for {scenario_name!r}."
-            )
-        if _optional_float(feedback.get("control_outcome")) != expected_outcome:
-            raise ValueError(
-                f"Resumed fresh control outcome changed for {scenario_name!r}."
-            )
-        self.fresh_control_consumed.add(scenario_name)
 
     def _fresh_control_row(
         self,
@@ -298,13 +162,7 @@ class SelfEvolutionReflectionController:
         *,
         consume: bool = True,
     ) -> dict[str, Any]:
-        if self.fresh_control_rows is None:
-            raise ValueError("Same-run fresh control rows are not configured.")
-        if (
-            scenario_name
-            and scenario_name not in self.fresh_control_rows
-            and self.fresh_control_channel is not None
-        ):
+        if scenario_name and scenario_name not in self.fresh_control_rows:
             self._consume_streamed_control_message(expected_scenario=scenario_name)
         if not scenario_name or scenario_name not in self.fresh_control_rows:
             raise ValueError(
@@ -328,8 +186,6 @@ class SelfEvolutionReflectionController:
         *,
         expected_scenario: str | None,
     ) -> None:
-        if self.fresh_control_channel is None:
-            raise ValueError("Same-run fresh control streaming is not configured.")
         if self.fresh_control_stream_complete:
             if expected_scenario is None:
                 return
@@ -421,7 +277,7 @@ class SelfEvolutionReflectionController:
                 f"Streamed control row for {scenario_name!r} contains repository "
                 "whole-response replay."
             )
-        if scenario_name in (self.fresh_control_rows or {}):
+        if scenario_name in self.fresh_control_rows:
             raise ValueError(
                 f"Duplicate streamed same-run fresh control for {scenario_name!r}."
             )
@@ -435,10 +291,6 @@ class SelfEvolutionReflectionController:
                 "Out-of-order streamed same-run fresh control: expected "
                 f"{expected_scenario!r}, observed {scenario_name!r}."
             )
-        if self.fresh_control_rows is None:
-            raise AssertionError(
-                "Fresh-control stream row storage was not initialized."
-            )
         self.fresh_control_rows[scenario_name] = dict(row)
 
     def assert_fresh_control_complete(
@@ -446,15 +298,10 @@ class SelfEvolutionReflectionController:
         expected_scenarios: tuple[str, ...],
     ) -> None:
         """Fail closed unless reflection consumed one fresh row per candidate task."""
-        if not self.require_fresh_control:
-            return
-        if (
-            self.fresh_control_channel is not None
-            and not self.fresh_control_stream_complete
-        ):
+        if not self.fresh_control_stream_complete:
             self._consume_streamed_control_message(expected_scenario=None)
         expected = set(expected_scenarios)
-        available = set(self.fresh_control_rows or {})
+        available = set(self.fresh_control_rows)
         consumed = set(self.fresh_control_consumed)
         if len(expected) != len(expected_scenarios):
             raise ValueError("Candidate scenario list contains duplicate task names.")
@@ -481,10 +328,7 @@ class SelfEvolutionReflectionController:
         )
 
         self.completed_count += 1
-        if row.get("control_cache_hit", row.get("control_cache_eligible")):
-            self.cache_hit_count += 1
-        else:
-            self.cache_miss_count += 1
+        self.cache_miss_count += 1
 
         control_score = _optional_float(row.get("control_score"))
         score_delta = _optional_float(row.get("score_delta"))
@@ -593,7 +437,6 @@ class SelfEvolutionReflectionController:
         self,
         *,
         scenario_name: str,
-        baseline_scenario: Scenario,
         result: dict[str, Any],
         selection_record: dict[str, Any],
         side_effect_failures: list[str],
@@ -602,28 +445,10 @@ class SelfEvolutionReflectionController:
     ) -> None:
         """Record feedback and update lifecycle state at pulse boundaries."""
 
-        if self.require_fresh_control:
-            control_row = self._fresh_control_row(scenario_name)
-            control_source = "same_run_fresh"
-            control_available = True
-            control_reason = "exact_same_run_task_match"
-        else:
-            if self.control_cache is None:
-                raise ValueError("Legacy reflection requires a control baseline cache.")
-            lookup = self.control_cache.lookup(
-                compatibility_context(
-                    scenario_key=scenario_name,
-                    scenario=baseline_scenario,
-                    agent=self.agent,
-                    user=self.user,
-                    base_tool_policy=self.base_tool_policy,
-                    manifest_path=self.manifest_path,
-                )
-            )
-            control_row = lookup.row
-            control_source = "legacy_control_cache"
-            control_available = bool(lookup.eligible and lookup.row is not None)
-            control_reason = lookup.reason
+        control_row = self._fresh_control_row(scenario_name)
+        control_source = "same_run_fresh"
+        control_available = True
+        control_reason = "exact_same_run_task_match"
         control_score = None
         control_outcome = None
         control_outcome_source = "unavailable"
@@ -668,12 +493,8 @@ class SelfEvolutionReflectionController:
             "completed_count": self.completed_count + 1,
             "control_source": control_source,
             "control_baseline_available": control_available,
-            "control_cache_eligible": (
-                control_available if control_source == "legacy_control_cache" else False
-            ),
-            "control_cache_hit": (
-                control_available if control_source == "legacy_control_cache" else False
-            ),
+            "control_cache_eligible": False,
+            "control_cache_hit": False,
             "control_cache_reason": control_reason,
             "control_score": control_score,
             "candidate_score": candidate_score,

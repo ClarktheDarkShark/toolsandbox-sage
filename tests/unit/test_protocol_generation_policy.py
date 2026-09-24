@@ -7,17 +7,14 @@ import pytest
 
 from scripts.run_sage_protocol import (
     DIAGNOSTIC_FORCE_ENV_VARS,
+    MODES,
     PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION,
     PUBLICATION_GATE_PURPOSE_RELEASE_SAMPLE,
-    SAGE_POLICY_AUTO,
-    SAGE_POLICY_NONE,
     SAGE_POLICY_SELF_EVOLVING_PRAXIS,
     SELF_EVOLVING_PRAXIS_ENV_DEFAULTS,
     _apply_sage_policy_preset,
-    _generation_enabled_by_default,
     _protocol_gate_decision,
     _publication_gate_decisions,
-    _resolve_sage_policy_preset,
     _restore_registry_after_failed_gate,
     _route_mismatch_qualified,
     _snapshot_registry_for_gate,
@@ -42,40 +39,8 @@ def _restore_sage_environment() -> None:
                 os.environ[key] = value
 
 
-def test_discovery_manifest_enables_generation_in_transfer_mode() -> None:
-    assert (
-        _generation_enabled_by_default("transfer_40", "sage_diverse_cluster_discovery")
-        is True
-    )
-
-
-def test_transfer_mode_stays_frozen_for_non_discovery_manifest() -> None:
-    assert _generation_enabled_by_default("transfer_40", "frozen_transfer") is False
-
-
-def test_mechanism_mode_enables_generation_by_default() -> None:
-    assert _generation_enabled_by_default("mechanism_40", "anything") is True
-
-
-def test_auto_sage_policy_uses_praxis_for_generation_enabled_runs() -> None:
-    assert (
-        _resolve_sage_policy_preset(SAGE_POLICY_AUTO, generation_enabled=True)
-        == SAGE_POLICY_SELF_EVOLVING_PRAXIS
-    )
-
-
-def test_auto_sage_policy_stays_none_for_frozen_runs() -> None:
-    assert (
-        _resolve_sage_policy_preset(SAGE_POLICY_AUTO, generation_enabled=False)
-        == SAGE_POLICY_NONE
-    )
-
-
-def test_explicit_sage_policy_override_is_preserved() -> None:
-    assert (
-        _resolve_sage_policy_preset(SAGE_POLICY_NONE, generation_enabled=True)
-        == SAGE_POLICY_NONE
-    )
+def test_protocol_exposes_only_complete_paper_modes() -> None:
+    assert MODES == ("online_build_full", "full_benchmark")
 
 
 def test_self_evolving_praxis_policy_sets_tool_generation_runtime_defaults(
@@ -474,29 +439,6 @@ def test_strict_fresh_rows_require_exact_uncached_task_mapping(tmp_path) -> None
     assert mapped["task_a"]["outcome_similarity"] == 0.5
 
 
-def test_strict_publication_mode_rejects_every_partial_resume(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "run_sage_protocol.py",
-            "--mode",
-            "full_benchmark",
-            "--manifest",
-            "unused.json",
-            "--require-fresh-control",
-            "--parallel-arms",
-            "--resume-run-root",
-            "old-run",
-        ],
-    )
-
-    with pytest.raises(SystemExit, match="forbids --resume-run-root"):
-        run_protocol_main()
-
-
 @pytest.mark.parametrize("force_name", DIAGNOSTIC_FORCE_ENV_VARS)
 def test_strict_publication_mode_rejects_diagnostic_force_environment(
     monkeypatch,
@@ -512,13 +454,10 @@ def test_strict_publication_mode_rejects_diagnostic_force_environment(
             "online_build_full",
             "--manifest",
             "unused.json",
-            "--require-fresh-control",
-            "--parallel-arms",
-            "--diagnostic-force-allowed",
         ],
     )
 
-    with pytest.raises(SystemExit, match="forbidden during a strict publication"):
+    with pytest.raises(SystemExit, match="forbidden during a publication"):
         run_protocol_main()
 
 

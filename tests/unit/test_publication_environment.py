@@ -385,6 +385,8 @@ def test_publication_launcher_binds_environment_and_git_provenance() -> None:
     assert "git status --porcelain --untracked-files=all" in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/run_sage_protocol.py' in launcher
     assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py' in launcher
+    assert '"$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py' in launcher
+    assert '[[ "$PUBLICATION_GATE_PURPOSE" == "release-sample" ]]' in launcher
     for provenance_field in (
         "python_executable=",
         "python_version=",

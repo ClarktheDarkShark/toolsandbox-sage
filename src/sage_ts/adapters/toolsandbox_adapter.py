@@ -63,8 +63,6 @@ class ToolSandboxRunConfig:
     processes: int = 1
     run_type: str = "baseline"
     base_tool_policy: str = UPSTREAM_POLICY
-    resume_from_dir: Path | None = None
-    resume_completed_limit: int | None = None
 
 
 def git_sha() -> str | None:
@@ -85,9 +83,6 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
         "online_feedback_evaluator_version": ONLINE_FEEDBACK_EVALUATOR_VERSION,
         "timezone": os.environ.get("TZ"),
         "scenario_names": list(config.scenario_names),
-        "resume_from_dir": str(config.resume_from_dir)
-        if config.resume_from_dir
-        else None,
         "git_sha": git_sha(),
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -121,102 +116,6 @@ def _output_directory(config: ToolSandboxRunConfig) -> Path:
         / f"{config.run_type}_agent_{config.agent}_user_{config.user}_"
         f"{datetime.now().strftime('%m_%d_%Y_%H_%M_%S')}"
     )
-
-
-def _resume_rows(
-    resume_from_dir: Path | None,
-    *,
-    completed_limit: int | None = None,
-) -> list[dict[str, Any]]:
-    if resume_from_dir is None:
-        return []
-    for filename in ("result_summary.json", "live_result_summary.json"):
-        path = resume_from_dir / filename
-        if not path.is_file():
-            continue
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(payload, list):
-            rows = [row for row in payload if isinstance(row, dict)]
-            return rows[:completed_limit] if completed_limit is not None else rows
-        rows = payload.get("per_scenario_results")
-        if isinstance(rows, list):
-            parsed = [row for row in rows if isinstance(row, dict)]
-            return parsed[:completed_limit] if completed_limit is not None else parsed
-    return []
-
-
-def _copy_resume_artifacts(
-    resume_from_dir: Path | None,
-    output_directory: Path,
-    *,
-    completed_limit: int | None = None,
-) -> None:
-    if resume_from_dir is None or not resume_from_dir.exists():
-        return
-    warnings: list[dict[str, str]] = []
-    retained_rows = _resume_rows(resume_from_dir, completed_limit=completed_limit)
-    retained_names = {
-        str(row.get("name"))
-        for row in retained_rows
-        if str(row.get("name", "")).strip()
-    }
-
-    def record_warning(stage: str, src: Path, error: BaseException) -> None:
-        warnings.append(
-            {
-                "stage": stage,
-                "source": str(src),
-                "error_type": type(error).__name__,
-                "error": str(error),
-            }
-        )
-
-    trajectories = resume_from_dir / "trajectories"
-    if trajectories.exists() and os.environ.get(
-        "SAGE_TS_SKIP_RESUME_TRAJECTORY_COPY"
-    ) not in {"1", "true", "TRUE", "yes"}:
-        try:
-            if completed_limit is None:
-                shutil.copytree(
-                    trajectories,
-                    output_directory / "trajectories",
-                    dirs_exist_ok=True,
-                )
-            else:
-                target = output_directory / "trajectories"
-                target.mkdir(parents=True, exist_ok=True)
-                for scenario_name in retained_names:
-                    src = trajectories / scenario_name
-                    if src.exists():
-                        shutil.copytree(src, target / scenario_name, dirs_exist_ok=True)
-        except (OSError, shutil.Error) as exc:
-            record_warning("copy_trajectories", trajectories, exc)
-    for path in resume_from_dir.glob("*.jsonl"):
-        try:
-            if completed_limit is None:
-                shutil.copy2(path, output_directory / path.name)
-            else:
-                filtered_lines: list[str] = []
-                for line in path.read_text(encoding="utf-8").splitlines():
-                    try:
-                        row = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    scenario = row.get("scenario")
-                    if scenario in retained_names:
-                        filtered_lines.append(json.dumps(row, sort_keys=True))
-                if filtered_lines:
-                    (output_directory / path.name).write_text(
-                        "\n".join(filtered_lines) + "\n",
-                        encoding="utf-8",
-                    )
-        except OSError as exc:
-            record_warning("copy_jsonl", path, exc)
-    if warnings:
-        (output_directory / "resume_artifact_copy_warnings.json").write_text(
-            json.dumps(warnings, indent=2) + "\n",
-            encoding="utf-8",
-        )
 
 
 def _transient_scenario_retry_attempts() -> int:
@@ -412,11 +311,6 @@ def run_scenario_sequence(
     output_directory.mkdir(parents=True, exist_ok=True)
     install_llm_usage_tracking()
     reset_llm_usage(run_dir=output_directory, arm=config.run_type)
-    _copy_resume_artifacts(
-        config.resume_from_dir,
-        output_directory,
-        completed_limit=config.resume_completed_limit,
-    )
 
     name_to_scenario = (
         dict(scenarios)
@@ -432,22 +326,8 @@ def run_scenario_sequence(
             "The following requested scenarios were not provided: "
             f"{sorted(missing_scenarios)}"
         )
-    prior_by_name = {
-        str(row.get("name")): row
-        for row in _resume_rows(
-            config.resume_from_dir,
-            completed_limit=config.resume_completed_limit,
-        )
-        if row.get("name") in set(config.scenario_names)
-    }
-    result_summary: list[dict[str, Any]] = [
-        prior_by_name[name] for name in config.scenario_names if name in prior_by_name
-    ]
-    ordered_items = [
-        (name, name_to_scenario[name])
-        for name in config.scenario_names
-        if name not in prior_by_name
-    ]
+    result_summary: list[dict[str, Any]] = []
+    ordered_items = [(name, name_to_scenario[name]) for name in config.scenario_names]
     write_live_result_summary(
         output_directory=output_directory,
         result_summary=result_summary,
