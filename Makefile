@@ -40,7 +40,6 @@ test-core:
 		tests/unit/test_openai_toolsandbox_roles.py \
 		tests/unit/test_online_birth.py \
 		tests/unit/test_tool_generator.py \
-		tests/unit/test_control_baseline_cache.py \
 		tests/unit/test_self_evolution_reflection.py \
 		tests/unit/test_online_feedback_score.py \
 		tests/unit/test_outcome_score.py \
@@ -135,7 +134,7 @@ require-analysis-output:
 		(echo "Set ANALYSIS_OUTPUT to a new, timestamped output directory." >&2; exit 2)
 
 analyze: require-campaign-manifest require-analysis-output
-	$(COMMON_ENV) "$(PYTHON)" scripts/build_chapter4_evidence_dashboard.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/build_chapter4_evolution_dashboard.py \
 		--repo-root . \
 		--campaign-manifest "$(CAMPAIGN_MANIFEST)" \
 		--output-dir "$(ANALYSIS_OUTPUT)"
@@ -149,6 +148,6 @@ require-table-output:
 		(echo "Set TABLE_OUTPUT to a new, timestamped table directory." >&2; exit 2)
 
 render-paper: require-evidence-data require-table-output
-	$(COMMON_ENV) "$(PYTHON)" scripts/render_chapter4_evidence_tables.py \
+	$(COMMON_ENV) "$(PYTHON)" scripts/render_chapter4_evolution_tables.py \
 		--data "$(EVIDENCE_DATA)" \
 		--output-dir "$(TABLE_OUTPUT)"
