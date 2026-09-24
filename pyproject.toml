@@ -34,16 +34,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "anthropic==0.26.1",
+    "attrs==26.1.0",
     "ccy==2.0.0",
     "decorator==5.1.1",
     "dill==0.4.1",
     "geopy==2.4.1",
-    "google-cloud-aiplatform==1.149.0",
     "holidays==0.95",
     "httpx==0.28.1",
-    "huggingface-hub==1.10.1",
-    "jsonschema==4.23.0",
     "langchain-core==0.2.43",
     "networkx==3.3",
     "numpy==1.26.4",
@@ -57,11 +54,9 @@ dependencies = [
     "requests==2.33.1",
     "rouge-score==0.1.2",
     "scipy==1.13.1",
-    "sentencepiece==0.2.1",
     "StrEnum==0.4.15",
     "tenacity==8.5.0",
     "tqdm==4.67.3",
-    "transformers==5.7.0",
     "typing-extensions==4.15.0",
 ]
 
@@ -115,7 +110,6 @@ namespaces = false
 [tool.setuptools.package-data]
 "sage_ts.dashboard" = ["*.html"]
 "scripts.research" = ["chapter4_evidence_template.html"]
-"tool_sandbox.roles" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 addopts = ""

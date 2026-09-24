@@ -15,19 +15,9 @@ from tool_sandbox.common.execution_context import (
 )
 from tool_sandbox.common.scenario import Scenario
 from tool_sandbox.common.tool_discovery import ToolBackend
-from tool_sandbox.roles.anthropic_api_agent import (
-    ClaudeHaikuAgent,
-    ClaudeOpusAgent,
-    ClaudeSonnetAgent,
-)
 from tool_sandbox.roles.base_role import BaseRole
 from tool_sandbox.roles.cli_role import CliAgent, CliUser
-from tool_sandbox.roles.cohere_agent import CohereAgent
 from tool_sandbox.roles.execution_environment import ExecutionEnvironment
-from tool_sandbox.roles.gemini_agent import GeminiAgent
-from tool_sandbox.roles.gorilla_api_agent import GorillaAPIAgent
-from tool_sandbox.roles.hermes_api_agent import HermesAPIAgent
-from tool_sandbox.roles.mistral_api_agent import MistralOpenAIServerAgent
 from tool_sandbox.roles.openai_api_agent import (
     GPT_3_5_0125_Agent,
     GPT_4_0125_Agent,
@@ -43,53 +33,19 @@ from tool_sandbox.scenarios import named_scenarios
 
 
 class RoleImplType(StrEnum):
-    Hermes = auto()
-    Gorilla = auto()
     GPT_3_5_0125 = auto()
     GPT_4_0125 = auto()
     GPT_4_o_2024_05_13 = auto()
-    Claude_3_Opus = auto()
-    Claude_3_Sonnet = auto()
-    Claude_3_Haiku = auto()
-    Gemini_1_0 = auto()
-    Gemini_1_5 = auto()
-    Gemini_1_5_Flash = auto()
     Cli = auto()
     Deterministic = auto()
-    MistralOpenAIServer = auto()
-    Cohere_Command_R = auto()
-    Cohere_Command_R_Plus = auto()
     Unhelpful = auto()
 
 
 AGENT_TYPE_TO_FACTORY: dict[RoleImplType, Callable[..., BaseRole]] = {
-    RoleImplType.Hermes: lambda: HermesAPIAgent(
-        model_name="NousResearch/Hermes-2-Pro-Mistral-7B"
-    ),
-    RoleImplType.Gorilla: lambda: GorillaAPIAgent(
-        model_name="gorilla-llm/gorilla-openfunctions-v2"
-    ),
-    RoleImplType.MistralOpenAIServer: lambda: MistralOpenAIServerAgent(
-        model_name="mistralai/Mistral-7B-Instruct-v0.3"
-    ),
     RoleImplType.GPT_3_5_0125: GPT_3_5_0125_Agent,
     RoleImplType.GPT_4_0125: GPT_4_0125_Agent,
     RoleImplType.GPT_4_o_2024_05_13: GPT_4_o_2024_05_13_Agent,
-    RoleImplType.Claude_3_Opus: ClaudeOpusAgent,
-    RoleImplType.Claude_3_Sonnet: ClaudeSonnetAgent,
-    RoleImplType.Claude_3_Haiku: ClaudeHaikuAgent,
-    RoleImplType.Gemini_1_0: lambda: GeminiAgent(model_name="gemini-1.0-pro"),
-    RoleImplType.Gemini_1_5: lambda: GeminiAgent(model_name="gemini-1.5-pro-001"),
-    RoleImplType.Gemini_1_5_Flash: lambda: GeminiAgent(
-        model_name="gemini-1.5-flash-001"
-    ),
     RoleImplType.Cli: CliAgent,
-    RoleImplType.Cohere_Command_R: lambda: CohereAgent(
-        model_name="CohereForAI/c4ai-command-r-v01"
-    ),
-    RoleImplType.Cohere_Command_R_Plus: lambda: CohereAgent(
-        model_name="CohereForAI/c4ai-command-r-plus"
-    ),
     RoleImplType.Unhelpful: UnhelpfulAgent,
 }
 
