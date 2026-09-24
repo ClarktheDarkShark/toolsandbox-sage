@@ -48,7 +48,6 @@ dependencies = [
     "pint==0.25.3",
     "polars==0.20.31",
     "pydantic==2.13.4",
-    "pyyaml==6.0.3",
     "rapidfuzz==3.13.0",
     "requests==2.33.1",
     "rouge-score==0.1.2",
@@ -61,7 +60,6 @@ dependencies = [
 
 [project.optional-dependencies]
 publication = [
-    "matplotlib==3.10.9",
     "Pillow==11.3.0",
 ]
 dev = [

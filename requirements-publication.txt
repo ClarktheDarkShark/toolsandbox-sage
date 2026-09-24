@@ -10,7 +10,6 @@ geopy==2.4.1
 holidays==0.95
 httpx==0.28.1
 langchain-core==0.2.43
-matplotlib==3.10.9
 networkx==3.3
 numpy==1.26.4
 openai==2.37.0
@@ -19,7 +18,6 @@ Pillow==11.3.0
 pint==0.25.3
 polars==0.20.31
 pydantic==2.13.4
-pyyaml==6.0.3
 rapidfuzz==3.13.0
 requests==2.33.1
 rouge-score==0.1.2
