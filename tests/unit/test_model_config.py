@@ -1,6 +1,5 @@
 from sage_ts.config.models import (
     DEFAULT_MODEL,
-    LEGACY_MODEL,
     model_metadata,
     paired_model_metadata,
     supports_temperature,
@@ -9,7 +8,6 @@ from sage_ts.config.models import (
 
 def test_default_model_is_gpt_4o_mini() -> None:
     assert DEFAULT_MODEL == "gpt-4o-mini"
-    assert LEGACY_MODEL == "gpt-5-mini"
 
 
 def test_model_metadata_marks_gpt_4o_mini_for_comparisons() -> None:

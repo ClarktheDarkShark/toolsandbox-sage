@@ -8,7 +8,6 @@ from typing import Any
 _VALID_REASONING_EFFORTS = {"minimal", "low", "medium", "high"}
 
 DEFAULT_MODEL = "gpt-4o-mini"
-LEGACY_MODEL = "gpt-5-mini"
 
 MODEL_METADATA: dict[str, dict[str, Any]] = {
     "gpt-4o-mini": {

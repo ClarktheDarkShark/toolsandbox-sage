@@ -130,19 +130,6 @@ def _manifest_type(manifest: Path) -> str:
     return str(payload.get("manifest_type", ""))
 
 
-def _manifest_split_for_mode(mode: str) -> str:
-    """Map run modes to manifest split names.
-
-    ``full_benchmark`` remains a frozen validation mode, so the generation-enabled
-    whole-dataset build lane uses its own mode name while reading the same sealed
-    manifest split.
-    """
-
-    if mode == "online_build_full":
-        return "full_benchmark"
-    return mode
-
-
 DIAGNOSTIC_FORCE_ENV_VARS = (
     "SAGE_DIAGNOSTIC_EXPOSE_TOOL_NAME",
     "SAGE_DIAGNOSTIC_FORCE_TOOL_NAME",
@@ -1377,14 +1364,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if (
-        args.publication_gate_purpose == PUBLICATION_GATE_PURPOSE_CAMPAIGN_INCLUSION
-        and args.mode not in {"online_build_full", "full_benchmark"}
-    ):
-        raise SystemExit(
-            "--publication-gate-purpose campaign-inclusion is restricted to "
-            "complete publication benchmark modes."
-        )
     active_force_env = _active_diagnostic_force_env()
     if active_force_env:
         raise SystemExit(
@@ -1412,7 +1391,7 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 
-    split_name = _manifest_split_for_mode(args.mode)
+    split_name = "full_benchmark"
     scenario_names = tuple(load_split_names(args.manifest, split_name))
     benchmark_manifest_path = args.manifest.resolve()
     benchmark_manifest_sha256 = _digest_file(benchmark_manifest_path)
