@@ -1,11 +1,16 @@
 # Contribution Guide
 
-Thanks for your interest in contributing. This project was released to accompany a research paper for purposes of reproducibility, and beyond its publication there are limited plans for future development of the repository.
+Thanks for your interest in contributing. This project accompanies a research
+paper and is maintained primarily for reproducibility.
 
-While we welcome new pull requests and issues please note that our response may be limited. Forks and out-of-tree improvements are strongly encouraged.
+Issues that identify reproduction defects are welcome. Pull requests are not
+accepted until the author has selected and documented a license for the
+SAGE-authored portions of the repository.
 
 ## Before you get started
 
-By submitting a pull request, you represent that you have the right to license your contribution to Apple and the community, and agree by submitting the patch that your contributions are licensed under the [LICENSE](LICENSE).
+The root [LICENSE](LICENSE) is the inherited Apple license for upstream
+ToolSandbox portions. It does not establish contribution terms for SAGE.
 
-We ask that all community members read and observe our [Code of Conduct](CODE_OF_CONDUCT.md).
+All community members must read and observe the
+[Code of Conduct](CODE_OF_CONDUCT.md).

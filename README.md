@@ -269,5 +269,6 @@ September 16 framing.
 - `scripts/research/` — offline campaign aggregation, not production runtime
 - `tool_sandbox/` — upstream Apple benchmark code, excluded from SAGE line counts
 
-The SAGE additions build on Apple's ToolSandbox. See `LICENSE` and
-`ACKNOWLEDGEMENTS` for attribution and license terms.
+The SAGE additions build on Apple's ToolSandbox. See `LICENSE`,
+`ACKNOWLEDGEMENTS`, and `NOTICE.md` for attribution, license scope, and the two
+decisions that must be resolved before public redistribution.
