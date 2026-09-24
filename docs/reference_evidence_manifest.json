@@ -48,5 +48,17 @@
     "dashboard_html_sha256": "7473d7bc2b6fe3bfb5e42231797666f9d79f919738d767e4be7c7f63fcbbf41b",
     "contact_sheet_sha256": "703aa6fe5e791b65a8be4a7818dc574edb8eae674207d51a20cd5c52ecdd7b54"
   },
+  "public_reconstruction": {
+    "relative_root": "artifacts/publication_evidence/chapter4_current",
+    "evidence_data_sha256": "b2b1795b8c6497bece0436e674fd71d563ccd8fd75c6479d28bd77395235b8bc",
+    "dashboard_html_sha256": "f5a7a664b34964803fd1070655bba36ecfcc3597aadf0623adda205c8d0eb906",
+    "contact_sheet_sha256": "703aa6fe5e791b65a8be4a7818dc574edb8eae674207d51a20cd5c52ecdd7b54",
+    "normalization": [
+      "campaign.updated_at",
+      "campaign.updated_at_label",
+      "campaign.thresholds_path"
+    ],
+    "normalized_json_equal": true
+  },
   "provenance_note": "The current H2/H3 definitions and tests were committed after the selected runs completed; the historical ledger analysis is reproducible but retrospective."
 }

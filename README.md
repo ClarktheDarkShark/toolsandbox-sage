@@ -49,6 +49,8 @@ under the release contract tests those fixed rules prospectively.
 The selected cohort, replacement disclosures, endpoint identities, hashes,
 and paper-ready values are recorded in
 [`docs/sage_protocol/policy_production_final_evidence_20260916.md`](docs/sage_protocol/policy_production_final_evidence_20260916.md).
+The portable aggregate dashboard, evidence JSON, and manuscript tables are in
+[`artifacts/publication_evidence/chapter4_current/`](artifacts/publication_evidence/chapter4_current/).
 
 The detailed historical audit is in
 [`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
@@ -248,7 +250,9 @@ concurrently. Every pair receives a distinct preflighted dashboard port and
 opens Task Compare in the external browser. With `online-and-frozen`, the
 second wave evaluates each independently learned registry with generation and
 repair disabled. Verify and analyze completed campaign artifacts with
-`make verify-campaign`, `make analyze`, and `make render-paper`.
+`make verify-campaign`, `make analyze`, and `make render-paper`. The last two
+commands use the current H1--H3 reconstruction rather than the superseded
+September 16 framing.
 
 ## Source layout
 

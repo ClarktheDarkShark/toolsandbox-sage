@@ -43,7 +43,9 @@ not inputs to the runtime, analysis, dashboards, or manuscript build.
 
 The repository does not track the large raw 20-run cohort. Its immutable local
 location and hashes are recorded in the experiment contract and reference
-manifest. The source release therefore verifies the compact frozen inputs but
-cannot reconstruct the Chapter 4 aggregate without obtaining that cohort.
-Dashboard HTML and images are regenerated from the cohort by the maintained
-analysis commands in the main README.
+manifest. The source release therefore cannot independently recalculate the
+Chapter 4 aggregate without obtaining that cohort. It does include a portable,
+hash-receipted copy of the resulting [aggregate evidence dashboard, JSON, and
+tables](../artifacts/publication_evidence/chapter4_current/). Those files are
+regenerated from the raw cohort by the maintained analysis commands in the main
+README.
