@@ -174,6 +174,8 @@ artifacts/publication_cleanup_20260901/fixtures/*
 artifacts/publication_cleanup_20260901/analysis/*
 !artifacts/publication_cleanup_20260901/analysis/campaign_manifest.json
 !artifacts/publication_cleanup_20260901/analysis/chapter4_evidence_data.json
+!artifacts/publication_evidence/
+!artifacts/publication_evidence/**
 .sage_cache/
 persistent_prompt_cache/
 generated_tools/

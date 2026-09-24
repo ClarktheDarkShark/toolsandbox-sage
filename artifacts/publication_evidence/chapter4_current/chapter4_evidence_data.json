@@ -1,0 +1,5554 @@
+{
+  "schema_version": 3,
+  "campaign": {
+    "id": "chapter4_final_policy_selected_valid_cohort_20260916_4ce1c6d_evolution_hypotheses_20260921",
+    "model": "gpt-4o-mini",
+    "benchmark_label": "ToolSandbox complete 1,032-task benchmark",
+    "status_label": "Complete",
+    "completed_runs": 20,
+    "expected_runs": 20,
+    "completed_online_runs": 10,
+    "completed_frozen_runs": 10,
+    "excluded_completed_artifacts": 0,
+    "inference_complete": true,
+    "distribution_complete": true,
+    "analysis_role": "confirmatory_two_way_run_task_clustered",
+    "preregistered_inference_eligible": true,
+    "replication_accounting": {},
+    "study_design_notice": "",
+    "hypothesis_section_description": "",
+    "manifest_status": "complete",
+    "progress_percent": 100.0,
+    "progress_label": "20 of 20 verified runs included",
+    "recorded_task_progress": 20640,
+    "expected_task_progress": 20640,
+    "paired_observations": 10320,
+    "audited_current_matched_observations": 10320,
+    "paper_comparable_matched_observations": 8000,
+    "tasks_per_run": 1032,
+    "updated_at": "2026-09-24T17:10:38.380703+00:00",
+    "updated_at_label": "2026-09-24 13:10:38 EDT",
+    "benchmark_sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+    "baseline_cache": "",
+    "baseline_cache_policy": "prohibited; every arm executes a live matched control",
+    "claim_safeguards": {
+      "scenario_name_birth_disabled": true,
+      "scenario_name_routing_disabled": true,
+      "visible_task_context_only": true,
+      "synthetic_bridge_completions_disabled": true,
+      "diagnostic_force_calls_disabled": true,
+      "performance_endpoint_policy": "dual_scoped_outcome_endpoints",
+      "canonical_metric_policy": "descriptive_only_never_a_release_gate",
+      "sage_task_cache": "off",
+      "openai_response_cache": "disabled",
+      "openai_response_cache_scope": "persistent_repository_whole_response_replay",
+      "persistent_generation_output_cache": "disabled",
+      "generator_contract_and_repair_analysis_memoization": "within_run_only",
+      "openai_provider_prompt_prefix_cache": "automatic_implicit",
+      "execution_environment": {
+        "TZ": "America/New_York",
+        "SAGE_OPENAI_MAX_RETRIES": "5",
+        "SAGE_OPENAI_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
+        "SAGE_GENERATION_TRANSIENT_RETRY_DELAYS_SECONDS": "1,3",
+        "SAGE_TS_TRANSIENT_SCENARIO_RETRY_ATTEMPTS": "4",
+        "SAGE_OPENAI_REQUEST_TIMEOUT_SECONDS": "120",
+        "SAGE_GENERATION_OPENAI_REQUEST_TIMEOUT_SECONDS": "600"
+      },
+      "control_cache": "off",
+      "cross_run_failure_memory": "disabled",
+      "fresh_control_required": true,
+      "parallel_arms": true,
+      "release_sample_gate_purpose": "release-sample",
+      "replication_gate_purpose": "campaign-inclusion",
+      "replication_inclusion_policy": "integrity_provenance_completeness_only",
+      "observed_performance_controls_replication_inclusion": false,
+      "online_reflection_control": "same_run_fresh",
+      "online_registry_start": "empty",
+      "frozen_generation": "off",
+      "frozen_candidate_repair": "off"
+    },
+    "endpoint_policy": "dual_scoped_outcome_endpoints",
+    "inference_exclusion_reason": null,
+    "thresholds_path": "docs/sage_protocol/publication_validation_thresholds_v3.json",
+    "thresholds_sha256": "dcd5e4f3fb2191a68bd30bf2b7e24827d3fe626824d0b15bb741e314b00e67d5",
+    "hypothesis_framework": "reordered_evolution_h1_h2_h3_v1",
+    "primary_performance_hypothesis_id": "H1",
+    "primary_performance_threshold_percent": 10.0,
+    "replication_chart_subtitle": "Audited v9 all-task mean and H1 threshold",
+    "replication_chart_threshold_label": "H1 threshold: 10%",
+    "replication_chart_threshold_percent": 10.0,
+    "lower_section_title": "Replication Stability And Generated-Tool Evolution",
+    "lower_section_description": "Run-level outcome variation and generated-tool evidence remain visible.",
+    "source_campaign_manifest": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/final_selected_cohort/selected_cohort_manifest.json",
+    "source_campaign_manifest_sha256": "8cd359bebdc0f3576643d6d4850f0abe09fd3c05dafd50a62fc07d62c6425192"
+  },
+  "hypotheses": [
+    {
+      "id": "Hypothesis 1",
+      "title": "Improved Task Completion",
+      "analysis_role": "confirmatory_two_way_run_task_clustered",
+      "decision_rule": {
+        "target_contrast": "candidate_mean - 1.1 * control_mean",
+        "estimate_requirement": "audited_relative_outcome_lift_percent >= 10",
+        "two_way_uncertainty_requirement": "two_way_run_task_bootstrap_95_ci_lower_for_target_contrast > 0",
+        "run_cluster_requirement": "run_cluster_bootstrap_95_ci_lower_for_target_contrast > 0",
+        "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+        "replication_unit": "independently_evolved_registry_run",
+        "task_unit": "fixed_matched_benchmark_task",
+        "iid_task_analysis_role": "descriptive_only"
+      },
+      "estimate_percent": 33.670376901035944,
+      "confidence_interval": {
+        "level": 0.95,
+        "lower": 28.062518090290283,
+        "upper": 39.802985794523224,
+        "unit": "percent"
+      },
+      "threshold_percent": 10.0,
+      "sample_size": 10,
+      "matched_task_observations": 10320,
+      "baseline_mean": 0.5861757105943152,
+      "sage_mean": 0.7835432816537468,
+      "threshold_contrast": 0.13875000000000004,
+      "two_way_threshold_contrast_ci": {
+        "level": 0.95,
+        "lower": 0.10970134851421173,
+        "upper": 0.16826148659560716,
+        "unit": "score"
+      },
+      "run_threshold_contrast_ci": {
+        "level": 0.95,
+        "lower": 0.1308814801356589,
+        "upper": 0.14780523255813952,
+        "unit": "score"
+      },
+      "run_threshold_sign_flip_p": 0.001953125,
+      "decision": "supported",
+      "decision_label": "Supported",
+      "value_label": "+33.7%",
+      "primary_label": "Across ten independent registry runs, integrated SAGE increased mean route-independent outcome score.",
+      "claim_label": "A self-evolving AI agent using autonomous tool generation can improve task-completion accuracy by at least 10 percent over a non-learning AI agent on matched benchmark tasks.",
+      "evidence_label": "Ten independent online-build runs compare SAGE with a fresh matched control on the same 1,032 benchmark tasks.",
+      "observed_label": "Observed +33.7%",
+      "threshold_label": "Target >= 10%",
+      "fill_position": 67.34075380207189,
+      "target_position": 20.0,
+      "status": "supported",
+      "detail_id": "hypothesis:h1",
+      "detail": {
+        "eyebrow": "Primary hypothesis metric",
+        "title": "Hypothesis 1: Improved Task Completion",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Formula",
+                "value": "(SAGE outcome - baseline outcome) / baseline outcome"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.5862"
+              },
+              {
+                "label": "SAGE outcome",
+                "value": "0.7835"
+              },
+              {
+                "label": "Relative lift",
+                "value": "+33.7%"
+              },
+              {
+                "label": "Lift 95% two-way run/task bootstrap CI",
+                "value": "[+28.1%, +39.8%]"
+              },
+              {
+                "label": "10% target contrast",
+                "value": "+0.1388"
+              },
+              {
+                "label": "Decision threshold",
+                "value": ">= 10%"
+              },
+              {
+                "label": "Independent registry runs",
+                "value": "10"
+              },
+              {
+                "label": "Matched task observations",
+                "value": "10320"
+              }
+            ],
+            "note": "Support requires the point estimate to reach the target, both cluster-aware 95% lower bounds for the target contrast to exceed zero, and the two-sided run-level sign-flip p-value to be below .05."
+          },
+          {
+            "heading": "Confirmatory clustered inference",
+            "rows": [
+              {
+                "label": "Two-way target-contrast CI",
+                "value": "[+0.110, +0.168]"
+              },
+              {
+                "label": "Run-cluster target-contrast CI",
+                "value": "[+0.131, +0.148]"
+              },
+              {
+                "label": "Run-level target-contrast sign flip",
+                "value": "p = .002"
+              },
+              {
+                "label": "Two-way absolute-difference CI",
+                "value": "[+0.170, +0.225]"
+              }
+            ]
+          },
+          {
+            "heading": "Descriptive task-IID analysis",
+            "rows": [
+              {
+                "label": "Task-IID difference CI",
+                "value": "[+0.187, +0.208]"
+              },
+              {
+                "label": "Task-IID sign flip",
+                "value": "p < .001"
+              },
+              {
+                "label": "Task-IID target-contrast CI",
+                "value": "[+0.128, +0.149]"
+              },
+              {
+                "label": "Task-IID target-contrast sign flip",
+                "value": "p < .001"
+              },
+              {
+                "label": "Run-level raw-difference CI",
+                "value": "[+0.190, +0.206]"
+              },
+              {
+                "label": "Run-level raw-difference sign flip",
+                "value": "p = .002"
+              }
+            ],
+            "note": "These rows describe task-level precision and the raw positive-difference contrast. They do not determine the confirmatory H1 decision."
+          }
+        ]
+      }
+    },
+    {
+      "id": "Hypothesis 2",
+      "title": "Repairing Tools for Later Use",
+      "analysis_role": "preserved_ten_run_mechanism_analysis",
+      "decision_rule": {
+        "repair_conversion_requirement": "repaired_accepted / repair_entrants > 0.50",
+        "repair_cluster_ci_requirement": "run_cluster_bootstrap_95_ci_lower > 0.50",
+        "repair_run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+        "later_reuse_requirement": "repaired_reused_later / repaired_accepted >= 0.90",
+        "replication_unit": "independently_evolved_registry_run",
+        "tool_unit": "generated_tool_candidate_or_accepted_instance"
+      },
+      "estimate_percent": 65.21739130434783,
+      "confidence_interval": {
+        "level": 0.95,
+        "lower": 60.49382716049383,
+        "upper": 70.1300955988456,
+        "unit": "percent"
+      },
+      "secondary_estimate_percent": 100.0,
+      "secondary_confidence_interval": {
+        "level": 0.95,
+        "lower": 100.0,
+        "upper": 100.0,
+        "unit": "percent"
+      },
+      "threshold_percent": 50.0,
+      "secondary_threshold_percent": 90.0,
+      "sample_size": 161,
+      "independent_runs": 10,
+      "decision": "supported",
+      "decision_label": "Supported",
+      "value_label": "65.2%",
+      "primary_label": "105 of 161 failed candidates were repaired and admitted; all 105 were reused later.",
+      "claim_label": "More than half of generated-tool candidates that initially fail validation and enter autonomous repair will be corrected and admitted, and at least 90% of those repaired tools will be invoked on a later task.",
+      "evidence_label": "Birth and validation ledgers establish repair admission; ordered JIT birth, task-feedback, and invocation ledgers establish later reuse.",
+      "observed_label": "Repair 65.2% \u00b7 reuse 100.0%",
+      "threshold_label": "Targets >50% \u00b7 >=90%",
+      "fill_position": 65.21739130434783,
+      "target_position": 50.0,
+      "status": "supported",
+      "detail_id": "hypothesis:h2",
+      "detail": {
+        "eyebrow": "Generated-tool evolution hypothesis",
+        "title": "Hypothesis 2: Repairing Tools for Later Use",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Repair entrants",
+                "value": "161"
+              },
+              {
+                "label": "Corrected and admitted",
+                "value": "105"
+              },
+              {
+                "label": "Repair-to-admission rate",
+                "value": "65.2%"
+              },
+              {
+                "label": "Run-cluster bootstrap 95% CI",
+                "value": "[+60.5%, +70.1%]"
+              },
+              {
+                "label": "Run-level threshold sign flip",
+                "value": "p = .004"
+              },
+              {
+                "label": "Repaired tools invoked on a later task",
+                "value": "105 / 105"
+              },
+              {
+                "label": "Later-reuse rate",
+                "value": "100.0%"
+              },
+              {
+                "label": "Maximum repair attempts observed",
+                "value": "7"
+              },
+              {
+                "label": "Admission target",
+                "value": "> 50%"
+              },
+              {
+                "label": "Later-reuse target",
+                "value": ">= 90%"
+              }
+            ],
+            "note": "A repair entrant has repair_attempted=true, recorded initial validation errors, and at least one autonomous repair attempt. Later reuse requires an invocation on a task whose recorded order is after the tool's actual JIT birth task. The executed artifacts contain as many as seven repair attempts; that observed behavior, rather than a lower prose description, governs these counts."
+          },
+          {
+            "heading": "Replication-level evidence",
+            "table": {
+              "columns": [
+                "Run",
+                "Repair entrants",
+                "Admitted",
+                "Admission rate",
+                "Later reused",
+                "Reuse rate"
+              ],
+              "rows": [
+                [
+                  "R01",
+                  "16",
+                  "11",
+                  "68.8%",
+                  "11",
+                  "100.0%"
+                ],
+                [
+                  "R02",
+                  "17",
+                  "13",
+                  "76.5%",
+                  "13",
+                  "100.0%"
+                ],
+                [
+                  "R03",
+                  "15",
+                  "11",
+                  "73.3%",
+                  "11",
+                  "100.0%"
+                ],
+                [
+                  "R04",
+                  "20",
+                  "13",
+                  "65.0%",
+                  "13",
+                  "100.0%"
+                ],
+                [
+                  "R05",
+                  "13",
+                  "10",
+                  "76.9%",
+                  "10",
+                  "100.0%"
+                ],
+                [
+                  "R06",
+                  "14",
+                  "8",
+                  "57.1%",
+                  "8",
+                  "100.0%"
+                ],
+                [
+                  "R07",
+                  "14",
+                  "7",
+                  "50.0%",
+                  "7",
+                  "100.0%"
+                ],
+                [
+                  "R08",
+                  "19",
+                  "11",
+                  "57.9%",
+                  "11",
+                  "100.0%"
+                ],
+                [
+                  "R09",
+                  "17",
+                  "11",
+                  "64.7%",
+                  "11",
+                  "100.0%"
+                ],
+                [
+                  "R10",
+                  "16",
+                  "10",
+                  "62.5%",
+                  "10",
+                  "100.0%"
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Hypothesis 3",
+      "title": "Using Tools Across Task Types",
+      "analysis_role": "preserved_ten_run_mechanism_analysis",
+      "decision_rule": {
+        "estimate_requirement": "cross_family_tools / accepted_tools > 0.50",
+        "uncertainty_requirement": "run_cluster_bootstrap_95_ci_lower > 0.50",
+        "run_sign_flip_requirement": "two_sided_exact_p < 0.05",
+        "replication_unit": "independently_evolved_registry_run",
+        "tool_unit": "accepted_generated_tool_instance"
+      },
+      "estimate_percent": 57.54385964912281,
+      "confidence_interval": {
+        "level": 0.95,
+        "lower": 56.22775800711744,
+        "upper": 58.76288659793815,
+        "unit": "percent"
+      },
+      "threshold_percent": 50.0,
+      "sample_size": 285,
+      "independent_runs": 10,
+      "decision": "supported",
+      "decision_label": "Supported",
+      "value_label": "57.5%",
+      "primary_label": "164 of 285 accepted tools were invoked in a different semantic task family.",
+      "claim_label": "More than half of accepted generated tools will be invoked in a semantic task family different from the family that triggered their creation.",
+      "evidence_label": "The actual JIT birth task supplies the origin family; ordered later invocation tasks supply destination families.",
+      "observed_label": "Observed 57.5%",
+      "threshold_label": "Target > 50%",
+      "fill_position": 57.54385964912281,
+      "target_position": 50.0,
+      "status": "supported",
+      "detail_id": "hypothesis:h3",
+      "detail": {
+        "eyebrow": "Generated-tool evolution hypothesis",
+        "title": "Hypothesis 3: Using Tools Across Task Types",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Accepted generated-tool instances",
+                "value": "285"
+              },
+              {
+                "label": "Used in a different task family",
+                "value": "164"
+              },
+              {
+                "label": "Cross-family transfer rate",
+                "value": "57.5%"
+              },
+              {
+                "label": "Run-cluster bootstrap 95% CI",
+                "value": "[+56.2%, +58.8%]"
+              },
+              {
+                "label": "Run-level threshold sign flip",
+                "value": "p = .002"
+              },
+              {
+                "label": "Decision threshold",
+                "value": "> 50%"
+              }
+            ],
+            "note": "The triggering family is the base_family of the actual JIT birth scenario. A transfer requires a later invocation in a task with a different base_family. The generated capability's own family label is not used as the birth family."
+          },
+          {
+            "heading": "Replication-level evidence",
+            "table": {
+              "columns": [
+                "Run",
+                "Accepted tools",
+                "Cross-family tools",
+                "Rate"
+              ],
+              "rows": [
+                [
+                  "R01",
+                  "29",
+                  "17",
+                  "58.6%"
+                ],
+                [
+                  "R02",
+                  "29",
+                  "17",
+                  "58.6%"
+                ],
+                [
+                  "R03",
+                  "29",
+                  "16",
+                  "55.2%"
+                ],
+                [
+                  "R04",
+                  "28",
+                  "15",
+                  "53.6%"
+                ],
+                [
+                  "R05",
+                  "30",
+                  "18",
+                  "60.0%"
+                ],
+                [
+                  "R06",
+                  "28",
+                  "17",
+                  "60.7%"
+                ],
+                [
+                  "R07",
+                  "28",
+                  "16",
+                  "57.1%"
+                ],
+                [
+                  "R08",
+                  "27",
+                  "15",
+                  "55.6%"
+                ],
+                [
+                  "R09",
+                  "29",
+                  "17",
+                  "58.6%"
+                ],
+                [
+                  "R10",
+                  "28",
+                  "16",
+                  "57.1%"
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "performance_endpoints": {
+    "audited_current_all_tasks": {
+      "metric_field": "outcome_similarity",
+      "evaluator_version": "sage_outcome_contracts_v9",
+      "task_scope": "all_benchmark_tasks",
+      "task_count_per_run": 1032,
+      "matched_task_observations": 10320,
+      "baseline": 0.5861757105943152,
+      "sage": 0.7835432816537468,
+      "absolute_difference": 0.1973675710594316,
+      "relative_lift_percent": 33.670376901035944,
+      "delta_label": "+0.197",
+      "lift_label": "+33.7%",
+      "analysis_role": "current_same_run_hypothesis_endpoint",
+      "detail_id": "endpoint:audited-current-all-tasks",
+      "detail": {
+        "eyebrow": "Audited outcome endpoint",
+        "title": "Audited current endpoint: v9 on all 1,032 tasks",
+        "sections": [
+          {
+            "heading": "Exact endpoint identity",
+            "rows": [
+              {
+                "label": "Metric field",
+                "value": "outcome_similarity"
+              },
+              {
+                "label": "Evaluator version",
+                "value": "sage_outcome_contracts_v9"
+              },
+              {
+                "label": "Tasks per replication",
+                "value": "1032"
+              },
+              {
+                "label": "Matched observations",
+                "value": "10320"
+              }
+            ],
+            "note": "This complete-benchmark endpoint supplies the current same-run lift, confirmatory H1 analysis, and the selection-conditioned descriptive called-task analysis."
+          },
+          {
+            "heading": "Observed current results",
+            "rows": [
+              {
+                "label": "Fresh baseline mean",
+                "value": "0.5861757105943152"
+              },
+              {
+                "label": "SAGE mean",
+                "value": "0.7835432816537468"
+              },
+              {
+                "label": "Absolute difference",
+                "value": "+0.1974"
+              },
+              {
+                "label": "Relative lift",
+                "value": "+33.7%"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "paper_comparable_historical_subset": {
+      "metric_field": "online_feedback_outcome_similarity",
+      "evaluator_version": "sage_paper_outcome_contracts_v1",
+      "task_scope": "non_null_metric_rows_in_full_benchmark_order",
+      "task_count_per_run": 800,
+      "matched_task_observations": 8000,
+      "baseline": 0.4975352400166696,
+      "sage": 0.8003359706968236,
+      "absolute_difference": 0.302800730680154,
+      "relative_lift_percent": 60.860157497589285,
+      "historical_sage_mean": 0.7954070629777463,
+      "historical_sage_minimum": 0.776051529737963,
+      "historical_hybrid_control_mean": 0.4573418739172569,
+      "historical_original_control_mean": 0.4528026204750015,
+      "candidate_minus_historical_mean": 0.00492890771907728,
+      "delta_label": "+0.303",
+      "lift_label": "+60.9%",
+      "historical_delta_label": "+0.0049",
+      "analysis_role": "apples_to_apples_historical_comparison_only",
+      "detail_id": "endpoint:paper-comparable-historical-subset",
+      "detail": {
+        "eyebrow": "Historical-comparison endpoint",
+        "title": "Paper-comparable endpoint: v1 on the exact 800-task subset",
+        "sections": [
+          {
+            "heading": "Exact endpoint identity",
+            "rows": [
+              {
+                "label": "Metric field",
+                "value": "online_feedback_outcome_similarity"
+              },
+              {
+                "label": "Evaluator version",
+                "value": "sage_paper_outcome_contracts_v1"
+              },
+              {
+                "label": "Tasks per replication",
+                "value": "800"
+              },
+              {
+                "label": "Matched observations",
+                "value": "8000"
+              }
+            ],
+            "note": "Only the exact non-null v1 subset in frozen benchmark order is included. Values are never mixed with v9."
+          },
+          {
+            "heading": "Apples-to-apples historical comparison",
+            "rows": [
+              {
+                "label": "Current fresh baseline mean",
+                "value": "0.4975352400166696"
+              },
+              {
+                "label": "Current SAGE mean",
+                "value": "0.8003359706968236"
+              },
+              {
+                "label": "Archived paper SAGE mean",
+                "value": "0.7954070629777463"
+              },
+              {
+                "label": "Current minus archived SAGE mean",
+                "value": "+0.0049"
+              }
+            ],
+            "note": "The archived campaign remains provenance-invalid for final inference. This is a descriptive comparison under the same v1 evaluator and exact ordered 800-task subset."
+          }
+        ]
+      }
+    }
+  },
+  "performance": {
+    "baseline": 0.5861757105943152,
+    "sage": 0.7835432816537468,
+    "frozen_sage": 0.7761950904392766,
+    "outcome_delta": 0.1973675710594316,
+    "outcome_lift_percent": 33.670376901035944,
+    "canonical_baseline": 0.7431168893148553,
+    "canonical_sage": 0.8425246207499215,
+    "canonical_delta": 0.09940773143506634,
+    "canonical_lift_percent": 13.377132570182724,
+    "delta_label": "+0.197",
+    "outcome_lift_label": "+33.7%",
+    "canonical_lift_label": "+13.4%",
+    "detail_id": "panel:performance",
+    "detail": {
+      "eyebrow": "Evidence detail",
+      "title": "Overall matched performance",
+      "sections": [
+        {
+          "heading": "Audited v9 outcome (all 1,032 tasks per run)",
+          "rows": [
+            {
+              "label": "Baseline mean",
+              "value": "0.5862"
+            },
+            {
+              "label": "SAGE mean",
+              "value": "0.7835"
+            },
+            {
+              "label": "Absolute difference",
+              "value": "+0.1974"
+            },
+            {
+              "label": "Relative lift",
+              "value": "+33.7%"
+            }
+          ]
+        },
+        {
+          "heading": "Canonical/reference score",
+          "rows": [
+            {
+              "label": "Baseline mean",
+              "value": "0.7431"
+            },
+            {
+              "label": "SAGE mean",
+              "value": "0.8425"
+            },
+            {
+              "label": "Mean paired difference",
+              "value": "+0.0994"
+            },
+            {
+              "label": "Relative lift",
+              "value": "+13.4%"
+            }
+          ],
+          "note": "Canonical score is descriptive route-compatibility output only; it is never a performance or release criterion."
+        }
+      ]
+    }
+  },
+  "statistics": {
+    "mean_delta": 0.1973675710594316,
+    "analysis_role": "confirmatory_two_way_run_task_clustered",
+    "decision_rule": {
+      "target_contrast": "candidate_mean - 1.1 * control_mean",
+      "two_way_bootstrap_lower_must_exceed": 0.0,
+      "run_cluster_bootstrap_lower_must_exceed": 0.0,
+      "run_sign_flip_p_must_be_below": 0.05,
+      "iid_task_analysis_role": "descriptive_only"
+    },
+    "two_way_run_task_bootstrap_delta_ci": {
+      "level": 0.95,
+      "lower": 0.1703565083979327,
+      "upper": 0.22482255329457357,
+      "unit": "score"
+    },
+    "two_way_run_task_bootstrap_lift_ci": {
+      "level": 0.95,
+      "lower": 28.062518090290283,
+      "upper": 39.802985794523224,
+      "unit": "percent"
+    },
+    "two_way_run_task_bootstrap_threshold_contrast_ci": {
+      "level": 0.95,
+      "lower": 0.10970134851421173,
+      "upper": 0.16826148659560716,
+      "unit": "score"
+    },
+    "run_cluster_threshold_contrast_ci": {
+      "level": 0.95,
+      "lower": 0.1308814801356589,
+      "upper": 0.14780523255813952,
+      "unit": "score"
+    },
+    "run_threshold_contrast_sign_flip_p": 0.001953125,
+    "task_iid_bootstrap_ci": {
+      "level": 0.95,
+      "lower": 0.1872734980620155,
+      "upper": 0.20759871608527133,
+      "unit": "score"
+    },
+    "task_iid_sign_flip_p": 4.999750012499375e-05,
+    "task_iid_threshold_contrast_ci": {
+      "level": 0.95,
+      "lower": 0.1278587088178294,
+      "upper": 0.14938586078811364,
+      "unit": "score"
+    },
+    "task_iid_threshold_contrast_sign_flip_p": 4.999750012499375e-05,
+    "run_raw_difference_bootstrap_ci": {
+      "level": 0.95,
+      "lower": 0.18993842861757107,
+      "upper": 0.20606447835917313,
+      "unit": "score"
+    },
+    "run_raw_difference_sign_flip_p": 0.001953125,
+    "bootstrap_iterations": 10000,
+    "randomization_iterations": 20000,
+    "matched_task_observations": 10320,
+    "baseline_successes": 5516,
+    "sage_successes": 7530,
+    "independent_online_runs": 10,
+    "significance_alpha": 0.05,
+    "mean_delta_label": "+0.197",
+    "ci_label": "[+0.110, +0.168]",
+    "p_label": "p = .002",
+    "successes_label": "5,516 / 7,530",
+    "detail_id": "panel:statistics",
+    "detail": {
+      "eyebrow": "Evidence detail",
+      "title": "Paired audited-v9 statistical evidence",
+      "sections": [
+        {
+          "heading": "Confirmatory H1 clustered analysis",
+          "rows": [
+            {
+              "label": "Threshold contrast (SAGE - 1.1 x baseline)",
+              "value": "+0.1388"
+            },
+            {
+              "label": "Two-way run/task contrast 95% CI",
+              "value": "[+0.1097, +0.1683]"
+            },
+            {
+              "label": "Run-cluster contrast 95% CI",
+              "value": "[+0.1309, +0.1478]"
+            },
+            {
+              "label": "Run-level contrast sign flip",
+              "value": "p = .002"
+            },
+            {
+              "label": "Bootstrap iterations",
+              "value": "10,000"
+            },
+            {
+              "label": "Randomization iterations",
+              "value": "20,000"
+            },
+            {
+              "label": "Matched task observations",
+              "value": "10,320"
+            }
+          ],
+          "note": "The contrast tests the predeclared relative-lift target directly. H1 support requires both cluster-aware lower bounds above zero and the two-sided run-level sign-flip p-value below .05."
+        },
+        {
+          "heading": "Descriptive analyses (not decision criteria)",
+          "rows": [
+            {
+              "label": "Independent online-build runs",
+              "value": "10"
+            },
+            {
+              "label": "Two-way raw-difference 95% CI",
+              "value": "[+0.1704, +0.2248]"
+            },
+            {
+              "label": "Task-IID difference 95% CI",
+              "value": "[+0.1873, +0.2076]"
+            },
+            {
+              "label": "Task-IID sign-flip test",
+              "value": "p < .001"
+            },
+            {
+              "label": "Task-IID target-contrast 95% CI",
+              "value": "[+0.1279, +0.1494]"
+            },
+            {
+              "label": "Task-IID target-contrast sign flip",
+              "value": "p < .001"
+            },
+            {
+              "label": "Run-level raw-difference 95% CI",
+              "value": "[+0.1899, +0.2061]"
+            },
+            {
+              "label": "Run-level raw-difference sign flip",
+              "value": "p = .002"
+            }
+          ],
+          "note": "The task-IID rows do not treat repeated benchmark tasks across registries as independent confirmatory evidence."
+        }
+      ]
+    },
+    "h1_threshold_percent": 10.0,
+    "h1_threshold_multiplier": 1.1,
+    "h1_threshold_contrast": 0.13875000000000004,
+    "primary_hypothesis_id": "H1"
+  },
+  "integrity": {
+    "counts": {
+      "configuration_mismatches": 0,
+      "metadata_shortcut_violations": 0,
+      "bridge_shortcut_violations": 0,
+      "forced_call_violations": 0,
+      "shortcut_violations": 0,
+      "runtime_exceptions": 0,
+      "side_effect_flags": 16
+    },
+    "items": [
+      {
+        "label": "Same SAGE settings across runs",
+        "value": 0
+      },
+      {
+        "label": "Benchmark-metadata shortcut checks",
+        "value": 0
+      },
+      {
+        "label": "Code-based answer shortcut checks",
+        "value": 0
+      },
+      {
+        "label": "Diagnostic tool-call override checks",
+        "value": 0
+      },
+      {
+        "label": "Tool side-effect audit flags",
+        "value": 16
+      }
+    ],
+    "detail_id": "panel:integrity",
+    "detail": {
+      "eyebrow": "Evidence detail",
+      "title": "Evidence validity checks",
+      "sections": [
+        {
+          "heading": "Configuration and incident audit",
+          "table": {
+            "columns": [
+              "Run",
+              "Visible-context routing",
+              "Bridge disabled",
+              "Diagnostic override variables",
+              "SAGE digests",
+              "Runtime exceptions",
+              "Side effects"
+            ],
+            "rows": [
+              [
+                "R01",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "3"
+              ],
+              [
+                "R02",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "4"
+              ],
+              [
+                "R03",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R04",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "2"
+              ],
+              [
+                "R05",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R06",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R07",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R08",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R09",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ],
+              [
+                "R10",
+                "pass",
+                "pass",
+                "none",
+                "match",
+                "0",
+                "1"
+              ]
+            ]
+          },
+          "note": "A configuration violation is counted when a completed online-build run does not preserve the claim-grade safeguards."
+        }
+      ]
+    }
+  },
+  "tool_metrics": [
+    {
+      "label": "Repaired candidates admitted",
+      "value_label": "105 / 161",
+      "tone": "green",
+      "detail_id": "metric:repair_conversion",
+      "detail": {
+        "eyebrow": "Generated-tool evolution metric",
+        "title": "Repaired candidates admitted",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Repair entrants",
+                "value": "161"
+              },
+              {
+                "label": "Corrected and admitted",
+                "value": "105"
+              },
+              {
+                "label": "Conversion rate",
+                "value": "65.2%"
+              }
+            ],
+            "note": "Candidates with recorded initial validation failure that entered autonomous repair and were ultimately admitted."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Repaired tools reused later",
+      "value_label": "105 / 105",
+      "tone": "green",
+      "detail_id": "metric:repaired_later_reuse",
+      "detail": {
+        "eyebrow": "Generated-tool evolution metric",
+        "title": "Repaired tools reused later",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Admitted repaired tools",
+                "value": "105"
+              },
+              {
+                "label": "Invoked on a later task",
+                "value": "105"
+              },
+              {
+                "label": "Later-reuse rate",
+                "value": "100.0%"
+              }
+            ],
+            "note": "Admitted repaired tools with an invocation on a benchmark task ordered after their actual JIT birth task."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Cross-family transfers",
+      "value_label": "164 / 285",
+      "tone": "green",
+      "detail_id": "metric:cross_family_transfer",
+      "detail": {
+        "eyebrow": "Generated-tool evolution metric",
+        "title": "Cross-family transfers",
+        "sections": [
+          {
+            "heading": "Definition and result",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "285"
+              },
+              {
+                "label": "Cross-family tools",
+                "value": "164"
+              },
+              {
+                "label": "Transfer rate",
+                "value": "57.5%"
+              }
+            ],
+            "note": "Accepted generated-tool instances invoked after birth in at least one semantic task family different from the triggering task family."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Accepted tools",
+      "value_label": "285",
+      "tone": "",
+      "detail_id": "metric:accepted",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Accepted tools",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "285"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Tools accepted after source, held-out, negative, schema, and runtime validation."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Reused on later tasks",
+      "value_label": "274",
+      "tone": "green",
+      "detail_id": "metric:reused",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Reused on later tasks",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "274"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Accepted tool instances with at least one registry reuse event after birth."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Tool reuse rate",
+      "value_label": "96.1%",
+      "tone": "green",
+      "detail_id": "metric:reuse_rate",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Tool reuse rate",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "96.1%"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Accepted tool instances reused at least once divided by accepted tool instances."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Policy-directed tool calls",
+      "value_label": "8,024",
+      "tone": "",
+      "detail_id": "metric:calls",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Policy-directed tool calls",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "8,024"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Matched task scenarios containing a generated-tool call selected by the production actor policy, with diagnostic overrides disabled."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Called-task gains",
+      "value_label": "3,002",
+      "tone": "green",
+      "detail_id": "metric:gains",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Called-task gains",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "3,002"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Generated-tool-called scenarios with positive matched outcome difference; descriptive association only."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Preserved outcomes",
+      "value_label": "4,462",
+      "tone": "",
+      "detail_id": "metric:preserved",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Preserved outcomes",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "4,462"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Called generated-tool scenarios with zero matched outcome difference."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Called-task regressions",
+      "value_label": "761",
+      "tone": "amber",
+      "detail_id": "metric:regressions",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Called-task regressions",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "761"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Generated-tool-called scenarios with negative matched outcome difference; descriptive association only."
+          }
+        ]
+      }
+    },
+    {
+      "label": "Tool-call failure scenarios",
+      "value_label": "289",
+      "tone": "amber",
+      "detail_id": "metric:failures",
+      "detail": {
+        "eyebrow": "Generated-tool metric",
+        "title": "Tool-call failure scenarios",
+        "sections": [
+          {
+            "heading": "Definition",
+            "rows": [
+              {
+                "label": "Observed value",
+                "value": "289"
+              },
+              {
+                "label": "Completed online-build runs",
+                "value": "10"
+              }
+            ],
+            "note": "Matched scenarios containing at least one recorded failed generated-tool call across completed online-build runs."
+          }
+        ]
+      }
+    }
+  ],
+  "tool_failure_summary": {
+    "completed_online_runs": 10,
+    "failed_scenarios": 289,
+    "tools": [
+      {
+        "name": "apply_single_device_state_action",
+        "failed_scenarios": 271
+      },
+      {
+        "name": "plan_device_status_lookup",
+        "failed_scenarios": 6
+      },
+      {
+        "name": "extract_distance_result",
+        "failed_scenarios": 6
+      },
+      {
+        "name": "plan_contact_lookup_query",
+        "failed_scenarios": 4
+      },
+      {
+        "name": "select_record_by_timestamp_extreme",
+        "failed_scenarios": 1
+      },
+      {
+        "name": "select_message_content_by_recency",
+        "failed_scenarios": 1
+      }
+    ]
+  },
+  "runs": [
+    {
+      "replication": 1,
+      "label": "Replication 01",
+      "short_label": "R1",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64500/dashboard/task_compare.html",
+      "baseline_outcome": 0.6009366925064599,
+      "online_sage_outcome": 0.7842377260981911,
+      "frozen_sage_outcome": 0.7677648578811369,
+      "audited_current_outcome_lift_percent": 30.5025530771298,
+      "online_outcome_lift_percent": 30.5025530771298,
+      "paper_comparable_baseline_outcome": 0.4983621780824174,
+      "paper_comparable_sage_outcome": 0.8037670397062254,
+      "paper_comparable_outcome_lift_percent": 61.281709378295005,
+      "paper_comparable_candidate_minus_historical_mean": 0.008359976728479102,
+      "frozen_gain_retention_percent": 91.01321585903088,
+      "detail_id": "run:1",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 01",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.601"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.784"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+30.5%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.768"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "91.0%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.498"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.804"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+61.3%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0084"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "29"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1945"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "794"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "50"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64500/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64530/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 2,
+      "label": "Replication 02",
+      "short_label": "R2",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64501/dashboard/task_compare.html",
+      "baseline_outcome": 0.5704941860465116,
+      "online_sage_outcome": 0.7999031007751938,
+      "frozen_sage_outcome": 0.7697835917312661,
+      "audited_current_outcome_lift_percent": 40.212314225053085,
+      "online_outcome_lift_percent": 40.212314225053085,
+      "paper_comparable_baseline_outcome": 0.4918839592763568,
+      "paper_comparable_sage_outcome": 0.805237533622853,
+      "paper_comparable_outcome_lift_percent": 63.70477598161393,
+      "paper_comparable_candidate_minus_historical_mean": 0.00983047064510667,
+      "frozen_gain_retention_percent": 86.87082013375571,
+      "detail_id": "run:2",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 02",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.570"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.800"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+40.2%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.770"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "86.9%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.492"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.805"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+63.7%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0098"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "29"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1994"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "802"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "39"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64501/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64531/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 3,
+      "label": "Replication 03",
+      "short_label": "R3",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64502/dashboard/task_compare.html",
+      "baseline_outcome": 0.595203488372093,
+      "online_sage_outcome": 0.7964308785529716,
+      "frozen_sage_outcome": 0.7798772609819121,
+      "audited_current_outcome_lift_percent": 33.80816714150047,
+      "online_outcome_lift_percent": 33.80816714150047,
+      "paper_comparable_baseline_outcome": 0.4863135043813706,
+      "paper_comparable_sage_outcome": 0.7926060425220531,
+      "paper_comparable_outcome_lift_percent": 62.98252780997948,
+      "paper_comparable_candidate_minus_historical_mean": -0.002801020455693193,
+      "frozen_gain_retention_percent": 91.7736757624398,
+      "detail_id": "run:3",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 03",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.595"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.796"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+33.8%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.780"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "91.8%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.486"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.793"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+63.0%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "-0.0028"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "29"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1915"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "832"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "10"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64502/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64532/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 4,
+      "label": "Replication 04",
+      "short_label": "R4",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64520/dashboard/task_compare.html",
+      "baseline_outcome": 0.5927002583979328,
+      "online_sage_outcome": 0.7768895348837209,
+      "frozen_sage_outcome": 0.7680878552971576,
+      "audited_current_outcome_lift_percent": 31.07629427792915,
+      "online_outcome_lift_percent": 31.07629427792915,
+      "paper_comparable_baseline_outcome": 0.5017626248397911,
+      "paper_comparable_sage_outcome": 0.7885166968103416,
+      "paper_comparable_outcome_lift_percent": 57.14934867101928,
+      "paper_comparable_candidate_minus_historical_mean": -0.006890366167404682,
+      "frozen_gain_retention_percent": 95.22139412538361,
+      "detail_id": "run:4",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 04",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.593"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.777"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+31.1%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.768"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "95.2%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.502"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.789"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+57.1%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "-0.0069"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "28"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1968"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "803"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "32"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64520/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64533/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 5,
+      "label": "Replication 05",
+      "short_label": "R5",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64504/dashboard/task_compare.html",
+      "baseline_outcome": 0.5976259689922481,
+      "online_sage_outcome": 0.779796511627907,
+      "frozen_sage_outcome": 0.7709948320413437,
+      "audited_current_outcome_lift_percent": 30.482367247669234,
+      "online_outcome_lift_percent": 30.482367247669234,
+      "paper_comparable_baseline_outcome": 0.502175191546107,
+      "paper_comparable_sage_outcome": 0.8037140205490156,
+      "paper_comparable_outcome_lift_percent": 60.04654034671144,
+      "paper_comparable_candidate_minus_historical_mean": 0.008306957571269313,
+      "frozen_gain_retention_percent": 95.16843971631207,
+      "detail_id": "run:5",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 05",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.598"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.780"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+30.5%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.771"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "95.2%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.502"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.804"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+60.0%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0083"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "30"
+              },
+              {
+                "label": "Reuse events",
+                "value": "2001"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "833"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "12"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64504/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:65110/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 6,
+      "label": "Replication 06",
+      "short_label": "R6",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64505/dashboard/task_compare.html",
+      "baseline_outcome": 0.5838985788113694,
+      "online_sage_outcome": 0.7848837209302325,
+      "frozen_sage_outcome": 0.7880329457364341,
+      "audited_current_outcome_lift_percent": 34.42124187525931,
+      "online_outcome_lift_percent": 34.42124187525931,
+      "paper_comparable_baseline_outcome": 0.4960442937800151,
+      "paper_comparable_sage_outcome": 0.8106320929055287,
+      "paper_comparable_outcome_lift_percent": 63.41929603266973,
+      "paper_comparable_candidate_minus_historical_mean": 0.015225029927782407,
+      "frozen_gain_retention_percent": 101.56689433507435,
+      "detail_id": "run:6",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 06",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.584"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.785"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+34.4%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.788"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "101.6%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.496"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.811"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+63.4%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0152"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "28"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1932"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "789"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "9"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64505/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64535/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 7,
+      "label": "Replication 07",
+      "short_label": "R7",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64506/dashboard/task_compare.html",
+      "baseline_outcome": 0.57453165374677,
+      "online_sage_outcome": 0.7678456072351421,
+      "frozen_sage_outcome": 0.7734980620155039,
+      "audited_current_outcome_lift_percent": 33.64722417427969,
+      "online_outcome_lift_percent": 33.64722417427969,
+      "paper_comparable_baseline_outcome": 0.49929582936336436,
+      "paper_comparable_sage_outcome": 0.7847493984938047,
+      "paper_comparable_outcome_lift_percent": 57.171230429545695,
+      "paper_comparable_candidate_minus_historical_mean": -0.010657664483941676,
+      "frozen_gain_retention_percent": 102.92397660818715,
+      "detail_id": "run:7",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 07",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.575"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.768"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+33.6%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.773"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "102.9%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.499"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.785"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+57.2%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "-0.0107"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "28"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1863"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "785"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "49"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64506/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64536/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 8,
+      "label": "Replication 08",
+      "short_label": "R8",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64507/dashboard/task_compare.html",
+      "baseline_outcome": 0.5763888888888888,
+      "online_sage_outcome": 0.7720445736434108,
+      "frozen_sage_outcome": 0.780281007751938,
+      "audited_current_outcome_lift_percent": 33.945082656206225,
+      "online_outcome_lift_percent": 33.945082656206225,
+      "paper_comparable_baseline_outcome": 0.4950373773310075,
+      "paper_comparable_sage_outcome": 0.7891237145425515,
+      "paper_comparable_outcome_lift_percent": 59.40689545446236,
+      "paper_comparable_candidate_minus_historical_mean": -0.0062833484351948465,
+      "frozen_gain_retention_percent": 104.20965744944284,
+      "detail_id": "run:8",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 08",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.576"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.772"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+33.9%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.780"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "104.2%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.495"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.789"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+59.4%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "-0.0063"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "27"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1932"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "803"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "31"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64507/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64537/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 9,
+      "label": "Replication 09",
+      "short_label": "R9",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64508/dashboard/task_compare.html",
+      "baseline_outcome": 0.5853520671834626,
+      "online_sage_outcome": 0.7848837209302325,
+      "frozen_sage_outcome": 0.7683301033591731,
+      "audited_current_outcome_lift_percent": 34.087460339357136,
+      "online_outcome_lift_percent": 34.087460339357136,
+      "paper_comparable_baseline_outcome": 0.5059658565448666,
+      "paper_comparable_sage_outcome": 0.81436104826285,
+      "paper_comparable_outcome_lift_percent": 60.95177920185143,
+      "paper_comparable_candidate_minus_historical_mean": 0.018953985285103725,
+      "frozen_gain_retention_percent": 91.70376365843788,
+      "detail_id": "run:9",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 09",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.585"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.785"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+34.1%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.768"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "91.7%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.506"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.814"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+61.0%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0190"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "29"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1945"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "802"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "45"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64508/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64538/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "replication": 10,
+      "label": "Replication 10",
+      "short_label": "R10",
+      "status_label": "Online + frozen complete",
+      "online_inference_eligible": true,
+      "frozen_inference_eligible": true,
+      "dashboard_url": "http://127.0.0.1:64509/dashboard/task_compare.html",
+      "baseline_outcome": 0.584625322997416,
+      "online_sage_outcome": 0.7885174418604651,
+      "frozen_sage_outcome": 0.7953003875968992,
+      "audited_current_outcome_lift_percent": 34.87569060773482,
+      "online_outcome_lift_percent": 34.87569060773482,
+      "paper_comparable_baseline_outcome": 0.49851158502139953,
+      "paper_comparable_sage_outcome": 0.810652119553013,
+      "paper_comparable_outcome_lift_percent": 62.614499624560224,
+      "paper_comparable_candidate_minus_historical_mean": 0.015245056575266647,
+      "frozen_gain_retention_percent": 103.32673267326733,
+      "detail_id": "run:10",
+      "detail": {
+        "eyebrow": "Full-dataset replication",
+        "title": "Replication 10",
+        "sections": [
+          {
+            "heading": "Audited current endpoint (v9, all 1,032 tasks)",
+            "rows": [
+              {
+                "label": "Online-build task completion",
+                "value": "1032/1032"
+              },
+              {
+                "label": "Baseline outcome",
+                "value": "0.585"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.789"
+              },
+              {
+                "label": "Online-build outcome lift",
+                "value": "+34.9%"
+              },
+              {
+                "label": "Frozen-registry SAGE outcome",
+                "value": "0.795"
+              },
+              {
+                "label": "Frozen gain retention",
+                "value": "103.3%"
+              }
+            ]
+          },
+          {
+            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "rows": [
+              {
+                "label": "Fresh baseline outcome",
+                "value": "0.499"
+              },
+              {
+                "label": "Online-build SAGE outcome",
+                "value": "0.811"
+              },
+              {
+                "label": "Same-run relative lift",
+                "value": "+62.6%"
+              },
+              {
+                "label": "SAGE minus historical SAGE mean",
+                "value": "+0.0152"
+              }
+            ],
+            "note": "This v1 subset is used only for an apples-to-apples descriptive comparison with the archived paper campaign. It is not mixed with the v9 all-task hypothesis analysis."
+          },
+          {
+            "heading": "Tool lifecycle",
+            "rows": [
+              {
+                "label": "Accepted tools",
+                "value": "28"
+              },
+              {
+                "label": "Reuse events",
+                "value": "1789"
+              },
+              {
+                "label": "Generated-tool-called tasks",
+                "value": "781"
+              },
+              {
+                "label": "Generated-tool failure scenarios",
+                "value": "12"
+              },
+              {
+                "label": "Runtime exceptions",
+                "value": "0"
+              }
+            ]
+          },
+          {
+            "heading": "Run configuration",
+            "rows": [
+              {
+                "label": "Actor model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "User model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation model",
+                "value": "gpt-4o-mini"
+              },
+              {
+                "label": "Generation enabled",
+                "value": "enabled"
+              },
+              {
+                "label": "Complete/native-action tools",
+                "value": "enabled"
+              },
+              {
+                "label": "Synthetic bridge completions",
+                "value": "disabled"
+              },
+              {
+                "label": "Scenario-name birth/routing",
+                "value": "disabled / disabled"
+              },
+              {
+                "label": "Control cache",
+                "value": "off: 0 cached / 1032 fresh"
+              }
+            ]
+          },
+          {
+            "heading": "Run dashboards",
+            "links": [
+              {
+                "label": "Open online-build Task Compare",
+                "href": "http://127.0.0.1:64509/dashboard/task_compare.html"
+              },
+              {
+                "label": "Open frozen-registry Task Compare",
+                "href": "http://127.0.0.1:64539/dashboard/task_compare.html"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "tools": [
+    {
+      "name": "prepare_reminder_creation_args",
+      "calls": 952,
+      "later_calls": 958,
+      "gains": 836,
+      "regressions": 0,
+      "preserved": 116,
+      "failures": 0,
+      "mean_outcome_delta": 0.8781512605042017,
+      "mean_outcome_delta_label": "+0.878",
+      "detail_id": "tool:prepare_reminder_creation_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_reminder_creation_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "952"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "958"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "836"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "116"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.878"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "10"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "026f68830fb9, 2ed5179c59c8, 691bf8cbc511, 89aa8cc8f65b, 99d61ea9922e, a777cf3fa4a1, ad1dcaee1fe3, bd21524be36a, e90e91e0fc21, ef5807cc2bf8"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "relative_day_time_to_timestamp",
+      "calls": 798,
+      "later_calls": 906,
+      "gains": 651,
+      "regressions": 0,
+      "preserved": 147,
+      "failures": 0,
+      "mean_outcome_delta": 0.8157894736842105,
+      "mean_outcome_delta_label": "+0.816",
+      "detail_id": "tool:relative_day_time_to_timestamp",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "relative_day_time_to_timestamp",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "798"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "906"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "651"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "147"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.816"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "3"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "671888cce8d4, 960acb0cd81a, ea908e1576d4"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_safe_action_or_abstain",
+      "calls": 1360,
+      "later_calls": 3326,
+      "gains": 711,
+      "regressions": 64,
+      "preserved": 585,
+      "failures": 0,
+      "mean_outcome_delta": 0.47573529411764703,
+      "mean_outcome_delta_label": "+0.476",
+      "detail_id": "tool:prepare_safe_action_or_abstain",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_safe_action_or_abstain",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "1360"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "3326"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "711"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "64"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "585"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.476"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "7"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "26b756379037, 3c90e75137b1, 5e207ddc2f42, 6c58f336162e, c57fcd4be548, cedb2139c3f8, fef5556bff33"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_specific_location_search_args",
+      "calls": 860,
+      "later_calls": 1615,
+      "gains": 450,
+      "regressions": 113,
+      "preserved": 297,
+      "failures": 0,
+      "mean_outcome_delta": 0.4095930232558139,
+      "mean_outcome_delta_label": "+0.410",
+      "detail_id": "tool:prepare_specific_location_search_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_specific_location_search_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "860"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "1615"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "450"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "113"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "297"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.410"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "3"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "148e12edaa77, 79b8f557133f, 817aad52e498"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "next_weekday_time_to_timestamp",
+      "calls": 313,
+      "later_calls": 316,
+      "gains": 292,
+      "regressions": 0,
+      "preserved": 21,
+      "failures": 0,
+      "mean_outcome_delta": 0.9329073482428115,
+      "mean_outcome_delta_label": "+0.933",
+      "detail_id": "tool:next_weekday_time_to_timestamp",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "next_weekday_time_to_timestamp",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "313"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "316"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "292"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "21"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.933"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "2"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "1ab7c4c9e76a, c017b6d9ec79"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_contact_lookup_query",
+      "calls": 888,
+      "later_calls": 1157,
+      "gains": 293,
+      "regressions": 57,
+      "preserved": 538,
+      "failures": 4,
+      "mean_outcome_delta": 0.16047297297297297,
+      "mean_outcome_delta_label": "+0.160",
+      "detail_id": "tool:plan_contact_lookup_query",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_contact_lookup_query",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "888"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "1157"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "293"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "57"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "538"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.160"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "7"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "2479876a3da5, 4469558a5045, 51b599442be0, 6eabfd85422d, 7c245b098681, ab36f4d6b827, fa5a0aeadeb6"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "4"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "select_message_counterparty_for_contact_update",
+      "calls": 259,
+      "later_calls": 326,
+      "gains": 211,
+      "regressions": 4,
+      "preserved": 44,
+      "failures": 0,
+      "mean_outcome_delta": 0.525096525096525,
+      "mean_outcome_delta_label": "+0.525",
+      "detail_id": "tool:select_message_counterparty_for_contact_update",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "select_message_counterparty_for_contact_update",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "259"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "326"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "211"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "4"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "44"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.525"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "9"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "9"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "0d92cd37dae7, 37b276be0215, 467f3ee03a90, 5d6703682b65, 97202080e513, a4523acc68a1, b0a9b732c79b, c17ee5c46cb1, fcafda8e7a0b"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "select_message_content_by_recency",
+      "calls": 620,
+      "later_calls": 872,
+      "gains": 127,
+      "regressions": 5,
+      "preserved": 488,
+      "failures": 1,
+      "mean_outcome_delta": 0.1967741935483871,
+      "mean_outcome_delta_label": "+0.197",
+      "detail_id": "tool:select_message_content_by_recency",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "select_message_content_by_recency",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "620"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "872"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "127"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "5"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "488"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.197"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "9"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "0cb31395b1e9, 3a585ce587b4, 4e2590183fc1, 6ecd8ee5b4f5, 96af663d2369, b1652edcafdc, b9f991d1303d, bd2521280165, ff3ae0a0c1af"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "1"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_distance_result",
+      "calls": 131,
+      "later_calls": 177,
+      "gains": 99,
+      "regressions": 4,
+      "preserved": 28,
+      "failures": 6,
+      "mean_outcome_delta": 0.7251908396946565,
+      "mean_outcome_delta_label": "+0.725",
+      "detail_id": "tool:extract_distance_result",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_distance_result",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "131"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "177"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "99"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "4"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "28"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.725"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R05, R06, R07, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "8"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "4"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "6b5400ae63d1, 8ea2ac509d15, 91d63478ae79, a2a9aed873c4"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "6"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_send_message_contact_lookup",
+      "calls": 212,
+      "later_calls": 199,
+      "gains": 202,
+      "regressions": 3,
+      "preserved": 7,
+      "failures": 0,
+      "mean_outcome_delta": 0.369496855345912,
+      "mean_outcome_delta_label": "+0.369",
+      "detail_id": "tool:plan_send_message_contact_lookup",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_send_message_contact_lookup",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "212"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "199"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "202"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "3"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "7"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.369"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "9"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "6"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "41dd3229f20b, 798a434cb4d5, 852231d12ea1, 8643aca73a9a, 9fa783168784, c05a6d49c8de"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "1"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_phone_number_result",
+      "calls": 80,
+      "later_calls": 187,
+      "gains": 76,
+      "regressions": 0,
+      "preserved": 4,
+      "failures": 0,
+      "mean_outcome_delta": 0.95,
+      "mean_outcome_delta_label": "+0.950",
+      "detail_id": "tool:extract_phone_number_result",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_phone_number_result",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "80"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "187"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "76"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "4"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.950"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "4"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "08c43a7697ee, 2d0eefcd9a94, 620fe21ddddb, 8f0467f9c7f5"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "select_record_by_timestamp_extreme",
+      "calls": 664,
+      "later_calls": 847,
+      "gains": 144,
+      "regressions": 71,
+      "preserved": 449,
+      "failures": 1,
+      "mean_outcome_delta": 0.10993975903614457,
+      "mean_outcome_delta_label": "+0.110",
+      "detail_id": "tool:select_record_by_timestamp_extreme",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "select_record_by_timestamp_extreme",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "664"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "847"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "144"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "71"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "449"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.110"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "5"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "3bfe4dcedf37, 4d795141ac5b, 8ecdaeec3a5e, bc7e893dfa1f, f1060c1dbdc2"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "1"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_contact_relationship_batch_update",
+      "calls": 319,
+      "later_calls": 720,
+      "gains": 110,
+      "regressions": 0,
+      "preserved": 209,
+      "failures": 0,
+      "mean_outcome_delta": 0.2084639498432602,
+      "mean_outcome_delta_label": "+0.208",
+      "detail_id": "tool:plan_contact_relationship_batch_update",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_contact_relationship_batch_update",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "319"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "720"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "110"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "209"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.208"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "8"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "083ab6266d6d, 257af9cff271, 8d6444e261fb, 8dccbee9b952, b87cb221fb83, c4527f0bb4af, e29133841e3b, fc82edaac9b9"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_upcoming_reminder_search_args",
+      "calls": 260,
+      "later_calls": 260,
+      "gains": 51,
+      "regressions": 0,
+      "preserved": 209,
+      "failures": 0,
+      "mean_outcome_delta": 0.19615384615384615,
+      "mean_outcome_delta_label": "+0.196",
+      "detail_id": "tool:prepare_upcoming_reminder_search_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_upcoming_reminder_search_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "260"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "260"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "51"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "209"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.196"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "1"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "bd16d7bed50f"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "select_action_target_by_recency",
+      "calls": 95,
+      "later_calls": 101,
+      "gains": 44,
+      "regressions": 0,
+      "preserved": 51,
+      "failures": 0,
+      "mean_outcome_delta": 0.4631578947368421,
+      "mean_outcome_delta_label": "+0.463",
+      "detail_id": "tool:select_action_target_by_recency",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "select_action_target_by_recency",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "95"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "101"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "44"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "51"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.463"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R03, R04, R05, R07"
+              },
+              {
+                "label": "Validation passes",
+                "value": "4"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "4"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "410d12f0ff8f, 5f1ddd634894, 92d1685e534b, cb39601fd2d4"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_past_reminder_recency_search_args",
+      "calls": 32,
+      "later_calls": 32,
+      "gains": 32,
+      "regressions": 0,
+      "preserved": 0,
+      "failures": 0,
+      "mean_outcome_delta": 1.0,
+      "mean_outcome_delta_label": "+1.000",
+      "detail_id": "tool:prepare_past_reminder_recency_search_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_past_reminder_recency_search_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "32"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "32"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "32"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "0"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+1.000"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "1"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "e2aa4255b0da"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "resolve_search_window_or_bounds",
+      "calls": 392,
+      "later_calls": 437,
+      "gains": 77,
+      "regressions": 46,
+      "preserved": 269,
+      "failures": 0,
+      "mean_outcome_delta": 0.07908163265306123,
+      "mean_outcome_delta_label": "+0.079",
+      "detail_id": "tool:resolve_search_window_or_bounds",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "resolve_search_window_or_bounds",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "392"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "437"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "77"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "46"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "269"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.079"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R04, R05, R06, R09"
+              },
+              {
+                "label": "Validation passes",
+                "value": "6"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "5"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "54a96bd8b10f, 6e7107ae1d25, b725a44acb04, d164b01fa248, d3343c330363"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_message_recency_search_args",
+      "calls": 140,
+      "later_calls": 165,
+      "gains": 22,
+      "regressions": 9,
+      "preserved": 109,
+      "failures": 0,
+      "mean_outcome_delta": 0.07142857142857142,
+      "mean_outcome_delta_label": "+0.071",
+      "detail_id": "tool:prepare_message_recency_search_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_message_recency_search_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "140"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "165"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "22"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "9"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "109"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.071"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "2"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "4e652d14f836, fbb05588ecc1"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_converted_amount_result",
+      "calls": 158,
+      "later_calls": 163,
+      "gains": 5,
+      "regressions": 4,
+      "preserved": 149,
+      "failures": 0,
+      "mean_outcome_delta": 0.006329113924050633,
+      "mean_outcome_delta_label": "+0.006",
+      "detail_id": "tool:extract_converted_amount_result",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_converted_amount_result",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "158"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "163"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "5"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "4"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "149"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.006"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "8"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "43815a8455bb, 9eccfcaacbb3, b49e739928d1, be5034454b96, eb37400c62b4, f5a45add4b21, fc40645d10f8, fd7655b7f57a"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "days_between_timestamps",
+      "calls": 160,
+      "later_calls": 160,
+      "gains": 0,
+      "regressions": 0,
+      "preserved": 160,
+      "failures": 0,
+      "mean_outcome_delta": 0.0,
+      "mean_outcome_delta_label": "+0.000",
+      "detail_id": "tool:days_between_timestamps",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "days_between_timestamps",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "160"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "160"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "0"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "160"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.000"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "1"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "9513717b578f"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_device_status_lookup",
+      "calls": 153,
+      "later_calls": 363,
+      "gains": 6,
+      "regressions": 6,
+      "preserved": 141,
+      "failures": 6,
+      "mean_outcome_delta": 0.0,
+      "mean_outcome_delta_label": "+0.000",
+      "detail_id": "tool:plan_device_status_lookup",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_device_status_lookup",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "153"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "363"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "6"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "6"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "141"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.000"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "9"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "14792f30acce, 263a801713ed, 3b5653d144b5, 633f0a05d454, 871491f17c26, dde348af7a50, e62f4db238e8, f69efdbdf957, f6a08748e1dc"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "6"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_address_result",
+      "calls": 80,
+      "later_calls": 80,
+      "gains": 0,
+      "regressions": 0,
+      "preserved": 80,
+      "failures": 0,
+      "mean_outcome_delta": 0.0,
+      "mean_outcome_delta_label": "+0.000",
+      "detail_id": "tool:extract_address_result",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_address_result",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "80"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "80"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "0"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "0"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "80"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "+0.000"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "1"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "d3083148c52a"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_stock_symbol",
+      "calls": 189,
+      "later_calls": 190,
+      "gains": 0,
+      "regressions": 1,
+      "preserved": 188,
+      "failures": 0,
+      "mean_outcome_delta": -0.005291005291005291,
+      "mean_outcome_delta_label": "-0.005",
+      "detail_id": "tool:extract_stock_symbol",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_stock_symbol",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "189"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "190"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "0"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "1"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "188"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.005"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "1"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "9a126038608c"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "apply_single_device_state_action",
+      "calls": 187,
+      "later_calls": 740,
+      "gains": 19,
+      "regressions": 21,
+      "preserved": 147,
+      "failures": 271,
+      "mean_outcome_delta": -0.0075757575757575725,
+      "mean_outcome_delta_label": "-0.008",
+      "detail_id": "tool:apply_single_device_state_action",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "apply_single_device_state_action",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "187"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "740"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "19"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "21"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "147"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.008"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "3"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "21ea83d80f45, 440d12d966fd, 5310ace87a04"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "271"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_contact_update_from_id",
+      "calls": 24,
+      "later_calls": 24,
+      "gains": 0,
+      "regressions": 14,
+      "preserved": 10,
+      "failures": 0,
+      "mean_outcome_delta": -0.2916666666666667,
+      "mean_outcome_delta_label": "-0.292",
+      "detail_id": "tool:plan_contact_update_from_id",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_contact_update_from_id",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "24"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "24"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "0"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "14"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "10"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.292"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R05, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "8"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "8"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "030cb8bcdb07, 4868613af083, 4c63c085d681, 61c5f6614f3c, 70876cd98da0, 772621a1ddba, caddebb95849, e7261ad07c78"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "plan_device_state_action_sequence_v3",
+      "calls": 1176,
+      "later_calls": 1255,
+      "gains": 242,
+      "regressions": 269,
+      "preserved": 665,
+      "failures": 0,
+      "mean_outcome_delta": -0.006731859410430837,
+      "mean_outcome_delta_label": "-0.007",
+      "detail_id": "tool:plan_device_state_action_sequence_v3",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "plan_device_state_action_sequence_v3",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "1176"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "1255"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "242"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "269"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "665"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.007"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R03, R04, R05, R06, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "6"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "3"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "447df201477b, 7cc1df8295a5, aed7c3adbb8f"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "13"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_direct_contact_action_args",
+      "calls": 188,
+      "later_calls": 188,
+      "gains": 0,
+      "regressions": 18,
+      "preserved": 170,
+      "failures": 0,
+      "mean_outcome_delta": -0.047872340425531915,
+      "mean_outcome_delta_label": "-0.048",
+      "detail_id": "tool:prepare_direct_contact_action_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_direct_contact_action_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "188"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "188"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "0"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "18"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "170"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.048"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "4"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "08c7161f56f7, 9df88195cc94, dc3451c9d5b6, ea8540ce3592"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "2"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_add_contact_args",
+      "calls": 55,
+      "later_calls": 55,
+      "gains": 3,
+      "regressions": 48,
+      "preserved": 4,
+      "failures": 0,
+      "mean_outcome_delta": -0.4090909090909091,
+      "mean_outcome_delta_label": "-0.409",
+      "detail_id": "tool:prepare_add_contact_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_add_contact_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "55"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "55"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "3"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "48"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "4"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.409"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "10"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "08d1efca8bf5, 7e5e4bb4b21c, a22656c6c564, af64ca40bf9a, baed7348be60, ca1f348fe28c, d42e8bac2eee, dab064cf072f, f8052ca28eeb, fc789c54c19f"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "prepare_broad_location_search_args",
+      "calls": 570,
+      "later_calls": 1509,
+      "gains": 31,
+      "regressions": 196,
+      "preserved": 343,
+      "failures": 0,
+      "mean_outcome_delta": -0.19649122807017544,
+      "mean_outcome_delta_label": "-0.196",
+      "detail_id": "tool:prepare_broad_location_search_args",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "prepare_broad_location_search_args",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "570"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "1509"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "31"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "196"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "343"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.196"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "3"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "09068c123a52, 59030b9e3a28, df8f27e5504b"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    },
+    {
+      "name": "extract_temperature_result",
+      "calls": 713,
+      "later_calls": 1270,
+      "gains": 36,
+      "regressions": 284,
+      "preserved": 393,
+      "failures": 0,
+      "mean_outcome_delta": -0.24053295932678825,
+      "mean_outcome_delta_label": "-0.241",
+      "detail_id": "tool:extract_temperature_result",
+      "detail": {
+        "eyebrow": "Generated tool",
+        "title": "extract_temperature_result",
+        "sections": [
+          {
+            "heading": "Contribution",
+            "rows": [
+              {
+                "label": "Policy-directed calls",
+                "value": "713"
+              },
+              {
+                "label": "Later-task reuse events",
+                "value": "1270"
+              },
+              {
+                "label": "Outcome gains",
+                "value": "36"
+              },
+              {
+                "label": "Outcome regressions",
+                "value": "284"
+              },
+              {
+                "label": "Outcomes preserved",
+                "value": "393"
+              },
+              {
+                "label": "Mean called-task outcome delta",
+                "value": "-0.241"
+              }
+            ]
+          },
+          {
+            "heading": "Generation and validation provenance",
+            "rows": [
+              {
+                "label": "Accepted in replications",
+                "value": "R01, R02, R03, R04, R05, R06, R07, R08, R09, R10"
+              },
+              {
+                "label": "Validation passes",
+                "value": "10"
+              },
+              {
+                "label": "Distinct code hashes",
+                "value": "9"
+              },
+              {
+                "label": "Code hash prefixes",
+                "value": "1359703c69f0, 14f9a0fb3981, 22fba82b5de9, 7562319b33dd, 908ffc6c7aaf, af7898e99627, da2ee3e79b67, e46740f87d33, f6da4743ebd2"
+              },
+              {
+                "label": "Runtime failures",
+                "value": "0"
+              },
+              {
+                "label": "Side-effect incidents",
+                "value": "0"
+              }
+            ],
+            "note": "Distinct hashes preserve evidence that model-authored tool code can vary across independent online-build runs."
+          }
+        ]
+      }
+    }
+  ],
+  "supporting_reuse": {
+    "frozen_gain_retention_percent": 96.27690041731447,
+    "frozen_gain_retention_confidence_interval": {
+      "level": 0.95,
+      "lower": 92.53854800879905,
+      "upper": 100.00834454030327,
+      "unit": "percent"
+    },
+    "analysis_role": "supporting_rq1_evidence"
+  },
+  "evolution_metrics": {
+    "schema_version": 1,
+    "run_count": 10,
+    "totals": {
+      "repair_entrants": 161,
+      "repaired_accepted": 105,
+      "repaired_reused_later": 105,
+      "accepted_tools": 285,
+      "cross_family_tools": 164,
+      "max_repair_attempts_observed": 7
+    },
+    "repair_conversion_percent": 65.21739130434783,
+    "repair_conversion_run_cluster_ci": {
+      "level": 0.95,
+      "lower": 60.49382716049383,
+      "upper": 70.1300955988456,
+      "unit": "percent"
+    },
+    "repair_threshold_sign_flip_p": 0.00390625,
+    "repaired_reuse_percent": 100.0,
+    "repaired_reuse_run_cluster_ci": {
+      "level": 0.95,
+      "lower": 100.0,
+      "upper": 100.0,
+      "unit": "percent"
+    },
+    "cross_family_percent": 57.54385964912281,
+    "cross_family_run_cluster_ci": {
+      "level": 0.95,
+      "lower": 56.22775800711744,
+      "upper": 58.76288659793815,
+      "unit": "percent"
+    },
+    "cross_family_threshold_sign_flip_p": 0.001953125,
+    "definitions": {
+      "repair_entrant": "tool_birth_events repair_attempted=true with recorded initial validation errors and at least one autonomous repair attempt",
+      "repaired_accepted": "repair entrant whose final accepted field is true",
+      "later_reuse": "generated_tool_invoked event whose task completed_count is greater than the tool's JIT birth task completed_count",
+      "birth_task_family": "base_family joined from the JIT birth scenario's task-feedback row",
+      "cross_family_transfer": "accepted tool with a later generated_tool_invoked event whose base_family differs from its JIT birth task family",
+      "analysis_unit": "accepted generated-tool instance within registry run"
+    },
+    "runs": [
+      {
+        "replication": 1,
+        "label": "R01",
+        "repair_entrants": 16,
+        "repaired_accepted": 11,
+        "repaired_reused_later": 11,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 29,
+        "cross_family_tools": 17,
+        "repair_conversion_percent": 68.75,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 58.620689655172406,
+        "birth_event_rows": 34,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1945,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "1fb04e85ee695b014edf74c46c13f87286077c1be181d8c3d9597f93d181dfc5",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "14f4735cf444ba6b600a72a8ad972bdbbe315d21b2610e362dee0dd66fb88b38",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "f723b0b75ea5cc96f6775a96732b189fe34218e4e86dddcb6720e9ebf29a3d8b",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "3808eab3512f35cb0249166a705990983715808fafdb23fc0aa936a06ddbad7c",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "58d7d6b2eca6b908bb78da736e69b4553d9f4c9e600fe3ac30d3ae00bd595bfc"
+      },
+      {
+        "replication": 2,
+        "label": "R02",
+        "repair_entrants": 17,
+        "repaired_accepted": 13,
+        "repaired_reused_later": 13,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 29,
+        "cross_family_tools": 17,
+        "repair_conversion_percent": 76.47058823529412,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 58.620689655172406,
+        "birth_event_rows": 33,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1994,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep02/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "1544224457cc6746bb4373945cab51ee1735036ee6fc4a9e3c68b26ac45b5405",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep02/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "397647de55cae2ac27483f00c739297afae16d55a91b8741ca45f40875d07e05",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep02/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "7613ce35c902549e05165d7104f639da59f92af84d67f20b6c88181382ccbafe",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep02/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "ca7d1ba206171391051f6e267a37acfe14238bcd62275ef6ec560ac88f21008b",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep02/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "befb389d07674ef668e236f4b28ac356b3a5aa01ea2d064c87378b99d6684bcb"
+      },
+      {
+        "replication": 3,
+        "label": "R03",
+        "repair_entrants": 15,
+        "repaired_accepted": 11,
+        "repaired_reused_later": 11,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 29,
+        "cross_family_tools": 16,
+        "repair_conversion_percent": 73.33333333333333,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 55.172413793103445,
+        "birth_event_rows": 33,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1915,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep03/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "aafdcd8270e2264ca247724795ed0d1c4c43579629563cf57618b3a90089b0f1",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep03/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "c2f42ae27f8490bba4d17e7509c099389fb350d9efe1d726f86d6b6639aeb162",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep03/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "b221c5b8afeab55f80748ab913440497f4cbdb75bd76c158180a9b70d22b5a08",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep03/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "29b95bf7791a2f0a78d87b27dedb28e782e742c67382788325a5c5fc3c21be64",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep03/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "9b3627b6e792f0f0b64356b36909038dae3d65c49ff27af950e502266a0bb585"
+      },
+      {
+        "replication": 4,
+        "label": "R04",
+        "repair_entrants": 20,
+        "repaired_accepted": 13,
+        "repaired_reused_later": 13,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 28,
+        "cross_family_tools": 15,
+        "repair_conversion_percent": 65.0,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 53.57142857142857,
+        "birth_event_rows": 35,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1968,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/online/rep04r1/native_action/online_build_full_20260912_043434/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_12_2026_04_34_39/tool_birth_events.jsonl",
+        "birth_events_sha256": "d3198edbcc8da81723e26f017e4bf17052bad238230c7c124194d8049555ed63",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/online/rep04r1/native_action/online_build_full_20260912_043434/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_12_2026_04_34_39/sage_run_events.jsonl",
+        "run_events_sha256": "3ee5120c8300172ee65130a078e51081b9823ca4ccb35cf5464a2765dbc76050",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/online/rep04r1/native_action/online_build_full_20260912_043434/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_12_2026_04_34_39/reuse_events.jsonl",
+        "reuse_events_sha256": "176b548a27c44fa1208fe31ed97140dd902c9f2b4ec8af77bf1a54857b8ec83f",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/online/rep04r1/native_action/online_build_full_20260912_043434/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_12_2026_04_34_39/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "fa41a1fccf368ca937f514c56753dfeab061dd9497c310bc7db98ffbccfc9fc4",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/online/rep04r1/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "0221d3c8d236cc8b4f8c34696dc05af0cae4dfbcd57a7ead90dc96eb8fde61e1"
+      },
+      {
+        "replication": 5,
+        "label": "R05",
+        "repair_entrants": 13,
+        "repaired_accepted": 10,
+        "repaired_reused_later": 10,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 30,
+        "cross_family_tools": 18,
+        "repair_conversion_percent": 76.92307692307693,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 60.0,
+        "birth_event_rows": 34,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 2001,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep05/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "20b0a9b2763dc67fca90f1e3308aa4af5a552a8d7de8dfa30b20da2435ff18bf",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep05/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "6ef8f3881eb3299eafdb31dcf6713f62890394211f5a6e912202797553d4c410",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep05/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "20d17113112b21fcb6c2b1f56a123ac1baa9509fe86d65251fc549a70f355f1a",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep05/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "6f9f30e2139f9c5fd3878ab964e8165780c5f0e18c46d1fc231f829f3717e6c7",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep05/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "d4280f36896a61b661b21ee7a835a260ff08dde7832c3c1141a644be76e82372"
+      },
+      {
+        "replication": 6,
+        "label": "R06",
+        "repair_entrants": 14,
+        "repaired_accepted": 8,
+        "repaired_reused_later": 8,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 28,
+        "cross_family_tools": 17,
+        "repair_conversion_percent": 57.14285714285714,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 60.71428571428571,
+        "birth_event_rows": 34,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1932,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep06/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "27389971b8bd3bf5aa201dc6372c95b854c334b47f79617192624e32ba4a2281",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep06/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "48156670e5b35fb6f5580c752cf0edee1218ff81cf2eaf1dd473ef6dda91a93d",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep06/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "1d4fd6147e6ebfacdc267a9fd3e21610245db90cef29f02b5de1366cc13eb126",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep06/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "be09e0b77df77d9d9e059f739b72f60f777064db6a02a18abc6ca811d6aa863f",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep06/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "89002d87818e2a71e178339a6c48fd01ba0d4b3b46b2b15cf0fc14f0e978bc0e"
+      },
+      {
+        "replication": 7,
+        "label": "R07",
+        "repair_entrants": 14,
+        "repaired_accepted": 7,
+        "repaired_reused_later": 7,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 28,
+        "cross_family_tools": 16,
+        "repair_conversion_percent": 50.0,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 57.14285714285714,
+        "birth_event_rows": 35,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1863,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep07/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "ad82ee74600de1bad0c63280128e866a1564a284e37b898f62d702e536074cbd",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep07/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "b2bb923d569e052807c53d0561943db7c623545769f8ce4405032e5ca610286e",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep07/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "4c2787ba093da456d4ac431692d761d8ecabb2ad190e21f23a5fded992c3dd5f",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep07/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "d3b70a252cde26896805af2ef8eaf9bd7b3efa9fc2a04db28b4a3f85c582ace7",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep07/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "209be0f8d84d5268ec4c371c1f2bd024ee8d461f7eda11244a85f613532b7382"
+      },
+      {
+        "replication": 8,
+        "label": "R08",
+        "repair_entrants": 19,
+        "repaired_accepted": 11,
+        "repaired_reused_later": 11,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 27,
+        "cross_family_tools": 15,
+        "repair_conversion_percent": 57.89473684210527,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 55.55555555555556,
+        "birth_event_rows": 35,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1932,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep08/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "8fe9e147aa29d6795c04d1b00d65325a862e24b640edbae3f64f8ee344c7120b",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep08/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "f43f576930335ba9f00ee171dfaae50fe21793b547958d647c22b700b8325b91",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep08/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "04e01a43a8ac578db060868c89138423475e45a8c7107dcc6f41e42e3244e12e",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep08/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "3e99555df65b9d0af92e919c29a100ae680bc8db7ed725d5058c3e359f89e209",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep08/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "7c384051dfb80d664f0a5a64dcce0ceb9559d909b732f3cc6adc0e858bc1e694"
+      },
+      {
+        "replication": 9,
+        "label": "R09",
+        "repair_entrants": 17,
+        "repaired_accepted": 11,
+        "repaired_reused_later": 11,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 29,
+        "cross_family_tools": 17,
+        "repair_conversion_percent": 64.70588235294117,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 58.620689655172406,
+        "birth_event_rows": 35,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1945,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep09/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "008bb5a2c18f3dec1947794edf28072c554fcedd7ec6b3347ae4ed5cea533344",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep09/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "8563aee52e6ac722295abd7c8107dd38442b2d35e008f9249464bbda737511fe",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep09/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "e12926c60fe79ee225e09eae2bfe943c577b61e2a1fd50f266c48e155019304b",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep09/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "ec47624e7af823a3d91073e3af6a46e98fb1a1397440a13cf474bfb28b24ce35",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep09/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "ecf5962718dd8578056d8dbc21888b93d8af970d18eb8a6145fea71c711984de"
+      },
+      {
+        "replication": 10,
+        "label": "R10",
+        "repair_entrants": 16,
+        "repaired_accepted": 10,
+        "repaired_reused_later": 10,
+        "max_repair_attempts_observed": 7,
+        "accepted_tools": 28,
+        "cross_family_tools": 16,
+        "repair_conversion_percent": 62.5,
+        "repaired_reuse_percent": 100.0,
+        "cross_family_percent": 57.14285714285714,
+        "birth_event_rows": 34,
+        "feedback_rows": 1032,
+        "reuse_event_rows": 1789,
+        "birth_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep10/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl",
+        "birth_events_sha256": "0c42f889d53462504d6229c0f5ea4b2e9606749832f6e2acff8e531b6c6cd1f3",
+        "run_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep10/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/sage_run_events.jsonl",
+        "run_events_sha256": "70bab992db5b01191b405e2b239afdbae54cdf4f66e032751c8ef08cd63b2d6e",
+        "reuse_events_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep10/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl",
+        "reuse_events_sha256": "8d16b93a49046b9bc571c04b487331b73b4df9de8eeb1d44c60672af11cc085c",
+        "feedback_path": "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep10/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl",
+        "feedback_sha256": "e99749501b9a64cbc71ae181cde7578271946cc3f65f7f979614fb14fec5c068",
+        "registry_manifest_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep10/native_action_registry/registry_manifest.json",
+        "registry_manifest_sha256": "6975c59cf1659ed2f90ff5b2649659dc7a43afe684822271b59defba926ef489"
+      }
+    ],
+    "bootstrap_iterations": 10000,
+    "randomization_iterations": 20000,
+    "seed": 20260730
+  },
+  "evolution_schema_version": 1
+}
