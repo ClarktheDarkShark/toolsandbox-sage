@@ -157,9 +157,10 @@ locked distribution set.
 
 ## Verify the code and frozen inputs
 
-The frozen publication environment intentionally contains only run-time
-dependencies. Use a separate development environment for pytest and Ruff so
-installing test tools cannot change the environment used for publication runs:
+The frozen publication environment preserves the exact 108-distribution
+scientific lock, including historical packages that the slim release no longer
+imports. Use a separate development environment for pytest and Ruff so adding
+test tools cannot change the environment used for publication runs:
 
 ```bash
 python3.12 -m venv .venv-dev
