@@ -1,6 +1,19 @@
 {
   "schema_version": 1,
   "generated_at_utc": "2026-09-24T17:10:56Z",
+  "analysis": {
+    "portable_path_commit": "3a3c8cf6255583cf88e172800865a5a851c390f2",
+    "portable_path_tree": "6d75301f40a312f3dd9aff40560b6fc52a99095f",
+    "chapter4_evidence_source_sha256": "aae9deeea01f8288f5c36fac8a3742b75dc7b5a6a363209aa6c36449ee11211b",
+    "chapter4_evolution_source_sha256": "a90a434f60b4858adf0a1d06e4ad0e64e87bda5574fe5ef8713d26aaaa86d749",
+    "dashboard_template_sha256": "55857fe51f26a46b319bef3110951a1e503b2b054d8073e89857f5577f9bdc9c",
+    "evolution_builder_sha256": "665abf7719d4ace43198581d25b1ae96b9a6c9cfc063cc4bc346351a4f2e52a6",
+    "evolution_renderer_sha256": "6dd85f78f8bf9562bb69ec849ca21d5e29d80c3729de32509f18471adc646727",
+    "base_renderer_sha256": "52edf19df230965e4401b9b97f24c0c6cab31a22466212ba130e18091c3e265f",
+    "bootstrap_iterations": 10000,
+    "randomization_iterations": 20000,
+    "seed": 20260730
+  },
   "reference": {
     "runtime_commit": "4ce1c6de0ab36dd59e1a319f4e56e298133f4a79",
     "selected_cohort_manifest_sha256": "8cd359bebdc0f3576643d6d4850f0abe09fd3c05dafd50a62fc07d62c6425192",

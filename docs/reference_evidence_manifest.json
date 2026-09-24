@@ -50,6 +50,7 @@
   },
   "public_reconstruction": {
     "relative_root": "artifacts/publication_evidence/chapter4_current",
+    "reconstruction_receipt_sha256": "b255f0055d1d89c3e4cca7b94d42127e1001471c84712b37a4516ba24d6c4adc",
     "evidence_data_sha256": "b2b1795b8c6497bece0436e674fd71d563ccd8fd75c6479d28bd77395235b8bc",
     "dashboard_html_sha256": "f5a7a664b34964803fd1070655bba36ecfcc3597aadf0623adda205c8d0eb906",
     "contact_sheet_sha256": "703aa6fe5e791b65a8be4a7818dc574edb8eae674207d51a20cd5c52ecdd7b54",
