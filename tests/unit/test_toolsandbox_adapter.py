@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sage_ts.adapters.toolsandbox_adapter import (
     ToolSandboxRunConfig,
+    _is_transient_model_exception,
     run_scenario_sequence,
     write_run_manifest,
 )
@@ -24,6 +25,25 @@ def test_write_run_manifest(tmp_path: Path) -> None:
 
     assert "wifi_off" in text
     assert "baseline" in text
+
+
+def test_model_tool_argument_json_truncation_is_retryable() -> None:
+    error = json.JSONDecodeError("Unterminated string", '{"query":"', 10)
+    traceback_text = (
+        "File 'tool_sandbox/common/message_conversion.py', line 88, "
+        "in openai_tool_call_to_python_code"
+    )
+
+    assert _is_transient_model_exception(error, traceback_text)
+
+
+def test_unrelated_json_decode_error_is_not_retryable() -> None:
+    error = json.JSONDecodeError("Unterminated string", '{"query":"', 10)
+
+    assert not _is_transient_model_exception(
+        error,
+        "File 'sage_ts/runtime/registry.py', line 1, in load_registry",
+    )
 
 
 def test_run_scenario_sequence_continues_after_transform_failure(

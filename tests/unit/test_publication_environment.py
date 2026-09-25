@@ -113,6 +113,42 @@ def test_exact_environment_passes_and_allows_only_repo_metadata(tmp_path: Path) 
     assert repository_import_provenance["module_paths"] == repository_import_paths
 
 
+def test_environment_identity_canonicalizes_virtualenv_directory_alias(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    lock = repo / "requirements-publication-lock.txt"
+    lock_hash = _write_lock(lock)
+    runtime = tmp_path / "runtime"
+    (runtime / "bin").mkdir(parents=True)
+    alias = tmp_path / "venv-alias"
+    alias.symlink_to(runtime, target_is_directory=True)
+    repository_import_paths = _repository_import_paths(repo)
+
+    report = verify_environment(
+        lock,
+        repo_root=repo,
+        expected_lock_sha256=lock_hash,
+        python_version=(3, 12, 7),
+        python_executable=str(alias / "bin" / "python"),
+        python_prefix=str(alias),
+        python_base_prefix=str(tmp_path / "base"),
+        python_implementation="CPython",
+        platform_system="Darwin",
+        platform_machine="arm64",
+        installed_distributions=(
+            _external(tmp_path),
+            _editable_project(repo, tmp_path / "site-packages"),
+        ),
+        pip_checker=lambda: "No broken requirements found.",
+        repository_import_checker=lambda _python, _repo: repository_import_paths,
+    )
+
+    assert report["python_executable"] == str(runtime / "bin" / "python")
+    assert report["python_prefix"] == str(runtime)
+
+
 def test_verifier_rejects_repository_import_from_wrong_checkout(
     tmp_path: Path,
 ) -> None:

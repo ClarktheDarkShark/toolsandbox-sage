@@ -145,6 +145,15 @@ def _is_transient_model_exception(exc: Exception, traceback_text: str) -> bool:
     }
     if names & transient_names:
         return True
+    if (
+        "JSONDecodeError" in names
+        and "openai_tool_call_to_python_code" in traceback_text
+        and "tool_sandbox/common/message_conversion.py" in traceback_text
+    ):
+        # A model response can reach its output cap midway through function-call
+        # JSON. Retry only that model-to-ToolSandbox conversion failure; unrelated
+        # JSONDecodeErrors remain deterministic failures.
+        return True
     transient_markers = (
         "openai.APIConnectionError",
         "openai.APITimeoutError",

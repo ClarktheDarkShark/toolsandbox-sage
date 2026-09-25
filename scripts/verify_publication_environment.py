@@ -318,8 +318,8 @@ def verify_environment(
         raise EnvironmentVerificationError(
             f"Publication runs require Python {required} exactly; observed {observed}"
         )
-    observed_prefix = str(Path(python_prefix or sys.prefix).absolute())
-    observed_base_prefix = str(Path(python_base_prefix or sys.base_prefix).absolute())
+    observed_prefix = str(Path(python_prefix or sys.prefix).resolve())
+    observed_base_prefix = str(Path(python_base_prefix or sys.base_prefix).resolve())
     if observed_prefix == observed_base_prefix:
         raise EnvironmentVerificationError(
             "Publication runs require an isolated virtual environment "
@@ -424,7 +424,11 @@ def verify_environment(
     if errors:
         raise EnvironmentVerificationError("; ".join(errors))
 
-    executable = str(Path(python_executable or sys.executable).absolute())
+    executable_path = Path(python_executable or sys.executable).absolute()
+    # Preserve the virtual-environment interpreter name while canonicalizing an
+    # alias to its environment directory. Resolving the interpreter itself would
+    # incorrectly collapse a normal venv symlink onto the base Python binary.
+    executable = str(executable_path.parent.resolve() / executable_path.name)
     pip_check_output = (pip_checker or _run_pip_check)()
     imported_module_paths = (
         repository_import_checker or _run_isolated_repository_import_check
