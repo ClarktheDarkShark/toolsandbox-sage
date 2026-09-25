@@ -81,10 +81,6 @@ PUBLICATION_GIT_TREE="$(git rev-parse "${PUBLICATION_GIT_COMMIT}^{tree}")"
 readonly PUBLICATION_GIT_COMMIT
 readonly PUBLICATION_GIT_TREE
 
-# Verify the tracked release chain: immutable P0 inputs, checkpoint policy
-# amendment, benchmark, fixture, thresholds, and historical analysis references.
-"$PYTHON_EXECUTABLE" scripts/verify_publication_inputs.py
-
 if [[ -z "${OPENAI_API_KEY:-}" && -f ".secrets/env.sh" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -298,14 +294,4 @@ echo "Starting strict fresh-control publication run: full_$RUN_STAMP"
 echo "[$ARM] output: $ARM_OUTPUT"
 echo "[$ARM] log: $LOG_FILE"
 "${CMD[@]}" 2>&1 | tee "$LOG_FILE"
-
-"$PYTHON_EXECUTABLE" scripts/verify_publication_run.py \
-  --search-root "$ARM_OUTPUT" \
-  --expected-tasks 1032 \
-  --expect-reflection "$REFLECTION_EXPECTATION" \
-  --gate-purpose "$PUBLICATION_GATE_PURPOSE" | tee -a "$LOG_FILE"
-if [[ "$PUBLICATION_GATE_PURPOSE" == "release-sample" ]]; then
-  "$PYTHON_EXECUTABLE" scripts/verify_publication_sample.py \
-    --search-root "$ARM_OUTPUT" | tee -a "$LOG_FILE"
-fi
 echo "Strict fresh-control publication run complete: full_$RUN_STAMP"

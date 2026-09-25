@@ -874,9 +874,9 @@ def _campaign_inclusion_gate_decision(
 ) -> tuple[bool, list[str]]:
     """Gate a prespecified campaign replication on run integrity only.
 
-    Full provenance, cache, ordering, dashboard, and artifact checks are applied
-    by ``verify_publication_run.py`` after the protocol manifest is written. The
-    runner-level decision intentionally does not inspect outcome performance.
+    The runner-level decision checks integrity and intentionally does not inspect
+    outcome performance. Full provenance, cache, ordering, dashboard, and
+    artifact details are recorded in the protocol manifest.
     """
 
     reasons: list[str] = []

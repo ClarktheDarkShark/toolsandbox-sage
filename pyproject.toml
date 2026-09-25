@@ -45,7 +45,6 @@ dependencies = [
     "numpy==1.26.4",
     "openai==2.37.0",
     "phonenumbers==9.0.29",
-    "Pillow==11.3.0",
     "pint==0.25.3",
     "polars==0.20.31",
     "pydantic==2.13.4",
@@ -59,21 +58,11 @@ dependencies = [
     "typing-extensions==4.15.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "mypy==1.11.2",
-    "pre-commit==4.0.1",
-    "pytest==7.4.4",
-    "ruff==0.15.13",
-]
-
 [project.scripts]
 tool_sandbox = "tool_sandbox.cli:main"
 sage-protocol = "scripts.run_sage_protocol:main"
-sage-campaign = "scripts.run_chapter4_evidence_campaign:main"
 sage-dashboard = "sage_ts.dashboard.server:main"
 sage-build-chapter4-evolution = "scripts.build_chapter4_evolution_dashboard:main"
-sage-render-chapter4-evolution = "scripts.render_chapter4_evolution_tables:main"
 
 [project.urls]
 Homepage = "https://github.com/ClarktheDarkShark/toolsandbox-sage"
@@ -103,39 +92,3 @@ namespaces = false
 [tool.setuptools.package-data]
 "sage_ts.dashboard" = ["*.html"]
 "scripts.research" = ["chapter4_evidence_template.html"]
-
-[tool.pytest.ini_options]
-addopts = ""
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-
-[tool.ruff.format]
-docstring-code-format = true
-
-[tool.ruff.lint]
-extend-select = ["I"]
-ignore = ["F841"]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-
-[[tool.mypy.overrides]]
-module = ["holidays", "polars", "rouge_score", "rouge_score.*", "tqdm", "tqdm.*"]
-ignore_missing_imports = true
-
-[tool.mypy]
-mypy_path = "src"
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_subclassing_any = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-extra_checks = true
-implicit_reexport = false
-strict_equality = true
-warn_unused_configs = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_ignores = true

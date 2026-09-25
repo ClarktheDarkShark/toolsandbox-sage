@@ -1,277 +1,123 @@
 # SAGE for ToolSandbox
 
-This repository contains the production research implementation of SAGE used
-with Apple's 1,032-task ToolSandbox benchmark. SAGE detects recurring capability
-gaps, generates and validates reusable Python tools, retains accepted tools in a
-registry, routes them to later tasks, and applies an actor policy that selects and
-sequences the generated and native tools.
+This repository contains the executable research implementation of SAGE on
+Apple's 1,032-task ToolSandbox benchmark. SAGE detects recurring capability
+gaps, generates and validates reusable Python tools, stores accepted tools in a
+registry, routes them to later tasks, and monitors their subsequent use.
 
-This release intentionally restores the **policy-directed** SAGE studied in the
-paper. It does not claim that the base model naturally chooses generated tools.
-The later natural-selection experiments are not part of this branch.
+This branch preserves the policy-directed configuration used for the reported
+paper results. The policy selects among routed native and generated tools; the
+model supplies arguments, consumes results, and produces the final response.
+Later natural-selection experiments are not included.
 
-## Publication release and evidence
+## What is included
 
-The publication runtime is pinned to commit
-`4ce1c6de0ab36dd59e1a319f4e56e298133f4a79` and tree
-`4640019c7a054d4af6a500e7327ebbd0a507bfc5`. Every selected run records that
-exact clean identity, the same locked environment, benchmark order, frozen
-clock, evaluator hashes, and read-only external-service fixture.
+- `src/sage_ts/` — the complete SAGE runtime
+- `tool_sandbox/` — the upstream benchmark/runtime required by SAGE
+- `scripts/run_sage_protocol.py` — concurrent matched control/SAGE execution
+- `scripts/run_native_action_4omini_ab.sh` — reproducible full-run launcher
+- `src/sage_ts/dashboard/` — live run dashboards
+- `scripts/research/` — Chapter 4 dashboard aggregation
+- `docs/sage_protocol/manifests/` — the ordered 1,032-task benchmark manifest
+- `artifacts/publication_cleanup_20260901/fixtures/` — the frozen read-only
+  external-service fixture
 
-The completed evidence cohort contains ten online-build runs and ten paired
-frozen-registry runs. Each run includes all 1,032 tasks, a fresh matched
-control, no application-level response or result cache, and zero runtime
-exceptions. Two original executions failed the zero-exception integrity gate
-and remain preserved: online `rep04` and frozen `rep05`. They were replaced by
-`rep04r1` and `rep05r1`, respectively. Replacement eligibility depended only
-on the predeclared integrity gate, never on observed performance.
-
-The current manuscript reports three supported hypotheses:
-
-- **H1 — outcome lift:** audited v9 outcome was `0.586176` for the matched
-  control and `0.783543` for SAGE, an absolute difference of `+0.197368` and
-  relative lift of `+33.67%` (10,320 matched task pairs).
-- **H2 — repair and later reuse:** SAGE repaired and admitted `105/161`
-  initially failed candidates (`65.2%`), and all `105/105` admitted repaired
-  tools were invoked on a later task.
-- **H3 — cross-family use:** `164/285` accepted generated-tool instances
-  (`57.5%`) were invoked later for a task from a semantic family different
-  from the tool's birth task.
-
-The ten frozen-registry runs produced a v9 SAGE mean of `0.776195` and retained
-`96.28%` of the online-build gain. On the exact historical 800-task v1 subset,
-the online means were `0.497535` for control and `0.800336` for SAGE. H2 and H3
-were reconstructed exactly from immutable run ledgers, but their current
-definitions and decision rules were committed after the cohort completed.
-They are therefore retrospective analyses of the historical cohort; a new run
-under the release contract tests those fixed rules prospectively.
-
-The selected cohort, replacement disclosures, endpoint identities, hashes,
-and paper-ready values are recorded in
-[`docs/sage_protocol/policy_production_final_evidence_20260916.md`](docs/sage_protocol/policy_production_final_evidence_20260916.md).
-The portable aggregate dashboard, evidence JSON, and manuscript tables are in
-[`artifacts/publication_evidence/chapter4_current/`](artifacts/publication_evidence/chapter4_current/).
-
-The dated diagnostic of the superseded hybrid-cache campaign is in
-[`docs/sage_protocol/publication_cleanup_audit_20260901.md`](docs/sage_protocol/publication_cleanup_audit_20260901.md).
-Its proposed actions and hypothesis framing are historical, not current run
-instructions.
-The dated restoration rationale and pre-cleanup mechanism inventory are
-recorded in
-[`docs/sage_protocol/policy_production_release_20260908.md`](docs/sage_protocol/policy_production_release_20260908.md).
-
-## Restored high-lift configuration
-
-The restored high-lift configuration uses an external actor policy rather than
-natural model selection. On each actor request the policy can:
-
-1. add workflow-specific instructions derived from the visible conversation;
-2. filter the routed generated-tool schemas to a small relevant set;
-3. hide wrapped native-action schemas when a validated generated replacement is
-   selected;
-4. choose a generated, downstream native, completion, or recovery tool through
-   a deterministic selector cascade; and
-5. send a named OpenAI `tool_choice` for that step.
-
-The model still supplies tool arguments, consumes results, and produces the user
-response. The controller decides which tool the model must call at policy-covered
-steps. Run manifests record `actor_selection_mode="policy"` explicitly.
-
-The other critical components are:
-
-- visible-context inadequacy classification and candidate admission;
-- online tool birth, model-authored generation, and repair;
-- schema, AST, sandbox, held-out, and negative-applicability validation;
-- registry storage, lifecycle reflection, and task-conditioned routing;
-- native/generated ToolSandbox injection and execution;
-- output normalization, reuse accounting, and outcome evaluation.
-
-These mechanisms remain intact. Cleanup removes obsolete experiments,
-compatibility paths, cache/resume modes, and superseded reporting that are not
-reachable from the production workflow. Chapter 4 aggregation remains
-available under `scripts/research/` and is included in the source and wheel
-distributions.
-
-## Outcome measurement and behavioral compatibility
-
-The paper-era outcome evaluator influenced online tool birth and lifecycle
-decisions. Replacing it in place would change later registry contents and would
-not restore the validated algorithm. This release therefore keeps the feedback
-and reporting roles distinct:
-
-- `outcome_similarity` is computed by audited v9 for all 1,032 tasks. It is the
-  current same-run outcome endpoint and supplies the control-to-SAGE lift gate;
-- `online_feedback_outcome_similarity` is computed by paper-era v1 on its exact
-  ordered 800-task applicability subset. It is the only endpoint compared with
-  the historical paper range and is also the preferred lifecycle feedback
-  signal on those tasks; and
-- on the other 232 tasks, lifecycle feedback falls back to the audited v9
-  outcome. Canonical score deltas can inform internal lifecycle decisions but
-  are never a release or paper-result gate.
-
-These are post-task, evaluator-derived scalar feedback signals. Benchmark
-answer and state targets are used by the evaluators, but raw targets, expected
-answers, and evaluator traces are not provided to the actor or generated tools
-before or during that task. Both evaluator identities and hashes are written to
-the run artifacts. This split preserves the studied policy behavior without
-comparing incompatible task sets or evaluator versions.
-
-The completed ten-run online cohort is the primary current result. Audited v9
-uses all 10,320 matched task observations and paper-comparable v1 uses 8,000.
-The v1 SAGE mean of `0.800336` is above the archived paper mean of `0.795407`.
-Endpoint values are never mixed: v9 supports current same-run inference, while
-v1 is used only for the apples-to-apples historical comparison.
-
-## Excluded historical protocol
-
-The successful July campaign used a strict hybrid control cache, and those
-cached rows also informed online reflection. The cache contained 1,182 records
-for 1,032 tasks, including 75 triplicated tasks. Consequently, the archived ten
-runs are evidence of the policy system under that cache-conditioned protocol,
-not clean fresh-control causal evidence.
-
-That hybrid-cache implementation is not part of this release. All 20 selected
-publication runs used fresh controls and recorded zero cached task, control, or
-response reuse.
+Tests, superseded experiments, campaign orchestration, paper figures, table
+renderers, and historical reports are intentionally excluded from this
+application release.
 
 ## Installation
 
-The frozen publication environment is CPython 3.12.7 on Darwin/arm64. Create it
-from the exact dependency lock:
+The validated environment is CPython 3.12.7 on Darwin/arm64:
 
 ```bash
 ./scripts/bootstrap_env.sh .venv-publication
 source .venv-publication/bin/activate
+```
+
+The bootstrap script installs the exact dependency lock, installs this checkout
+in editable mode, runs `pip check`, and verifies the environment and import
+provenance. Set `OPENAI_API_KEY` before a live run. A local
+`.secrets/env.sh` file is supported and must not be committed.
+
+## Run SAGE
+
+Run one complete matched pair (fresh ToolSandbox control and SAGE execute in
+parallel):
+
+```bash
+make paper-online PORT=63105
+```
+
+The launcher uses:
+
+- the fixed 1,032-task order;
+- an empty run-local generated-tool registry;
+- no application response, task, result, or control cache;
+- the fixed ToolSandbox clock and hash-pinned read-only RapidAPI fixture;
+- the same model configuration for the matched arms; and
+- policy-directed actor selection, generation, validation, routing, lifecycle
+  monitoring, and outcome evaluation.
+
+It writes run data below `outputs/publication_validation/`, runtime artifacts
+below `artifacts/publication_validation/`, and opens Task Compare in the
+external browser before execution begins.
+
+Evaluate an existing registry with generation disabled:
+
+```bash
+RESUME_REGISTRY_CHECKPOINT=/absolute/path/to/registry \
+  make paper-frozen PORT=63106
+```
+
+The launcher requires a clean Git checkout so each run records an unambiguous
+source identity.
+
+## Dashboards
+
+Every paired run produces three dashboards:
+
+- `dashboard/task_compare.html` — control versus SAGE progress and outcomes
+- `dashboard/task_focus.html` — task-level traces and tool activity
+- `dashboard/index.html` — overall run and lifecycle status
+
+Serve an existing dashboard directory with:
+
+```bash
+make dashboard ROOT=/absolute/path/to/run/dashboard PORT=63105
+```
+
+The retained Chapter 4 dashboard can be opened directly from
+`artifacts/publication_evidence/chapter4_current/chapter4_evidence.html`.
+Rebuild aggregate evidence from a compatible campaign manifest with:
+
+```bash
+sage-build-chapter4-evolution \
+  --campaign-manifest /absolute/path/to/campaign_manifest.json \
+  --output-dir /absolute/path/to/dashboard-output
+```
+
+## Package and source checks
+
+These checks do not make model calls:
+
+```bash
+make compile
+make package
 python scripts/verify_publication_environment.py
 ```
 
-The verifier checks the Python/platform identity, exact external distributions,
-editable repository metadata, and isolated imports of both `sage_ts` and
-`tool_sandbox` from this checkout. Set `OPENAI_API_KEY` in the environment before
-a live run. A local `.secrets/env.sh` is supported and must not be committed.
+## Core architecture
 
-For a normal development installation, use
-`python3.12 -m pip install -e '.[dev]'`. The strict publication
-environment above is separate so adding developer tools cannot change its
-locked distribution set.
-
-## Verify the code and frozen inputs
-
-The frozen publication environment preserves the exact 108-distribution
-scientific lock, including historical packages that the slim release no longer
-imports. Use a separate development environment for pytest and Ruff so adding
-test tools cannot change the environment used for publication runs:
-
-```bash
-python3.12 -m venv .venv-dev
-.venv-dev/bin/python -m pip install -e '.[dev]'
-make compile PYTHON=.venv-dev/bin/python
-make test-core PYTHON=.venv-dev/bin/python
-make lint PYTHON=.venv-dev/bin/python
-make package PYTHON=.venv-dev/bin/python
-
-.venv-publication/bin/python scripts/verify_publication_environment.py
-make verify-inputs PYTHON=.venv-publication/bin/python
-```
-
-Important frozen inputs include:
-
-- benchmark SHA-256:
-  `21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec`
-- ordered task names SHA-256:
-  `fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176`
-- sanitized RapidAPI fixture SHA-256:
-  `eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f`
-- environment lock SHA-256:
-  `5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f`
-- fixed ToolSandbox timestamp: `1784832588`
-- timezone: `America/New_York`
-
-## Run one complete validation pair
-
-```bash
-make paper-online
-```
-
-The canonical launcher:
-
-- requires a clean Git tree and the exact publication environment;
-- starts the matched control and policy-directed SAGE in isolated,
-  concurrent child processes;
-- streams each uncached control row to SAGE at the matching task boundary;
-- starts SAGE from an empty run-local registry;
-- disables application control, response, task, and persistent output replay;
-- uses the fixed clock and hash-pinned read-only external-service fixture;
-- creates `dashboard/task_compare.html`, verifies the server root and served
-  bytes, and opens it in the external browser before either model process; and
-- verifies task order, complete one-to-one coverage, process overlap, evaluator
-  identity, reflection provenance, cache state, and runtime exceptions.
-
-The matched control is not the stock ToolSandbox agent. It uses the same model
-settings, task order, execution harness, and configurable policy-aware actor
-wrapper as SAGE, but it has no generated-tool registry, cannot generate or
-learn tools, and receives only the native ToolSandbox inventory. This isolates
-the contribution of the SAGE tool system within the studied production setup.
-
-OpenAI may still report provider-managed prompt-prefix cached input tokens. That
-does not replay a response or task outcome and is recorded separately.
-
-To verify an already completed run:
-
-```bash
-make verify-publication \
-  RUN=outputs/publication_validation/<run-stamp>/native_action
-```
-
-Live calls are stochastic and the recorded provider model identifier is an
-unversioned alias, so a future run is not expected to reproduce an identical
-trajectory. The release gates are the predeclared outcome and integrity rules,
-not byte-identical model output.
-
-## Reproduce the completed ten-run campaign
-
-Preparation writes a plan and does not make model calls:
-
-```bash
-make prepare-paper-rerun \
-  SAMPLE_REPORT=outputs/publication_validation/<sample>/native_action/<run>/publication_validation_report.json \
-  CAMPAIGN_ARGS='--campaign-id chapter4_policy_10x_<date> --scope online-and-frozen --expected-online-runs 10'
-```
-
-Execution remains explicitly gated:
-
-```bash
-PYTHONPATH=src:. python scripts/run_chapter4_evidence_campaign.py run \
-  --campaign-manifest artifacts/chapter4_evidence/<campaign-id>/campaign_manifest.json \
-  --wave all \
-  --approve-execution
-```
-
-The runner launches ten isolated online-build pairs concurrently; inside every
-pair, the matched control and policy-directed SAGE processes also run
-concurrently. Every pair receives a distinct preflighted dashboard port and
-opens Task Compare in the external browser. With `online-and-frozen`, the
-second wave evaluates each independently learned registry with generation and
-repair disabled. Verify and analyze completed campaign artifacts with
-`make verify-campaign`, `make analyze`, and `make render-paper`. The last two
-commands use the current H1--H3 reconstruction rather than the superseded
-September 16 framing.
-
-## Source layout
-
-- `src/sage_ts/adapters/` — policy actor and ToolSandbox execution adapters
-- `src/sage_ts/adequacy/` — visible-context gap classification and admission
-- `src/sage_ts/generation/` — tool specifications, generation, and repair
-- `src/sage_ts/validation/` — candidate validation and output normalization
-- `src/sage_ts/registry/` — retained generated-tool registry
-- `src/sage_ts/runtime/` — routing, injection, and execution
-- `src/sage_ts/orchestration/` — online birth and lifecycle reflection
-- `src/sage_ts/evaluation/` — reporting and feedback evaluators, metrics, reuse
-- `scripts/run_sage_protocol.py` — paired execution protocol
-- `scripts/run_native_action_4omini_ab.sh` — guarded publication launcher
-- `scripts/research/` — offline campaign aggregation, not production runtime
-- `tool_sandbox/` — upstream Apple benchmark code, excluded from SAGE line counts
+- `adapters/` — actor and ToolSandbox execution adapters
+- `adequacy/` — gap classification and candidate admission
+- `generation/` — reusable tool specification, generation, and repair
+- `validation/` — schema, AST, sandbox, and behavioral validation
+- `registry/` — retained-tool storage and manifests
+- `runtime/` — task-conditioned routing, injection, and execution
+- `orchestration/` — online tool birth and lifecycle reflection
+- `evaluation/` — outcome feedback, metrics, and contribution accounting
+- `dashboard/` — generated live dashboards and local server
 
 The SAGE additions build on Apple's ToolSandbox. See `LICENSE`,
-`ACKNOWLEDGEMENTS`, and `NOTICE.md` for attribution, license scope, and the two
-decisions that must be resolved before public redistribution.
+`ACKNOWLEDGEMENTS`, and `NOTICE.md` for attribution and license scope.
