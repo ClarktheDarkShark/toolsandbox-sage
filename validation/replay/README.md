@@ -49,6 +49,17 @@ or suppress normalization rules.
   reminder, device, recency, insufficient-information, location, external
   service, and lifecycle states. It snapshots every visibility decision and
   the selected schema order.
+- `runtime_contracts`: provides the fail-closed seam for the router and output
+  normalization refactor. It characterizes 42 normalization cases across every
+  generated-tool family and pass-through, 41 routing cases covering every
+  reachable decision reason and precedence layer, and the ToolSandbox runtime
+  wrapper's visible-trace traversal, malformed-trace behavior, input-enrichment
+  order, abstention/error handling, trace emission, reuse callbacks, and native
+  trace preservation. Unlike the ordinary semantic snapshot, this probe also
+  records recursive dictionary insertion order, exact compact JSON bytes, and
+  SHA-256 hashes. Its vectors incorporate the relevant historical
+  normalization and generated-tool-injection oracle cases without adding tests
+  to the production package.
 - `lifecycle`: replays one ordered same-run control/candidate feedback stream
   and snapshots feedback records, immediate actions, pulses, registry hash,
   reuse/success-flip counters, retirement state, and final retain, repair, park,

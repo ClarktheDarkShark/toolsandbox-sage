@@ -37,6 +37,7 @@ DEFAULT_PROBES = (
     "normalization",
     "validation",
     "routing",
+    "runtime_contracts",
     "lifecycle",
     "reporting",
 )

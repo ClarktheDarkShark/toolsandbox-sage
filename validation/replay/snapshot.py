@@ -60,6 +60,48 @@ def _jsonable(value: Any) -> Any:
     return str(value)
 
 
+def _ordered_key_paths(value: Any, path: str = "") -> list[dict[str, Any]]:
+    """Expose mapping insertion order that the semantic JSON comparer ignores."""
+
+    orders: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        keys = [str(key) for key in value]
+        orders.append({"path": path or "/", "keys": keys})
+        for key, item in value.items():
+            escaped = str(key).replace("~", "~0").replace("/", "~1")
+            orders.extend(_ordered_key_paths(item, f"{path}/{escaped}"))
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            orders.extend(_ordered_key_paths(item, f"{path}/{index}"))
+    return orders
+
+
+def _exact_json_snapshot(value: Any) -> dict[str, Any]:
+    """Snapshot JSON meaning, type, insertion order, and exact compact bytes."""
+
+    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return {
+        "python_type": type(value).__name__,
+        "value": _jsonable(value),
+        "object_key_order": _ordered_key_paths(value),
+        "raw_json": raw,
+        "raw_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+    }
+
+
+def _capture_exact_call(call: Callable[[], Any]) -> dict[str, Any]:
+    """Capture either an exact JSON result or a stable exception contract."""
+
+    try:
+        return {"status": "returned", "result": _exact_json_snapshot(call())}
+    except Exception as error:  # noqa: BLE001 - exception behavior is the contract.
+        return {
+            "status": "raised",
+            "exception_type": type(error).__name__,
+            "message": str(error),
+        }
+
+
 def _relative_source(module: Any, root: Path) -> str:
     raw = getattr(module, "__file__", None)
     if not raw:
@@ -1184,6 +1226,9 @@ def _tool_spec(
     preserves: tuple[str, ...] = (),
     required_calls: tuple[str, ...] = (),
     abstain_behavior: str = "",
+    applicable_task_families: tuple[str, ...] = (),
+    expected_replacements: tuple[str, ...] = (),
+    native_action_delegation: bool = False,
 ) -> Any:
     from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolSpec
 
@@ -1207,6 +1252,9 @@ def _tool_spec(
         preserves_side_effect_tools=preserves,
         required_original_tool_calls=required_calls,
         abstain_behavior=abstain_behavior,
+        applicable_task_families=applicable_task_families,
+        expected_milestone_calls_replaced=expected_replacements,
+        native_action_delegation=native_action_delegation,
         generalization_rationale=(
             "The same deterministic transformation recurs across multiple visible "
             "task variants and therefore merits a reusable helper."
@@ -1460,6 +1508,818 @@ def probe_normalization(_root: Path) -> dict[str, Any]:
         ),
     }
     return _jsonable({"cases": cases})
+
+
+def _probe_normalization_contract_matrix() -> dict[str, Any]:
+    """Characterize every normalization family and its important pass-throughs."""
+
+    from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
+    from sage_ts.validation.output_normalization import normalize_generated_tool_output
+
+    string = {"type": "string"}
+    boolean = {"type": "boolean"}
+    array = {"type": "array"}
+    mapping = {"type": "object"}
+
+    def generated(
+        name: str,
+        family: Any,
+        *,
+        inputs: tuple[Any, ...] = (),
+        output_properties: dict[str, Any] | None = None,
+        preserves: tuple[str, ...] = (),
+        required_calls: tuple[str, ...] = (),
+        native_action_delegation: bool = False,
+    ) -> Any:
+        spec = _tool_spec(
+            name=name,
+            family=family,
+            inputs=inputs,
+            output_properties=output_properties,
+            preserves=preserves,
+            required_calls=required_calls,
+            native_action_delegation=native_action_delegation,
+        )
+        return GeneratedTool(
+            spec=spec,
+            code=f"def {name}(**kwargs):\n    return {{}}\n",
+        )
+
+    selector_properties = {
+        "selected_record": mapping,
+        "selected_index": {"type": "integer"},
+        "selected_id": string,
+        "value": string,
+        "matched_constraints": array,
+        "tie_candidates": array,
+        "abstain_reason": string,
+    }
+    selector = generated(
+        "select_visible_record_by_constraints",
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible records."),
+            ToolInput("field_name", "str", "Visible field."),
+            ToolInput("expected_value", "str", "Visible expected value."),
+        ),
+        output_properties=selector_properties,
+    )
+    selector_inputs = {
+        "records": [
+            {"person_id": "a", "relationship": "friend"},
+            {"person_id": "b", "relationship": "friend"},
+        ],
+        "field_name": "relationship",
+        "expected_value": "friend",
+    }
+
+    workflow_properties = {
+        "selected_record": mapping,
+        "selected_index": {"type": "integer"},
+        "selected_id": string,
+        "value": string,
+        "downstream_tool_name": string,
+        "downstream_tool_kwargs": mapping,
+        "should_call_tool": boolean,
+        "tie_candidates": array,
+        "abstain_reason": string,
+        "safety_notes": string,
+    }
+    workflow = generated(
+        "prepare_side_effect_args_from_selected_record",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties=workflow_properties,
+    )
+    generic_properties = {
+        "should_call_search_contacts": boolean,
+        "search_contacts_kwargs": mapping,
+        "downstream_tool_name": string,
+        "downstream_tool_kwargs": mapping,
+        "downstream_tool_kwargs_list": array,
+        "action_sequence": array,
+        "answer_field": string,
+        "message_content": string,
+        "next_step": string,
+        "final_answer_recommendation": string,
+        "abstain_reason": string,
+    }
+    generic = generated(
+        "plan_generic_composite",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties=generic_properties,
+    )
+    send_lookup = generated(
+        "plan_send_message_contact_lookup",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties=generic_properties,
+    )
+    relationship_batch = generated(
+        "plan_contact_relationship_batch_update",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties={
+            **generic_properties,
+            "phase": string,
+            "source_relationship": string,
+            "target_relationship": string,
+            "selected_contacts": array,
+            "should_call_tools": boolean,
+        },
+    )
+
+    guard_properties = {
+        "should_abstain": boolean,
+        "missing_information": array,
+        "required_original_tools": array,
+        "forbidden_downstream_tools": array,
+        "safe_next_action": string,
+        "clarification_prompt": string,
+        "final_answer_recommendation": string,
+        "abstain_reason": string,
+    }
+    guard = generated(
+        "prepare_safe_action_or_abstain",
+        ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        output_properties=guard_properties,
+    )
+    guard_raw = {
+        "should_abstain": False,
+        "missing_information": [],
+        "required_original_tools": [],
+        "forbidden_downstream_tools": [],
+        "safe_next_action": "continue_with_original_tool",
+        "clarification_prompt": "",
+        "final_answer_recommendation": "",
+        "abstain_reason": "",
+    }
+
+    state = generated(
+        "plan_device_state_action_sequence_v3",
+        ToolFamily.STATE_PRECONDITION_HELPER,
+        output_properties={
+            "tool_name": string,
+            "arguments": mapping,
+            "should_call": boolean,
+            "reason": string,
+            "action_sequence": array,
+            "final_response_recommendation": string,
+            "continue_original_task_after_sequence": boolean,
+            "abstain_reason": string,
+        },
+    )
+    state_blank = {
+        "tool_name": "",
+        "arguments": {},
+        "should_call": False,
+        "reason": "",
+        "action_sequence": [],
+        "final_response_recommendation": "",
+        "continue_original_task_after_sequence": False,
+        "abstain_reason": "not_ready",
+    }
+
+    reminder = generated(
+        "prepare_reminder_creation_args",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties={
+            "add_reminder_kwargs": mapping,
+            "should_call_add_reminder": boolean,
+            "location_status": string,
+            "timestamp_source": string,
+            "abstain_reason": string,
+        },
+    )
+    reminder_raw = {
+        "add_reminder_kwargs": {
+            "content": "Pick up groceries",
+            "reminder_timestamp": None,
+        },
+        "should_call_add_reminder": True,
+        "location_status": "",
+        "timestamp_source": "",
+        "abstain_reason": "",
+    }
+
+    derived_properties = {
+        "answer_value": string,
+        "answer_kind": string,
+        "answer_unit": string,
+        "should_call_downstream_tool": boolean,
+        "downstream_tool_name": string,
+        "downstream_tool_kwargs": mapping,
+        "exact_final_answer": string,
+        "final_answer_recommendation": string,
+        "copy_exactly": boolean,
+        "abstain_reason": string,
+    }
+    derived = generated(
+        "extract_temperature_result",
+        ToolFamily.DERIVED_VALUE_CALCULATOR,
+        output_properties=derived_properties,
+    )
+    derived_raw = {
+        "answer_value": "",
+        "answer_kind": "",
+        "answer_unit": "",
+        "should_call_downstream_tool": False,
+        "downstream_tool_name": "",
+        "downstream_tool_kwargs": {},
+        "exact_final_answer": "",
+        "final_answer_recommendation": "",
+        "copy_exactly": False,
+        "abstain_reason": "",
+    }
+
+    canonicalizer = generated(
+        "canonicalize_replay_label",
+        ToolFamily.CANONICALIZER,
+        output_properties={"value": string},
+    )
+    native = generated(
+        "native_replay_composite",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties={"native_result": mapping, "abstain_reason": string},
+        preserves=("remove_contact",),
+        required_calls=("remove_contact",),
+        native_action_delegation=True,
+    )
+    malformed_selector_schema = generated(
+        "selector_without_contract_fields",
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        output_properties={"value": string},
+    )
+
+    cases: list[tuple[str, Any, Any, dict[str, Any] | None]] = [
+        ("non_dict_passthrough", selector, ["unchanged", None], None),
+        (
+            "unsupported_family_nested_null_cleanup",
+            canonicalizer,
+            {"tool_kwargs": {"kept": 1, "removed": None}, "plain": None},
+            None,
+        ),
+        (
+            "native_action_passthrough_before_null_cleanup",
+            native,
+            {"native_result": {"kept": 1, "still_none": None}, "abstain_reason": ""},
+            None,
+        ),
+        (
+            "selector_nonambiguous_constraint_dedupe",
+            selector,
+            {
+                "selected_record": selector_inputs["records"][0],
+                "selected_index": 0,
+                "selected_id": "a",
+                "value": "a",
+                "matched_constraints": ["functions.relationship", "relationship"],
+                "tie_candidates": [],
+                "abstain_reason": "",
+            },
+            selector_inputs,
+        ),
+        (
+            "selector_ambiguous_inferred_ties",
+            selector,
+            {
+                "selected_record": selector_inputs["records"][0],
+                "selected_index": 0,
+                "selected_id": "a",
+                "value": "a",
+                "matched_constraints": [],
+                "tie_candidates": [],
+                "abstain_reason": "Ambiguous multiple matches.",
+            },
+            selector_inputs,
+        ),
+        (
+            "selector_ambiguous_selected_fallback",
+            selector,
+            {
+                "selected_record": {"person_id": "solo", "name": "Dana"},
+                "selected_index": 7,
+                "selected_id": "solo",
+                "value": "solo",
+                "matched_constraints": [],
+                "tie_candidates": [{"person_id": "other"}],
+                "abstain_reason": "tie",
+            },
+            {"records": [], "field_name": "name", "expected_value": "Dana"},
+        ),
+        (
+            "selector_contract_schema_passthrough",
+            malformed_selector_schema,
+            {"value": "same", "tool_kwargs": {"x": 1, "drop": None}},
+            {},
+        ),
+        (
+            "generic_composite_nested_null_cleanup",
+            generic,
+            {
+                "should_call_search_contacts": True,
+                "search_contacts_kwargs": {
+                    "relationship": "__all_contacts__",
+                    "name": None,
+                },
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {"person_id": "p1", "drop": None},
+                "downstream_tool_kwargs_list": [
+                    {"person_id": "p1", "drop": None},
+                    "sentinel",
+                ],
+                "action_sequence": [
+                    {
+                        "tool_name": "modify_contact",
+                        "arguments": {"person_id": "p1", "drop": None},
+                    }
+                ],
+                "answer_field": "phone_number",
+                "message_content": "",
+                "next_step": "",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            {},
+        ),
+        (
+            "generic_composite_abstention_clears_downstream",
+            generic,
+            {
+                "should_call_tool": False,
+                "should_call_tools": False,
+                "should_call_search_contacts": False,
+                "should_call_downstream_tool": False,
+                "search_contacts_kwargs": {},
+                "downstream_tool_name": "remove_contact",
+                "downstream_tool_kwargs": {"person_id": "unsafe"},
+                "downstream_tool_kwargs_list": [{"person_id": "unsafe"}],
+                "answer_field": "person_id",
+                "message_content": "",
+                "next_step": "",
+                "final_answer_recommendation": "",
+                "abstain_reason": "missing target!",
+            },
+            {},
+        ),
+        (
+            "generic_contact_lookup_missing_constraint",
+            generic,
+            {
+                "should_call_search_contacts": False,
+                "search_contacts_kwargs": {},
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "downstream_tool_kwargs_list": [],
+                "answer_field": "phone_number",
+                "message_content": "",
+                "next_step": "",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            {"requested_field": "phone_number"},
+        ),
+        (
+            "send_lookup_advisory_fields",
+            send_lookup,
+            {
+                "should_call_search_contacts": True,
+                "search_contacts_kwargs": {"name": "Dana"},
+                "downstream_tool_name": "send_message_with_phone_number",
+                "downstream_tool_kwargs": {},
+                "downstream_tool_kwargs_list": [],
+                "action_sequence": [],
+                "answer_field": "",
+                "message_content": "Meet at five",
+                "next_step": "",
+                "final_answer_recommendation": "",
+                "abstain_reason": "",
+            },
+            {},
+        ),
+        (
+            "relationship_batch_stale_records_request_fresh_search",
+            relationship_batch,
+            {
+                "phase": "abstain",
+                "source_relationship": "friends",
+                "target_relationship": "coworkers",
+                "selected_contacts": [{"person_id": "stale"}],
+                "should_call_tools": False,
+                "should_call_search_contacts": False,
+                "search_contacts_kwargs": {},
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {},
+                "downstream_tool_kwargs_list": [],
+                "action_sequence": [],
+                "answer_field": "",
+                "message_content": "",
+                "next_step": "",
+                "final_answer_recommendation": "do not continue",
+                "abstain_reason": "no matching contacts",
+            },
+            {
+                "source_relationship": "friend",
+                "target_relationship": "coworker",
+                "contacts": [{"person_id": "p1", "relationship": "enemy"}],
+            },
+        ),
+        (
+            "workflow_unique_downstream_action",
+            workflow,
+            {
+                "selected_record": {"person_id": "p1", "name": "Dana"},
+                "selected_index": -1,
+                "selected_id": "",
+                "value": "",
+                "downstream_tool_name": "modify_contact",
+                "downstream_tool_kwargs": {"person_id": "p1", "relationship": "friend"},
+                "should_call_tool": False,
+                "tie_candidates": [],
+                "abstain_reason": "",
+                "safety_notes": "",
+            },
+            {"records": [{"person_id": "p1", "name": "Dana"}]},
+        ),
+        (
+            "workflow_answer_only_selection",
+            workflow,
+            {
+                "selected_record": {"person_id": "p1", "phone_number": "+1555"},
+                "selected_index": None,
+                "selected_id": "",
+                "value": "",
+                "downstream_tool_name": "",
+                "downstream_tool_kwargs": {},
+                "should_call_tool": True,
+                "tie_candidates": [],
+                "abstain_reason": "",
+                "safety_notes": "",
+            },
+            {
+                "records": [{"person_id": "p1", "phone_number": "+1555"}],
+                "return_field": "phone_number",
+            },
+        ),
+        (
+            "workflow_ambiguity_clears_action",
+            workflow,
+            {
+                "selected_record": {"person_id": "a", "relationship": "friend"},
+                "selected_index": 0,
+                "selected_id": "a",
+                "value": "a",
+                "downstream_tool_name": "remove_contact",
+                "downstream_tool_kwargs": {"person_id": "a"},
+                "should_call_tool": True,
+                "tie_candidates": [],
+                "abstain_reason": "multiple match",
+                "safety_notes": "",
+            },
+            selector_inputs,
+        ),
+        (
+            "guard_missing_contact_target",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "Remove that contact",
+                "requested_action": "remove_contact",
+                "target_identifier": "",
+                "required_original_tools": ["search_contacts", "remove_contact"],
+                "available_original_tools": ["search_contacts", "remove_contact"],
+                "visible_records_count": 0,
+            },
+        ),
+        (
+            "guard_missing_original_tool_has_priority",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "Remove Dana",
+                "requested_action": "remove_contact",
+                "target_identifier": "Dana",
+                "required_original_tools": ["search_contacts", "remove_contact"],
+                "available_original_tools": ["remove_contact"],
+                "visible_records_count": 0,
+            },
+        ),
+        (
+            "guard_current_city_requires_location",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "What city am I in?",
+                "requested_action": "",
+                "target_identifier": "",
+                "required_original_tools": [],
+                "available_original_tools": [],
+                "visible_records_count": 0,
+            },
+        ),
+        (
+            "guard_named_message_requires_contact_lookup",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "Tell Dana I will be late",
+                "requested_action": "send_message",
+                "target_identifier": "Dana",
+                "required_original_tools": ["send_message_with_phone_number"],
+                "available_original_tools": ["send_message_with_phone_number"],
+                "visible_records_count": 0,
+            },
+        ),
+        (
+            "guard_relative_reminder_requires_clock",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "Find my reminder from yesterday",
+                "requested_action": "search_reminder",
+                "target_identifier": "",
+                "required_original_tools": [],
+                "available_original_tools": ["search_reminder"],
+                "visible_records_count": 0,
+            },
+        ),
+        (
+            "guard_relative_message_with_clock_can_continue",
+            guard,
+            dict(guard_raw),
+            {
+                "user_request": "Find my latest message",
+                "requested_action": "search_messages",
+                "target_identifier": "",
+                "required_original_tools": [],
+                "available_original_tools": ["search_messages", "get_current_timestamp"],
+                "visible_records_count": 0,
+            },
+        ),
+    ]
+
+    direct_state_vectors = (
+        ("cellular_on", "turn on cellular", "set_cellular_service_status", True),
+        ("cellular_off", "disable cellular service", "set_cellular_service_status", False),
+        ("wifi_on", "enable wi-fi", "set_wifi_status", True),
+        ("wifi_off", "turn wifi off", "set_wifi_status", False),
+        ("location_on", "enable location services", "set_location_service_status", True),
+        ("location_off", "turn off location", "set_location_service_status", False),
+        ("low_battery_on", "enable low battery mode", "set_low_battery_mode_status", True),
+        ("low_battery_off", "disable low battery mode", "set_low_battery_mode_status", False),
+    )
+    for case_id, request, _tool_name, _on in direct_state_vectors:
+        cases.append(
+            (
+                f"state_direct_{case_id}",
+                state,
+                dict(state_blank),
+                {"user_request": request},
+            )
+        )
+    cases.extend(
+        [
+            (
+                "state_cellular_blocked_clears_low_battery_first",
+                state,
+                dict(state_blank),
+                {
+                    "user_request": "Send a message",
+                    "visible_state_or_error": (
+                        "Cellular service is disabled; low battery mode is on"
+                    ),
+                },
+            ),
+            (
+                "state_location_blocked_builds_three_step_recovery",
+                state,
+                dict(state_blank),
+                {
+                    "user_request": "Find weather near me",
+                    "visible_state_or_error": "PermissionError: location is disabled",
+                },
+            ),
+            (
+                "state_wifi_blocked_recovery",
+                state,
+                dict(state_blank),
+                {
+                    "user_request": "Search for a holiday",
+                    "visible_state_or_error": "Wi-Fi is off",
+                },
+            ),
+            (
+                "state_existing_sequence_dedupes_and_drops_redundant_clear",
+                state,
+                {
+                    **state_blank,
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_low_battery_mode_status",
+                            "arguments": {"on": False},
+                            "reason": "clear_low_battery_before_enabling_service",
+                        },
+                        {
+                            "tool_name": "set_wifi_status",
+                            "arguments": {"on": True},
+                            "reason": "set_wifi_on",
+                        },
+                        {
+                            "tool_name": "set_wifi_status",
+                            "arguments": {"on": True},
+                            "reason": "duplicate",
+                        },
+                    ],
+                },
+                {
+                    "visible_state_summary": "low battery mode is off",
+                    "resume_original_task": True,
+                },
+            ),
+            (
+                "state_structured_final_response",
+                state,
+                {
+                    **state_blank,
+                    "action_sequence": [
+                        {
+                            "tool_name": "set_cellular_service_status",
+                            "arguments": {"on": True},
+                            "reason": "set_cellular_on",
+                        }
+                    ],
+                    "final_response_recommendation": "Completed action.",
+                },
+                {
+                    "target_service": "cellular",
+                    "desired_on": True,
+                    "resume_original_task": False,
+                },
+            ),
+            (
+                "reminder_required_location_missing",
+                reminder,
+                copy.deepcopy(reminder_raw),
+                {
+                    "location_required": True,
+                    "location_available": False,
+                    "current_timestamp": 100000.0,
+                    "day_offset": 1,
+                    "hour": 9,
+                    "minute": 30,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 1,
+                        "day": 1,
+                        "hour": 10,
+                        "minute": 0,
+                        "second": 0,
+                    },
+                },
+            ),
+            (
+                "reminder_optional_location_lookup_pending",
+                reminder,
+                copy.deepcopy(reminder_raw),
+                {
+                    "location_requested": True,
+                    "location_available": False,
+                    "location_lookup_failed": False,
+                    "resolved_reminder_timestamp": 200000.0,
+                },
+            ),
+            (
+                "reminder_relative_timestamp_recovery",
+                reminder,
+                copy.deepcopy(reminder_raw),
+                {
+                    "content": "Pick up groceries",
+                    "current_timestamp": 100000.0,
+                    "day_offset": 1,
+                    "hour": 9,
+                    "minute": 30,
+                    "current_datetime_info": {
+                        "year": 2026,
+                        "month": 1,
+                        "day": 1,
+                        "hour": 10,
+                        "minute": 0,
+                        "second": 0,
+                    },
+                },
+            ),
+            (
+                "reminder_missing_datetime_info",
+                reminder,
+                copy.deepcopy(reminder_raw),
+                {
+                    "current_timestamp": 100000.0,
+                    "day_offset": 1,
+                    "hour": 9,
+                    "minute": 30,
+                    "current_datetime_info": {},
+                },
+            ),
+            (
+                "reminder_coordinates_strip_location_suffix",
+                reminder,
+                {
+                    **copy.deepcopy(reminder_raw),
+                    "add_reminder_kwargs": {
+                        "content": "Pick up groceries at Market Street",
+                        "reminder_timestamp": 200000.0,
+                    },
+                },
+                {
+                    "content": "Pick up groceries at Market Street",
+                    "location_requested": True,
+                    "location_available": True,
+                    "latitude": 37.0,
+                    "longitude": -122.0,
+                    "resolved_reminder_timestamp": 200000.0,
+                },
+            ),
+            (
+                "derived_temperature_visible_payload",
+                derived,
+                dict(derived_raw),
+                {
+                    "service_payload": {
+                        "current_temperature": 15.1,
+                        "temperature_unit": "Celsius",
+                    },
+                    "requested_unit": "Celsius",
+                    "answer_subject": "Grand Canyon",
+                },
+            ),
+            (
+                "derived_unit_conversion",
+                derived,
+                {
+                    **derived_raw,
+                    "should_call_downstream_tool": True,
+                    "downstream_tool_name": "unit_conversion",
+                    "downstream_tool_kwargs": {
+                        "amount": 15.1,
+                        "from_unit": "degrees C",
+                        "to_unit": "F",
+                    },
+                },
+                {},
+            ),
+            (
+                "derived_abstention_does_not_synthesize",
+                derived,
+                {**derived_raw, "abstain_reason": "missing payload!"},
+                {
+                    "service_payload": {
+                        "current_temperature": 15.1,
+                        "temperature_unit": "Celsius",
+                    }
+                },
+            ),
+        ]
+    )
+
+    results: dict[str, Any] = {}
+    for case_id, tool, raw_value, inputs in cases:
+        value_before = copy.deepcopy(raw_value)
+        inputs_before = copy.deepcopy(inputs)
+        call = _capture_exact_call(
+            lambda tool=tool, raw_value=raw_value, inputs=inputs: (
+                normalize_generated_tool_output(tool, raw_value, inputs=inputs)
+            )
+        )
+        if raw_value != value_before or inputs != inputs_before:
+            raise RuntimeError(
+                f"Normalization case {case_id!r} mutated caller-owned input"
+            )
+        results[case_id] = {
+            "call": call,
+            "value_before": _exact_json_snapshot(value_before),
+            "value_after": _exact_json_snapshot(raw_value),
+            "inputs_before": _exact_json_snapshot(inputs_before),
+            "inputs_after": _exact_json_snapshot(inputs),
+        }
+
+    return {
+        "case_count": len(results),
+        "historical_oracle_vectors": [
+            "structured_state_sequence_normalizes_control_fields",
+            "derived_value_abstention_does_not_synthesize_visible_fallback",
+            "selector_output_normalization_enforces_ambiguity_abstention",
+            "composite_output_normalization_fills_safe_defaults",
+            "generated_kwargs_normalization_removes_null_optional_values",
+            "safe_abstention_normalization_rejects_unresolved_side_effect_target",
+            "safe_abstention_normalization_preserves_missing_original_tool_priority",
+            "safe_abstention_normalization_forces_current_city_location_lookup",
+            "safe_abstention_normalization_requires_clock_for_relative_search",
+            "safe_abstention_allows_blank_target_when_relative_search_has_clock",
+            "generic_composite_abstention_clears_downstream_action",
+            "generic_contact_lookup_abstention_fills_missing_constraint_reason",
+            "search_contacts_kwargs_converts_all_contacts_sentinel",
+            "send_message_lookup_normalization_fills_advisory_fields",
+            "composite_output_normalization_enforces_ambiguity_abstention",
+        ],
+        "cases": results,
+    }
 
 
 def probe_validation(_root: Path) -> dict[str, Any]:
@@ -2013,6 +2873,1602 @@ def probe_routing(_root: Path) -> dict[str, Any]:
             },
         }
     return _jsonable({"validation_proof": proof, "cases": results})
+
+
+def _probe_routing_contract_matrix() -> dict[str, Any]:
+    """Exercise every reachable router reason and precedence layer."""
+
+    from dataclasses import replace
+
+    from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
+    from sage_ts.runtime.toolsandbox_integration import route_registry_entries
+
+    string = {"type": "string"}
+    boolean = {"type": "boolean"}
+    array = {"type": "array"}
+    mapping = {"type": "object"}
+
+    def entry(
+        name: str,
+        *,
+        family: Any = ToolFamily.CANONICALIZER,
+        inputs: tuple[Any, ...] = (),
+        output_properties: dict[str, Any] | None = None,
+        positive: tuple[str, ...] = (),
+        negative: tuple[str, ...] = (),
+        applicable: tuple[str, ...] = (),
+        preserves: tuple[str, ...] = (),
+        required: tuple[str, ...] = (),
+        expected_replacements: tuple[str, ...] = (),
+        abstain_behavior: str = "",
+        retired: bool = False,
+        current_proof: bool = True,
+        native_action_delegation: bool = False,
+    ) -> Any:
+        normalized_inputs = inputs or (
+            ToolInput("visible_value", "str", "Visible replay value."),
+        )
+        normalized_output = output_properties
+        normalized_negative = negative
+        normalized_abstain = abstain_behavior
+        normalized_preserves = preserves
+        normalized_required = required
+        if family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+            if not any(item.name in {"records", "candidates"} for item in normalized_inputs):
+                normalized_inputs = (
+                    ToolInput("records", "list", "Visible candidate records."),
+                    *normalized_inputs,
+                )
+            normalized_output = normalized_output or selector_properties
+            normalized_negative = normalized_negative or ("ambiguous tie",)
+            normalized_abstain = normalized_abstain or "Abstain on ambiguous ties."
+        elif family == ToolFamily.COMPOSITE_WORKFLOW_HELPER:
+            normalized_preserves = normalized_preserves or (
+                normalized_required or ("search_contacts",)
+            )
+            normalized_required = normalized_required or normalized_preserves
+            normalized_output = normalized_output or {
+                "downstream_tool_kwargs": mapping,
+                "abstain_reason": string,
+            }
+            if not any(str(key).endswith("_kwargs") for key in normalized_output):
+                normalized_output = {
+                    **normalized_output,
+                    "downstream_tool_kwargs": mapping,
+                }
+            normalized_negative = normalized_negative or (
+                "insufficient_information",
+            )
+            normalized_abstain = (
+                normalized_abstain or "Abstain on insufficient_information."
+            )
+        tool = GeneratedTool(
+            spec=_tool_spec(
+                name=name,
+                family=family,
+                inputs=normalized_inputs,
+                output_properties=normalized_output,
+                positive_triggers=positive,
+                negative_triggers=normalized_negative,
+                applicable_task_families=applicable,
+                preserves=normalized_preserves,
+                required_calls=normalized_required,
+                expected_replacements=expected_replacements,
+                abstain_behavior=normalized_abstain,
+                native_action_delegation=native_action_delegation,
+            ),
+            code=f"def {name}(**kwargs):\n    return {{}}\n",
+        )
+        accepted = _accepted_entry(tool)
+        if retired:
+            accepted = replace(accepted, retired=True)
+        if not current_proof:
+            accepted = replace(accepted, stored_code_hash="not-current")
+        return accepted
+
+    state_properties = {
+        "tool_name": {
+            "type": "string",
+            "enum": [
+                "",
+                "set_wifi_status",
+                "set_cellular_service_status",
+                "set_location_service_status",
+                "set_low_battery_mode_status",
+            ],
+        },
+        "arguments": mapping,
+        "should_call": boolean,
+        "reason": string,
+        "abstain_reason": string,
+    }
+    guard_properties = {
+        "should_abstain": boolean,
+        "missing_information": array,
+        "required_original_tools": array,
+        "forbidden_downstream_tools": array,
+        "safe_next_action": string,
+        "clarification_prompt": string,
+        "final_answer_recommendation": string,
+        "abstain_reason": string,
+    }
+    selector_properties = {
+        "selected_record": mapping,
+        "selected_id": string,
+        "value": string,
+        "tie_candidates": array,
+        "abstain_reason": string,
+    }
+
+    def one_case(
+        case_id: str,
+        item: Any,
+        context: str | None,
+        *,
+        family_key: str = "replay_family",
+        base_tools: set[str] | None = None,
+        lifecycle: dict[str, dict[str, Any]] | None = None,
+        max_bundle_size: int = 4,
+        scenario_name: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "id": case_id,
+            "entries": {item.tool.spec.tool_name: item},
+            "context": context,
+            "family": family_key,
+            "base_tools": base_tools,
+            "lifecycle": lifecycle,
+            "max_bundle_size": max_bundle_size,
+            "scenario_name": scenario_name or case_id,
+        }
+
+    cases: list[dict[str, Any]] = []
+
+    cases.extend(
+        [
+            one_case(
+                "inactive_entry",
+                entry(
+                    "inactive_helper",
+                    positive=("active_signal",),
+                    retired=True,
+                ),
+                "request=test signals=active_signal",
+            ),
+            one_case(
+                "legacy_proof",
+                entry(
+                    "legacy_proof_helper",
+                    positive=("active_signal",),
+                    current_proof=False,
+                ),
+                "request=test signals=active_signal",
+            ),
+            one_case(
+                "missing_context",
+                entry("missing_context_helper", positive=("active_signal",)),
+                None,
+            ),
+            one_case(
+                "negative_trigger_precedence",
+                entry(
+                    "negative_helper",
+                    positive=("positive_signal",),
+                    negative=("negative_signal",),
+                ),
+                "request=test signals=positive_signal negative_signal",
+                lifecycle={
+                    "negative_helper": {
+                        "decision": "retain_with_route_repair",
+                        "failed_count": 0,
+                        "side_effect_incident_count": 0,
+                    }
+                },
+            ),
+            one_case(
+                "required_signal_missing",
+                entry(
+                    "prepare_holiday_search_args",
+                    family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                    positive=("holiday",),
+                ),
+                "request=Tell me something unrelated signals=unrelated",
+            ),
+            one_case(
+                "pending_relative_time",
+                entry(
+                    "relative_day_time_to_timestamp",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("relative_time",),
+                    required=("get_current_timestamp",),
+                ),
+                "request=Create a reminder tools=get_current_timestamp signals=reminder_create",
+                family_key="reminder_create",
+                base_tools={"get_current_timestamp"},
+            ),
+            one_case(
+                "pending_weekday_time",
+                entry(
+                    "next_weekday_time_to_timestamp",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("weekday_time",),
+                    required=("get_current_timestamp",),
+                ),
+                "request=Create a reminder next week tools=get_current_timestamp signals=reminder_create",
+                family_key="reminder_create",
+                base_tools={"get_current_timestamp"},
+            ),
+            one_case(
+                "relative_time_external_service_suppression",
+                entry(
+                    "relative_day_time_to_timestamp",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("relative_time",),
+                ),
+                (
+                    "request=Find weather tomorrow tools=search_weather_around_lat_lon "
+                    "signals=relative_time external_lookup service_answer_extraction"
+                ),
+            ),
+        ]
+    )
+
+    def location_entry(name: str, *, coordinates: bool) -> Any:
+        inputs: list[Any] = [ToolInput("location_query", "str", "Visible place.")]
+        if coordinates:
+            inputs.extend(
+                [
+                    ToolInput("latitude", "float", "Visible latitude."),
+                    ToolInput("longitude", "float", "Visible longitude."),
+                ]
+            )
+        return entry(
+            name,
+            family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+            inputs=tuple(inputs),
+            output_properties={"search_kwargs": mapping, "abstain_reason": string},
+            positive=("location_phrase", "external_lookup"),
+        )
+
+    cases.extend(
+        [
+            one_case(
+                "location_reverse_geocode_suppression",
+                location_entry("prepare_specific_location_search_args", coordinates=False),
+                (
+                    "request=What is the address at latitude 37.3 longitude -122.0 "
+                    "signals=location_phrase external_lookup"
+                ),
+            ),
+            one_case(
+                "broad_helper_rejects_specific_address",
+                location_entry("prepare_broad_location_search_args", coordinates=True),
+                (
+                    "request=Find weather near 1 Market Street "
+                    "signals=location_phrase external_lookup"
+                ),
+            ),
+            one_case(
+                "specific_helper_rejects_broad_place",
+                location_entry("prepare_specific_location_search_args", coordinates=False),
+                "request=Find weather in Boston signals=location_phrase external_lookup",
+            ),
+            one_case(
+                "broad_helper_requires_coordinates",
+                location_entry("prepare_broad_location_search_args", coordinates=False),
+                "request=Find weather in Boston signals=location_phrase external_lookup",
+            ),
+            one_case(
+                "location_helper_requires_external_or_reminder_context",
+                location_entry("prepare_specific_location_search_args", coordinates=False),
+                "request=Remember near 1 Market Street signals=location_phrase",
+            ),
+            one_case(
+                "generic_service_extractor_temperature_suppression",
+                entry(
+                    "extract_service_answer_field",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("service_answer_extraction",),
+                ),
+                "request=What is the temperature in Celsius signals=service_answer_extraction",
+            ),
+            one_case(
+                "scalar_extractor_visible_request_mismatch",
+                entry(
+                    "extract_distance_result",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("service_answer_extraction",),
+                ),
+                "request=What is the stock price signals=service_answer_extraction",
+            ),
+            one_case(
+                "recency_action_requires_reminder_context",
+                entry(
+                    "select_action_target_by_recency",
+                    family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                    output_properties=selector_properties,
+                    positive=("recency_action",),
+                ),
+                "request=Delete the newest contact signals=recency_action",
+            ),
+            one_case(
+                "direct_phone_skips_contact_lookup",
+                entry(
+                    "plan_send_message_contact_lookup",
+                    family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                    output_properties={"abstain_reason": string},
+                    positive=("named_message_recipient",),
+                ),
+                (
+                    "request=Send +15550100 hello "
+                    "signals=named_message_recipient has_phone_number"
+                ),
+            ),
+            one_case(
+                "direct_contact_helper_skips_message_counterparty_update",
+                entry(
+                    "prepare_direct_contact_action_args",
+                    family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                    output_properties={"abstain_reason": string},
+                    positive=("direct_contact_action",),
+                ),
+                (
+                    "request=Update my latest message sender "
+                    "signals=direct_contact_action message_counterparty_update"
+                ),
+            ),
+            one_case(
+                "side_effect_helper_insufficient_information",
+                entry(
+                    "select_action_target_by_recency",
+                    family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                    output_properties=selector_properties,
+                    positive=("recency_action",),
+                    preserves=("remove_reminder",),
+                    required=("search_reminder", "remove_reminder"),
+                ),
+                (
+                    "request=Remove it signals=recency_action reminder "
+                    "insufficient_information safe_abstain_needed"
+                ),
+                base_tools={"search_reminder", "remove_reminder"},
+            ),
+            one_case(
+                "visible_signal_match",
+                entry(
+                    "extract_stock_symbol",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("stock_lookup",),
+                ),
+                "request=Look up ACME signals=stock_lookup",
+            ),
+            one_case(
+                "visible_metadata_match",
+                entry(
+                    "metadata_only_helper",
+                    positive=("metadata_signal",),
+                ),
+                "request=Use metadata_signal signals=unmapped",
+                family_key="metadata_family",
+            ),
+            one_case(
+                "visible_no_match",
+                entry("unmatched_helper", positive=("absent_signal",)),
+                "request=Nothing relevant signals=unrelated",
+            ),
+        ]
+    )
+
+    lifecycle_base = entry(
+        "lifecycle_helper",
+        positive=("lifecycle_signal",),
+    )
+    cases.extend(
+        [
+            one_case(
+                "lifecycle_parked",
+                lifecycle_base,
+                "request=test signals=lifecycle_signal",
+                family_key="lifecycle_family",
+                lifecycle={"lifecycle_helper": {"decision": "parked"}},
+            ),
+            one_case(
+                "lifecycle_exact_harmful_scenario",
+                lifecycle_base,
+                "request=test signals=lifecycle_signal",
+                family_key="lifecycle_family",
+                lifecycle={
+                    "lifecycle_helper": {
+                        "decision": "retain_with_route_repair",
+                        "harmful_called_scenarios": ["lifecycle_family"],
+                    }
+                },
+            ),
+            one_case(
+                "lifecycle_harmful_family",
+                lifecycle_base,
+                "request=test signals=lifecycle_signal",
+                family_key="lifecycle_family",
+                lifecycle={
+                    "lifecycle_helper": {
+                        "decision": "retain_with_route_repair",
+                        "route_repair_families": ["lifecycle_family"],
+                        "harmful_called_families": [
+                            "lifecycle_family",
+                            "lifecycle_family",
+                        ],
+                        "helpful_called_families": [],
+                        "failed_count": 1,
+                    }
+                },
+            ),
+            one_case(
+                "lifecycle_mixed_helpful_family_remains_visible",
+                lifecycle_base,
+                "request=test signals=lifecycle_signal",
+                family_key="lifecycle_family",
+                lifecycle={
+                    "lifecycle_helper": {
+                        "decision": "retain_with_route_repair",
+                        "route_repair_families": ["lifecycle_family"],
+                        "harmful_called_families": [
+                            "lifecycle_family",
+                            "lifecycle_family",
+                        ],
+                        "helpful_called_families": [
+                            "lifecycle_family/c",
+                            "lifecycle_family/d",
+                        ],
+                    }
+                },
+            ),
+        ]
+    )
+
+    global_insufficient = entry(
+        "extract_stock_symbol",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        positive=("stock_lookup",),
+    )
+    cases.append(
+        one_case(
+            "global_insufficient_information_suppression",
+            global_insufficient,
+            "request=Unknown stock signals=stock_lookup insufficient_information",
+        )
+    )
+
+    substitute = entry(
+        "original_substitute_helper",
+        positive=("substitute_signal",),
+        expected_replacements=("search_contacts",),
+    )
+    cases.append(
+        one_case(
+            "original_substitute_suppression",
+            substitute,
+            "request=test signals=substitute_signal",
+            base_tools={"search_contacts"},
+        )
+    )
+    derived_substitute = entry(
+        "derived_original_substitute_helper",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        positive=("substitute_signal",),
+        expected_replacements=("search_contacts",),
+    )
+    cases.append(
+        one_case(
+            "derived_substitute_exception",
+            derived_substitute,
+            "request=test signals=substitute_signal",
+            base_tools={"search_contacts"},
+        )
+    )
+
+    timestamp_selector = entry(
+        "select_record_by_timestamp_extreme",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible records."),
+            ToolInput("selection_mode", "str", "Oldest or latest."),
+        ),
+        output_properties=selector_properties,
+        positive=("recency_search", "message_recency"),
+        preserves=("search_messages",),
+        required=("search_messages",),
+    )
+    content_selector = entry(
+        "select_message_content_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        output_properties=selector_properties,
+        positive=("message_recency",),
+        preserves=("search_messages",),
+        required=("search_messages",),
+    )
+    cases.append(
+        {
+            "id": "message_content_selector_precedence",
+            "entries": {
+                timestamp_selector.tool.spec.tool_name: timestamp_selector,
+                content_selector.tool.spec.tool_name: content_selector,
+            },
+            "context": (
+                "request=What did my latest message say tools=search_messages "
+                "signals=recency_search message_recency message_search_followup_possible"
+            ),
+            "family": "message_recency",
+            "base_tools": {"search_messages"},
+            "lifecycle": None,
+            "max_bundle_size": 4,
+            "scenario_name": "message_content_selector_precedence",
+        }
+    )
+
+    counterparty_selector = entry(
+        "select_message_counterparty_for_contact_update",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        output_properties=selector_properties,
+        positive=("message_counterparty_update",),
+        preserves=("search_messages", "modify_contact"),
+        required=("search_messages", "modify_contact"),
+    )
+    cases.append(
+        {
+            "id": "message_counterparty_selector_precedence",
+            "entries": {
+                timestamp_selector.tool.spec.tool_name: timestamp_selector,
+                counterparty_selector.tool.spec.tool_name: counterparty_selector,
+            },
+            "context": (
+                "request=Update my latest message sender tools=search_messages modify_contact "
+                "signals=recency_search message_counterparty_update"
+            ),
+            "family": "message_counterparty_update",
+            "base_tools": {"search_messages", "modify_contact"},
+            "lifecycle": None,
+            "max_bundle_size": 4,
+            "scenario_name": "message_counterparty_selector_precedence",
+        }
+    )
+
+    search_window = entry(
+        "resolve_search_window_or_bounds",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        positive=("recency_search", "message_search_followup_possible"),
+        required=("search_messages",),
+    )
+    cases.append(
+        one_case(
+            "message_recency_suppresses_search_window",
+            search_window,
+            (
+                "request=Latest message tools=search_messages "
+                "signals=recency_search message_recency message_search_followup_possible"
+            ),
+            family_key="message_recency",
+            base_tools={"search_messages"},
+        )
+    )
+    cases.append(
+        one_case(
+            "message_recency_suppresses_generic_timestamp_selector",
+            timestamp_selector,
+            (
+                "request=Latest message tools=search_messages "
+                "signals=recency_search message_recency message_search_followup_possible"
+            ),
+            family_key="message_recency",
+            base_tools={"search_messages"},
+        )
+    )
+
+    guard = entry(
+        "prepare_safe_action_or_abstain",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        output_properties=guard_properties,
+        positive=("insufficient_information", "safe_abstain_needed"),
+        preserves=("search_contacts", "remove_contact"),
+        required=("search_contacts", "remove_contact"),
+        abstain_behavior="Ask for clarification on missing information.",
+    )
+    cases.append(
+        one_case(
+            "abstention_guard_no_tool_guardrail",
+            guard,
+            (
+                "request=remove_contact without lookup tools=remove_contact "
+                "signals=insufficient_information safe_abstain_needed"
+            ),
+            family_key="safe_abstain",
+            base_tools={"remove_contact"},
+        )
+    )
+
+    missing_downstream = entry(
+        "missing_downstream_helper",
+        positive=("downstream_signal",),
+        required=("search_contacts",),
+    )
+    cases.append(
+        one_case(
+            "missing_downstream_original",
+            missing_downstream,
+            "request=test signals=downstream_signal",
+            base_tools=set(),
+        )
+    )
+
+    any_downstream = entry(
+        "any_downstream_helper",
+        output_properties={
+            "tool_name": {"type": "string", "enum": ["search_contacts", "search_messages"]},
+            "arguments": mapping,
+        },
+        positive=("downstream_signal",),
+        required=("unrelated_required",),
+    )
+    cases.append(
+        one_case(
+            "downstream_enum_requires_any",
+            any_downstream,
+            "request=test signals=downstream_signal",
+            base_tools={"search_messages"},
+        )
+    )
+
+    state_missing_downstream = entry(
+        "plan_device_state_action_sequence_v3",
+        family=ToolFamily.STATE_PRECONDITION_HELPER,
+        output_properties=state_properties,
+        positive=("device_state_action",),
+        preserves=("set_wifi_status",),
+        required=("set_wifi_status",),
+    )
+    cases.append(
+        one_case(
+            "state_helper_static_downstream_exception",
+            state_missing_downstream,
+            "request=Turn on wifi signals=device_state_action",
+            family_key="device_state_action",
+            base_tools=set(),
+        )
+    )
+
+    lower = entry(
+        "lower_value_helper",
+        family=ToolFamily.CANONICALIZER,
+        inputs=(ToolInput("value", "str", "Visible value."),),
+        positive=("shared_signal",),
+        required=("search_contacts",),
+    )
+    composite = entry(
+        "composite_value_helper",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(ToolInput("value", "str", "Visible value."),),
+        output_properties={"value": string, "abstain_reason": string},
+        positive=("shared_signal",),
+        required=("search_contacts",),
+    )
+    cases.append(
+        {
+            "id": "composite_subsumes_lower_level",
+            "entries": {
+                lower.tool.spec.tool_name: lower,
+                composite.tool.spec.tool_name: composite,
+            },
+            "context": "request=test signals=shared_signal",
+            "family": "shared_family",
+            "base_tools": {"search_contacts"},
+            "lifecycle": None,
+            "max_bundle_size": 4,
+            "scenario_name": "composite_subsumes_lower_level",
+        }
+    )
+
+    weekday = entry(
+        "next_weekday_time_to_timestamp",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        positive=("weekday_time",),
+        required=("get_current_timestamp",),
+    )
+    relative = entry(
+        "relative_day_time_to_timestamp",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        positive=("relative_time",),
+        required=("get_current_timestamp",),
+    )
+    cases.append(
+        {
+            "id": "weekday_specificity_precedence",
+            "entries": {
+                weekday.tool.spec.tool_name: weekday,
+                relative.tool.spec.tool_name: relative,
+            },
+            "context": (
+                "request=Reminder next Friday tools=get_current_timestamp "
+                "signals=reminder_create relative_time weekday_time"
+            ),
+            "family": "reminder_create",
+            "base_tools": {"get_current_timestamp"},
+            "lifecycle": None,
+            "max_bundle_size": 4,
+            "scenario_name": "weekday_specificity_precedence",
+        }
+    )
+
+    budget_entries = {
+        name: entry(name, positive=("budget_signal",))
+        for name in ("budget_alpha", "budget_beta", "budget_gamma")
+    }
+    cases.append(
+        {
+            "id": "context_budget_stable_tie_order",
+            "entries": budget_entries,
+            "context": "request=test signals=budget_signal",
+            "family": "budget_family",
+            "base_tools": set(),
+            "lifecycle": None,
+            "max_bundle_size": 1,
+            "scenario_name": "context_budget_stable_tie_order",
+        }
+    )
+
+    clean_override_entry = entry(
+        "prepare_specific_location_search_args",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(ToolInput("location_query", "str", "Visible place."),),
+        output_properties={"search_kwargs": mapping, "abstain_reason": string},
+        positive=("location_phrase", "external_lookup"),
+    )
+    cases.append(
+        one_case(
+            "specific_visible_signal_overrides_coarse_lifecycle_family",
+            clean_override_entry,
+            (
+                "request=Weather near 1 Market Street "
+                "signals=location_phrase external_lookup"
+            ),
+            family_key="location_family",
+            lifecycle={
+                "prepare_specific_location_search_args": {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["location_family"],
+                    "harmful_called_families": [
+                        "location_family",
+                        "location_family",
+                    ],
+                    "helpful_called_families": [],
+                    "failed_count": 0,
+                    "side_effect_incident_count": 0,
+                }
+            },
+        )
+    )
+
+    results: dict[str, Any] = {}
+    observed_reasons: set[str] = set()
+    for case in cases:
+        selected, decisions = route_registry_entries(
+            case["entries"],
+            case["scenario_name"],
+            max_bundle_size=int(case["max_bundle_size"]),
+            available_base_tools=case["base_tools"],
+            lifecycle_state=case["lifecycle"],
+            task_context_text=case["context"],
+            task_family_key=case["family"],
+        )
+        decision_payload = {
+            name: decision.to_json() for name, decision in decisions.items()
+        }
+        observed_reasons.update(
+            str(decision.reason) for decision in decisions.values()
+        )
+        results[str(case["id"])] = {
+            "entry_order": list(case["entries"]),
+            "selected_in_schema_order": [
+                selected_entry.tool.spec.tool_name for selected_entry in selected
+            ],
+            "decisions": _exact_json_snapshot(decision_payload),
+        }
+
+    required_reasons = {
+        "registry_entry_not_active",
+        "legacy_validation_missing_current_proof",
+        "missing_visible_task_context_no_scenario_routing",
+        "blocked_by_negative_trigger",
+        "visible_context_required_signal_missing",
+        "visible_context_pending_weekday_time",
+        "visible_context_pending_relative_time",
+        "relative_time_suppressed_for_external_service_lookup",
+        "location_search_args_suppressed_for_reverse_geocode_request",
+        "broad_location_search_args_requires_unqualified_place_query",
+        "specific_location_search_args_suppressed_for_broad_place_query",
+        "location_search_args_broad_query_requires_coordinate_capable_tool",
+        "location_search_args_requires_visible_place_query",
+        "service_answer_extractor_suppressed_temperature_unit_context",
+        "service_scalar_extractor_requires_matching_visible_request",
+        "recency_action_selector_requires_reminder_action_context",
+        "direct_phone_message_does_not_need_contact_lookup",
+        "direct_contact_action_suppressed_for_message_counterparty_update",
+        "side_effect_tool_suppressed_for_insufficient_information",
+        "visible_context_signal_match",
+        "visible_context_metadata_match",
+        "visible_context_no_match",
+        "lifecycle_suppressed_parked_tool",
+        "lifecycle_suppressed_exact_harmful_called_scenario",
+        "lifecycle_suppressed_harmful_called_family",
+        "generated_tool_suppressed_for_insufficient_information_context",
+        "generated_substitute_suppressed_original_available",
+        "message_content_selector_preferred_over_generic_timestamp_selector",
+        "message_counterparty_selector_preferred_over_generic_timestamp_selector",
+        "message_recency_uses_content_selector_not_search_window",
+        "message_recency_answer_requires_content_selector",
+        "abstention_guard_suppressed_for_no_tool_guardrail",
+        "blocked_by_missing_downstream_original_tool",
+        "blocked_by_context_budget",
+    }
+    missing_reasons = sorted(required_reasons - observed_reasons)
+    if missing_reasons:
+        raise RuntimeError(
+            "Routing characterization failed to reach reasons: "
+            f"{missing_reasons}; observed={sorted(observed_reasons)}"
+        )
+
+    expected_precedence = {
+        "negative_trigger_precedence": (
+            [],
+            "negative_helper",
+            "blocked_by_negative_trigger",
+        ),
+        "message_content_selector_precedence": (
+            ["select_message_content_by_recency"],
+            "select_record_by_timestamp_extreme",
+            "message_content_selector_preferred_over_generic_timestamp_selector",
+        ),
+        "context_budget_stable_tie_order": (
+            ["budget_alpha"],
+            "budget_beta",
+            "blocked_by_context_budget",
+        ),
+        "specific_visible_signal_overrides_coarse_lifecycle_family": (
+            ["prepare_specific_location_search_args"],
+            "prepare_specific_location_search_args",
+            "visible_context_signal_match",
+        ),
+    }
+    for case_id, (selected_names, tool_name, reason) in expected_precedence.items():
+        result = results[case_id]
+        actual_reason = result["decisions"]["value"][tool_name]["reason"]
+        if (
+            result["selected_in_schema_order"] != selected_names
+            or actual_reason != reason
+        ):
+            raise RuntimeError(
+                f"Routing precedence contract changed for {case_id!r}: "
+                f"selected={result['selected_in_schema_order']!r}, "
+                f"reason={actual_reason!r}"
+            )
+
+    return {
+        "case_count": len(results),
+        "observed_reasons": sorted(observed_reasons),
+        "required_reasons": sorted(required_reasons),
+        "unreachable_or_legacy_reason_audit": [
+            "missing_visible_task_context",
+            "recency_action_selector_requires_visible_action_signal",
+            "direct_scalar_action_signal_required",
+            "blocked_by_visible_not_called_adoption_risk",
+            "recency_action_selector_requires_recency_action_task",
+            "side_effect_selector_suppressed_for_insufficient_information",
+            "side_effect_composite_suppressed_for_insufficient_information",
+            "derived_calculator_suppressed_for_insufficient_information",
+            "post_selection_composite_requires_downstream_action_task",
+        ],
+        "cases": results,
+    }
+
+
+def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
+    """Characterize trace readers, input enrichers, and wrapper control flow."""
+
+    import inspect
+    from types import SimpleNamespace
+
+    import sage_ts.runtime.toolsandbox_integration as integration
+    from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
+
+    class TraceColumn(list[Any]):
+        def to_list(self) -> list[Any]:
+            return list(self)
+
+    class FakeSandbox:
+        def __init__(
+            self,
+            rows: list[dict[str, Any]],
+            current_traces: list[Any] | None = None,
+        ) -> None:
+            self.rows = rows
+            self.current_traces = current_traces
+
+        def to_dicts(self) -> list[dict[str, Any]]:
+            return self.rows
+
+        def __getitem__(self, key: str) -> list[Any]:
+            if key != "tool_trace":
+                raise KeyError(key)
+            return [self.current_traces]
+
+    class FakeContext:
+        def __init__(
+            self,
+            sandbox: FakeSandbox,
+            *,
+            tool_allow_list: list[str] | None = None,
+        ) -> None:
+            self.sandbox = sandbox
+            self.tool_allow_list = tool_allow_list
+            self.name_to_tool = {
+                name: object() for name in (tool_allow_list or [])
+            }
+
+        def get_database(self, *args: Any, **kwargs: Any) -> FakeSandbox:
+            return self.sandbox
+
+    def trace(
+        tool_name: str,
+        result: Any,
+        *,
+        arguments: dict[str, Any] | None = None,
+    ) -> str:
+        payload: dict[str, Any] = {"tool_name": tool_name, "result": result}
+        if arguments is not None:
+            payload["arguments"] = arguments
+        return json.dumps(payload, separators=(",", ":"))
+
+    datetime_info = {
+        "year": 2026,
+        "month": 9,
+        "day": 26,
+        "hour": 12,
+        "minute": 34,
+        "second": 56,
+    }
+    trace_rows = [
+        {
+            "tool_trace": TraceColumn(
+                [
+                    trace(
+                        "search_contacts",
+                        [
+                            {
+                                "person_id": "p1",
+                                "name": "Dana",
+                                "relationship": "friend",
+                            }
+                        ],
+                    ),
+                    trace("set_wifi_status", None, arguments={"on": True}),
+                    trace("get_current_timestamp", 100.0),
+                ]
+            )
+        },
+        {
+            "tool_trace": [
+                trace(
+                    "search_messages",
+                    [
+                        {"message_id": "m1", "content": "old"},
+                        {"message_id": "m2", "content": "new"},
+                    ],
+                ),
+                trace(
+                    "select_message_content_by_recency",
+                    {"selected_record": {"message_id": "m2", "content": "new"}},
+                ),
+                trace(
+                    "search_location_around_lat_lon",
+                    [{"id": "loc1", "latitude": 37.0, "longitude": -122.0}],
+                ),
+                trace("get_current_timestamp", 200.0),
+                trace(
+                    "timestamp_to_datetime_info",
+                    datetime_info,
+                    arguments={"timestamp": 200.0},
+                ),
+                trace(
+                    "set_wifi_status",
+                    "Wi-Fi is already disabled",
+                    arguments={"on": False},
+                ),
+                "{malformed-json",
+            ]
+        },
+    ]
+    sandbox = FakeSandbox(trace_rows, current_traces=["a", "b", "c"])
+    original_get_current_context = integration.get_current_context
+    integration.get_current_context = lambda: FakeContext(sandbox)
+    try:
+        trace_reader_results = {
+            "latest_generated_selected_record": _capture_exact_call(
+                lambda: integration._latest_generated_tool_result_with_key(  # noqa: SLF001
+                    "selected_record"
+                )
+            ),
+            "latest_single_search_record": _capture_exact_call(
+                integration._latest_single_original_search_record  # noqa: SLF001
+            ),
+            "latest_search_records": _capture_exact_call(
+                integration._latest_original_search_records  # noqa: SLF001
+            ),
+            "named_payload_list_uses_first_mapping": _capture_exact_call(
+                lambda: integration._latest_original_tool_payload(  # noqa: SLF001
+                    ("search_messages",)
+                )
+            ),
+            "named_payload_scalar_wraps_result": _capture_exact_call(
+                lambda: integration._latest_original_tool_payload(  # noqa: SLF001
+                    ("get_current_timestamp",)
+                )
+            ),
+            "latest_scalar": _capture_exact_call(
+                lambda: integration._latest_original_tool_scalar(  # noqa: SLF001
+                    "get_current_timestamp"
+                )
+            ),
+            "matching_datetime": _capture_exact_call(
+                lambda: integration._latest_datetime_info_for_timestamp(200.4)  # noqa: SLF001
+            ),
+            "mismatched_datetime": _capture_exact_call(
+                lambda: integration._latest_datetime_info_for_timestamp(300.0)  # noqa: SLF001
+            ),
+            "named_records": _capture_exact_call(
+                lambda: integration._latest_original_tool_records(  # noqa: SLF001
+                    ("search_contacts",)
+                )
+            ),
+            "setting_summary_forward_last_write_wins": _capture_exact_call(
+                integration._visible_setting_state_summary_from_trace  # noqa: SLF001
+            ),
+            "location_coordinate_match": _capture_exact_call(
+                lambda: integration._latest_location_search_matches_coordinates(  # noqa: SLF001
+                    37.0005,
+                    -122.0005,
+                )
+            ),
+            "current_trace_count": _capture_exact_call(
+                integration._current_tool_trace_count  # noqa: SLF001
+            ),
+        }
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    integration.get_current_context = lambda: FakeContext(
+        FakeSandbox([{"tool_trace": [json.dumps("valid-json-scalar")]}])
+    )
+    try:
+        non_mapping_trace = _capture_exact_call(
+            integration._latest_original_search_records  # noqa: SLF001
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    def failing_context() -> Any:
+        raise RuntimeError("context unavailable")
+
+    integration.get_current_context = failing_context
+    try:
+        unavailable_context = {
+            "generated": _capture_exact_call(
+                lambda: integration._latest_generated_tool_result_with_key("x")  # noqa: SLF001
+            ),
+            "records": _capture_exact_call(
+                lambda: integration._latest_original_tool_records(("search_contacts",))  # noqa: SLF001
+            ),
+            "summary": _capture_exact_call(
+                integration._visible_setting_state_summary_from_trace  # noqa: SLF001
+            ),
+            "visible_names": _capture_exact_call(
+                integration._visible_original_tool_names  # noqa: SLF001
+            ),
+        }
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    def namespace_entry(spec: Any) -> Any:
+        return SimpleNamespace(tool=SimpleNamespace(spec=spec))
+
+    derived_spec = _tool_spec(
+        name="extract_visible_temperature",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        inputs=(ToolInput("service_payload", "dict", "Visible payload."),),
+        required_calls=("search_weather_around_lat_lon",),
+    )
+    weather_rows = [
+        {
+            "tool_trace": [
+                trace(
+                    "search_weather_around_lat_lon",
+                    {"current_temperature": 12.3, "temperature_unit": "Celsius"},
+                )
+            ]
+        }
+    ]
+    integration.get_current_context = lambda: FakeContext(FakeSandbox(weather_rows))
+    try:
+        derived_subset = integration._with_chained_visible_payload_arguments(  # noqa: SLF001
+            namespace_entry(derived_spec),
+            {"service_payload": {"current_temperature": 12.3}},
+        )
+        derived_mismatch = integration._with_chained_visible_payload_arguments(  # noqa: SLF001
+            namespace_entry(derived_spec),
+            {"service_payload": {"current_temperature": 99.0}},
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    contact_spec = _tool_spec(
+        name="contact_record_enricher",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(ToolInput("contacts", "list", "Visible contacts."),),
+        required_calls=("search_contacts",),
+    )
+    contact_rows = [
+        {
+            "tool_trace": [
+                trace(
+                    "search_contacts",
+                    [
+                        {
+                            "person_id": "p1",
+                            "name": "Dana",
+                            "relationship": "friend",
+                        }
+                    ],
+                )
+            ]
+        }
+    ]
+    integration.get_current_context = lambda: FakeContext(FakeSandbox(contact_rows))
+    try:
+        contact_merge = integration._with_chained_contact_records_arguments(  # noqa: SLF001
+            namespace_entry(contact_spec),
+            {"contacts": [{"person_id": "p1", "relationship": "coworker"}]},
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    selection_spec = _tool_spec(
+        name="post_selection_replay",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible records."),
+            ToolInput("selected_record", "dict", "Visible selection."),
+            ToolInput("updates", "dict", "Requested updates."),
+            ToolInput("action_type", "str", "Requested action."),
+        ),
+    )
+    selection_rows = [
+        {
+            "tool_trace": [
+                trace(
+                    "search_contacts",
+                    [{"person_id": "p1", "name": "Dana", "phone_number": "+1555"}],
+                ),
+                trace(
+                    "selector_helper",
+                    {"selected_record": {"person_id": "p1", "name": "Dana"}},
+                ),
+            ]
+        }
+    ]
+    integration.get_current_context = lambda: FakeContext(FakeSandbox(selection_rows))
+    try:
+        post_selection = integration._with_chained_post_selection_arguments(  # noqa: SLF001
+            namespace_entry(selection_spec),
+            {
+                "records": [{"person_id": "p1", "name": "Dana"}],
+                "action_type": "remove_contact",
+            },
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    optional_spec = _tool_spec(
+        name="optional_defaults_replay",
+        family=ToolFamily.CANONICALIZER,
+        inputs=(
+            ToolInput("constraints", "dict", "Required constraints."),
+            ToolInput("filters", "dict", "Required filter mapping."),
+            ToolInput("name", "str", "Optional visible name."),
+        ),
+    )
+    optional_entry = namespace_entry(optional_spec)
+    optional_defaults = integration._with_optional_helper_defaults(  # noqa: SLF001
+        optional_entry,
+        {},
+    )
+    unknown_removed = integration._without_unknown_helper_kwargs(  # noqa: SLF001
+        optional_entry,
+        {"constraints": {}, "name": "Dana", "invented": "drop"},
+    )
+
+    state_argument_spec = _tool_spec(
+        name="plan_device_state_action_sequence_v3",
+        family=ToolFamily.STATE_PRECONDITION_HELPER,
+        inputs=(
+            ToolInput("visible_state_summary", "str", "Visible state summary."),
+            ToolInput("available_tools", "list", "Visible tools."),
+        ),
+        output_properties={
+            "tool_name": {"type": "string", "enum": ["", "set_wifi_status"]},
+            "arguments": {"type": "object"},
+            "should_call": {"type": "boolean"},
+            "reason": {"type": "string"},
+        },
+        negative_triggers=("unknown service",),
+        preserves=("set_wifi_status",),
+        required_calls=("set_wifi_status",),
+    )
+    integration.get_current_context = lambda: FakeContext(
+        sandbox,
+        tool_allow_list=[
+            "set_wifi_status",
+            "get_wifi_status",
+            "unrelated_hidden_tool",
+        ],
+    )
+    try:
+        state_arguments = integration._with_visible_setting_state_arguments(  # noqa: SLF001
+            namespace_entry(state_argument_spec),
+            {
+                "visible_state_summary": "cellular service is on",
+                "available_tools": [
+                    {"type": "function", "function": {"name": "functions.get_wifi_status"}}
+                ],
+            },
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    datetime_spec = _tool_spec(
+        name="relative_day_time_to_timestamp",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        inputs=(
+            ToolInput("current_timestamp", "float", "Visible timestamp."),
+            ToolInput("current_datetime_info", "dict", "Visible datetime."),
+        ),
+    )
+    integration.get_current_context = lambda: FakeContext(sandbox)
+    try:
+        datetime_arguments = integration._with_visible_datetime_context_arguments(  # noqa: SLF001
+            namespace_entry(datetime_spec),
+            {"current_timestamp": None, "current_datetime_info": {}},
+        )
+    finally:
+        integration.get_current_context = original_get_current_context
+
+    modify_guard_spec = _tool_spec(
+        name="modify_selected_contact_replay",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(
+            ToolInput("action_type", "str", "Visible action."),
+            ToolInput("updates", "dict", "Visible requested updates."),
+        ),
+        output_properties={
+            "should_call_tool": {"type": "boolean"},
+            "downstream_tool_name": {"type": "string"},
+            "downstream_tool_kwargs": {"type": "object"},
+            "abstain_reason": {"type": "string"},
+        },
+        negative_triggers=("missing update",),
+        preserves=("modify_contact",),
+        required_calls=("modify_contact",),
+    )
+    missing_modify_update = integration._missing_modify_update_abstain_result(  # noqa: SLF001
+        namespace_entry(modify_guard_spec),
+        {"action_type": "modify_contact", "updates": {}},
+    )
+
+    input_enrichment = {
+        "derived_exact_subset_expands": _exact_json_snapshot(derived_subset),
+        "derived_mismatch_does_not_expand": _exact_json_snapshot(derived_mismatch),
+        "contact_record_merge_preserves_supplied_override": _exact_json_snapshot(
+            contact_merge
+        ),
+        "post_selection_trace_chaining": _exact_json_snapshot(post_selection),
+        "optional_defaults_filters_exception": _exact_json_snapshot(optional_defaults),
+        "unknown_kwargs_removed": _exact_json_snapshot(unknown_removed),
+        "visible_setting_state_and_tool_inventory": _exact_json_snapshot(
+            state_arguments
+        ),
+        "visible_datetime_autofill": _exact_json_snapshot(datetime_arguments),
+        "missing_modify_update_schema_abstention": _exact_json_snapshot(
+            missing_modify_update
+        ),
+    }
+
+    wrapper_spec = _tool_spec(
+        name="replay_wrapper_tool",
+        family=ToolFamily.CANONICALIZER,
+        inputs=(ToolInput("value", "str", "Visible value."),),
+        output_properties={"raw": {"type": "string"}},
+        positive_triggers=("replay_wrapper",),
+    )
+    wrapper_entry = _accepted_entry(
+        GeneratedTool(
+            spec=wrapper_spec,
+            code=(
+                "def replay_wrapper_tool(value: str) -> dict:\n"
+                "    return {'raw': value}\n"
+            ),
+        )
+    )
+    stage_names = (
+        "_with_chained_visible_payload_arguments",
+        "_with_chained_contact_records_arguments",
+        "_with_chained_post_selection_arguments",
+        "_with_visible_setting_state_arguments",
+        "_with_visible_datetime_context_arguments",
+        "_with_optional_helper_defaults",
+        "_without_unknown_helper_kwargs",
+    )
+    original_functions = {name: getattr(integration, name) for name in stage_names}
+    original_normalize = integration.normalize_generated_tool_output
+    original_trace_count = integration._current_tool_trace_count  # noqa: SLF001
+    original_add_trace = integration.add_tool_trace
+    original_native_enabled = integration.native_action_tool_enabled
+    stage_log: list[str] = []
+    trace_log: list[dict[str, Any]] = []
+    reuse_log: list[str] = []
+
+    def stage(name: str) -> Callable[[Any, dict[str, Any]], dict[str, Any]]:
+        def apply(_entry: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+            stage_log.append(name)
+            return dict(kwargs)
+
+        return apply
+
+    for stage_name in stage_names:
+        setattr(integration, stage_name, stage(stage_name))
+    integration.normalize_generated_tool_output = (
+        lambda _tool, value, *, inputs=None: {
+            "normalized": True,
+            "inner": value,
+            "input_keys": list((inputs or {}).keys()),
+        }
+    )
+    integration._current_tool_trace_count = lambda: 0  # type: ignore[assignment] # noqa: SLF001
+    integration.native_action_tool_enabled = lambda _tool: False
+
+    def record_trace(
+        function: Callable[..., Any],
+        result: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        trace_log.append(
+            {
+                "function": function.__name__,
+                "result": result,
+                "args": list(args),
+                "kwargs": kwargs,
+            }
+        )
+
+    integration.add_tool_trace = record_trace
+    wrapper_input = {"value": "visible"}
+    wrapper_input_before = copy.deepcopy(wrapper_input)
+    try:
+        wrapped = integration._compile_toolsandbox_tool(  # noqa: SLF001
+            wrapper_entry,
+            reuse_log.append,
+        )
+        wrapper_result = _capture_exact_call(lambda: wrapped(**wrapper_input))
+        wrapper_metadata = {
+            "name": wrapped.__name__,
+            "module": wrapped.__module__,
+            "signature": str(inspect.signature(wrapped)),
+            "annotations": {
+                key: getattr(value, "__name__", str(value))
+                for key, value in wrapped.__annotations__.items()
+            },
+            "is_tool": bool(getattr(wrapped, "is_tool", False)),
+            "visible_to": [str(item) for item in getattr(wrapped, "visible_to", ())],
+            "backend": str(getattr(wrapped, "backend", "")),
+        }
+    finally:
+        for stage_name, original in original_functions.items():
+            setattr(integration, stage_name, original)
+        integration.normalize_generated_tool_output = original_normalize
+        integration._current_tool_trace_count = original_trace_count  # type: ignore[assignment] # noqa: SLF001
+        integration.add_tool_trace = original_add_trace
+        integration.native_action_tool_enabled = original_native_enabled
+
+    if stage_log != list(stage_names):
+        raise RuntimeError(
+            "Generated-tool wrapper stage order changed: "
+            f"expected={list(stage_names)!r}, actual={stage_log!r}"
+        )
+    if wrapper_input != wrapper_input_before:
+        raise RuntimeError("Generated-tool wrapper mutated caller-owned kwargs")
+    if reuse_log != [wrapper_spec.tool_name]:
+        raise RuntimeError(
+            "Generated-tool wrapper reuse callback contract changed: "
+            f"{reuse_log!r}"
+        )
+
+    wrapper_stage_contract = {
+        "call": wrapper_result,
+        "stage_order": stage_log,
+        "trace_calls": _exact_json_snapshot(trace_log),
+        "reuse_calls": reuse_log,
+        "caller_input_before": _exact_json_snapshot(wrapper_input_before),
+        "caller_input_after": _exact_json_snapshot(wrapper_input),
+        "metadata": _exact_json_snapshot(wrapper_metadata),
+    }
+
+    abstain_properties = {
+        "should_call_tool": {"type": "boolean"},
+        "downstream_tool_name": {"type": "string"},
+        "downstream_tool_kwargs": {"type": "object"},
+        "abstain_reason": {"type": "string"},
+    }
+
+    def compile_entry(
+        name: str,
+        code: str,
+        *,
+        inputs: tuple[Any, ...],
+        family: Any = ToolFamily.CANONICALIZER,
+    ) -> Any:
+        return _accepted_entry(
+            GeneratedTool(
+                spec=_tool_spec(
+                    name=name,
+                    family=family,
+                    inputs=inputs,
+                    output_properties=abstain_properties,
+                    positive_triggers=("wrapper_error",),
+                ),
+                code=code,
+            )
+        )
+
+    trace_events: list[dict[str, Any]] = []
+    reuse_events: list[str] = []
+    integration._current_tool_trace_count = lambda: 0  # type: ignore[assignment] # noqa: SLF001
+    integration.add_tool_trace = (
+        lambda function, result, *args, **kwargs: trace_events.append(
+            {
+                "function": function.__name__,
+                "result": result,
+                "args": list(args),
+                "kwargs": kwargs,
+            }
+        )
+    )
+    try:
+        missing_entry = compile_entry(
+            "wrapper_missing_argument",
+            (
+                "def wrapper_missing_argument(value: str) -> dict:\n"
+                "    return {'should_call_tool': False, 'downstream_tool_name': '', "
+                "'downstream_tool_kwargs': {}, 'abstain_reason': ''}\n"
+            ),
+            inputs=(ToolInput("value", "str", "Required visible value."),),
+        )
+        invalid_entry = compile_entry(
+            "wrapper_invalid_argument",
+            (
+                "def wrapper_invalid_argument(value: float) -> dict:\n"
+                "    converted = float(value)\n"
+                "    return {'should_call_tool': False, 'downstream_tool_name': '', "
+                "'downstream_tool_kwargs': {'value': converted}, 'abstain_reason': ''}\n"
+            ),
+            inputs=(ToolInput("value", "float", "Required numeric value."),),
+        )
+        unhandled_entry = compile_entry(
+            "wrapper_unhandled_type_error",
+            (
+                "def wrapper_unhandled_type_error(value: str) -> dict:\n"
+                "    return len(value, value)\n"
+            ),
+            inputs=(ToolInput("value", "str", "Required visible value."),),
+        )
+        missing_tool = integration._compile_toolsandbox_tool(  # noqa: SLF001
+            missing_entry,
+            reuse_events.append,
+        )
+        invalid_tool = integration._compile_toolsandbox_tool(  # noqa: SLF001
+            invalid_entry,
+            reuse_events.append,
+        )
+        unhandled_tool = integration._compile_toolsandbox_tool(  # noqa: SLF001
+            unhandled_entry,
+            reuse_events.append,
+        )
+        wrapper_error_contracts = {
+            "missing_required_argument": _capture_exact_call(missing_tool),
+            "invalid_none_argument": _capture_exact_call(
+                lambda: invalid_tool(value=None)
+            ),
+            "unhandled_type_error": _capture_exact_call(
+                lambda: unhandled_tool(value="x")
+            ),
+        }
+    finally:
+        integration._current_tool_trace_count = original_trace_count  # type: ignore[assignment] # noqa: SLF001
+        integration.add_tool_trace = original_add_trace
+
+    wrapper_error_contracts["trace_events"] = _exact_json_snapshot(trace_events)
+    wrapper_error_contracts["reuse_events"] = reuse_events
+
+    native_trace_events: list[dict[str, Any]] = []
+    native_reuse_events: list[str] = []
+    trace_counts = iter((3, 4))
+    integration._current_tool_trace_count = lambda: next(trace_counts)  # type: ignore[assignment] # noqa: SLF001
+    integration.add_tool_trace = (
+        lambda function, result, *args, **kwargs: native_trace_events.append(
+            {"function": function.__name__, "result": result}
+        )
+    )
+    integration.native_action_tool_enabled = lambda _tool: True
+    try:
+        native_trace_tool = integration._compile_toolsandbox_tool(  # noqa: SLF001
+            wrapper_entry,
+            native_reuse_events.append,
+        )
+        native_trace_result = _capture_exact_call(
+            lambda: native_trace_tool(value="visible")
+        )
+    finally:
+        integration._current_tool_trace_count = original_trace_count  # type: ignore[assignment] # noqa: SLF001
+        integration.add_tool_trace = original_add_trace
+        integration.native_action_tool_enabled = original_native_enabled
+
+    native_trace_preservation = {
+        "call": native_trace_result,
+        "generated_trace_calls": native_trace_events,
+        "reuse_calls": native_reuse_events,
+    }
+
+    return {
+        "trace_readers": trace_reader_results,
+        "malformed_trace_semantics": {
+            "malformed_json_is_skipped_in_primary_cases": True,
+            "valid_json_scalar": non_mapping_trace,
+            "unavailable_context": unavailable_context,
+        },
+        "input_enrichment": input_enrichment,
+        "wrapper_stage_contract": wrapper_stage_contract,
+        "wrapper_error_contracts": wrapper_error_contracts,
+        "native_trace_preservation": native_trace_preservation,
+        "historical_oracle_vectors": [
+            "chained_payload_expands_only_an_exact_visible_subset",
+            "registry_tools_emit_toolsandbox_trace",
+            "generated_tools_support_toolsandbox_name_scrambling",
+            "reminder_creation_args_optional_mentioned_location_not_required",
+            "reminder_creation_args_required_unresolved_definitively_abstains",
+            "lifecycle_hides_negative_called_subset_family",
+            "lifecycle_keeps_mixed_positive_route_repair_visible",
+        ],
+    }
+
+
+def probe_runtime_contracts(_root: Path) -> dict[str, Any]:
+    """Full router, normalizer, trace, and wrapper equivalence boundary."""
+
+    payload = {
+        "normalization": _probe_normalization_contract_matrix(),
+        "routing": _probe_routing_contract_matrix(),
+        "runtime_integration": _probe_runtime_integration_contract_matrix(),
+    }
+    return {
+        "contract_schema_version": 1,
+        "contract_sections": list(payload),
+        "payload": payload,
+    }
 
 
 def probe_lifecycle(_root: Path) -> dict[str, Any]:
@@ -2965,6 +5421,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "normalization": probe_normalization,
     "validation": probe_validation,
     "routing": probe_routing,
+    "runtime_contracts": probe_runtime_contracts,
     "lifecycle": probe_lifecycle,
     "reporting": probe_reporting,
 }
