@@ -2,7 +2,7 @@
 # ToolSandbox portions are Copyright (C) 2024 Apple Inc. All Rights Reserved.
 
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools==84.0.0", "wheel==0.48.0", "packaging==26.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
