@@ -6,13 +6,10 @@ import re
 from dataclasses import dataclass, replace
 from typing import Any
 
+from sage_ts.facts import TaskFacts
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
 from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
-from tool_sandbox.common.execution_context import (
-    DatabaseNamespace,
-    RoleType,
-)
 from tool_sandbox.common.scenario import Scenario
 
 
@@ -4471,30 +4468,9 @@ class CapabilityObservation:
 def visible_task_context_from_scenario(scenario: Scenario) -> VisibleTaskContext:
     """Extract only user-visible task text and available tool names."""
 
-    request = ""
-    try:
-        sandbox_db = scenario.starting_context.get_database(
-            DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-            drop_sandbox_message_index=False,
-        )
-        for row in sandbox_db.iter_rows(named=True):
-            if (
-                row.get("sender") == RoleType.USER
-                and row.get("recipient") == RoleType.AGENT
-            ):
-                content = str(row.get("content") or "").strip()
-                if content:
-                    request = content
-    except Exception:
-        request = ""
-    try:
-        available = scenario.starting_context.get_available_tools(
-            scrambling_allowed=False
-        )
-        tools = tuple(sorted(str(name) for name in available))
-    except Exception:
-        tools = ()
+    task_facts = TaskFacts.from_scenario(scenario)
+    request = task_facts.user_request
+    tools = task_facts.available_tools
     signals = _visible_task_signals(request, tools)
     return VisibleTaskContext(
         user_request=request,
