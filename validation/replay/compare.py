@@ -47,6 +47,8 @@ DEFAULT_PROBES = (
     "schema_ast_matrix",
     "validator_matrix",
     "online_birth_repair",
+    "generator_profile_corpus",
+    "validator_error_corpus",
     "lifecycle",
     "reporting",
 )

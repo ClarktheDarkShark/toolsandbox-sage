@@ -119,6 +119,22 @@ or suppress normalization rules.
   cumulative versus native-current errors, strict best-score improvement,
   complementary native case-frontier advancement, seed rollback, event order,
   successful acceptance, and missing-repair behavior.
+- `generator_profile_corpus`: executes every one of the 34 named generator
+  profiles plus the generic `apply_single_device_state_action`, unknown-name,
+  and `None` paths through the live `ToolGenerator`. It freezes exact
+  `ChatRequest` field order and prompt hashes, mapping order/types, legacy
+  canonical-key mappings, every native-action eligibility boundary, repair
+  strategies 1–7, contract/repair-analysis cache order, generated spec/code
+  normalization, parsing/coercion failures, and candidate selection. A live-path
+  reachability test patches `ToolGenerationRequest.prompt` to raise and proves
+  generation still succeeds, documenting that the legacy prompt is not used by
+  evidence runs.
+- `validator_error_corpus`: reaches every sandbox-validator return/error branch,
+  preserves exact error order, and covers source/held-out/negative precedence,
+  gate → AST → schema → execution order, runtime-smoke failures, benign negative
+  wording, structured abstention, and every native-action validation failure.
+  The fixture declares all required error kinds explicitly so omissions fail
+  closed.
 - `lifecycle`: replays one ordered same-run control/candidate feedback stream
   and snapshots feedback records, immediate actions, pulses, registry hash,
   reuse/success-flip counters, retirement state, and final retain, repair, park,
@@ -158,6 +174,14 @@ the full corpus and both unhashed and rehashed tamper rejection with:
 
 ```bash
 python validation/replay/classifier_contracts.py --tamper-self-test
+```
+
+The generator/validator corpus is readable Python rather than a generated data
+blob. Verify its explicit profile inventory, order, duplicate detection, and
+validator-branch tamper rejection with:
+
+```bash
+python -m unittest validation.replay.test_generator_validator_corpus -v
 ```
 
 Reporting inputs live in `fixtures/reporting_v1.json` and

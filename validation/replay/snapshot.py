@@ -4566,6 +4566,34 @@ def probe_online_birth_repair(_root: Path) -> dict[str, Any]:
     return _probe_step5_contract("online_birth_repair")
 
 
+def _probe_generator_validator_corpus(name: str) -> dict[str, Any]:
+    """Load the validation-only exhaustive Step 5 corpus."""
+
+    module_name = "_sage_replay_generator_validator_corpus"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = (
+            Path(__file__).resolve().parent / "generator_validator_corpus.py"
+        )
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load generator/validator corpus: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(name)
+
+
+def probe_generator_profile_corpus(_root: Path) -> dict[str, Any]:
+    return _probe_generator_validator_corpus("generator_profile_corpus")
+
+
+def probe_validator_error_corpus(_root: Path) -> dict[str, Any]:
+    return _probe_generator_validator_corpus("validator_error_corpus")
+
+
 def probe_lifecycle(_root: Path) -> dict[str, Any]:
     """Replay ordered feedback into retention, repair, and adoption decisions."""
 
@@ -5526,6 +5554,8 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "schema_ast_matrix": probe_schema_ast_matrix,
     "validator_matrix": probe_validator_matrix,
     "online_birth_repair": probe_online_birth_repair,
+    "generator_profile_corpus": probe_generator_profile_corpus,
+    "validator_error_corpus": probe_validator_error_corpus,
     "lifecycle": probe_lifecycle,
     "reporting": probe_reporting,
 }
