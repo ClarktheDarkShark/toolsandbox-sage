@@ -34,6 +34,7 @@ DEFAULT_PROBES = (
     "trajectory",
     "classifier",
     "actor",
+    "actor_model_inference",
     "normalization",
     "validation",
     "routing",

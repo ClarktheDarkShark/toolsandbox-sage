@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "fixture": "actor_fixture.py",
+  "source_byte_count": 54845,
+  "source_line_count": 1426,
+  "source_sha256": "888669ef1c1a2ac1adfbfcf62f820bb870c5295e25d14000e9ebc3af8addf6e5",
+  "case_count": 43,
+  "historical_test_seed_count": 13,
+  "deterministic_characterization_count": 24,
+  "deterministic_envelope_or_near_miss_count": 6,
+  "trajectory_derived_case_count": 0,
+  "archived_request_identity_claimed": false,
+  "policy_builder_contract": {
+    "direct_composer_builders": 46,
+    "nested_state_builders": 3,
+    "reachable_builders": 49
+  },
+  "provenance_note": "Historical-test seed cases are adapted from the 72 passing actor tests in the detached historical test oracle. Other cases are deterministic reference characterizations. No case is represented as an archived evidence-run request."
+}

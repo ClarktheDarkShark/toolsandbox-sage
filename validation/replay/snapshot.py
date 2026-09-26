@@ -1214,6 +1214,22 @@ def probe_actor(_root: Path) -> dict[str, Any]:
     return _jsonable({"cases": results})
 
 
+def probe_actor_model_inference(root: Path) -> dict[str, Any]:
+    """Run fixture-first actor cases through the real model-inference path."""
+
+    module_name = "_sage_replay_actor_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "actor_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(f"Could not load actor replay contracts: {module_path}")
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.probe_actor_model_inference(root)
+
+
 def _tool_spec(
     *,
     name: str,
@@ -5479,6 +5495,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "trajectory": probe_trajectory,
     "classifier": probe_classifier,
     "actor": probe_actor,
+    "actor_model_inference": probe_actor_model_inference,
     "normalization": probe_normalization,
     "validation": probe_validation,
     "routing": probe_routing,

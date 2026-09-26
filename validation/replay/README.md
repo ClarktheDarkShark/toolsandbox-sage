@@ -41,6 +41,18 @@ or suppress normalization rules.
   policy composer and every named-choice selector in production precedence
   order. It snapshots exact prompt text, original schema order, selected named
   `tool_choice`, filtered schema content, and final schema order.
+- `actor_model_inference`: invokes the real
+  `ConfigurableOpenAIAgent.model_inference` method for 43 fixture-first cases
+  while a fake `chat.completions.create` records the exact API kwargs. The
+  corpus has positive branch receipts for all 46 directly composed policy
+  builders and all three nested device-state builders. It preserves exact
+  prompt/schema/message order, the eagerly evaluated first four selectors,
+  named-choice precedence, `NOT_GIVEN`, named-call usage recording, transient
+  named retry followed by natural fallback, post-response safe-abstention
+  grounding, response object identity, sentinel re-entry behavior, and focused
+  near misses. Thirteen cases are explicitly labeled adaptations of the 72
+  historical actor tests; the others are deterministic reference
+  characterizations. None is claimed to be an archived evidence-run request.
 - `normalization`: snapshots contract repair for state sequencing, ambiguous
   record selection, service-answer extraction, and safe abstention.
 - `validation`: snapshots accepted and rejected generated tools across AST
@@ -109,11 +121,21 @@ or suppress normalization rules.
 The behavior vectors are validation-only characterization fixtures. Outcome and
 classifier cases are drawn from the committed benchmark and the historical
 characterization tests at the validated test-oracle checkpoint. Actor vectors
-use the same message/schema shapes as those oracle tests. Routing and lifecycle
-vectors are deliberately minimal typed contracts and ordered feedback events,
-so they exercise policy without copying a mutable registry or invoking an LLM.
-No probe calls the network, current clock, model service, or an unseeded random
-source.
+use the same message/schema shapes as those oracle tests, and the expanded
+model-inference corpus labels every case's provenance in source. Routing and
+lifecycle vectors are deliberately minimal typed contracts and ordered
+feedback events, so they exercise policy without copying a mutable registry or
+invoking an LLM. No probe calls the network, current clock, model service, or an
+unseeded random source.
+
+The actor corpus is stored as readable Python data in `actor_fixture.py`; its
+line count, byte count, and SHA-256 are frozen in
+`actor_fixture.manifest.json`. Run the fixture-integrity and semantic tamper
+tests with:
+
+```bash
+python -m unittest validation.replay.test_actor_contracts -v
+```
 
 Reporting inputs live in `fixtures/reporting_v1.json` and
 `fixtures/reporting_v1.manifest.json`. They are synthetic and deliberately
@@ -168,8 +190,9 @@ and lifecycle decisions, but did not persist the exact per-request OpenAI tool
 schema payload and actor prompt sent to the model. That boundary cannot be
 truthfully reconstructed from the artifacts. Exact prompt, schema, order,
 filtering, and named-choice behavior is therefore gated by the deterministic
-`actor` probe above. A future evidence run should archive those payloads if a
-historical byte-for-byte model-boundary replay is required.
+`actor` and real-path `actor_model_inference` probes above. A future evidence
+run should archive those payloads if a historical byte-for-byte model-boundary
+replay is required.
 
 If a source artifact contains a timestamp, PID, temporary path, or duration
 that has no behavioral meaning, add the narrowest possible allowlist rule with
