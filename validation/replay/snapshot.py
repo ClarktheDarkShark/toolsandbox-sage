@@ -887,6 +887,24 @@ def probe_classifier(_root: Path) -> dict[str, Any]:
     }
 
 
+def probe_classifier_corpus(root: Path) -> dict[str, Any]:
+    """Load the validation-only full classifier contract after root selection."""
+
+    module_name = "_sage_replay_classifier_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "classifier_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load classifier replay contracts: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.probe_classifier_corpus(root)
+
+
 def _openai_tool(
     name: str,
     *,
@@ -5494,6 +5512,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "outcomes": probe_outcomes,
     "trajectory": probe_trajectory,
     "classifier": probe_classifier,
+    "classifier_corpus": probe_classifier_corpus,
     "actor": probe_actor,
     "actor_model_inference": probe_actor_model_inference,
     "normalization": probe_normalization,

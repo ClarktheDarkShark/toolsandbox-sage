@@ -37,6 +37,20 @@ or suppress normalization rules.
   exercises independent database/tool-discovery failures, role filtering,
   last-nonempty-request selection, string conversion, sorted tool names, and
   one visible execution-trace precondition failure.
+- `classifier_corpus`: freezes the complete ordered classifier boundary for all
+  1,032 tasks and 1,874 emitted observations. It records per-task signal order,
+  primary family, emission order, route/reason, exact observation hashes, and
+  separate prompt, validation-example, and semantic factory-product hashes so
+  a difference can be localized without embedding every repeated prompt in
+  each case. The corpus also freezes all 21 dictionary expected-result key
+  sequences (plus the two scalar expected types), eight intentional duplicate
+  emission cases, benchmark and synthetic primary-family collisions, terminal
+  insufficient-information versus nonterminal safe-abstention behavior, fresh
+  factory materialization and mutation isolation, empty/malformed/temporal/
+  precondition trace behavior, and the generic external-service fallback.
+  Recursive type tags distinguish tuple/list, bool/int/float, dataclass, set,
+  and insertion-ordered dictionary values; hashes are therefore not based on
+  lossy sorted JSON.
 - `actor`: feeds fixed model-boundary messages and routed schemas through the
   policy composer and every named-choice selector in production precedence
   order. It snapshots exact prompt text, original schema order, selected named
@@ -135,6 +149,15 @@ tests with:
 
 ```bash
 python -m unittest validation.replay.test_actor_contracts -v
+```
+
+The classifier corpus is materialized from the frozen benchmark rather than
+shipped as a multi-megabyte duplicate fixture. Its independent reference
+digests and structural assertions live in `classifier_contracts.py`. Verify
+the full corpus and both unhashed and rehashed tamper rejection with:
+
+```bash
+python validation/replay/classifier_contracts.py --tamper-self-test
 ```
 
 Reporting inputs live in `fixtures/reporting_v1.json` and

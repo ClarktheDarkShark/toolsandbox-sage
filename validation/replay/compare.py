@@ -33,6 +33,7 @@ DEFAULT_PROBES = (
     "outcomes",
     "trajectory",
     "classifier",
+    "classifier_corpus",
     "actor",
     "actor_model_inference",
     "normalization",
