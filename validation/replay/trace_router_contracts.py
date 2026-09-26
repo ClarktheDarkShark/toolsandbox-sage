@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any, Callable
 
 
@@ -391,6 +392,234 @@ def _trace_contracts(
         current_traces=["first", "second", "third"],
     )
 
+    def database_argument(value: Any) -> dict[str, Any]:
+        """Make the database-call boundary JSON-readable without weakening it."""
+
+        if isinstance(value, integration.DatabaseNamespace):
+            return {
+                "python_type": type(value).__name__,
+                "name": value.name,
+                "value": value.value,
+                "is_sandbox_singleton": value is integration.DatabaseNamespace.SANDBOX,
+            }
+        return {"python_type": type(value).__name__, "value": value}
+
+    class InstrumentedContext:
+        def __init__(self, sandboxes: list[Any]) -> None:
+            self.sandboxes = list(sandboxes)
+            self.database_calls: list[dict[str, Any]] = []
+
+        def get_database(self, *args: Any, **kwargs: Any) -> Any:
+            self.database_calls.append(
+                {
+                    "positional_arguments": [
+                        database_argument(value) for value in args
+                    ],
+                    "keyword_arguments": {
+                        key: database_argument(value) for key, value in kwargs.items()
+                    },
+                }
+            )
+            index = len(self.database_calls) - 1
+            if index >= len(self.sandboxes):
+                raise AssertionError(
+                    f"unexpected database acquisition {index + 1}; "
+                    f"only {len(self.sandboxes)} snapshot(s) supplied"
+                )
+            return self.sandboxes[index]
+
+    def observe_acquisitions(
+        context: InstrumentedContext,
+        callback: Callable[[], Any],
+    ) -> dict[str, Any]:
+        context_acquisitions = 0
+
+        def current_context() -> InstrumentedContext:
+            nonlocal context_acquisitions
+            context_acquisitions += 1
+            return context
+
+        integration.get_current_context = current_context
+        try:
+            result = capture(callback)
+        finally:
+            integration.get_current_context = original_get_current_context
+        return {
+            "call": result,
+            "context_acquisition_count": context_acquisitions,
+            "database_acquisition_count": len(context.database_calls),
+            "database_calls": context.database_calls,
+        }
+
+    changing_context = InstrumentedContext(
+        [
+            FakeSandbox(
+                [{"tool_trace": [trace("get_current_timestamp", 101.25)]}]
+            ),
+            FakeSandbox(
+                [{"tool_trace": [trace("get_current_timestamp", 202.5)]}]
+            ),
+        ]
+    )
+    changing_snapshots = observe_acquisitions(
+        changing_context,
+        lambda: [
+            integration._latest_original_tool_scalar(  # noqa: SLF001
+                "get_current_timestamp"
+            ),
+            integration._latest_original_tool_scalar(  # noqa: SLF001
+                "get_current_timestamp"
+            ),
+        ],
+    )
+
+    datetime_context = InstrumentedContext(
+        [
+            FakeSandbox(
+                [{"tool_trace": [trace("get_current_timestamp", 200.0)]}]
+            ),
+            FakeSandbox(
+                [
+                    {
+                        "tool_trace": [
+                            trace(
+                                "timestamp_to_datetime_info",
+                                complete_datetime,
+                                arguments={"timestamp": 200.0},
+                                include_arguments=True,
+                            )
+                        ]
+                    }
+                ]
+            ),
+        ]
+    )
+    datetime_entry = SimpleNamespace(
+        tool=SimpleNamespace(
+            spec=SimpleNamespace(
+                inputs=(
+                    SimpleNamespace(name="current_timestamp"),
+                    SimpleNamespace(name="current_datetime_info"),
+                )
+            )
+        )
+    )
+    datetime_enrichment = observe_acquisitions(
+        datetime_context,
+        lambda: integration._with_visible_datetime_context_arguments(  # noqa: SLF001
+            datetime_entry,
+            {},
+        ),
+    )
+
+    def database_call_contract(callback: Callable[[], Any]) -> dict[str, Any]:
+        return observe_acquisitions(
+            InstrumentedContext([FakeSandbox([])]),
+            callback,
+        )
+
+    database_call_contracts = {
+        "search_records": database_call_contract(
+            integration._latest_original_search_records  # noqa: SLF001
+        ),
+        "named_payload": database_call_contract(
+            lambda: integration._latest_original_tool_payload(  # noqa: SLF001
+                ("search_contacts",)
+            )
+        ),
+        "named_scalar": database_call_contract(
+            lambda: integration._latest_original_tool_scalar(  # noqa: SLF001
+                "get_current_timestamp"
+            )
+        ),
+        "datetime_info": database_call_contract(
+            lambda: integration._latest_datetime_info_for_timestamp(  # noqa: SLF001
+                200.0
+            )
+        ),
+        "named_records": database_call_contract(
+            lambda: integration._latest_original_tool_records(  # noqa: SLF001
+                ("search_contacts",)
+            )
+        ),
+        "setting_summary": database_call_contract(
+            integration._visible_setting_state_summary_from_trace  # noqa: SLF001
+        ),
+    }
+
+    empty_wanted_context = InstrumentedContext([FakeSandbox([]), FakeSandbox([])])
+    empty_wanted_names = observe_acquisitions(
+        empty_wanted_context,
+        lambda: {
+            "payload": integration._latest_original_tool_payload(()),  # noqa: SLF001
+            "records": integration._latest_original_tool_records([]),  # noqa: SLF001
+        },
+    )
+
+    class TraceRowsFailure(RuntimeError):
+        pass
+
+    class FailingRowsSandbox:
+        def to_dicts(self) -> list[dict[str, Any]]:
+            raise TraceRowsFailure("sentinel sandbox.to_dicts failure")
+
+    def rows_failure_contract(callback: Callable[[], Any]) -> dict[str, Any]:
+        return observe_acquisitions(
+            InstrumentedContext([FailingRowsSandbox()]),
+            callback,
+        )
+
+    rows_failure_propagation = {
+        "search_records": rows_failure_contract(
+            integration._latest_original_search_records  # noqa: SLF001
+        ),
+        "named_payload": rows_failure_contract(
+            lambda: integration._latest_original_tool_payload(  # noqa: SLF001
+                ("search_contacts",)
+            )
+        ),
+        "named_scalar": rows_failure_contract(
+            lambda: integration._latest_original_tool_scalar(  # noqa: SLF001
+                "get_current_timestamp"
+            )
+        ),
+        "datetime_info": rows_failure_contract(
+            lambda: integration._latest_datetime_info_for_timestamp(  # noqa: SLF001
+                200.0
+            )
+        ),
+        "named_records": rows_failure_contract(
+            lambda: integration._latest_original_tool_records(  # noqa: SLF001
+                ("search_contacts",)
+            )
+        ),
+        "setting_summary": rows_failure_contract(
+            integration._visible_setting_state_summary_from_trace  # noqa: SLF001
+        ),
+    }
+
+    poison_conversion_attempts = 0
+
+    class UnreachedTraceCollection:
+        def __iter__(self) -> Any:
+            nonlocal poison_conversion_attempts
+            poison_conversion_attempts += 1
+            raise RuntimeError("older trace collection must remain unreachable")
+
+    lazy_short_circuit = with_rows(
+        [
+            {"tool_trace": UnreachedTraceCollection()},
+            {"tool_trace": [trace("search_contacts", [newest_contact])]},
+        ],
+        lambda: integration._latest_original_tool_records(  # noqa: SLF001
+            ("search_contacts",)
+        ),
+    )
+    lazy_short_circuit_contract = {
+        "call": lazy_short_circuit,
+        "unreached_conversion_attempt_count": poison_conversion_attempts,
+    }
+
     return {
         "traversal_order": exact(
             {
@@ -420,6 +649,12 @@ def _trace_contracts(
         "timestamp_tolerance": exact(timestamp_cases),
         "setting_overwrite_order": exact(setting_cases),
         "current_trace_count": current_trace_count,
+        "changing_snapshots": exact(changing_snapshots),
+        "datetime_enrichment_acquisitions": exact(datetime_enrichment),
+        "database_call_contracts": exact(database_call_contracts),
+        "empty_wanted_names": exact(empty_wanted_names),
+        "rows_failure_propagation": exact(rows_failure_propagation),
+        "lazy_short_circuit": exact(lazy_short_circuit_contract),
     }
 
 
