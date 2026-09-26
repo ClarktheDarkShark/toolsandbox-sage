@@ -38,6 +38,12 @@ DEFAULT_PROBES = (
     "validation",
     "routing",
     "runtime_contracts",
+    "generation_boundary",
+    "validation_distance",
+    "native_structural_cases",
+    "schema_ast_matrix",
+    "validator_matrix",
+    "online_birth_repair",
     "lifecycle",
     "reporting",
 )

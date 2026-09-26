@@ -60,6 +60,29 @@ or suppress normalization rules.
   SHA-256 hashes. Its vectors incorporate the relevant historical
   normalization and generated-tool-injection oracle cases without adding tests
   to the production package.
+- `generation_boundary`: records every exact `ChatRequest` byte stream and hash
+  for ordinary generation, native-action generation, cached contract analysis,
+  repair analysis, repeated repair, and strategy-specific repair. It also
+  freezes candidate parsing, invalid-candidate rejection, normalization, and
+  first-accepted candidate selection.
+- `validation_distance`: compares the generator and online-birth copies of
+  structural, execution, native-action, nested value, and `NOT_GIVEN` error
+  weights, including aggregate empty/error results and repair-case frontiers.
+- `native_structural_cases`: freezes generator projection and validator
+  augmentation for explicit and inferred timestamp keys, malformed records,
+  rank ties, aliases, boolean numeric values, duplicate negatives, and the
+  first-eligible-contract rule.
+- `schema_ast_matrix`: snapshots denied/safe AST constructs, exact sorted error
+  order, generated-function compilation, optional annotations, schema mismatch,
+  function-count/name precedence, and defensive unreachable errors.
+- `validator_matrix`: snapshots source/held-out/negative partitioning, gate →
+  AST → schema → execution precedence, deterministic replay, semantic errors,
+  and accepted/rejected native-action delegation contracts.
+- `online_birth_repair`: drives the live seven-attempt repair controller with
+  deterministic fake generators. It freezes batch selection, stable ties,
+  cumulative versus native-current errors, strict best-score improvement,
+  complementary native case-frontier advancement, seed rollback, event order,
+  successful acceptance, and missing-repair behavior.
 - `lifecycle`: replays one ordered same-run control/candidate feedback stream
   and snapshots feedback records, immediate actions, pulses, registry hash,
   reuse/success-flip counters, retirement state, and final retain, repair, park,

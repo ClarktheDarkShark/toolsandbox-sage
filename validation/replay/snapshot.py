@@ -4471,6 +4471,46 @@ def probe_runtime_contracts(_root: Path) -> dict[str, Any]:
     }
 
 
+def _probe_step5_contract(name: str) -> dict[str, Any]:
+    """Load validation-only generation probes after the selected checkout."""
+
+    module_name = "_sage_replay_generation_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "generation_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(f"Could not load Step 5 replay probes: {module_path}")
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(name)
+
+
+def probe_generation_boundary(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("generation_boundary")
+
+
+def probe_validation_distance(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("validation_distance")
+
+
+def probe_native_structural_cases(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("native_structural_cases")
+
+
+def probe_schema_ast_matrix(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("schema_ast_matrix")
+
+
+def probe_validator_matrix(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("validator_matrix")
+
+
+def probe_online_birth_repair(_root: Path) -> dict[str, Any]:
+    return _probe_step5_contract("online_birth_repair")
+
+
 def probe_lifecycle(_root: Path) -> dict[str, Any]:
     """Replay ordered feedback into retention, repair, and adoption decisions."""
 
@@ -5422,6 +5462,12 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "validation": probe_validation,
     "routing": probe_routing,
     "runtime_contracts": probe_runtime_contracts,
+    "generation_boundary": probe_generation_boundary,
+    "validation_distance": probe_validation_distance,
+    "native_structural_cases": probe_native_structural_cases,
+    "schema_ast_matrix": probe_schema_ast_matrix,
+    "validator_matrix": probe_validator_matrix,
+    "online_birth_repair": probe_online_birth_repair,
     "lifecycle": probe_lifecycle,
     "reporting": probe_reporting,
 }
