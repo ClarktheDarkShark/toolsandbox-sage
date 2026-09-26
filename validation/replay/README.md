@@ -127,8 +127,8 @@ or suppress normalization rules.
   strategies 1–7, contract/repair-analysis cache order, generated spec/code
   normalization, parsing/coercion failures, and candidate selection. A live-path
   reachability test patches `ToolGenerationRequest.prompt` to raise and proves
-  generation still succeeds, documenting that the legacy prompt is not used by
-  evidence runs.
+  generation, repair, and online birth still succeed, documenting that the
+  legacy prompt is not used by evidence runs.
 - `validator_error_corpus`: reaches every sandbox-validator return/error branch,
   preserves exact error order, and covers source/held-out/negative precedence,
   gate → AST → schema → execution order, runtime-smoke failures, benign negative

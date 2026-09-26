@@ -770,10 +770,19 @@ def _all_profile_repair_prompt_matrix() -> dict[str, Any]:
 def _prompt_nonreachability_proof() -> dict[str, Any]:
     """Prove the live generator does not call the legacy request.prompt method."""
 
+    import tempfile
+    from pathlib import Path
+    from types import MethodType, SimpleNamespace
+
+    from sage_ts.adequacy.inadequacy_classifier import CapabilityObservation
     from sage_ts.generation.tool_generator import ToolGenerationRequest, ToolGenerator
+    from sage_ts.orchestration.online_birth import OnlineBirthController
+    from sage_ts.registry.store import RegistryStore
+    from sage_ts.validation.sandbox_validator import ToolExample, ValidationResult
 
     request = _profile_request("unknown_reusable_profile")
     completer = _StaticCompleter(_response_for("unknown_reusable_profile"))
+    generator = ToolGenerator(completer)
     original = ToolGenerationRequest.prompt
 
     def fail_if_used(_self: Any) -> str:
@@ -782,20 +791,88 @@ def _prompt_nonreachability_proof() -> dict[str, Any]:
     ToolGenerationRequest.prompt = fail_if_used
     try:
         direct_call = _capture(request.prompt)
-        generated = ToolGenerator(completer).generate(request)
+        generated = generator.generate(request)
+        repaired = generator.repair_candidates(
+            request,
+            generated,
+            ("source_0_mismatch:'actual'!='expected'", "repair_strategy:7"),
+        )
+
+        online_name = "prompt_reachability_online"
+        online_completer = _StaticCompleter(_response_for(online_name))
+        with tempfile.TemporaryDirectory(prefix="sage-prompt-reachability-") as raw:
+            root = Path(raw)
+            output_dir = root / "output"
+            output_dir.mkdir()
+            controller = OnlineBirthController(
+                store=RegistryStore(root / "registry"),
+                generator=ToolGenerator(online_completer),
+                output_dir=output_dir,
+                recurrence_threshold=1,
+                failure_memory_path=None,
+            )
+
+            def accept_without_changing_generation(
+                _self: Any, tool: Any, _observation: Any
+            ) -> tuple[Any, None, ValidationResult]:
+                return (
+                    SimpleNamespace(grading_classification="canonical_preserving"),
+                    None,
+                    ValidationResult(
+                        True,
+                        (),
+                        source_example_count=1,
+                        held_out_check_count=1,
+                        runtime_smoke_passed=True,
+                    ),
+                )
+
+            controller._gate_and_validate = MethodType(  # noqa: SLF001
+                accept_without_changing_generation,
+                controller,
+            )
+            observation = CapabilityObservation(
+                scenario_name="Legacy prompt online-birth reachability",
+                canonical_key=f"canonicalizer:{online_name}",
+                observation="Normalize repeated visible values deterministically.",
+                allowed_families=("canonicalizer",),
+                validation_examples=(
+                    ToolExample({"value": " alpha "}, "alpha"),
+                    ToolExample({"value": " beta "}, "beta", held_out=True),
+                ),
+                generation_allowed=True,
+                reason="prompt_reachability",
+                inadequacy_signals=("prompt_reachability",),
+                evidence_source="visible_task_context",
+                task_context_label="visible normalization request",
+                task_family_key="prompt_reachability_family",
+            )
+            online_outcome = controller.observe(observation)
+            online_registry_names = sorted(controller.store.load_entries())
     finally:
         ToolGenerationRequest.prompt = original
-    if direct_call.get("status") != "raised" or len(completer.calls) != 1:
+    if (
+        direct_call.get("status") != "raised"
+        or len(completer.calls) != 2
+        or len(online_completer.calls) != 1
+    ):
         raise RuntimeError("legacy prompt live-path reachability proof failed")
     return {
         "direct_prompt_call": direct_call,
         "live_generate_returned": _exact(generated.to_json()),
-        "live_chat_requests": [
+        "live_repair_returned": _exact([tool.to_json() for tool in repaired]),
+        "live_generator_chat_requests": [
             _chat_request_projection(item) for item in completer.calls
+        ],
+        "online_birth_outcome": online_outcome,
+        "online_birth_registry_names": online_registry_names,
+        "online_birth_chat_requests": [
+            _chat_request_projection(item) for item in online_completer.calls
         ],
         "proof": (
             "ToolGenerationRequest.prompt raised under the patch while "
-            "ToolGenerator.generate completed and emitted one ChatRequest."
+            "ToolGenerator.generate, ToolGenerator.repair_candidates, and the "
+            "OnlineBirthController generation path all completed."
         ),
     }
 
