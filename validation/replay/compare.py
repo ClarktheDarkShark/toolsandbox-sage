@@ -51,6 +51,7 @@ DEFAULT_PROBES = (
     "validator_error_corpus",
     "lifecycle",
     "reporting",
+    "runner_provenance",
 )
 
 

@@ -5529,6 +5529,28 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
         }
 
 
+def probe_runner_provenance(root: Path) -> dict[str, Any]:
+    """Load the validation-only runner and publication provenance contracts."""
+
+    module_name = "_sage_replay_runner_provenance"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "runner_provenance.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load runner/provenance probes: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(
+        root,
+        exact=_exact_json_snapshot,
+        capture=_capture_exact_call,
+    )
+
+
 # Extension point: each deterministic probe receives the selected root and
 # returns JSON-compatible data. Volatile timestamps/PIDs may be normalized only
 # through the checked-in approved_nondeterminism.json allowlist.
@@ -5558,6 +5580,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "validator_error_corpus": probe_validator_error_corpus,
     "lifecycle": probe_lifecycle,
     "reporting": probe_reporting,
+    "runner_provenance": probe_runner_provenance,
 }
 
 

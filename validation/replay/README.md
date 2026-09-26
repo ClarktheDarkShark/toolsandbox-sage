@@ -150,6 +150,21 @@ or suppress normalization rules.
   reordered, missing, duplicate, non-object, and invalidly typed result rows;
   strict versus tolerant JSON/JSONL readers; final-summary precedence; live
   fallback; uncached-run rejection reasons; and strict-fresh report checks.
+- `runner_provenance`: executes the real ToolSandbox sequence and SAGE runner
+  boundaries over two tiny synthetic tasks with model/network calls replaced by
+  deterministic fakes. It freezes run-manifest key order, compact semantic
+  bytes, writer bytes and terminal newline; manifest-order execution and
+  scenario index environment values; initial/per-task/final progress callbacks;
+  transform-failure fallback; result-hook timing; usage snapshot-before-clear;
+  transient retry archives, terminal failure rows, and role teardown. Separate
+  frozen and online fixtures preserve registry checkpoint and event order. The
+  probe also records exact campaign-status, task-plan, event-ledger, run-index,
+  and registry-snapshot bytes; publication-environment pass output, distribution
+  digest/order, isolated import provenance, and fail-closed error text. Finally,
+  it pins the publication Python launcher to
+  `b40856762456913a70e60270f443b91c6c32c56d6ecd7975b8c196edc968b64c`
+  and the shell entrypoint to
+  `78811efa9f6c682c671c4664a4cf6249937591c94d4e6449df6b9ebd201f1183`.
 
 The behavior vectors are validation-only characterization fixtures. Outcome and
 classifier cases are drawn from the committed benchmark and the historical
@@ -192,6 +207,13 @@ detection with:
 
 ```bash
 python -m unittest validation.replay.test_trace_router_contracts -v
+```
+
+Verify runner callback/checkpoint/provenance invariants and deliberate tamper
+detection with:
+
+```bash
+python -m unittest validation.replay.test_runner_provenance -v
 ```
 
 Reporting inputs live in `fixtures/reporting_v1.json` and
@@ -264,3 +286,11 @@ tolerant readers. It does not exercise concurrent writers, filesystem failures,
 permission errors, interrupted atomic replacement, resume-checkpoint mtimes, or
 the full dashboard HTML rendering path; those remain separate integration
 concerns.
+
+The runner fixture does not start multiprocessing workers, open a browser, call
+an LLM, or reproduce signal/kill timing. It characterizes each worker's shared
+sequence and hook boundary in-process; operating-system scheduling and provider
+transport failures are not deterministic replay inputs. The full protocol
+manifest remains covered by its frozen launcher source hash plus reporting and
+campaign contracts rather than by executing the 1,032-task CLI in this offline
+probe.
