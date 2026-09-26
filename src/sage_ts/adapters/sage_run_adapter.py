@@ -23,11 +23,12 @@ from sage_ts.adequacy.inadequacy_classifier import (
     visible_task_context_from_scenario,
 )
 from sage_ts.generation.complete_tools import native_action_tool_enabled
-from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.orchestration.online_birth import (
     GeneratedToolFactory,
     OnlineBirthController,
 )
+from sage_ts.reporting.artifact_io import append_sorted_jsonl as append_jsonl
+from sage_ts.reporting.artifact_io import write_pretty_json
 from sage_ts.orchestration.self_evolution_reflection import (
     SelfEvolutionReflectionController,
 )
@@ -244,10 +245,7 @@ def _snapshot_registry_checkpoint(
         "registry_dir": str(registry_dir),
         "copied_files": copied,
     }
-    (checkpoint_dir / "checkpoint.json").write_text(
-        json.dumps(metadata, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_pretty_json(checkpoint_dir / "checkpoint.json", metadata)
     return checkpoint_dir
 
 
@@ -1293,8 +1291,5 @@ def run_sage_with_registry(
             1 for row in selection_rows if row.get("relevance_gating_hid_retained_tool")
         ),
     }
-    (output_directory / "selection_summary.json").write_text(
-        json.dumps(selection_summary, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_pretty_json(output_directory / "selection_summary.json", selection_summary)
     return output_directory

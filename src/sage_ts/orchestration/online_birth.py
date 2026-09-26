@@ -24,9 +24,9 @@ from sage_ts.generation.tool_spec import (
     GeneratedTool,
     ToolFamily,
 )
-from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
+from sage_ts.reporting.artifact_io import append_sorted_jsonl as append_jsonl
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
     ValidationResult,

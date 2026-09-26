@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
 from sage_ts.evaluation.run_metrics import _read_json, _read_jsonl, _scenario_rows
+from sage_ts.reporting.artifact_io import write_pretty_json
 
 
 def _optional_float(value: Any) -> float | None:
@@ -376,5 +376,5 @@ def write_helper_contribution_summary(
         registry_dir=registry_dir,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(output_path, summary)
     return summary

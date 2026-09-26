@@ -21,6 +21,7 @@ from typing import Any, Iterable, cast
 from openai import NOT_GIVEN, NotGiven
 from openai.types.chat import ChatCompletion
 
+from sage_ts.reporting.artifact_io import write_pretty_json
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
 from tool_sandbox.roles.openai_api_user import OpenAIAPIUser
 
@@ -289,9 +290,7 @@ def write_llm_usage_artifacts(run_dir: Path | None = None) -> None:
     )
     summary["schema_version"] = 2
     summary["token_source"] = "openai_chat_completion_usage"
-    (target / "llm_usage_summary.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
-    )
+    write_pretty_json(target / "llm_usage_summary.json", summary)
 
 
 def _record_unless_nested(

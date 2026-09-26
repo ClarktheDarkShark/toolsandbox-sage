@@ -9,15 +9,15 @@ globally label-free.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Empty
 from typing import Any
 
 from sage_ts.evaluation.task_strata import base_task_family
-from sage_ts.orchestration.checkpoints import append_jsonl
 from sage_ts.registry.store import RegistryStore
+from sage_ts.reporting.artifact_io import append_sorted_jsonl as append_jsonl
+from sage_ts.reporting.artifact_io import write_pretty_json
 
 FRESH_CONTROL_ROW_EVENT = "fresh_control_row"
 FRESH_CONTROL_COMPLETE_EVENT = "fresh_control_complete"
@@ -772,20 +772,15 @@ class SelfEvolutionReflectionController:
         }
         if extra is not None:
             payload["last_pulse"] = extra
-        (self.output_dir / "self_evolution_reflection_state.json").write_text(
-            json.dumps(payload, indent=2) + "\n",
-            encoding="utf-8",
+        write_pretty_json(
+            self.output_dir / "self_evolution_reflection_state.json", payload
         )
         registry_state_path = self.store.root / "tool_lifecycle.json"
-        registry_state_path.write_text(
-            json.dumps(
-                {
-                    "artifact_type": "self_evolution_tool_lifecycle",
-                    "source_run": str(self.output_dir),
-                    "tool_lifecycle": payload["tool_lifecycle"],
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
+        write_pretty_json(
+            registry_state_path,
+            {
+                "artifact_type": "self_evolution_tool_lifecycle",
+                "source_run": str(self.output_dir),
+                "tool_lifecycle": payload["tool_lifecycle"],
+            },
         )

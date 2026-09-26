@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from sage_ts.evaluation.llm_usage import summarize_events
+from sage_ts.reporting.artifact_io import read_jsonl_strict as _read_jsonl
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -24,16 +25,6 @@ def _read_json(path: Path) -> dict[str, Any]:
     if last_error is not None:
         raise last_error
     return {}
-
-
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            rows.append(json.loads(line))
-    return rows
 
 
 def _scenario_rows(run_dir: Path) -> list[dict[str, Any]]:

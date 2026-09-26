@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from sage_ts.config.models import DEFAULT_MODEL
+from sage_ts.reporting.artifact_io import read_jsonl_strict
+from sage_ts.reporting.artifact_io import write_pretty_json
 
 ARTIFACT_ROOT = Path("artifacts")
 EVENT_TYPES = {
@@ -94,13 +96,8 @@ def read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, An
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    """Preserve the campaign artifact API while sharing strict JSONL parsing."""
+    return read_jsonl_strict(path)
 
 
 def append_event(
@@ -187,7 +184,7 @@ def initialize_campaign(
         "next_action": "Run clean mechanism40 reproduction with dashboard and campaign artifacts.",
         "updated_at": utc_now(),
     }
-    status_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(status_path, payload)
     write_task_plan(root=base)
     append_event("campaign_started", {"phase": phase}, root=base)
     return status_path
@@ -201,7 +198,7 @@ def write_task_plan(*, root: Path | None = None) -> Path:
         {"task": task, "status": status} for task, status in DEFAULT_TASKS
     ]
     payload = {"updated_at": utc_now(), "tasks": tasks}
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(path, payload)
     return path
 
 
@@ -217,7 +214,7 @@ def record_run(run: dict[str, Any], *, root: Path | None = None) -> Path:
     runs.append({"updated_at": utc_now(), **run})
     payload["runs"] = runs[-100:]
     payload["updated_at"] = utc_now()
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(path, payload)
     return path
 
 

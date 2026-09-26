@@ -34,6 +34,7 @@ from sage_ts.evaluation.outcome_score import (
     compute_outcome_score,
     outcome_evaluator_manifest,
 )
+from sage_ts.reporting.artifact_io import write_pretty_json
 from sage_ts.runtime.base_toolset import UPSTREAM_POLICY, apply_base_tool_policy
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
@@ -86,7 +87,7 @@ def write_run_manifest(config: ToolSandboxRunConfig) -> Path:
         "git_sha": git_sha(),
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(path, payload)
     return path
 
 
@@ -106,7 +107,7 @@ def write_live_result_summary(
         "per_scenario_results": result_summary,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_pretty_json(path, payload)
     return path
 
 

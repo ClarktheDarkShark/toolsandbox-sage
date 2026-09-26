@@ -8,6 +8,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from sage_ts.registry.manifest import RegistryEntry
+from sage_ts.reporting.artifact_io import write_pretty_json
 
 
 class RegistryStore:
@@ -28,7 +29,7 @@ class RegistryStore:
     def save_entries(self, entries: dict[str, RegistryEntry]) -> None:
         payload = {"tools": {name: entry.to_json() for name, entry in entries.items()}}
         tmp = self.manifest_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        write_pretty_json(tmp, payload)
         os.replace(tmp, self.manifest_path)
 
     def put(self, entry: RegistryEntry) -> None:
