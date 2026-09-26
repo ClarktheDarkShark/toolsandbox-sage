@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "contract_id": "sage-paper-behavior-contract-v1",
+  "status": "frozen_before_minimal-runtime-refactor",
+  "frozen_on": "2026-09-26",
+  "purpose": "Fail-closed identity, evidence-anchor, and predeclared noninferiority contract for the SAGE minimal-runtime refactor.",
+  "scope": {
+    "primary_metric": "route-independent outcome_similarity",
+    "canonical_score_is_a_gate": false,
+    "live_trajectory_exactness_is_required": false,
+    "deterministic_contract_exactness_is_required": true,
+    "performance_based_run_exclusion_allowed": false
+  },
+  "reference_source": {
+    "git_commit": "2518a2a134c50d603d6250b08f47623b27e7737f",
+    "git_tree": "82fef3f7cc0e94b4cf2abd612db91e0904a53b52",
+    "sage_runtime_tree": "a7e2ff2c8ec32cd1c1a0b3e236f84eb6d71dd125",
+    "toolsandbox_runtime_tree": "dee5f6124725c169dac9643f1b42357b77522e54",
+    "scripts_tree": "8b6c98a64a06ea378ee182559a2827144eb601c6",
+    "validated_full_run_runtime_commit": "c75ac52ac049707151a363bf44b79fd97911d6a9",
+    "validated_full_run_sage_runtime_tree": "a7e2ff2c8ec32cd1c1a0b3e236f84eb6d71dd125",
+    "note": "The current release and the completed 1,032-task validation checkpoint have the same src/sage_ts tree. The frozen Git identity remains historical provenance; the validator itself may live in a descendant commit."
+  },
+  "frozen_inputs": {
+    "benchmark": {
+      "path": "docs/sage_protocol/manifests/v2_1_formal_1000_full_benchmark.json",
+      "sha256": "21877bd3524258b80f74207c66ed3640b6db629d13b4a2fb4d817e35d0390bec",
+      "manifest_type": "v2_1_formal_1000plus_full_benchmark_best3_scale",
+      "split": "full_benchmark",
+      "scenario_count": 1032,
+      "unique_scenario_count": 1032,
+      "scenario_order_encoding": "utf-8 newline-joined scenario names with one trailing newline",
+      "scenario_order_sha256": "fec899dde5b3ce1879157c16eff120e24c1791a2ab1df53712677bcacb250176"
+    },
+    "environment_lock": {
+      "path": "requirements-publication-lock.txt",
+      "sha256": "5c3ea1802331bf45809fd3e3e31fd8352473449e709cd7a443d03d1975477d1f",
+      "exact_distribution_count": 108,
+      "python_version": "3.12.7",
+      "python_implementation": "CPython",
+      "platform_system": "Darwin",
+      "platform_machine": "arm64"
+    },
+    "external_fixture": {
+      "path": "artifacts/publication_cleanup_20260901/fixtures/rapid_api_cache.sanitized.json",
+      "sha256": "eae0a6ab7d2ee5dd272612a0b5ce44d85af34cd1297ff662007260941192322f",
+      "mode": "read_only"
+    },
+    "clock": {
+      "policy": "frozen",
+      "toolsandbox_fixed_now_timestamp": 1784832588,
+      "timezone": "America/New_York"
+    },
+    "paper_evidence": {
+      "path": "artifacts/publication_evidence/chapter4_current/chapter4_evidence_data.json",
+      "sha256": "b2b1795b8c6497bece0436e674fd71d563ccd8fd75c6479d28bd77395235b8bc"
+    },
+    "historical_selected_cohort": {
+      "storage_policy": "external_read_only_not_copied",
+      "logical_path": "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/final_selected_cohort/selected_cohort_manifest.json",
+      "path_locator": {
+        "required": true,
+        "cli_option": "--historical-cohort-manifest",
+        "environment_variable": "SAGE_HISTORICAL_COHORT_MANIFEST"
+      },
+      "sha256": "8cd359bebdc0f3576643d6d4850f0abe09fd3c05dafd50a62fc07d62c6425192",
+      "schema_version": 2,
+      "campaign_id": "chapter4_final_policy_selected_valid_cohort_20260916_4ce1c6d",
+      "status": "complete",
+      "expected_online_runs": 10,
+      "expected_frozen_runs": 10,
+      "expected_tasks_per_run": 1032
+    }
+  },
+  "model_configuration": {
+    "agent": "gpt-4o-mini",
+    "generation": "gpt-4o-mini",
+    "user": "gpt-4o-mini",
+    "comparison_key": "agent=gpt-4o-mini|generation=gpt-4o-mini|user=gpt-4o-mini",
+    "model_config_source": {
+      "path": "src/sage_ts/config/models.py",
+      "sha256": "7c47160dbefa9be353d14ab000f0a3ead7bc31310b4f4c45cf1c9d1e4ffddf9d"
+    }
+  },
+  "policy_configuration": {
+    "base_tool_policy": "upstream",
+    "online_sage_policy": "self-evolving-praxis",
+    "frozen_sage_policy": "none",
+    "actor_selection_mode": "policy",
+    "online_generation_enabled": true,
+    "frozen_generation_enabled": false,
+    "fresh_control_required": true,
+    "parallel_arms_required": true,
+    "control_cache": "off",
+    "sage_task_cache": "off",
+    "openai_response_cache": "off",
+    "cross_run_failure_memory": "disabled",
+    "reflection_control_source": "same_run_fresh",
+    "scenario_name_birth_enabled": false,
+    "scenario_name_routing_enabled": false,
+    "synthetic_bridge_completions_enabled": false,
+    "diagnostic_force_calls_enabled": false,
+    "source_hashes": [
+      {
+        "role": "actor_policy",
+        "path": "src/sage_ts/adapters/openai_toolsandbox_roles.py",
+        "sha256": "28179db6bc9291b4956f3597ec3f76ac9b247c9978528d405184468566767a90"
+      },
+      {
+        "role": "publication_protocol",
+        "path": "scripts/run_sage_protocol.py",
+        "sha256": "b40856762456913a70e60270f443b91c6c32c56d6ecd7975b8c196edc968b64c"
+      }
+    ]
+  },
+  "evaluator_configuration": {
+    "primary": {
+      "metric_field": "outcome_similarity",
+      "version": "sage_outcome_contracts_v9",
+      "contract_sha256": "d6a7598e708b24e40823278c228c895c387ef1a4d116e3b92173885967ad1955",
+      "source": {
+        "path": "src/sage_ts/evaluation/outcome_score.py",
+        "sha256": "8ed1595b3eb050004ba2cc161836fb78906e58d3c0127b2c421df03400f14c63"
+      },
+      "insufficient_information_scenario_count": 224,
+      "scalar_scenario_count": 24
+    },
+    "paper_comparable": {
+      "metric_field": "online_feedback_outcome_similarity",
+      "version": "sage_paper_outcome_contracts_v1",
+      "source": {
+        "path": "src/sage_ts/evaluation/online_feedback_score.py",
+        "sha256": "ae2bf3c52d48e05c3951c871006a9931288d556021f1e2d7876c50564c3c6381"
+      },
+      "task_count_per_run": 800
+    }
+  },
+  "paper_anchors": {
+    "campaign": {
+      "completed_online_runs": 10,
+      "completed_frozen_runs": 10,
+      "tasks_per_run": 1032,
+      "matched_online_observations": 10320,
+      "paper_comparable_observations": 8000
+    },
+    "h1_task_completion": {
+      "decision": "supported",
+      "baseline_mean": 0.5861757105943152,
+      "sage_mean": 0.7835432816537468,
+      "absolute_difference": 0.1973675710594316,
+      "relative_lift_percent": 33.670376901035944,
+      "two_way_run_task_delta_ci_95": [
+        0.1703565083979327,
+        0.22482255329457357
+      ],
+      "two_way_threshold_contrast_ci_95": [
+        0.10970134851421173,
+        0.16826148659560716
+      ],
+      "run_cluster_threshold_contrast_ci_95": [
+        0.1308814801356589,
+        0.14780523255813952
+      ],
+      "run_threshold_sign_flip_p": 0.001953125,
+      "baseline_successes": 5516,
+      "sage_successes": 7530
+    },
+    "paper_comparable_800_task_endpoint": {
+      "baseline_mean": 0.4975352400166696,
+      "sage_mean": 0.8003359706968236,
+      "absolute_difference": 0.302800730680154,
+      "relative_lift_percent": 60.860157497589285
+    },
+    "frozen_registry": {
+      "sage_mean": 0.7761950904392766,
+      "gain_retention_percent": 96.27690041731447,
+      "gain_retention_ci_95": [
+        92.53854800879905,
+        100.00834454030327
+      ]
+    },
+    "h2_repair_and_later_reuse": {
+      "decision": "supported",
+      "repair_entrants": 161,
+      "repaired_accepted": 105,
+      "repair_conversion_rate": 0.6521739130434783,
+      "repair_conversion_run_cluster_ci_95": [
+        0.6049382716049383,
+        0.701300955988456
+      ],
+      "repair_threshold_sign_flip_p": 0.00390625,
+      "repaired_reused_later": 105,
+      "repaired_reuse_rate": 1.0
+    },
+    "h3_cross_family_use": {
+      "decision": "supported",
+      "accepted_tools": 285,
+      "cross_family_tools": 164,
+      "cross_family_rate": 0.5754385964912281,
+      "cross_family_run_cluster_ci_95": [
+        0.5622775800711744,
+        0.5876288659793815
+      ],
+      "cross_family_threshold_sign_flip_p": 0.001953125
+    }
+  },
+  "predeclared_acceptance_gates": {
+    "replication_accounting": {
+      "required_online_runs": 10,
+      "required_frozen_runs": 10,
+      "required_tasks_per_run": 1032,
+      "required_runtime_exception_count": 0,
+      "required_integrity_violation_count": 0,
+      "performance_based_exclusions_allowed": false
+    },
+    "primary_outcome_noninferiority": {
+      "metric": "new_sage_mean_outcome",
+      "reference_mean": 0.7835432816537468,
+      "absolute_margin": 0.01,
+      "minimum_new_mean": 0.7735432816537468,
+      "contemporaneous_difference": "new_minus_reference",
+      "one_sided_confidence_level": 0.95,
+      "ci_lower_operator": ">",
+      "ci_lower_threshold": -0.01
+    },
+    "paired_improvement": {
+      "metric": "new_sage_mean_minus_fresh_control_mean",
+      "reference_difference": 0.1973675710594316,
+      "absolute_margin": 0.01,
+      "minimum_difference": 0.18736757105943158
+    },
+    "h1_original_decision_rule": {
+      "minimum_relative_lift_percent": 10.0,
+      "two_way_threshold_contrast_ci_lower_operator": ">",
+      "two_way_threshold_contrast_ci_lower_threshold": 0.0,
+      "run_cluster_threshold_contrast_ci_lower_operator": ">",
+      "run_cluster_threshold_contrast_ci_lower_threshold": 0.0,
+      "run_threshold_sign_flip_p_operator": "<",
+      "run_threshold_sign_flip_p_threshold": 0.05
+    },
+    "paper_comparable_endpoint": {
+      "reference_mean": 0.8003359706968236,
+      "absolute_margin": 0.01,
+      "minimum_new_mean": 0.7903359706968236,
+      "required_tasks_per_run": 800
+    },
+    "frozen_registry": {
+      "reference_mean": 0.7761950904392766,
+      "absolute_margin": 0.01,
+      "minimum_new_mean": 0.7661950904392766,
+      "minimum_gain_retention_percent": 90.0
+    },
+    "h2_repair_and_later_reuse": {
+      "reference_repair_conversion_rate": 0.6521739130434783,
+      "noninferiority_margin": 0.05,
+      "minimum_repair_conversion_rate": 0.6021739130434782,
+      "support_threshold_rate": 0.5,
+      "estimate_operator": ">",
+      "run_cluster_ci_lower_operator": ">",
+      "run_cluster_ci_lower_threshold": 0.5,
+      "sign_flip_p_operator": "<",
+      "sign_flip_p_threshold": 0.05,
+      "minimum_repaired_reuse_rate": 0.9
+    },
+    "h3_cross_family_use": {
+      "reference_cross_family_rate": 0.5754385964912281,
+      "noninferiority_margin": 0.03,
+      "minimum_cross_family_rate": 0.5454385964912281,
+      "support_threshold_rate": 0.5,
+      "estimate_operator": ">",
+      "run_cluster_ci_lower_operator": ">",
+      "run_cluster_ci_lower_threshold": 0.5,
+      "sign_flip_p_operator": "<",
+      "sign_flip_p_threshold": 0.05
+    },
+    "predeclared_strata": {
+      "minimum_observations_for_gate": 100,
+      "maximum_absolute_outcome_decline": 0.03
+    }
+  }
+}
