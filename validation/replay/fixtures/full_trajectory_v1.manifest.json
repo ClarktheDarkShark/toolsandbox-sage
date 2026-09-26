@@ -1,0 +1,162 @@
+{
+  "canonical_case_hash": "sha256(json.dumps(case, ensure_ascii=False, separators=(',', ':'), sort_keys=True).encode('utf-8'))",
+  "case_count": 8,
+  "case_sha256": {
+    "online_rep01_0000_add_contact_with_name_and_phone_number": "0a6ace0efb5f46515e74f0f712c87b2a232005672153916c89bfa7f4de03e16e",
+    "online_rep01_0040_add_reminder_content_and_week_delta_and_time": "65e3c6e56a25ce4375ad938f5bf39d06c2fe5eadaa0c772f4a131bd3dc7f72ba",
+    "online_rep01_0240_find_days_till_holiday_insufficient_information": "62caa8b8007bf2a2edfefc30cc555df8dc380d7f55a1f055ff36b0f055834377",
+    "online_rep01_0288_find_distance_with_location_name": "fb90d5f48ae9edb9cc7013c4b4cb8017eb531dea762d30c4b3f7b05039d39452",
+    "online_rep01_0754_search_name_with_relationship_3_distraction_tools": "41a5c726b92d10eaba72b78056b9ae5300692388885b984fa03f0e6613a27b24",
+    "online_rep01_0928_send_message_with_phone_number_and_content": "6493de38a77ff74e380f0d65a7e881a79a1c3bef2a81c1f5557d1be50645a34a",
+    "online_rep01_0984_update_contact_relationship_with_relationship": "b1bd584bb1c1579aa65421a6b3f2c1918b36584e0287c43bd80b74dbf0393e6c",
+    "online_rep01_1024_wifi_off": "8d57499caf09d08d954991a7857ef9c0b03a2289acfb4dd61baefe161aaac834"
+  },
+  "cohort_id": "chapter4_final_policy_online_frozen_20260911_4ce1c6d",
+  "coverage": [
+    "abstention",
+    "answer_only",
+    "birth",
+    "contact",
+    "contact_read",
+    "device_state",
+    "early_task",
+    "external_fixture",
+    "generated_execution",
+    "insufficient_information",
+    "location",
+    "messaging",
+    "multi_step",
+    "native_execution",
+    "post_700",
+    "relative_time",
+    "reminder",
+    "repair",
+    "reuse",
+    "state_change"
+  ],
+  "fixture_byte_count": 140144,
+  "fixture_file": "full_trajectory_v1.json",
+  "fixture_sha256": "524116283524507c8ab92a233cde72c2f1d77e324b92eae50b6a1455db63dfb9",
+  "known_boundary_gap": "The frozen run preserved routed tool names and lifecycle decisions, but not the exact per-request OpenAI schema payload/prompt presented to the model. Exact actor schema/prompt equivalence is therefore covered by the separate deterministic actor probe, not reconstructed from these historical artifacts.",
+  "privacy": {
+    "absolute_paths_copied": false,
+    "benchmark_records_are_synthetic": true,
+    "credentials_copied": false,
+    "hidden_user_simulator_prompts_copied": false,
+    "mutable_registry_copied": false
+  },
+  "required_coverage": [
+    "birth",
+    "external_fixture",
+    "generated_execution",
+    "insufficient_information",
+    "native_execution",
+    "post_700",
+    "repair",
+    "reuse",
+    "state_change"
+  ],
+  "schema_version": 1,
+  "source_files": {
+    "artifacts/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/technical_replacement/final_selected_cohort/selected_cohort_manifest.json": {
+      "byte_count": 84309,
+      "sha256": "8cd359bebdc0f3576643d6d4850f0abe09fd3c05dafd50a62fc07d62c6425192"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/result_summary.json": {
+      "byte_count": 11674780,
+      "sha256": "3eff033a924cad68e5f0c6aa7718c23f098c6c89977e4c0c61ac46b477efa6a6"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/reuse_events.jsonl": {
+      "byte_count": 348881,
+      "sha256": "f723b0b75ea5cc96f6775a96732b189fe34218e4e86dddcb6720e9ebf29a3d8b"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/scenario_tool_selection.jsonl": {
+      "byte_count": 3844018,
+      "sha256": "d3037cf4b9bdac71775818019faa9ea8ef0cc5fbf351bef17a1bc19d27da7c30"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/scenario_tool_visibility.jsonl": {
+      "byte_count": 10406735,
+      "sha256": "ab4034477ffe0dec6a4bc2548525e084811c10a6030e42534ae22c9511ae59cb"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_task_feedback.jsonl": {
+      "byte_count": 1291886,
+      "sha256": "3808eab3512f35cb0249166a705990983715808fafdb23fc0aa936a06ddbad7c"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/self_evolution_tool_lifecycle.jsonl": {
+      "byte_count": 13546,
+      "sha256": "903c8863c4482a0a51468146c4e97153e70369f5aeb64a2868b081d5993c367d"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/tool_birth_events.jsonl": {
+      "byte_count": 647661,
+      "sha256": "1fb04e85ee695b014edf74c46c13f87286077c1be181d8c3d9597f93d181dfc5"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/add_contact_with_name_and_phone_number/conversation.json": {
+      "byte_count": 10482,
+      "sha256": "0f7b4f4a73b0174c02efbe589f9b6e9fec402a10f500cb73b3555adcababf858"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/add_contact_with_name_and_phone_number/execution_context.json": {
+      "byte_count": 25668,
+      "sha256": "0ed8fd0d75a04a373ad97623d8161d43da76304425b4244f2c47adb9a6464634"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/add_reminder_content_and_week_delta_and_time/conversation.json": {
+      "byte_count": 10228,
+      "sha256": "72d2adc44805ac5725bfcd5c568a8992ad51849729e1f7e0f7fdb10704b66567"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/add_reminder_content_and_week_delta_and_time/execution_context.json": {
+      "byte_count": 33944,
+      "sha256": "a3da58f8a5d96e14493c81a3d4d31dd1fa9ede2bb860303af405582c5b046d19"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/find_days_till_holiday_insufficient_information/conversation.json": {
+      "byte_count": 6814,
+      "sha256": "9c3785bbb2cdeadc054816592a15e5131f743324f9f739d8e12f6753a5297255"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/find_days_till_holiday_insufficient_information/execution_context.json": {
+      "byte_count": 38745,
+      "sha256": "7207c6eb651b27bca8d215acd21f07f9a36c90772e44ed9d9d511cb2122b902c"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/find_distance_with_location_name/conversation.json": {
+      "byte_count": 23284,
+      "sha256": "13fda464641d295a53cd0d3834beed045fbcc036c356c166d25910e581beadc6"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/find_distance_with_location_name/execution_context.json": {
+      "byte_count": 57693,
+      "sha256": "f1e3e4ea3af624337988df3860e83835f3be7d83b76a94a2ae91d911bbd8dbe8"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/search_name_with_relationship_3_distraction_tools/conversation.json": {
+      "byte_count": 8159,
+      "sha256": "8a9f1350a811d481be2a8ea4fadd990b9374a6d8ec8afbc9b27e82c3c3ed3bcf"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/search_name_with_relationship_3_distraction_tools/execution_context.json": {
+      "byte_count": 26531,
+      "sha256": "8442712f4838f51ccd1590e6fd0243699fbded61498a1420359fa85edb088120"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/send_message_with_phone_number_and_content/conversation.json": {
+      "byte_count": 12265,
+      "sha256": "a0f0683d7d303854feba83fe723726fd7b40a3f2e857078182aced1c46c99714"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/send_message_with_phone_number_and_content/execution_context.json": {
+      "byte_count": 29755,
+      "sha256": "49dae7369bdc725022dc6a7e5097ad7aeba66d2cbef657ad1687e38ab66cc1ea"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/update_contact_relationship_with_relationship/conversation.json": {
+      "byte_count": 16991,
+      "sha256": "7de3a55f47765d426c745a67cebf3875519aeef3d3c2fa5a097b2b6b77910328"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/update_contact_relationship_with_relationship/execution_context.json": {
+      "byte_count": 38504,
+      "sha256": "2875330df13c89e6decf759dd72cdb698b23e41465d12e3baec55f0573569ff7"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/wifi_off/conversation.json": {
+      "byte_count": 6736,
+      "sha256": "c4f8878ce3dd1f593c2bd20abe0585171c3b05af8ac5345a5338376891843bb9"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/candidate/online_build_full_candidate_agent_gpt-4o-mini_user_gpt-4o-mini_09_11_2026_15_07_31/trajectories/wifi_off/execution_context.json": {
+      "byte_count": 24415,
+      "sha256": "5d9176a756c0de4eea3f0491f449dc0c4b3b0cbf1a4ccaf216065f2975d43385"
+    },
+    "outputs/chapter4_evidence/chapter4_final_policy_online_frozen_20260911_4ce1c6d/online/rep01/native_action/online_build_full_20260911_150719/protocol_manifest.json": {
+      "byte_count": 14635,
+      "sha256": "3004a876963bc9662c1f6a9376fff4925723178a19f39a9d453b56b53b1aa7f7"
+    }
+  }
+}

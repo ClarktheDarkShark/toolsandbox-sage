@@ -9,13 +9,16 @@ at the front of ``sys.path``.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import importlib
+import importlib.util
 import json
 import os
 import random
 import sys
 import tempfile
+import time
 from dataclasses import asdict
 from pathlib import Path
 from queue import Queue
@@ -437,10 +440,343 @@ def probe_outcomes(_root: Path) -> dict[str, Any]:
     return {"cases": snapshots}
 
 
+def probe_trajectory(_root: Path) -> dict[str, Any]:
+    """Replay a content-hashed corpus from the frozen paper cohort.
+
+    The historical fixture supplies captured model/tool boundary rows and exact
+    state snapshots.  Each checkout supplies its own scenario definitions,
+    visible-context parser, and outcome evaluator.  This therefore detects
+    behavior drift without replaying model responses in a live evidence run.
+    """
+
+    import polars as pl
+    from tool_sandbox.cli.utils import resolve_scenarios
+    from tool_sandbox.common.execution_context import DatabaseNamespace
+    from tool_sandbox.common.tool_discovery import ToolBackend
+
+    # python -I deliberately excludes the script directory from sys.path. Load
+    # this validation-only helper by exact path so neither checkout can shadow
+    # it with production code.
+    fixture_module_path = Path(__file__).resolve().parent / "trajectory_fixture.py"
+    fixture_spec = importlib.util.spec_from_file_location(
+        "sage_validation_trajectory_fixture",
+        fixture_module_path,
+    )
+    if fixture_spec is None or fixture_spec.loader is None:
+        raise RuntimeError(f"Cannot load trajectory fixture helper: {fixture_module_path}")
+    fixture_module = importlib.util.module_from_spec(fixture_spec)
+    fixture_spec.loader.exec_module(fixture_module)
+    load_verified_fixture = fixture_module.load_verified_fixture
+
+    classifier = importlib.import_module("sage_ts.adequacy.inadequacy_classifier")
+    evaluator = importlib.import_module("sage_ts.evaluation.outcome_score")
+    fixture, manifest = load_verified_fixture()
+    cases = list(fixture["cases"])
+    scenario_names = [str(case["scenario"]) for case in cases]
+    fixed_timestamp = str(fixture["fixed_toolsandbox_timestamp"])
+    previous_fixed_timestamp = os.environ.get("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP")
+    try:
+        os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = fixed_timestamp
+        random.seed(0)
+        scenarios = resolve_scenarios(
+            desired_scenario_names=scenario_names,
+            preferred_tool_backend=ToolBackend.DEFAULT,
+        )
+
+        case_results: dict[str, Any] = {}
+        for case in cases:
+            case_id = str(case["id"])
+            scenario_name = str(case["scenario"])
+            scenario = scenarios[scenario_name]
+            context = copy.deepcopy(scenario.starting_context)
+            sandbox_rows = [
+                *fixture["shared"]["sandbox_prefix"],
+                *case["sandbox_rows"],
+            ]
+            context._dbs[DatabaseNamespace.SANDBOX] = pl.DataFrame(
+                sandbox_rows,
+                schema=context.dbs_schemas[DatabaseNamespace.SANDBOX],
+            )
+            for namespace_name in (
+                "SETTING",
+                "CONTACT",
+                "MESSAGING",
+                "REMINDER",
+            ):
+                namespace = DatabaseNamespace[namespace_name]
+                rows = [
+                    *fixture["shared"]["initial_state"][namespace_name],
+                    *case["state_rows"][namespace_name],
+                ]
+                context._dbs[namespace] = pl.DataFrame(
+                    rows,
+                    schema=context.dbs_schemas[namespace],
+                )
+
+            outcome = evaluator.compute_outcome_score(
+                scenario,
+                context,
+                scenario_name=scenario_name,
+            )
+            historical = case["historical"]
+            expected = {
+                "outcome_similarity": historical["outcome_similarity"],
+                "outcome_check_count": historical["outcome_check_count"],
+                "outcome_state_history_safe": historical[
+                    "outcome_state_history_safe"
+                ],
+            }
+            observed = {
+                "outcome_similarity": outcome.get("outcome_similarity"),
+                "outcome_check_count": outcome.get("outcome_check_count"),
+                "outcome_state_history_safe": outcome.get(
+                    "outcome_state_history_safe"
+                ),
+            }
+            if observed != expected:
+                raise RuntimeError(
+                    f"Historical trajectory no longer reproduces for {case_id}: "
+                    f"{observed!r} != {expected!r}"
+                )
+
+            trace: list[dict[str, Any]] = []
+            for row in case["sandbox_rows"]:
+                for raw_trace in row.get("tool_trace") or []:
+                    parsed = json.loads(raw_trace)
+                    if not isinstance(parsed, dict):
+                        raise ValueError(f"Non-object tool trace in {case_id}")
+                    trace.append(parsed)
+            visible = classifier.visible_task_context_from_scenario(scenario)
+            state_hashes = {
+                namespace_name: hashlib.sha256(
+                    json.dumps(
+                        context._dbs[DatabaseNamespace[namespace_name]].to_dicts(),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode("utf-8")
+                ).hexdigest()
+                for namespace_name in (
+                    "SETTING",
+                    "CONTACT",
+                    "MESSAGING",
+                    "REMINDER",
+                )
+            }
+            case_results[case_id] = _jsonable(
+                {
+                    "scenario": scenario_name,
+                    "task_index_zero_based": case["task_index_zero_based"],
+                    "coverage": case["coverage"],
+                    "historical": historical,
+                    "visible_context": {
+                        "user_request": visible.user_request,
+                        "available_tools": list(visible.available_tools),
+                        "signals": list(visible.signals),
+                        "primary_family_key": visible.primary_family_key,
+                        "routing_text": visible.routing_text(),
+                        "generation_label": visible.generation_label(),
+                    },
+                    "tool_trace": trace,
+                    "final_state_sha256": state_hashes,
+                    "outcome": outcome,
+                }
+            )
+    finally:
+        if previous_fixed_timestamp is None:
+            os.environ.pop("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP", None)
+        else:
+            os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = (
+                previous_fixed_timestamp
+            )
+
+    return {
+        "fixture": {
+            "cohort_id": fixture["cohort_id"],
+            "source_arm": fixture["source_arm"],
+            "fixed_toolsandbox_timestamp": int(fixed_timestamp),
+            "timezone": fixture["timezone"],
+            "fixture_byte_count": manifest["fixture_byte_count"],
+            "fixture_sha256": manifest["fixture_sha256"],
+            "case_sha256": manifest["case_sha256"],
+            "coverage": manifest["coverage"],
+            "source_files_sha256": {
+                path: details["sha256"]
+                for path, details in manifest["source_files"].items()
+            },
+            "privacy": manifest["privacy"],
+            "known_boundary_gap": manifest["known_boundary_gap"],
+        },
+        "birth_facts": fixture["birth_facts"],
+        "cases": case_results,
+    }
+
+
 def probe_classifier(_root: Path) -> dict[str, Any]:
     """Snapshot visible-context and trace-derived birth observations."""
 
     classifier = importlib.import_module("sage_ts.adequacy.inadequacy_classifier")
+    from tool_sandbox.cli.utils import resolve_scenarios
+    from tool_sandbox.common.execution_context import RoleType
+    from tool_sandbox.common.tool_discovery import ToolBackend
+
+    # Freeze the entire ordered 1,032-task facts seam, not only the targeted
+    # characterization cases below. These canonical bytes and digests were
+    # independently measured by the pre-refactor seam analysis.
+    random.seed(0)
+    all_scenarios = resolve_scenarios(
+        desired_scenario_names=None,
+        preferred_tool_backend=ToolBackend.DEFAULT,
+    )
+    raw_task_facts: list[Any] = []
+    full_visible_contexts: list[dict[str, Any]] = []
+    for scenario_name, scenario in all_scenarios.items():
+        context = classifier.visible_task_context_from_scenario(scenario)
+        raw_task_facts.append(
+            [scenario_name, context.user_request, list(context.available_tools)]
+        )
+        full_visible_contexts.append(
+            {
+                "scenario": scenario_name,
+                "user_request": context.user_request,
+                "available_tools": list(context.available_tools),
+                "signals": list(context.signals),
+                "primary_family_key": context.primary_family_key,
+                "routing_text": context.routing_text(),
+                "generation_label": context.generation_label(),
+            }
+        )
+
+    def canonical_digest(value: Any) -> dict[str, Any]:
+        canonical = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return {
+            "byte_count": len(canonical),
+            "sha256": hashlib.sha256(canonical).hexdigest(),
+        }
+
+    raw_digest = canonical_digest(raw_task_facts)
+    full_digest = canonical_digest(full_visible_contexts)
+    expected_raw = {
+        "byte_count": 381344,
+        "sha256": "9a1b7c21a7f91520b8b64771ee3fb99a6a50fae605b33a7a0e7259d1fd04bac8",
+    }
+    expected_full = {
+        "byte_count": 1138325,
+        "sha256": "e948d18d00746eb3e92b07cae0ea5c58c7c3415ec821f35216a8fb0de56339b5",
+    }
+    if raw_digest != expected_raw or full_digest != expected_full:
+        raise RuntimeError(
+            "Full benchmark visible-context seam drifted "
+            f"(raw={raw_digest!r}, full={full_digest!r})"
+        )
+
+    class _FakeRows:
+        def __init__(self, rows: tuple[dict[str, Any], ...]) -> None:
+            self._rows = rows
+
+        def iter_rows(self, *, named: bool) -> Any:
+            if not named:
+                raise AssertionError("visible context must request named rows")
+            return iter(self._rows)
+
+    class _FakeStartingContext:
+        def __init__(
+            self,
+            *,
+            rows: tuple[dict[str, Any], ...] = (),
+            tools: tuple[Any, ...] = (),
+            database_error: bool = False,
+            tool_error: bool = False,
+        ) -> None:
+            self._rows = rows
+            self._tools = tools
+            self._database_error = database_error
+            self._tool_error = tool_error
+
+        def get_database(self, *_args: Any, **_kwargs: Any) -> _FakeRows:
+            if self._database_error:
+                raise RuntimeError("fixture database failure")
+            return _FakeRows(self._rows)
+
+        def get_available_tools(self, *, scrambling_allowed: bool) -> tuple[Any, ...]:
+            if scrambling_allowed:
+                raise AssertionError("visible context must disable scrambling")
+            if self._tool_error:
+                raise RuntimeError("fixture tool-discovery failure")
+            return self._tools
+
+    class _FakeScenario:
+        def __init__(self, starting_context: _FakeStartingContext) -> None:
+            self.starting_context = starting_context
+
+    fake_cases = {
+        "last_nonempty_user_to_agent_and_sorted_string_tools": _FakeScenario(
+            _FakeStartingContext(
+                rows=(
+                    {
+                        "sender": RoleType.USER,
+                        "recipient": RoleType.AGENT,
+                        "content": "Demonstration request",
+                    },
+                    {
+                        "sender": RoleType.AGENT,
+                        "recipient": RoleType.USER,
+                        "content": "Wrong direction",
+                    },
+                    {
+                        "sender": RoleType.USER,
+                        "recipient": RoleType.EXECUTION_ENVIRONMENT,
+                        "content": "Wrong recipient",
+                    },
+                    {
+                        "sender": RoleType.USER,
+                        "recipient": RoleType.AGENT,
+                        "content": "   ",
+                    },
+                    {
+                        "sender": RoleType.USER,
+                        "recipient": RoleType.AGENT,
+                        "content": 917,
+                    },
+                ),
+                tools=("z_tool", 2, "a_tool"),
+            )
+        ),
+        "database_failure_preserves_tool_discovery": _FakeScenario(
+            _FakeStartingContext(
+                tools=("z_tool", "a_tool"),
+                database_error=True,
+            )
+        ),
+        "tool_failure_preserves_database_request": _FakeScenario(
+            _FakeStartingContext(
+                rows=(
+                    {
+                        "sender": RoleType.USER,
+                        "recipient": RoleType.AGENT,
+                        "content": "Keep this request when discovery fails",
+                    },
+                ),
+                tool_error=True,
+            )
+        ),
+    }
+    fake_results: dict[str, Any] = {}
+    for case_id, fake_scenario in fake_cases.items():
+        context = classifier.visible_task_context_from_scenario(fake_scenario)
+        fake_results[case_id] = {
+            "user_request": context.user_request,
+            "available_tools": list(context.available_tools),
+            "signals": list(context.signals),
+            "primary_family_key": context.primary_family_key,
+            "routing_text": context.routing_text(),
+            "generation_label": context.generation_label(),
+        }
+
     names = (
         "find_current_city_insufficient_information",
         "add_reminder_content_and_week_delta_and_time_and_location",
@@ -490,6 +826,17 @@ def probe_classifier(_root: Path) -> dict[str, Any]:
         },
     )
     return {
+        "full_benchmark_facts": {
+            "task_count": len(all_scenarios),
+            "canonical_serialization": (
+                "json.dumps(value, ensure_ascii=False, separators=(',', ':'))"
+            ),
+            "raw_task_facts": raw_digest,
+            "full_visible_contexts": full_digest,
+            "first_scenario": next(iter(all_scenarios)),
+            "last_scenario": next(reversed(all_scenarios)),
+        },
+        "fake_scenario_edge_cases": _jsonable(fake_results),
         "visible_context_cases": _jsonable(results),
         "visible_trace_case": {
             "scenario": trace_name,
@@ -1870,6 +2217,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "evaluator_manifest": probe_evaluator_manifest,
     "splits": probe_splits,
     "outcomes": probe_outcomes,
+    "trajectory": probe_trajectory,
     "classifier": probe_classifier,
     "actor": probe_actor,
     "normalization": probe_normalization,
@@ -1904,6 +2252,22 @@ def main() -> int:
     unknown = sorted(set(selected) - set(PROBES))
     if unknown:
         parser.error(f"unknown probes: {', '.join(unknown)}")
+    if "trajectory" in selected:
+        # ToolSandbox scenario factories cache time-derived starting state on
+        # first resolution. Pin the historical clock before *any* selected-root
+        # import/probe can resolve a scenario, not only inside probe_trajectory.
+        fixture_path = (
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "full_trajectory_v1.json"
+        )
+        fixture_metadata = json.loads(fixture_path.read_text(encoding="utf-8"))
+        os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(
+            fixture_metadata["fixed_toolsandbox_timestamp"]
+        )
+        os.environ["TZ"] = str(fixture_metadata["timezone"])
+        if hasattr(time, "tzset"):
+            time.tzset()
     _prepare_import_path(root)
     payload = {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,

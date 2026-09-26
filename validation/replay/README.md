@@ -23,10 +23,20 @@ or suppress normalization rules.
   complete evaluator output for targeted insufficient-information, scalar,
   dynamic-time, frozen-distance, weather, recency, contradiction, correction,
   and post-answer-tail cases.
+- `trajectory`: rehydrates eight complete, content-hashed trajectories from the
+  frozen Chapter 4 paper cohort under its fixed clock. The stratified corpus
+  covers generated and native execution, state changes, insufficient
+  information, external fixture output, birth/repair/reuse evidence, and four
+  post-700 tasks. It reruns each checkout's current visible-context parser and
+  outcome evaluator over the captured tool arguments, results, conversation,
+  and state history, and fails if the historical outcome no longer reproduces.
 - `classifier`: resolves committed benchmark scenarios, then snapshots the
   immutable visible task facts, signal order, family key, generation label, and
-  complete tool-birth observations (including validation examples). It also
-  includes one visible execution-trace precondition failure.
+  complete tool-birth observations (including validation examples). It gates
+  the canonical raw and classified hashes for all 1,032 ordered tasks and also
+  exercises independent database/tool-discovery failures, role filtering,
+  last-nonempty-request selection, string conversion, sorted tool names, and
+  one visible execution-trace precondition failure.
 - `actor`: feeds fixed model-boundary messages and routed schemas through the
   policy composer and every named-choice selector in production precedence
   order. It snapshots exact prompt text, original schema order, selected named
@@ -53,6 +63,25 @@ so they exercise policy without copying a mutable registry or invoking an LLM.
 No probe calls the network, current clock, model service, or an unseeded random
 source.
 
+The trajectory corpus and manifest live in `fixtures/full_trajectory_v1.json`
+and `fixtures/full_trajectory_v1.manifest.json`. Provider call IDs are replaced
+with stable fixture-local IDs. Hidden user-simulator/system prompts, absolute
+paths, credentials, interactive consoles, and mutable registries are excluded.
+Every source file, case, and fixture byte stream is hashed. Verify the portable
+fixture alone with:
+
+```bash
+python validation/replay/trajectory_fixture.py
+```
+
+When the original paper artifacts are mounted, verify the entire provenance
+chain as well:
+
+```bash
+python validation/replay/trajectory_fixture.py \
+  --source-root /absolute/path/to/the/original/paper/worktree
+```
+
 Run the full initial gate with the Python interpreter from the frozen
 publication environment:
 
@@ -67,14 +96,15 @@ python validation/replay/compare.py \
 Exit status is `0` for equivalence, `1` for semantic differences, and `2` when
 a probe or the harness fails. Probe failures never count as equivalence.
 
-## Remaining full-trajectory extension
+## Known historical boundary gap
 
-Before deleting an old implementation surface, add content-hashed fixture
-coverage for any behavior not reached by these vectors. In particular, a later
-phase should export representative complete trajectories and the corresponding
-validated registry/lifecycle states from the frozen paper cohort. Those
-fixtures should exercise native/generated execution and final state changes in
-addition to the pure and deterministic surfaces covered here.
+The frozen run recorded routed tool names, tool calls/results, state changes,
+and lifecycle decisions, but did not persist the exact per-request OpenAI tool
+schema payload and actor prompt sent to the model. That boundary cannot be
+truthfully reconstructed from the artifacts. Exact prompt, schema, order,
+filtering, and named-choice behavior is therefore gated by the deterministic
+`actor` probe above. A future evidence run should archive those payloads if a
+historical byte-for-byte model-boundary replay is required.
 
 If a source artifact contains a timestamp, PID, temporary path, or duration
 that has no behavioral meaning, add the narrowest possible allowlist rule with

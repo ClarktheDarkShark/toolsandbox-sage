@@ -31,6 +31,7 @@ DEFAULT_PROBES = (
     "evaluator_manifest",
     "splits",
     "outcomes",
+    "trajectory",
     "classifier",
     "actor",
     "normalization",

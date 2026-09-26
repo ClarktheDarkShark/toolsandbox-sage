@@ -1,0 +1,3201 @@
+{
+  "birth_facts": {
+    "apply_single_device_state_action": {
+      "accepted": true,
+      "canonical_key": "state_precondition:apply_single_device_state_action",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "cellular_off_10_distraction_tools",
+      "held_out_check_count": 3,
+      "last_reuse_scenario": "wifi_off_all_tools",
+      "repair_attempt_count": 0,
+      "repair_attempted": false,
+      "repair_code_sha256": [],
+      "repair_final_errors": [],
+      "repair_history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reuse_event_count": 142,
+      "runtime_smoke_passed": true,
+      "source_example_count": 1
+    },
+    "extract_distance_result": {
+      "accepted": true,
+      "canonical_key": "derived_value:extract_distance_result",
+      "family": "derived_value_calculator",
+      "first_reuse_scenario": "find_days_till_holiday_insufficient_information_alt_all_tools",
+      "held_out_check_count": 1,
+      "last_reuse_scenario": "find_distance_with_location_name_insufficient_information_alt_3_distraction_tools_tool_name_scrambled",
+      "repair_attempt_count": 5,
+      "repair_attempted": true,
+      "repair_code_sha256": [
+        "148d28f8fd881f6a6eb8e2a003fdbca16a1079a1a944c2262b0f6de2b9d8a37a",
+        "148d28f8fd881f6a6eb8e2a003fdbca16a1079a1a944c2262b0f6de2b9d8a37a",
+        "148d28f8fd881f6a6eb8e2a003fdbca16a1079a1a944c2262b0f6de2b9d8a37a",
+        "6bc5147be54505f808763bf055963a42eb46ad81ffa88764be6cd397fe680da0",
+        "6b5400ae63d18e6e153c4682d82b2999a459307728bcc704f425e8aa673dcd70"
+      ],
+      "repair_final_errors": [],
+      "repair_history_sha256": "eea1e6bff5c2f8d9887de4c0db7f71c9b3ce0a7b68787913c9a17be3776fe778",
+      "reuse_event_count": 19,
+      "runtime_smoke_passed": true,
+      "source_example_count": 1
+    },
+    "plan_contact_lookup_query": {
+      "accepted": true,
+      "canonical_key": "composite:plan_contact_lookup_query",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "modify_contact_with_message_recency_multiple_user_turn_alt_10_distraction_tools",
+      "held_out_check_count": 4,
+      "last_reuse_scenario": "update_contact_with_id_and_phone_number_all_tools",
+      "repair_attempt_count": 0,
+      "repair_attempted": false,
+      "repair_code_sha256": [],
+      "repair_final_errors": [],
+      "repair_history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reuse_event_count": 113,
+      "runtime_smoke_passed": true,
+      "source_example_count": 2
+    },
+    "plan_contact_relationship_batch_update": {
+      "accepted": true,
+      "canonical_key": "composite:plan_contact_relationship_batch_update",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "update_contact_relationship_with_relationship",
+      "held_out_check_count": 2,
+      "last_reuse_scenario": "update_contact_relationship_with_relationship_twice_multiple_user_turn_all_tools",
+      "repair_attempt_count": 1,
+      "repair_attempted": true,
+      "repair_code_sha256": [
+        "8d6444e261fbe894663d038f60b008abf3b6f9ca4649a8f04b666c2a6d0d3723"
+      ],
+      "repair_final_errors": [],
+      "repair_history_sha256": "aa64d5cf644cd2bcb1c0d9c8327fa02bd960c92b1809c9192a42395f3ee6eaea",
+      "reuse_event_count": 76,
+      "runtime_smoke_passed": true,
+      "source_example_count": 2
+    },
+    "prepare_add_contact_args": {
+      "accepted": true,
+      "canonical_key": "composite:prepare_add_contact_args",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "add_contact_with_name_and_phone_number",
+      "held_out_check_count": 1,
+      "last_reuse_scenario": "add_contact_with_name_and_phone_number_all_tools",
+      "repair_attempt_count": 4,
+      "repair_attempted": true,
+      "repair_code_sha256": [
+        "c45e2fc242e8ac04038632e1b7ba5b9f2ceaeb358e13faa1c5b509278956afcf",
+        "6bb12f7d73d9d5e9ebf120b0624a983318423942c2156884297b3e346d7f3e8d",
+        "a15542fb2ad1f971be8b371eb63aff51d04fa96b4c6becc41d44aaf523a2147c",
+        "dab064cf072f3a09a41c34a21f2881b3cc0661cc6cf118fa5b40c6cdcdd0f404"
+      ],
+      "repair_final_errors": [],
+      "repair_history_sha256": "c3b79959ad2eaba6b63d04204523c7e5cee708b1c0ec8d2700258b7102b34917",
+      "reuse_event_count": 8,
+      "runtime_smoke_passed": true,
+      "source_example_count": 1
+    },
+    "prepare_direct_contact_action_args": {
+      "accepted": true,
+      "canonical_key": "composite:prepare_direct_contact_action_args",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "remove_contact_with_id",
+      "held_out_check_count": 1,
+      "last_reuse_scenario": "update_contact_with_id_and_phone_number_3_distraction_tools_arg_type_scrambled",
+      "repair_attempt_count": 1,
+      "repair_attempted": true,
+      "repair_code_sha256": [
+        "9df88195cc94765c2a6d175e8a37ef855f63f87d7515e0bfdd3a022567b71894"
+      ],
+      "repair_final_errors": [],
+      "repair_history_sha256": "8c1e6ac084c046d642c0c975a761a9d8139b2051eec93773451f0eef1d85fa2f",
+      "reuse_event_count": 18,
+      "runtime_smoke_passed": true,
+      "source_example_count": 3
+    },
+    "prepare_reminder_creation_args": {
+      "accepted": true,
+      "canonical_key": "composite:prepare_reminder_creation_args",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "add_reminder_content_and_week_delta_and_time",
+      "held_out_check_count": 2,
+      "last_reuse_scenario": "add_reminder_content_and_weekday_delta_and_time_multiple_user_turn_alt_all_tools",
+      "repair_attempt_count": 5,
+      "repair_attempted": true,
+      "repair_code_sha256": [
+        "8cf6496a40cd62fb2cd348fc33bc11eeb7ad2e866300f6c5e22d8a7b24555478",
+        "c822a08d3b840417877d2e4c37a0f4542a3b2e19ab0e3e8405678b0ddc7af5fa",
+        "c822a08d3b840417877d2e4c37a0f4542a3b2e19ab0e3e8405678b0ddc7af5fa",
+        "a440f9a407ba84614dbb529c612d69bb9f4ee3908a493e2c8c97ab6f490122a8",
+        "a777cf3fa4a19c755f16cd3479ed7f3cf59f80182473a26b0a2a88b3ccdccda0"
+      ],
+      "repair_final_errors": [],
+      "repair_history_sha256": "71873a24e846f94db3be51442c5e4d155d3bf1ecfd0c7a089dc7c20ddee6f581",
+      "reuse_event_count": 95,
+      "runtime_smoke_passed": true,
+      "source_example_count": 2
+    },
+    "prepare_safe_action_or_abstain": {
+      "accepted": true,
+      "canonical_key": "validation:prepare_safe_action_or_abstain",
+      "family": "validation_abstention_helper",
+      "first_reuse_scenario": "find_days_till_holiday_insufficient_information",
+      "held_out_check_count": 2,
+      "last_reuse_scenario": "send_message_with_contact_content_cellular_off_insufficient_information_alt_all_tools",
+      "repair_attempt_count": 0,
+      "repair_attempted": false,
+      "repair_code_sha256": [],
+      "repair_final_errors": [],
+      "repair_history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reuse_event_count": 342,
+      "runtime_smoke_passed": true,
+      "source_example_count": 2
+    },
+    "prepare_specific_location_search_args": {
+      "accepted": true,
+      "canonical_key": "composite:prepare_specific_location_search_args",
+      "family": "composite_workflow_helper",
+      "first_reuse_scenario": "add_reminder_content_and_week_delta_and_time_and_location",
+      "held_out_check_count": 1,
+      "last_reuse_scenario": "find_temperature_low_battery_mode_all_tools",
+      "repair_attempt_count": 0,
+      "repair_attempted": false,
+      "repair_code_sha256": [],
+      "repair_final_errors": [],
+      "repair_history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reuse_event_count": 158,
+      "runtime_smoke_passed": true,
+      "source_example_count": 3
+    },
+    "relative_day_time_to_timestamp": {
+      "accepted": true,
+      "canonical_key": "canonicalizer:relative_day_time_timestamp",
+      "family": "canonicalizer",
+      "first_reuse_scenario": "add_reminder_content_and_week_delta_and_time",
+      "held_out_check_count": 1,
+      "last_reuse_scenario": "modify_reminder_with_recency_latest_alt_all_tools",
+      "repair_attempt_count": 0,
+      "repair_attempted": false,
+      "repair_code_sha256": [],
+      "repair_final_errors": [],
+      "repair_history_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reuse_event_count": 86,
+      "runtime_smoke_passed": true,
+      "source_example_count": 1
+    }
+  },
+  "cases": [
+    {
+      "coverage": [
+        "early_task",
+        "birth",
+        "repair",
+        "reuse",
+        "generated_execution",
+        "native_execution",
+        "state_change",
+        "contact"
+      ],
+      "historical": {
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 0.7777777777777778,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 1.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "prepare_add_contact_args"
+          ],
+          "generated_tools_called": [
+            "prepare_add_contact_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_add_contact_args"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": -0.2222222222222222,
+          "side_effect_failures": [],
+          "task_family_key": "add_contact"
+        },
+        "outcome_check_count": 2,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 0.5,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "prepare_add_contact_args"
+          ],
+          "generated_tools_called": [
+            "prepare_add_contact_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_add_contact_args"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": false,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "prepare_add_contact_args"
+          ]
+        },
+        "turn_count": 3,
+        "visibility": {
+          "available_tools": [
+            "add_contact",
+            "end_conversation",
+            "prepare_add_contact_args"
+          ],
+          "filtered_out_reasons_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "generated_routing_decisions": {
+            "prepare_add_contact_args": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "add_contact",
+                "direct_contact_action"
+              ],
+              "matched_task_families": [
+                "add_contact",
+                "direct_contact_action"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "prepare_add_contact_args",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "prepare_add_contact_args"
+          ],
+          "shortlisted_generated_tools": [
+            "prepare_add_contact_args"
+          ],
+          "tool_allow_list": [
+            "prepare_add_contact_args",
+            "end_conversation",
+            "add_contact"
+          ]
+        }
+      },
+      "id": "online_rep01_0000_add_contact_with_name_and_phone_number",
+      "sandbox_rows": [
+        {
+          "content": "Add Stephen Sondheim to my contact, his phone_number is +19876543210",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_6L07popNcssEELmpn91fpFLp_parameters = {'user_request': 'Add Stephen Sondheim to my contact, his phone_number is +19876543210', 'name': 'Stephen Sondheim', 'phone_number': '+19876543210'}\ncall_6L07popNcssEELmpn91fpFLp_response = prepare_add_contact_args(**call_6L07popNcssEELmpn91fpFLp_parameters)\nprint(repr(call_6L07popNcssEELmpn91fpFLp_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_add_contact_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'status': 'success', 'confirmation': 'Stephen Sondheim added with phone number +19876543210.', 'abstain_reason': '', 'native_action': 'add_contact', 'native_result': '30b557e3-56fe-49e8-8394-5ca65f18902a'}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_add_contact_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"add_contact\", \"arguments\": {\"name\": \"Stephen Sondheim\", \"phone_number\": \"+19876543210\", \"relationship\": null, \"is_self\": false}, \"result\": \"30b557e3-56fe-49e8-8394-5ca65f18902a\"}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "Stephen Sondheim has been added with the phone number +19876543210.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 19
+        },
+        {
+          "content": "call_5ySbOrISrmrAK4IdrS5bE14A_parameters = {}\ncall_5ySbOrISrmrAK4IdrS5bE14A_response = end_conversation(**call_5ySbOrISrmrAK4IdrS5bE14A_parameters)\nprint(repr(call_5ySbOrISrmrAK4IdrS5bE14A_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 19,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 20,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "add_contact_with_name_and_phone_number",
+      "source_record_sha256": {
+        "feedback": "fddfd8af6ed57b74c7f615a57400925f2671eecf069e783382020c6378dfc7a5",
+        "result": "5b5585a7488df3af183e9d3f194c363f3af643ca73b561af4729cb5178b6a863",
+        "selection": "264cf97a44af974a46e62a3a3505f78338d0abb55b58720006c699d17ee84026",
+        "visibility": "82aa77e242dd90f427a438446945cd7db3e568fd4a3d686cb3877bf98744247b"
+      },
+      "state_rows": {
+        "CONTACT": [
+          {
+            "is_self": true,
+            "name": "Tomas Haake",
+            "person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "phone_number": "+11233344455",
+            "relationship": "self",
+            "sandbox_message_index": 17
+          },
+          {
+            "is_self": false,
+            "name": "Fredrik Thordendal",
+            "person_id": "9e137f06-916a-5310-8174-cf0b7e9f7054",
+            "phone_number": "+12453344098",
+            "relationship": "friend",
+            "sandbox_message_index": 17
+          },
+          {
+            "is_self": false,
+            "name": "John Petrucci",
+            "person_id": "a22e1984-6c6c-530c-8831-c3ea3b5138e7",
+            "phone_number": "+1234560987",
+            "relationship": "friend",
+            "sandbox_message_index": 17
+          },
+          {
+            "is_self": false,
+            "name": "Homer S",
+            "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "phone_number": "+10000000000",
+            "relationship": "boss",
+            "sandbox_message_index": 17
+          },
+          {
+            "is_self": false,
+            "name": "Stephen Sondheim",
+            "person_id": "30b557e3-56fe-49e8-8394-5ca65f18902a",
+            "phone_number": "+19876543210",
+            "sandbox_message_index": 17
+          }
+        ],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 0
+    },
+    {
+      "coverage": [
+        "relative_time",
+        "generated_execution",
+        "native_execution",
+        "state_change",
+        "reminder"
+      ],
+      "historical": {
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 0.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "relative_day_time_to_timestamp",
+            "prepare_reminder_creation_args"
+          ],
+          "generated_tools_called": [
+            "relative_day_time_to_timestamp",
+            "prepare_reminder_creation_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 1.0,
+          "side_effect_failures": [],
+          "task_family_key": "reminder_create"
+        },
+        "outcome_check_count": 1,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "relative_day_time_to_timestamp",
+            "prepare_reminder_creation_args"
+          ],
+          "generated_tools_called": [
+            "relative_day_time_to_timestamp",
+            "prepare_reminder_creation_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp"
+          ]
+        },
+        "turn_count": 11,
+        "visibility": {
+          "available_tools": [
+            "add_reminder",
+            "datetime_info_to_timestamp",
+            "end_conversation",
+            "get_current_timestamp",
+            "modify_reminder",
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp",
+            "timestamp_to_datetime_info"
+          ],
+          "filtered_out_reasons_sha256": "5e8cad8956d2e44fc8bd36bec2a2d7143c8ee619e396c86fa6b017e509f1b016",
+          "generated_routing_decisions": {
+            "prepare_reminder_creation_args": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "reminder_create",
+                "relative_time"
+              ],
+              "matched_task_families": [
+                "reminder_create",
+                "relative_time"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "prepare_reminder_creation_args",
+              "visible": true
+            },
+            "relative_day_time_to_timestamp": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "relative_time",
+                "reminder_create"
+              ],
+              "matched_task_families": [
+                "relative_time",
+                "reminder_create"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "relative_day_time_to_timestamp",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp"
+          ],
+          "shortlisted_generated_tools": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp"
+          ],
+          "tool_allow_list": [
+            "prepare_reminder_creation_args",
+            "relative_day_time_to_timestamp",
+            "get_current_timestamp",
+            "modify_reminder",
+            "datetime_info_to_timestamp",
+            "timestamp_to_datetime_info",
+            "end_conversation",
+            "add_reminder"
+          ]
+        }
+      },
+      "id": "online_rep01_0040_add_reminder_content_and_week_delta_and_time",
+      "sandbox_rows": [
+        {
+          "content": "Remind me to buy chocolate milk tomorrow 5PM",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_mL7RfW3J6a08FRIc8jqVdO30_parameters = {}\ncall_mL7RfW3J6a08FRIc8jqVdO30_response = get_current_timestamp(**call_mL7RfW3J6a08FRIc8jqVdO30_parameters)\nprint(repr(call_mL7RfW3J6a08FRIc8jqVdO30_response))",
+          "conversation_active": true,
+          "openai_function_name": "get_current_timestamp",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "1784832588.0",
+          "conversation_active": true,
+          "openai_function_name": "get_current_timestamp",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"get_current_timestamp\", \"arguments\": {}, \"result\": 1784832588.0}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 18
+        },
+        {
+          "content": "call_KKRRquwKreEwoJiLjhXy9TSx_parameters = {'timestamp': 1784832588}\ncall_KKRRquwKreEwoJiLjhXy9TSx_response = timestamp_to_datetime_info(**call_KKRRquwKreEwoJiLjhXy9TSx_parameters)\nprint(repr(call_KKRRquwKreEwoJiLjhXy9TSx_response))",
+          "conversation_active": true,
+          "openai_function_name": "timestamp_to_datetime_info",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'year': 2026, 'month': 7, 'day': 23, 'hour': 14, 'minute': 49, 'second': 48, 'isoweekday': 4}",
+          "conversation_active": true,
+          "openai_function_name": "timestamp_to_datetime_info",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"timestamp_to_datetime_info\", \"arguments\": {\"timestamp\": 1784832588}, \"result\": {\"year\": 2026, \"month\": 7, \"day\": 23, \"hour\": 14, \"minute\": 49, \"second\": 48, \"isoweekday\": 4}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 20
+        },
+        {
+          "content": "call_YQWU9SM39ZTRdX90DTpbbotI_parameters = {'current_timestamp': 1784832588, 'day_offset': 1, 'hour': 17, 'minute': 0, 'local_utc_offset_hours': 0, 'current_datetime_info': {'hour': 14, 'minute': 49, 'second': 48}}\ncall_YQWU9SM39ZTRdX90DTpbbotI_response = relative_day_time_to_timestamp(**call_YQWU9SM39ZTRdX90DTpbbotI_parameters)\nprint(repr(call_YQWU9SM39ZTRdX90DTpbbotI_response))",
+          "conversation_active": true,
+          "openai_function_name": "relative_day_time_to_timestamp",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "1784926800.0",
+          "conversation_active": true,
+          "openai_function_name": "relative_day_time_to_timestamp",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "AGENT",
+          "sandbox_message_index": 21,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"relative_day_time_to_timestamp\", \"arguments\": {\"current_timestamp\": 1784832588, \"day_offset\": 1, \"hour\": 17, \"minute\": 0, \"local_utc_offset_hours\": 0, \"current_datetime_info\": {\"hour\": 14, \"minute\": 49, \"second\": 48}}, \"result\": 1784926800.0}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "call_hBAPK3XgSJ8y0qjUrKm2To0q_parameters = {'reminder_id': 'buy_chocolate_milk_tomorrow_5pm', 'content': 'Buy chocolate milk', 'reminder_timestamp': 1784926800}\ncall_hBAPK3XgSJ8y0qjUrKm2To0q_response = modify_reminder(**call_hBAPK3XgSJ8y0qjUrKm2To0q_parameters)\nprint(repr(call_hBAPK3XgSJ8y0qjUrKm2To0q_response))",
+          "conversation_active": true,
+          "openai_function_name": "modify_reminder",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 22,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "polars.exceptions.NoDataError: No db entry matching reminder_id='buy_chocolate_milk_tomorrow_5pm' found",
+          "conversation_active": true,
+          "openai_function_name": "modify_reminder",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "AGENT",
+          "sandbox_message_index": 23,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_call_exception": "polars.exceptions.NoDataError: No db entry matching reminder_id='buy_chocolate_milk_tomorrow_5pm' found",
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 24
+        },
+        {
+          "content": "call_BChsqBaIGC4wDjMii6gdx8kq_parameters = {'content': 'Buy chocolate milk', 'reminder_timestamp': 1784926800, 'location_requested': False, 'location_required': False, 'location_available': False}\ncall_BChsqBaIGC4wDjMii6gdx8kq_response = prepare_reminder_creation_args(**call_BChsqBaIGC4wDjMii6gdx8kq_parameters)\nprint(repr(call_BChsqBaIGC4wDjMii6gdx8kq_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_reminder_creation_args",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 24,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'status': 'success', 'confirmation': 'Reminder created for Buy chocolate milk at 1784926800.', 'abstain_reason': '', 'native_action': 'add_reminder', 'native_result': '8d8e1136-2ec4-4c44-bd8a-6679ff669f0d'}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_reminder_creation_args",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "AGENT",
+          "sandbox_message_index": 25,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"add_reminder\", \"arguments\": {\"content\": \"Buy chocolate milk\", \"reminder_timestamp\": 1784926800, \"latitude\": 0.0, \"longitude\": 0.0}, \"result\": \"8d8e1136-2ec4-4c44-bd8a-6679ff669f0d\"}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "Reminder created for \"Buy chocolate milk\" tomorrow at 5 PM.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 26,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 27
+        },
+        {
+          "content": "call_IlmnAdtW2OoO8sKjExL43Opk_parameters = {}\ncall_IlmnAdtW2OoO8sKjExL43Opk_response = end_conversation(**call_IlmnAdtW2OoO8sKjExL43Opk_parameters)\nprint(repr(call_IlmnAdtW2OoO8sKjExL43Opk_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 27,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 28,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "add_reminder_content_and_week_delta_and_time",
+      "source_record_sha256": {
+        "feedback": "d96aabe583cfbb74603e58f06e74841c31635b3bc48b5836b25bdc48c59080ce",
+        "result": "c4b8ef5e3a51eb3500779d80c5e57b6a12214e41ddc230ea240d5d2dd20cbe05",
+        "selection": "3ec5b85860b25d8c7e16538148c6d1f5a96f8366abb7318879baa8bf4c5818a2",
+        "visibility": "1a491abd1287fbe6d7f72080cd9785c239d99df0d98e0abe4d8bf1a6e916cf2d"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [],
+        "REMINDER": [
+          {
+            "content": "Look for Company SF tickets",
+            "creation_timestamp": 1784573388.0,
+            "reminder_id": "8f5b6fc6-1c25-5467-91ba-d4d1e17c7129",
+            "reminder_timestamp": 1784746188.0,
+            "sandbox_message_index": 25
+          },
+          {
+            "content": "Buy tickets for Merrily next week",
+            "creation_timestamp": 1784746188.0,
+            "reminder_id": "da2b856e-9390-511f-bcbe-7005f72cbf5e",
+            "reminder_timestamp": 1784832528.0,
+            "sandbox_message_index": 25
+          },
+          {
+            "content": "Buy a nice rich navy bathing dress",
+            "creation_timestamp": 1784828988.0,
+            "latitude": 37.3237926356735,
+            "longitude": -122.03961770355414,
+            "reminder_id": "54f20be9-eac3-5e76-8e57-724e48d3d477",
+            "reminder_timestamp": 1784836188.0,
+            "sandbox_message_index": 25
+          },
+          {
+            "content": "Buy chocolate milk",
+            "creation_timestamp": 1784832588.0,
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "reminder_id": "8d8e1136-2ec4-4c44-bd8a-6679ff669f0d",
+            "reminder_timestamp": 1784926800.0,
+            "sandbox_message_index": 25
+          }
+        ],
+        "SETTING": []
+      },
+      "task_index_zero_based": 40
+    },
+    {
+      "coverage": [
+        "insufficient_information",
+        "generated_execution",
+        "abstention"
+      ],
+      "historical": {
+        "categories": [
+          "INSUFFICIENT_INFORMATION",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "audited_outcome_fallback",
+          "control_outcome": 0.0,
+          "control_outcome_source": "audited_outcome_fallback",
+          "generated_tools_attempted": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "generated_tools_called": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 1.0,
+          "side_effect_failures": [],
+          "task_family_key": "holiday"
+        },
+        "outcome_check_count": 1,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": null,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "generated_tools_called": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "prepare_safe_action_or_abstain"
+          ]
+        },
+        "turn_count": 17,
+        "visibility": {
+          "available_tools": [
+            "end_conversation",
+            "prepare_safe_action_or_abstain",
+            "search_holiday",
+            "timestamp_diff"
+          ],
+          "filtered_out_reasons_sha256": "7473c663b894129173054ae51c45b0f69341b39312d14b70ea33dfec0c1ab20c",
+          "generated_routing_decisions": {
+            "prepare_safe_action_or_abstain": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "insufficient_information"
+              ],
+              "matched_task_families": [
+                "insufficient_information"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "prepare_safe_action_or_abstain",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "shortlisted_generated_tools": [
+            "prepare_safe_action_or_abstain"
+          ],
+          "tool_allow_list": [
+            "prepare_safe_action_or_abstain",
+            "timestamp_diff",
+            "search_holiday",
+            "end_conversation"
+          ]
+        }
+      },
+      "id": "online_rep01_0240_find_days_till_holiday_insufficient_information",
+      "sandbox_rows": [
+        {
+          "content": "How many days is it till Christmas Day",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_7OaHr1Cd4UgrnHAavBzeBNyu_parameters = {'user_request': 'How many days is it till Christmas Day', 'requested_action': 'timestamp_diff', 'required_original_tools': ['current_time'], 'available_original_tools': ['search_holiday', 'timestamp_diff'], 'visible_records_count': 0}\ncall_7OaHr1Cd4UgrnHAavBzeBNyu_response = prepare_safe_action_or_abstain(**call_7OaHr1Cd4UgrnHAavBzeBNyu_parameters)\nprint(repr(call_7OaHr1Cd4UgrnHAavBzeBNyu_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'should_abstain': True, 'missing_information': ['current_time'], 'required_original_tools': ['current_time'], 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'I need the current date and time, or an explicit date, to resolve the relative time in that request.', 'abstain_reason': 'missing_required_original_tool'}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_safe_action_or_abstain\", \"arguments\": {\"user_request\": \"How many days is it till Christmas Day\", \"requested_action\": \"timestamp_diff\", \"required_original_tools\": [\"current_time\"], \"available_original_tools\": [\"search_holiday\", \"timestamp_diff\"], \"visible_records_count\": 0}, \"result\": {\"should_abstain\": true, \"missing_information\": [\"current_time\"], \"required_original_tools\": [\"current_time\"], \"safe_next_action\": \"ask_user_or_abstain\", \"final_answer_recommendation\": \"I need the current date and time, or an explicit date, to resolve the relative time in that request.\", \"abstain_reason\": \"missing_required_original_tool\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "I need the current date and time, or an explicit date, to resolve the relative time in that request.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "content": "I don't have the current date and time info.",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 20
+        },
+        {
+          "content": "call_cT0eanAAujx8bStSqo2XGCA9_parameters = {'holiday_name': 'Christmas Day'}\ncall_cT0eanAAujx8bStSqo2XGCA9_response = search_holiday(**call_cT0eanAAujx8bStSqo2XGCA9_parameters)\nprint(repr(call_cT0eanAAujx8bStSqo2XGCA9_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_holiday",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "1798174800.0",
+          "conversation_active": true,
+          "openai_function_name": "search_holiday",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 21,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_holiday\", \"arguments\": {\"holiday_name\": \"Christmas Day\", \"year\": null}, \"result\": 1798174800.0}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 22
+        },
+        {
+          "content": "call_4RsO0X1XBfoIukupLQPam0Sp_parameters = {'user_request': 'How many days is it till Christmas Day', 'requested_action': 'timestamp_diff', 'required_original_tools': ['current_time'], 'available_original_tools': ['search_holiday', 'timestamp_diff'], 'visible_records_count': 0}\ncall_4RsO0X1XBfoIukupLQPam0Sp_response = prepare_safe_action_or_abstain(**call_4RsO0X1XBfoIukupLQPam0Sp_parameters)\nprint(repr(call_4RsO0X1XBfoIukupLQPam0Sp_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 22,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'should_abstain': True, 'missing_information': ['current_time'], 'required_original_tools': ['current_time'], 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'I need the current date and time, or an explicit date, to resolve the relative time in that request.', 'abstain_reason': 'missing_required_original_tool'}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "AGENT",
+          "sandbox_message_index": 23,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_safe_action_or_abstain\", \"arguments\": {\"user_request\": \"How many days is it till Christmas Day\", \"requested_action\": \"timestamp_diff\", \"required_original_tools\": [\"current_time\"], \"available_original_tools\": [\"search_holiday\", \"timestamp_diff\"], \"visible_records_count\": 0}, \"result\": {\"should_abstain\": true, \"missing_information\": [\"current_time\"], \"required_original_tools\": [\"current_time\"], \"safe_next_action\": \"ask_user_or_abstain\", \"final_answer_recommendation\": \"I need the current date and time, or an explicit date, to resolve the relative time in that request.\", \"abstain_reason\": \"missing_required_original_tool\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "I need the current date and time, or an explicit date, to resolve the relative time in that request.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 24,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "content": "I still can't provide the current date and time.",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 25,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "I'm unable to calculate the number of days until Christmas Day without the current date and time.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 26,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "content": "I get that, but I can’t help with the current date either.",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 27,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 28
+        },
+        {
+          "content": "call_cHW23OoJ8IUpcZAwCayFmckh_parameters = {'timestamp_0': 1798174800, 'timestamp_1': 1695290882}\ncall_cHW23OoJ8IUpcZAwCayFmckh_response = timestamp_diff(**call_cHW23OoJ8IUpcZAwCayFmckh_parameters)\nprint(repr(call_cHW23OoJ8IUpcZAwCayFmckh_response))",
+          "conversation_active": true,
+          "openai_function_name": "timestamp_diff",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 28,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'days': -1191, 'seconds': 22082}",
+          "conversation_active": true,
+          "openai_function_name": "timestamp_diff",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "AGENT",
+          "sandbox_message_index": 29,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"timestamp_diff\", \"arguments\": {\"timestamp_0\": 1798174800, \"timestamp_1\": 1695290882}, \"result\": {\"days\": -1191, \"seconds\": 22082}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 30
+        },
+        {
+          "content": "call_PPVxoM5szNSxZh8QqOfnzUpJ_parameters = {'user_request': 'How many days is it till Christmas Day', 'requested_action': 'timestamp_diff', 'required_original_tools': ['current_time'], 'available_original_tools': ['search_holiday', 'timestamp_diff'], 'visible_records_count': 0}\ncall_PPVxoM5szNSxZh8QqOfnzUpJ_response = prepare_safe_action_or_abstain(**call_PPVxoM5szNSxZh8QqOfnzUpJ_parameters)\nprint(repr(call_PPVxoM5szNSxZh8QqOfnzUpJ_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 30,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'should_abstain': True, 'missing_information': ['current_time'], 'required_original_tools': ['current_time'], 'safe_next_action': 'ask_user_or_abstain', 'final_answer_recommendation': 'I need the current date and time, or an explicit date, to resolve the relative time in that request.', 'abstain_reason': 'missing_required_original_tool'}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_safe_action_or_abstain",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "AGENT",
+          "sandbox_message_index": 31,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_safe_action_or_abstain\", \"arguments\": {\"user_request\": \"How many days is it till Christmas Day\", \"requested_action\": \"timestamp_diff\", \"required_original_tools\": [\"current_time\"], \"available_original_tools\": [\"search_holiday\", \"timestamp_diff\"], \"visible_records_count\": 0}, \"result\": {\"should_abstain\": true, \"missing_information\": [\"current_time\"], \"required_original_tools\": [\"current_time\"], \"safe_next_action\": \"ask_user_or_abstain\", \"final_answer_recommendation\": \"I need the current date and time, or an explicit date, to resolve the relative time in that request.\", \"abstain_reason\": \"missing_required_original_tool\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "I'm still unable to calculate the number of days until Christmas Day without the current date and time.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 32,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 33
+        },
+        {
+          "content": "call_87K9BTKLKMYPGw5vHUPbhtcH_parameters = {}\ncall_87K9BTKLKMYPGw5vHUPbhtcH_response = end_conversation(**call_87K9BTKLKMYPGw5vHUPbhtcH_parameters)\nprint(repr(call_87K9BTKLKMYPGw5vHUPbhtcH_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 33,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 34,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "find_days_till_holiday_insufficient_information",
+      "source_record_sha256": {
+        "feedback": "2cb7d707acecb6d17e91b3bebeb53143cc687de0e440a004fe5d416aff2e9185",
+        "result": "30375f380a8bb355beb9d4503f3215088d17f1f56ddf6c05b393a526b35cee3a",
+        "selection": "3366fc9824ed38dd3d0870409de9c27261aa5d545a6db76a4a94322f6af75654",
+        "visibility": "1e6b47263224e7b2e55f6e203e029f738261cb2ce81ff89447dab6edc90296fb"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 240
+    },
+    {
+      "coverage": [
+        "external_fixture",
+        "generated_execution",
+        "native_execution",
+        "answer_only",
+        "location"
+      ],
+      "historical": {
+        "categories": [
+          "CANONICALIZATION",
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 0.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "prepare_specific_location_search_args",
+            "extract_distance_result"
+          ],
+          "generated_tools_called": [
+            "prepare_specific_location_search_args",
+            "extract_distance_result"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "extract_distance_result",
+            "prepare_specific_location_search_args"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 1.0,
+          "side_effect_failures": [],
+          "task_family_key": "service_answer_extraction"
+        },
+        "outcome_check_count": 1,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "prepare_specific_location_search_args",
+            "extract_distance_result"
+          ],
+          "generated_tools_called": [
+            "prepare_specific_location_search_args",
+            "extract_distance_result"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "extract_distance_result",
+            "prepare_specific_location_search_args"
+          ],
+          "priority_injection_changed_tool_order": false,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "extract_distance_result",
+            "prepare_specific_location_search_args"
+          ]
+        },
+        "turn_count": 30,
+        "visibility": {
+          "available_tools": [
+            "calculate_lat_lon_distance",
+            "end_conversation",
+            "extract_distance_result",
+            "get_current_location",
+            "prepare_specific_location_search_args",
+            "search_location_around_lat_lon"
+          ],
+          "filtered_out_reasons_sha256": "64b519882c8fca6e12580867eaccfef747ba320ed77179dba8bc8e827a52c1b2",
+          "generated_routing_decisions": {
+            "extract_distance_result": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "service_answer_extraction",
+                "external_lookup"
+              ],
+              "matched_task_families": [
+                "service_answer_extraction",
+                "external_lookup"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "extract_distance_result",
+              "visible": true
+            },
+            "prepare_specific_location_search_args": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "location_phrase",
+                "external_lookup"
+              ],
+              "matched_task_families": [
+                "location_phrase",
+                "external_lookup"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 14,
+              "status": "shown",
+              "tool_name": "prepare_specific_location_search_args",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "extract_distance_result",
+            "prepare_specific_location_search_args"
+          ],
+          "shortlisted_generated_tools": [
+            "extract_distance_result",
+            "prepare_specific_location_search_args"
+          ],
+          "tool_allow_list": [
+            "prepare_specific_location_search_args",
+            "extract_distance_result",
+            "search_location_around_lat_lon",
+            "calculate_lat_lon_distance",
+            "get_current_location",
+            "end_conversation"
+          ]
+        }
+      },
+      "id": "online_rep01_0288_find_distance_with_location_name",
+      "sandbox_rows": [
+        {
+          "content": "How far am I from the Golden Gate Bridge",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_Tyc7PoOafQRVcXuqySgq0vGy_parameters = {'user_request': 'How far am I from the Golden Gate Bridge', 'location_phrase': 'Golden Gate Bridge'}\ncall_Tyc7PoOafQRVcXuqySgq0vGy_response = prepare_specific_location_search_args(**call_Tyc7PoOafQRVcXuqySgq0vGy_parameters)\nprint(repr(call_Tyc7PoOafQRVcXuqySgq0vGy_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'search_location_kwargs': {'location': 'Golden Gate Bridge'}, 'should_call_downstream_tool': True, 'downstream_tool_name': 'search_location_around_lat_lon', 'downstream_tool_kwargs': {'location': 'Golden Gate Bridge'}, 'location_query': 'Golden Gate Bridge', 'abstain_reason': ''}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_specific_location_search_args\", \"arguments\": {\"user_request\": \"How far am I from the Golden Gate Bridge\", \"location_phrase\": \"Golden Gate Bridge\"}, \"result\": {\"search_location_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"should_call_downstream_tool\": true, \"downstream_tool_name\": \"search_location_around_lat_lon\", \"downstream_tool_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"location_query\": \"Golden Gate Bridge\", \"abstain_reason\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 18
+        },
+        {
+          "content": "call_dfkF9ukoR7t0dECLLa9anWcg_parameters = {'location': 'Golden Gate Bridge'}\ncall_dfkF9ukoR7t0dECLLa9anWcg_response = search_location_around_lat_lon(**call_dfkF9ukoR7t0dECLLa9anWcg_parameters)\nprint(repr(call_dfkF9ukoR7t0dECLLa9anWcg_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "[{'city': 'San Francisco, CA', 'description': ['Iconic art deco span opened in 1937', 'Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.', None, 't', 't'], 'full_address': 'Golden Gate Bridge, Golden Gate Brg, San Francisco, CA', 'full_address_array': ['Golden Gate Brg', 'San Francisco, CA'], 'is_claimed': False, 'is_permanently_closed': False, 'is_temporarily_closed': False, 'latitude': 37.819910899999996, 'longitude': -122.4785598, 'name': 'Golden Gate Bridge', 'phone_number': '+14159215858', 'price_level': None, 'rating': 4.8, 'review_count': 85502, 'state': None, 'timezone': 'America/Los_Angeles', 'types': ['Bridge', 'Historical landmark', 'Tourist attraction'], 'website': 'https://www.goldengate.org/', 'working_hours': []}]",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_location_around_lat_lon\", \"arguments\": {\"location\": \"Golden Gate Bridge\", \"latitude\": null, \"longitude\": null}, \"result\": [{\"city\": \"San Francisco, CA\", \"description\": [\"Iconic art deco span opened in 1937\", \"Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.\", null, \"t\", \"t\"], \"full_address\": \"Golden Gate Bridge, Golden Gate Brg, San Francisco, CA\", \"full_address_array\": [\"Golden Gate Brg\", \"San Francisco, CA\"], \"is_claimed\": false, \"is_permanently_closed\": false, \"is_temporarily_closed\": false, \"latitude\": 37.819910899999996, \"longitude\": -122.4785598, \"name\": \"Golden Gate Bridge\", \"phone_number\": \"+14159215858\", \"price_level\": null, \"rating\": 4.8, \"review_count\": 85502, \"state\": null, \"timezone\": \"America/Los_Angeles\", \"types\": [\"Bridge\", \"Historical landmark\", \"Tourist attraction\"], \"website\": \"https://www.goldengate.org/\", \"working_hours\": []}]}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 20
+        },
+        {
+          "content": "call_nXkYjD91kGonuopCXc7JROzO_parameters = {}\ncall_nXkYjD91kGonuopCXc7JROzO_response = get_current_location(**call_nXkYjD91kGonuopCXc7JROzO_parameters)\nprint(repr(call_nXkYjD91kGonuopCXc7JROzO_response))",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'latitude': 37.334606, 'longitude': -122.009102}",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "AGENT",
+          "sandbox_message_index": 21,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"get_current_location\", \"arguments\": {}, \"result\": {\"latitude\": 37.334606, \"longitude\": -122.009102}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 22
+        },
+        {
+          "content": "call_6cpeqp6DApKmFepywdtbDY2d_parameters = {'latitude_0': 37.334606, 'longitude_0': -122.009102, 'latitude_1': 37.819910899999996, 'longitude_1': -122.4785598}\ncall_6cpeqp6DApKmFepywdtbDY2d_response = calculate_lat_lon_distance(**call_6cpeqp6DApKmFepywdtbDY2d_parameters)\nprint(repr(call_6cpeqp6DApKmFepywdtbDY2d_response))",
+          "conversation_active": true,
+          "openai_function_name": "calculate_lat_lon_distance",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 22,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "67.97730305839949",
+          "conversation_active": true,
+          "openai_function_name": "calculate_lat_lon_distance",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "AGENT",
+          "sandbox_message_index": 23,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"calculate_lat_lon_distance\", \"arguments\": {\"latitude_0\": 37.334606, \"longitude_0\": -122.009102, \"latitude_1\": 37.819910899999996, \"longitude_1\": -122.4785598}, \"result\": 67.97730305839949}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 24
+        },
+        {
+          "content": "call_AV3dEJQhrHAN7Anvu0P112Ae_parameters = {'service_payload': {'result': 67.97730305839949}, 'requested_unit': 'kilometers', 'answer_subject': 'Golden Gate Bridge'}\ncall_AV3dEJQhrHAN7Anvu0P112Ae_response = extract_distance_result(**call_AV3dEJQhrHAN7Anvu0P112Ae_parameters)\nprint(repr(call_AV3dEJQhrHAN7Anvu0P112Ae_response))",
+          "conversation_active": true,
+          "openai_function_name": "extract_distance_result",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 24,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'abstain_reason': '', 'answer_value': '67.97730305839949', 'answer_kind': 'distance', 'answer_unit': 'km', 'should_call_downstream_tool': False, 'downstream_tool_name': '', 'downstream_tool_kwargs': {}, 'exact_final_answer': 'You are approximately 67.98 kilometers away from Golden Gate Bridge.', 'final_answer_recommendation': 'You are approximately 67.98 kilometers away from Golden Gate Bridge.', 'copy_exactly': True}",
+          "conversation_active": true,
+          "openai_function_name": "extract_distance_result",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "AGENT",
+          "sandbox_message_index": 25,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"extract_distance_result\", \"arguments\": {\"service_payload\": {\"result\": 67.97730305839949}, \"requested_unit\": \"kilometers\", \"answer_subject\": \"Golden Gate Bridge\"}, \"result\": {\"abstain_reason\": \"\", \"answer_value\": \"67.97730305839949\", \"answer_kind\": \"distance\", \"answer_unit\": \"km\", \"should_call_downstream_tool\": false, \"downstream_tool_name\": \"\", \"downstream_tool_kwargs\": {}, \"exact_final_answer\": \"You are approximately 67.98 kilometers away from Golden Gate Bridge.\", \"final_answer_recommendation\": \"You are approximately 67.98 kilometers away from Golden Gate Bridge.\", \"copy_exactly\": true}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "You are approximately 67.98 kilometers away from Golden Gate Bridge.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 26,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "content": "I don't know where I'm currently located. You could use your location services to find the distance.",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 27,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 28
+        },
+        {
+          "content": "call_03Ui6fKDN8XupXQkKtJcGHo5_parameters = {'user_request': \"I don't know where I'm currently located. You could use your location services to find the distance.\", 'location_phrase': 'Golden Gate Bridge'}\ncall_03Ui6fKDN8XupXQkKtJcGHo5_response = prepare_specific_location_search_args(**call_03Ui6fKDN8XupXQkKtJcGHo5_parameters)\nprint(repr(call_03Ui6fKDN8XupXQkKtJcGHo5_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_006",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 28,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'search_location_kwargs': {'location': 'Golden Gate Bridge'}, 'should_call_downstream_tool': True, 'downstream_tool_name': 'search_location_around_lat_lon', 'downstream_tool_kwargs': {'location': 'Golden Gate Bridge'}, 'location_query': 'Golden Gate Bridge', 'abstain_reason': ''}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_006",
+          "recipient": "AGENT",
+          "sandbox_message_index": 29,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_specific_location_search_args\", \"arguments\": {\"user_request\": \"I don't know where I'm currently located. You could use your location services to find the distance.\", \"location_phrase\": \"Golden Gate Bridge\"}, \"result\": {\"search_location_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"should_call_downstream_tool\": true, \"downstream_tool_name\": \"search_location_around_lat_lon\", \"downstream_tool_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"location_query\": \"Golden Gate Bridge\", \"abstain_reason\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 30
+        },
+        {
+          "content": "call_stjBnzuMeJVpK97kLvpTN8XV_parameters = {'location': 'Golden Gate Bridge'}\ncall_stjBnzuMeJVpK97kLvpTN8XV_response = search_location_around_lat_lon(**call_stjBnzuMeJVpK97kLvpTN8XV_parameters)\nprint(repr(call_stjBnzuMeJVpK97kLvpTN8XV_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_007",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 30,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "[{'city': 'San Francisco, CA', 'description': ['Iconic art deco span opened in 1937', 'Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.', None, 't', 't'], 'full_address': 'Golden Gate Bridge, Golden Gate Brg, San Francisco, CA', 'full_address_array': ['Golden Gate Brg', 'San Francisco, CA'], 'is_claimed': False, 'is_permanently_closed': False, 'is_temporarily_closed': False, 'latitude': 37.819910899999996, 'longitude': -122.4785598, 'name': 'Golden Gate Bridge', 'phone_number': '+14159215858', 'price_level': None, 'rating': 4.8, 'review_count': 85502, 'state': None, 'timezone': 'America/Los_Angeles', 'types': ['Bridge', 'Historical landmark', 'Tourist attraction'], 'website': 'https://www.goldengate.org/', 'working_hours': []}]",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_007",
+          "recipient": "AGENT",
+          "sandbox_message_index": 31,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_location_around_lat_lon\", \"arguments\": {\"location\": \"Golden Gate Bridge\", \"latitude\": null, \"longitude\": null}, \"result\": [{\"city\": \"San Francisco, CA\", \"description\": [\"Iconic art deco span opened in 1937\", \"Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.\", null, \"t\", \"t\"], \"full_address\": \"Golden Gate Bridge, Golden Gate Brg, San Francisco, CA\", \"full_address_array\": [\"Golden Gate Brg\", \"San Francisco, CA\"], \"is_claimed\": false, \"is_permanently_closed\": false, \"is_temporarily_closed\": false, \"latitude\": 37.819910899999996, \"longitude\": -122.4785598, \"name\": \"Golden Gate Bridge\", \"phone_number\": \"+14159215858\", \"price_level\": null, \"rating\": 4.8, \"review_count\": 85502, \"state\": null, \"timezone\": \"America/Los_Angeles\", \"types\": [\"Bridge\", \"Historical landmark\", \"Tourist attraction\"], \"website\": \"https://www.goldengate.org/\", \"working_hours\": []}]}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 32
+        },
+        {
+          "content": "call_R6b7SBex0WYMxXuh64KnpSeB_parameters = {}\ncall_R6b7SBex0WYMxXuh64KnpSeB_response = get_current_location(**call_R6b7SBex0WYMxXuh64KnpSeB_parameters)\nprint(repr(call_R6b7SBex0WYMxXuh64KnpSeB_response))",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_008",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 32,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'latitude': 37.334606, 'longitude': -122.009102}",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_008",
+          "recipient": "AGENT",
+          "sandbox_message_index": 33,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"get_current_location\", \"arguments\": {}, \"result\": {\"latitude\": 37.334606, \"longitude\": -122.009102}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 34
+        },
+        {
+          "content": "call_yKzqsnUsvIm0gGNXBOr7XwT7_parameters = {'latitude_0': 37.334606, 'longitude_0': -122.009102, 'latitude_1': 37.819910899999996, 'longitude_1': -122.4785598}\ncall_yKzqsnUsvIm0gGNXBOr7XwT7_response = calculate_lat_lon_distance(**call_yKzqsnUsvIm0gGNXBOr7XwT7_parameters)\nprint(repr(call_yKzqsnUsvIm0gGNXBOr7XwT7_response))",
+          "conversation_active": true,
+          "openai_function_name": "calculate_lat_lon_distance",
+          "openai_tool_call_id": "fixture_call_009",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 34,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "67.97730305839949",
+          "conversation_active": true,
+          "openai_function_name": "calculate_lat_lon_distance",
+          "openai_tool_call_id": "fixture_call_009",
+          "recipient": "AGENT",
+          "sandbox_message_index": 35,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"calculate_lat_lon_distance\", \"arguments\": {\"latitude_0\": 37.334606, \"longitude_0\": -122.009102, \"latitude_1\": 37.819910899999996, \"longitude_1\": -122.4785598}, \"result\": 67.97730305839949}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 36
+        },
+        {
+          "content": "call_EOVsgMdiAUojszsFy5VzkSSV_parameters = {'service_payload': {'result': 67.97730305839949}, 'requested_unit': 'kilometers', 'answer_subject': 'Golden Gate Bridge'}\ncall_EOVsgMdiAUojszsFy5VzkSSV_response = extract_distance_result(**call_EOVsgMdiAUojszsFy5VzkSSV_parameters)\nprint(repr(call_EOVsgMdiAUojszsFy5VzkSSV_response))",
+          "conversation_active": true,
+          "openai_function_name": "extract_distance_result",
+          "openai_tool_call_id": "fixture_call_010",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 36,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'abstain_reason': '', 'answer_value': '67.97730305839949', 'answer_kind': 'distance', 'answer_unit': 'km', 'should_call_downstream_tool': False, 'downstream_tool_name': '', 'downstream_tool_kwargs': {}, 'exact_final_answer': 'You are approximately 67.98 kilometers away from Golden Gate Bridge.', 'final_answer_recommendation': 'You are approximately 67.98 kilometers away from Golden Gate Bridge.', 'copy_exactly': True}",
+          "conversation_active": true,
+          "openai_function_name": "extract_distance_result",
+          "openai_tool_call_id": "fixture_call_010",
+          "recipient": "AGENT",
+          "sandbox_message_index": 37,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"extract_distance_result\", \"arguments\": {\"service_payload\": {\"result\": 67.97730305839949}, \"requested_unit\": \"kilometers\", \"answer_subject\": \"Golden Gate Bridge\"}, \"result\": {\"abstain_reason\": \"\", \"answer_value\": \"67.97730305839949\", \"answer_kind\": \"distance\", \"answer_unit\": \"km\", \"should_call_downstream_tool\": false, \"downstream_tool_name\": \"\", \"downstream_tool_kwargs\": {}, \"exact_final_answer\": \"You are approximately 67.98 kilometers away from Golden Gate Bridge.\", \"final_answer_recommendation\": \"You are approximately 67.98 kilometers away from Golden Gate Bridge.\", \"copy_exactly\": true}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "You are approximately 67.98 kilometers away from Golden Gate Bridge.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 38,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "content": "I still don't have my current location information. You might want to turn on your location service to get an accurate distance.",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 39,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 40
+        },
+        {
+          "content": "call_WF0v0R4dTWgOnqh7j1HLuNrk_parameters = {'user_request': \"I still don't have my current location information.\", 'location_phrase': 'Golden Gate Bridge'}\ncall_WF0v0R4dTWgOnqh7j1HLuNrk_response = prepare_specific_location_search_args(**call_WF0v0R4dTWgOnqh7j1HLuNrk_parameters)\nprint(repr(call_WF0v0R4dTWgOnqh7j1HLuNrk_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_011",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 40,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'search_location_kwargs': {'location': 'Golden Gate Bridge'}, 'should_call_downstream_tool': True, 'downstream_tool_name': 'search_location_around_lat_lon', 'downstream_tool_kwargs': {'location': 'Golden Gate Bridge'}, 'location_query': 'Golden Gate Bridge', 'abstain_reason': ''}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_specific_location_search_args",
+          "openai_tool_call_id": "fixture_call_011",
+          "recipient": "AGENT",
+          "sandbox_message_index": 41,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_specific_location_search_args\", \"arguments\": {\"user_request\": \"I still don't have my current location information.\", \"location_phrase\": \"Golden Gate Bridge\"}, \"result\": {\"search_location_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"should_call_downstream_tool\": true, \"downstream_tool_name\": \"search_location_around_lat_lon\", \"downstream_tool_kwargs\": {\"location\": \"Golden Gate Bridge\"}, \"location_query\": \"Golden Gate Bridge\", \"abstain_reason\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 42
+        },
+        {
+          "content": "call_Pz4e25Sdyd1qUU5jMHv9f0CU_parameters = {'location': 'Golden Gate Bridge'}\ncall_Pz4e25Sdyd1qUU5jMHv9f0CU_response = search_location_around_lat_lon(**call_Pz4e25Sdyd1qUU5jMHv9f0CU_parameters)\nprint(repr(call_Pz4e25Sdyd1qUU5jMHv9f0CU_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_012",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 42,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "[{'city': 'San Francisco, CA', 'description': ['Iconic art deco span opened in 1937', 'Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.', None, 't', 't'], 'full_address': 'Golden Gate Bridge, Golden Gate Brg, San Francisco, CA', 'full_address_array': ['Golden Gate Brg', 'San Francisco, CA'], 'is_claimed': False, 'is_permanently_closed': False, 'is_temporarily_closed': False, 'latitude': 37.819910899999996, 'longitude': -122.4785598, 'name': 'Golden Gate Bridge', 'phone_number': '+14159215858', 'price_level': None, 'rating': 4.8, 'review_count': 85502, 'state': None, 'timezone': 'America/Los_Angeles', 'types': ['Bridge', 'Historical landmark', 'Tourist attraction'], 'website': 'https://www.goldengate.org/', 'working_hours': []}]",
+          "conversation_active": true,
+          "openai_function_name": "search_location_around_lat_lon",
+          "openai_tool_call_id": "fixture_call_012",
+          "recipient": "AGENT",
+          "sandbox_message_index": 43,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_location_around_lat_lon\", \"arguments\": {\"location\": \"Golden Gate Bridge\", \"latitude\": null, \"longitude\": null}, \"result\": [{\"city\": \"San Francisco, CA\", \"description\": [\"Iconic art deco span opened in 1937\", \"Famed 4,200 ft art deco suspension bridge open to car, bike & foot traffic.\", null, \"t\", \"t\"], \"full_address\": \"Golden Gate Bridge, Golden Gate Brg, San Francisco, CA\", \"full_address_array\": [\"Golden Gate Brg\", \"San Francisco, CA\"], \"is_claimed\": false, \"is_permanently_closed\": false, \"is_temporarily_closed\": false, \"latitude\": 37.819910899999996, \"longitude\": -122.4785598, \"name\": \"Golden Gate Bridge\", \"phone_number\": \"+14159215858\", \"price_level\": null, \"rating\": 4.8, \"review_count\": 85502, \"state\": null, \"timezone\": \"America/Los_Angeles\", \"types\": [\"Bridge\", \"Historical landmark\", \"Tourist attraction\"], \"website\": \"https://www.goldengate.org/\", \"working_hours\": []}]}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 44
+        },
+        {
+          "content": "call_iDFbNn7CErZNVV1zDXool421_parameters = {}\ncall_iDFbNn7CErZNVV1zDXool421_response = get_current_location(**call_iDFbNn7CErZNVV1zDXool421_parameters)\nprint(repr(call_iDFbNn7CErZNVV1zDXool421_response))",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_013",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 44,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'latitude': 37.334606, 'longitude': -122.009102}",
+          "conversation_active": true,
+          "openai_function_name": "get_current_location",
+          "openai_tool_call_id": "fixture_call_013",
+          "recipient": "AGENT",
+          "sandbox_message_index": 45,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"get_current_location\", \"arguments\": {}, \"result\": {\"latitude\": 37.334606, \"longitude\": -122.009102}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        }
+      ],
+      "scenario": "find_distance_with_location_name",
+      "source_record_sha256": {
+        "feedback": "7308ce0a5ea3c5b92ee48d8b5922afba59089ab495f620ac2652772956a0580b",
+        "result": "83b310ce5eb28b6025592fa6f0a04c9baa903592e13655fb581b9fb23bfb9eee",
+        "selection": "97dbbbed58075b20a191f6f5b917a5272d84d379745f4e13f323a6a7a3a32fdd",
+        "visibility": "525e2cfba31825b86deef6297811384a7c84454451b83c7e4e9f7e4cd7318346"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 288
+    },
+    {
+      "coverage": [
+        "post_700",
+        "generated_execution",
+        "native_execution",
+        "reuse",
+        "contact_read"
+      ],
+      "historical": {
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "THREE_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 0.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "plan_contact_lookup_query"
+          ],
+          "generated_tools_called": [
+            "plan_contact_lookup_query"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "plan_contact_lookup_query"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 1.0,
+          "side_effect_failures": [],
+          "task_family_key": "contact_lookup"
+        },
+        "outcome_check_count": 1,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "plan_contact_lookup_query"
+          ],
+          "generated_tools_called": [
+            "plan_contact_lookup_query"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "plan_contact_lookup_query"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "plan_contact_lookup_query"
+          ]
+        },
+        "turn_count": 5,
+        "visibility": {
+          "available_tools": [
+            "add_contact",
+            "end_conversation",
+            "modify_contact",
+            "plan_contact_lookup_query",
+            "remove_contact",
+            "search_contacts"
+          ],
+          "filtered_out_reasons_sha256": "ac5a0a470bb7bd9a1fc8365ddbd4588dcec4e8af41149257b4a08f70af661dc6",
+          "generated_routing_decisions": {
+            "plan_contact_lookup_query": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "contact_lookup"
+              ],
+              "matched_task_families": [
+                "contact_lookup"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "plan_contact_lookup_query",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "plan_contact_lookup_query"
+          ],
+          "shortlisted_generated_tools": [
+            "plan_contact_lookup_query"
+          ],
+          "tool_allow_list": [
+            "plan_contact_lookup_query",
+            "remove_contact",
+            "add_contact",
+            "modify_contact",
+            "search_contacts",
+            "end_conversation"
+          ]
+        }
+      },
+      "id": "online_rep01_0754_search_name_with_relationship_3_distraction_tools",
+      "sandbox_rows": [
+        {
+          "content": "What is the name of my boss?",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_ocNgrEbfQ888lhbo0Zyiv39v_parameters = {'relationship': 'boss'}\ncall_ocNgrEbfQ888lhbo0Zyiv39v_response = plan_contact_lookup_query(**call_ocNgrEbfQ888lhbo0Zyiv39v_parameters)\nprint(repr(call_ocNgrEbfQ888lhbo0Zyiv39v_response))",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_lookup_query",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'should_call_search_contacts': True, 'search_contacts_kwargs': {'relationship': 'boss'}, 'answer_field': None, 'selected_record': {}, 'answer_value': '', 'final_answer_recommendation': '', 'copy_exactly': False, 'abstain_reason': ''}",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_lookup_query",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"plan_contact_lookup_query\", \"arguments\": {\"relationship\": \"boss\", \"contact_name\": \"\", \"phone_number\": \"\"}, \"result\": {\"should_call_search_contacts\": true, \"search_contacts_kwargs\": {\"relationship\": \"boss\"}, \"answer_field\": null, \"selected_record\": {}, \"answer_value\": \"\", \"final_answer_recommendation\": \"\", \"copy_exactly\": false, \"abstain_reason\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 18
+        },
+        {
+          "content": "call_9ZI4B7U2kYYuITIoXs70iN9C_parameters = {'relationship': 'boss'}\ncall_9ZI4B7U2kYYuITIoXs70iN9C_response = search_contacts(**call_9ZI4B7U2kYYuITIoXs70iN9C_parameters)\nprint(repr(call_9ZI4B7U2kYYuITIoXs70iN9C_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_contacts",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "[{'person_id': 'e3570ab6-0819-5032-be1e-2b366390c8ef', 'name': 'Homer S', 'phone_number': '+10000000000', 'relationship': 'boss', 'is_self': False}]",
+          "conversation_active": true,
+          "openai_function_name": "search_contacts",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_contacts\", \"arguments\": {\"relationship\": \"boss\"}, \"result\": [{\"person_id\": \"e3570ab6-0819-5032-be1e-2b366390c8ef\", \"name\": \"Homer S\", \"phone_number\": \"+10000000000\", \"relationship\": \"boss\", \"is_self\": false}]}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "Your boss's name is Homer S.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 21
+        },
+        {
+          "content": "call_L8pFUdAF1apBwR66VIUXlBxx_parameters = {}\ncall_L8pFUdAF1apBwR66VIUXlBxx_response = end_conversation(**call_L8pFUdAF1apBwR66VIUXlBxx_parameters)\nprint(repr(call_L8pFUdAF1apBwR66VIUXlBxx_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 21,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 22,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "search_name_with_relationship_3_distraction_tools",
+      "source_record_sha256": {
+        "feedback": "1ef08e582787132993ec8b57c45b60aae002ac5596e98324c0a83628b376dabf",
+        "result": "e1fb117ecf69634c18433eefbbf00226be480537baafdecda9414c89755d82f4",
+        "selection": "5dd5eb2067e3af1b683216062327bdff316e3d55276c068ff59a51f1c657dff9",
+        "visibility": "2b5b94c353a766230cdf0f2d27012f2d30668cbd09ca25efcea14d0a6bc0847a"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 754
+    },
+    {
+      "coverage": [
+        "post_700",
+        "generated_execution",
+        "native_execution",
+        "state_change",
+        "messaging"
+      ],
+      "historical": {
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 1.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "prepare_direct_contact_action_args"
+          ],
+          "generated_tools_called": [
+            "prepare_direct_contact_action_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_direct_contact_action_args"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 0.0,
+          "side_effect_failures": [],
+          "task_family_key": "direct_contact_action"
+        },
+        "outcome_check_count": 2,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "prepare_direct_contact_action_args"
+          ],
+          "generated_tools_called": [
+            "prepare_direct_contact_action_args"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "prepare_direct_contact_action_args"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "prepare_direct_contact_action_args"
+          ]
+        },
+        "turn_count": 5,
+        "visibility": {
+          "available_tools": [
+            "end_conversation",
+            "prepare_direct_contact_action_args",
+            "send_message_with_phone_number"
+          ],
+          "filtered_out_reasons_sha256": "017d98071922ce8b82d429512ffb1d2cf8f8f884f57fecb57c3bec05019ff9d3",
+          "generated_routing_decisions": {
+            "prepare_direct_contact_action_args": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "direct_contact_action",
+                "send_message"
+              ],
+              "matched_task_families": [
+                "direct_contact_action",
+                "send_message"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "prepare_direct_contact_action_args",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "prepare_direct_contact_action_args"
+          ],
+          "shortlisted_generated_tools": [
+            "prepare_direct_contact_action_args"
+          ],
+          "tool_allow_list": [
+            "prepare_direct_contact_action_args",
+            "send_message_with_phone_number",
+            "end_conversation"
+          ]
+        }
+      },
+      "id": "online_rep01_0928_send_message_with_phone_number_and_content",
+      "sandbox_rows": [
+        {
+          "content": "Send a message to +12453344098 saying: How's the new album coming along",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_vRoz9okhcnBM7SSfOcSFHZJS_parameters = {'action_type': 'send', 'phone_number': '+12453344098', 'message_text': \"How's the new album coming along\"}\ncall_vRoz9okhcnBM7SSfOcSFHZJS_response = prepare_direct_contact_action_args(**call_vRoz9okhcnBM7SSfOcSFHZJS_parameters)\nprint(repr(call_vRoz9okhcnBM7SSfOcSFHZJS_response))",
+          "conversation_active": true,
+          "openai_function_name": "prepare_direct_contact_action_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'downstream_tool_name': 'send_message_with_phone_number', 'downstream_tool_kwargs': {'phone_number': '+12453344098', 'content': \"How's the new album coming along\"}, 'should_call_tool': True, 'abstain_reason': ''}",
+          "conversation_active": true,
+          "openai_function_name": "prepare_direct_contact_action_args",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"prepare_direct_contact_action_args\", \"arguments\": {\"action_type\": \"send\", \"phone_number\": \"+12453344098\", \"message_text\": \"How's the new album coming along\", \"contact_name\": \"\", \"relationship\": \"\", \"record_id\": \"\", \"target_field\": \"\", \"new_value\": \"\"}, \"result\": {\"downstream_tool_name\": \"send_message_with_phone_number\", \"downstream_tool_kwargs\": {\"phone_number\": \"+12453344098\", \"content\": \"How's the new album coming along\"}, \"should_call_tool\": true, \"abstain_reason\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 18
+        },
+        {
+          "content": "call_fWELa1kgTdqfa5tCGYmj8m69_parameters = {'phone_number': '+12453344098', 'content': \"How's the new album coming along\"}\ncall_fWELa1kgTdqfa5tCGYmj8m69_response = send_message_with_phone_number(**call_fWELa1kgTdqfa5tCGYmj8m69_parameters)\nprint(repr(call_fWELa1kgTdqfa5tCGYmj8m69_response))",
+          "conversation_active": true,
+          "openai_function_name": "send_message_with_phone_number",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "'9a166bb4-66d0-4d1f-af43-ce3453a36c9f'",
+          "conversation_active": true,
+          "openai_function_name": "send_message_with_phone_number",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"send_message_with_phone_number\", \"arguments\": {\"phone_number\": \"+12453344098\", \"content\": \"How's the new album coming along\"}, \"result\": \"9a166bb4-66d0-4d1f-af43-ce3453a36c9f\"}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "Your message to +12453344098 has been sent saying: How's the new album coming along.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 21
+        },
+        {
+          "content": "call_xeUVdBpOdcQRSza5YYpbbifE_parameters = {}\ncall_xeUVdBpOdcQRSza5YYpbbifE_response = end_conversation(**call_xeUVdBpOdcQRSza5YYpbbifE_parameters)\nprint(repr(call_xeUVdBpOdcQRSza5YYpbbifE_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 21,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 22,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "send_message_with_phone_number_and_content",
+      "source_record_sha256": {
+        "feedback": "c43bae20afec68c5f2235538f0adcdd1f978c291e99cb7304a8699e52178d8b7",
+        "result": "546cfb53c8088330e07e259fd1a8343a1efcc59d34b3898c53a03a971da9f27b",
+        "selection": "0d81a881a6488a1de30bc0d77ea65d097e25e7324737d21ddcf545197f975d64",
+        "visibility": "c20c7b9d852976e2a65a7011795e68582f034b10f71d47d9f14275c3b7a9ae0b"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [
+          {
+            "content": "Hey kid, you want some GPU?",
+            "creation_timestamp": 1784558682.0,
+            "message_id": "0d25dbb9-3737-5e0e-b0f0-7c1e359baccc",
+            "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "recipient_phone_number": "+11233344455",
+            "sandbox_message_index": 19,
+            "sender_phone_number": "+18307976530"
+          },
+          {
+            "content": "No leave me alone",
+            "creation_timestamp": 1784562282.0,
+            "message_id": "caaca9e8-7aa9-55a6-9d32-4b4aefed40d1",
+            "recipient_phone_number": "+18307976530",
+            "sandbox_message_index": 19,
+            "sender_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "sender_phone_number": "+11233344455"
+          },
+          {
+            "content": "How's it going",
+            "creation_timestamp": 1784828805.0,
+            "message_id": "0a0102dc-ceaf-5ebb-a665-63da99bf7c47",
+            "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "recipient_phone_number": "+11233344455",
+            "sandbox_message_index": 19,
+            "sender_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "sender_phone_number": "+10000000000"
+          },
+          {
+            "content": "Things are proceeding as expected",
+            "creation_timestamp": 1784828865.0,
+            "message_id": "6c9382cb-720e-5f2c-8ac0-77e7ebdea446",
+            "recipient_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "recipient_phone_number": "+10000000000",
+            "sandbox_message_index": 19,
+            "sender_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "sender_phone_number": "+11233344455"
+          },
+          {
+            "content": "Good, keep me posted",
+            "creation_timestamp": 1784832526.0,
+            "message_id": "0a0102dc-ceaf-5ebb-a665-63da99bf7c47",
+            "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "recipient_phone_number": "+11233344455",
+            "sandbox_message_index": 19,
+            "sender_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "sender_phone_number": "+10000000000"
+          },
+          {
+            "content": "How's the new album coming along",
+            "creation_timestamp": 1784832588.0,
+            "message_id": "9a166bb4-66d0-4d1f-af43-ce3453a36c9f",
+            "recipient_person_id": "9e137f06-916a-5310-8174-cf0b7e9f7054",
+            "recipient_phone_number": "+12453344098",
+            "sandbox_message_index": 19,
+            "sender_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "sender_phone_number": "+11233344455"
+          }
+        ],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 928
+    },
+    {
+      "coverage": [
+        "post_700",
+        "generated_execution",
+        "native_execution",
+        "state_change",
+        "multi_step",
+        "contact"
+      ],
+      "historical": {
+        "categories": [
+          "MULTIPLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 0.7352941176470589,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 0.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "generated_tools_called": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 0.7352941176470589,
+          "side_effect_failures": [],
+          "task_family_key": "relationship_batch_update"
+        },
+        "outcome_check_count": 2,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 0.5,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "generated_tools_called": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "plan_contact_relationship_batch_update"
+          ]
+        },
+        "turn_count": 11,
+        "visibility": {
+          "available_tools": [
+            "end_conversation",
+            "modify_contact",
+            "plan_contact_relationship_batch_update",
+            "search_contacts"
+          ],
+          "filtered_out_reasons_sha256": "ee35b79a98e61b7b032c75c327ba85f0d1c10c2d92cc6ee996491a9ac07f7d03",
+          "generated_routing_decisions": {
+            "plan_contact_relationship_batch_update": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "relationship_batch_update"
+              ],
+              "matched_task_families": [
+                "relationship_batch_update"
+              ],
+              "reason": "visible_context_signal_match",
+              "score": 13,
+              "status": "shown",
+              "tool_name": "plan_contact_relationship_batch_update",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "shortlisted_generated_tools": [
+            "plan_contact_relationship_batch_update"
+          ],
+          "tool_allow_list": [
+            "plan_contact_relationship_batch_update",
+            "end_conversation",
+            "modify_contact",
+            "search_contacts"
+          ]
+        }
+      },
+      "id": "online_rep01_0984_update_contact_relationship_with_relationship",
+      "sandbox_rows": [
+        {
+          "content": "Make all of my friends my enemy",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_EMgXkKbfmv5RJoaGfE9bpjiq_parameters = {'user_request': 'Make all of my friends my enemy', 'source_relationship': 'friend', 'target_relationship': 'enemy', 'contacts': []}\ncall_EMgXkKbfmv5RJoaGfE9bpjiq_response = plan_contact_relationship_batch_update(**call_EMgXkKbfmv5RJoaGfE9bpjiq_parameters)\nprint(repr(call_EMgXkKbfmv5RJoaGfE9bpjiq_response))",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_relationship_batch_update",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'phase': 'search_required', 'source_relationship': 'friend', 'target_relationship': 'enemy', 'should_call_search_contacts': True, 'search_contacts_kwargs': {'relationship': 'friend'}, 'selected_contacts': [], 'downstream_tool_name': '', 'downstream_tool_kwargs_list': [], 'should_call_tools': False, 'abstain_reason': '', 'final_answer_recommendation': ''}",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_relationship_batch_update",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"plan_contact_relationship_batch_update\", \"arguments\": {\"user_request\": \"Make all of my friends my enemy\", \"source_relationship\": \"friend\", \"target_relationship\": \"enemy\", \"contacts\": []}, \"result\": {\"phase\": \"search_required\", \"source_relationship\": \"friend\", \"target_relationship\": \"enemy\", \"should_call_search_contacts\": true, \"search_contacts_kwargs\": {\"relationship\": \"friend\"}, \"selected_contacts\": [], \"downstream_tool_name\": \"\", \"downstream_tool_kwargs_list\": [], \"should_call_tools\": false, \"abstain_reason\": \"\", \"final_answer_recommendation\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 18
+        },
+        {
+          "content": "call_rJecwDVTso86Sl5yzkThlhsg_parameters = {'relationship': 'friend'}\ncall_rJecwDVTso86Sl5yzkThlhsg_response = search_contacts(**call_rJecwDVTso86Sl5yzkThlhsg_parameters)\nprint(repr(call_rJecwDVTso86Sl5yzkThlhsg_response))",
+          "conversation_active": true,
+          "openai_function_name": "search_contacts",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "[{'person_id': '9e137f06-916a-5310-8174-cf0b7e9f7054', 'name': 'Fredrik Thordendal', 'phone_number': '+12453344098', 'relationship': 'friend', 'is_self': False}, {'person_id': 'a22e1984-6c6c-530c-8831-c3ea3b5138e7', 'name': 'John Petrucci', 'phone_number': '+1234560987', 'relationship': 'friend', 'is_self': False}]",
+          "conversation_active": true,
+          "openai_function_name": "search_contacts",
+          "openai_tool_call_id": "fixture_call_002",
+          "recipient": "AGENT",
+          "sandbox_message_index": 19,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"search_contacts\", \"arguments\": {\"relationship\": \"friend\"}, \"result\": [{\"person_id\": \"9e137f06-916a-5310-8174-cf0b7e9f7054\", \"name\": \"Fredrik Thordendal\", \"phone_number\": \"+12453344098\", \"relationship\": \"friend\", \"is_self\": false}, {\"person_id\": \"a22e1984-6c6c-530c-8831-c3ea3b5138e7\", \"name\": \"John Petrucci\", \"phone_number\": \"+1234560987\", \"relationship\": \"friend\", \"is_self\": false}]}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 20
+        },
+        {
+          "content": "call_Mqr4qyFgkO7tZByIiIXANjmR_parameters = {'user_request': 'Make all of my friends my enemy', 'source_relationship': 'friend', 'target_relationship': 'enemy', 'contacts': [{'person_id': '9e137f06-916a-5310-8174-cf0b7e9f7054', 'name': 'Fredrik Thordendal', 'phone_number': '+12453344098', 'relationship': 'friend', 'is_self': False}, {'person_id': 'a22e1984-6c6c-530c-8831-c3ea3b5138e7', 'name': 'John Petrucci', 'phone_number': '+1234560987', 'relationship': 'friend', 'is_self': False}]}\ncall_Mqr4qyFgkO7tZByIiIXANjmR_response = plan_contact_relationship_batch_update(**call_Mqr4qyFgkO7tZByIiIXANjmR_parameters)\nprint(repr(call_Mqr4qyFgkO7tZByIiIXANjmR_response))",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_relationship_batch_update",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 20,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'phase': 'modify_required', 'source_relationship': 'friend', 'target_relationship': 'enemy', 'should_call_search_contacts': False, 'search_contacts_kwargs': {}, 'selected_contacts': [{'person_id': '9e137f06-916a-5310-8174-cf0b7e9f7054', 'name': 'Fredrik Thordendal', 'phone_number': '+12453344098', 'relationship': 'friend', 'is_self': False}, {'person_id': 'a22e1984-6c6c-530c-8831-c3ea3b5138e7', 'name': 'John Petrucci', 'phone_number': '+1234560987', 'relationship': 'friend', 'is_self': False}], 'downstream_tool_name': 'modify_contact', 'downstream_tool_kwargs_list': [{'person_id': '9e137f06-916a-5310-8174-cf0b7e9f7054', 'relationship': 'enemy'}, {'person_id': 'a22e1984-6c6c-530c-8831-c3ea3b5138e7', 'relationship': 'enemy'}], 'should_call_tools': True, 'abstain_reason': '', 'final_answer_recommendation': ''}",
+          "conversation_active": true,
+          "openai_function_name": "plan_contact_relationship_batch_update",
+          "openai_tool_call_id": "fixture_call_003",
+          "recipient": "AGENT",
+          "sandbox_message_index": 21,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"plan_contact_relationship_batch_update\", \"arguments\": {\"user_request\": \"Make all of my friends my enemy\", \"source_relationship\": \"friend\", \"target_relationship\": \"enemy\", \"contacts\": [{\"person_id\": \"9e137f06-916a-5310-8174-cf0b7e9f7054\", \"name\": \"Fredrik Thordendal\", \"phone_number\": \"+12453344098\", \"relationship\": \"friend\", \"is_self\": false}, {\"person_id\": \"a22e1984-6c6c-530c-8831-c3ea3b5138e7\", \"name\": \"John Petrucci\", \"phone_number\": \"+1234560987\", \"relationship\": \"friend\", \"is_self\": false}]}, \"result\": {\"phase\": \"modify_required\", \"source_relationship\": \"friend\", \"target_relationship\": \"enemy\", \"should_call_search_contacts\": false, \"search_contacts_kwargs\": {}, \"selected_contacts\": [{\"person_id\": \"9e137f06-916a-5310-8174-cf0b7e9f7054\", \"name\": \"Fredrik Thordendal\", \"phone_number\": \"+12453344098\", \"relationship\": \"friend\", \"is_self\": false}, {\"person_id\": \"a22e1984-6c6c-530c-8831-c3ea3b5138e7\", \"name\": \"John Petrucci\", \"phone_number\": \"+1234560987\", \"relationship\": \"friend\", \"is_self\": false}], \"downstream_tool_name\": \"modify_contact\", \"downstream_tool_kwargs_list\": [{\"person_id\": \"9e137f06-916a-5310-8174-cf0b7e9f7054\", \"relationship\": \"enemy\"}, {\"person_id\": \"a22e1984-6c6c-530c-8831-c3ea3b5138e7\", \"relationship\": \"enemy\"}], \"should_call_tools\": true, \"abstain_reason\": \"\", \"final_answer_recommendation\": \"\"}}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 22
+        },
+        {
+          "content": "call_fpakJLHV8hlnHl7rtPL0mkqK_parameters = {'person_id': '9e137f06-916a-5310-8174-cf0b7e9f7054', 'relationship': 'enemy'}\ncall_fpakJLHV8hlnHl7rtPL0mkqK_response = modify_contact(**call_fpakJLHV8hlnHl7rtPL0mkqK_parameters)\nprint(repr(call_fpakJLHV8hlnHl7rtPL0mkqK_response))",
+          "conversation_active": true,
+          "openai_function_name": "modify_contact",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 22,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": true,
+          "openai_function_name": "modify_contact",
+          "openai_tool_call_id": "fixture_call_004",
+          "recipient": "AGENT",
+          "sandbox_message_index": 23,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"modify_contact\", \"arguments\": {\"person_id\": \"9e137f06-916a-5310-8174-cf0b7e9f7054\", \"relationship\": \"enemy\"}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "sandbox_message_index": 24
+        },
+        {
+          "content": "call_lfKyhjHMPnV1OJYHUlZoD9bW_parameters = {'person_id': 'a22e1984-6c6c-530c-8831-c3ea3b5138e7', 'relationship': 'enemy'}\ncall_lfKyhjHMPnV1OJYHUlZoD9bW_response = modify_contact(**call_lfKyhjHMPnV1OJYHUlZoD9bW_parameters)\nprint(repr(call_lfKyhjHMPnV1OJYHUlZoD9bW_response))",
+          "conversation_active": true,
+          "openai_function_name": "modify_contact",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 24,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": true,
+          "openai_function_name": "modify_contact",
+          "openai_tool_call_id": "fixture_call_005",
+          "recipient": "AGENT",
+          "sandbox_message_index": 25,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"modify_contact\", \"arguments\": {\"person_id\": \"a22e1984-6c6c-530c-8831-c3ea3b5138e7\", \"relationship\": \"enemy\"}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "All of your friends have been successfully changed to enemies.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 26,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 27
+        },
+        {
+          "content": "call_g4X8gqmZhpnjB0HcstUw6yz8_parameters = {}\ncall_g4X8gqmZhpnjB0HcstUw6yz8_response = end_conversation(**call_g4X8gqmZhpnjB0HcstUw6yz8_parameters)\nprint(repr(call_g4X8gqmZhpnjB0HcstUw6yz8_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 27,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 28,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "update_contact_relationship_with_relationship",
+      "source_record_sha256": {
+        "feedback": "3a0f65c639fd06794469d3ef87ddf192009b1413ea202a6337437fb386b31d2b",
+        "result": "f83e1b93143bfbdd5d63b0ab972a3c456e27378ff4968dce301b6f05be1fc40b",
+        "selection": "e722add1a63cd36b8217618f51a997877843ad950936b165b3cbf9d9c7cabe78",
+        "visibility": "2b24a1bb76500b8de36beb2788415710f9700a2360f57053a70b7e56469ef980"
+      },
+      "state_rows": {
+        "CONTACT": [
+          {
+            "is_self": true,
+            "name": "Tomas Haake",
+            "person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "phone_number": "+11233344455",
+            "relationship": "self",
+            "sandbox_message_index": 23
+          },
+          {
+            "is_self": false,
+            "name": "John Petrucci",
+            "person_id": "a22e1984-6c6c-530c-8831-c3ea3b5138e7",
+            "phone_number": "+1234560987",
+            "relationship": "friend",
+            "sandbox_message_index": 23
+          },
+          {
+            "is_self": false,
+            "name": "Homer S",
+            "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "phone_number": "+10000000000",
+            "relationship": "boss",
+            "sandbox_message_index": 23
+          },
+          {
+            "is_self": false,
+            "name": "Fredrik Thordendal",
+            "person_id": "9e137f06-916a-5310-8174-cf0b7e9f7054",
+            "phone_number": "+12453344098",
+            "relationship": "enemy",
+            "sandbox_message_index": 23
+          },
+          {
+            "is_self": true,
+            "name": "Tomas Haake",
+            "person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+            "phone_number": "+11233344455",
+            "relationship": "self",
+            "sandbox_message_index": 25
+          },
+          {
+            "is_self": false,
+            "name": "Homer S",
+            "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+            "phone_number": "+10000000000",
+            "relationship": "boss",
+            "sandbox_message_index": 25
+          },
+          {
+            "is_self": false,
+            "name": "Fredrik Thordendal",
+            "person_id": "9e137f06-916a-5310-8174-cf0b7e9f7054",
+            "phone_number": "+12453344098",
+            "relationship": "enemy",
+            "sandbox_message_index": 25
+          },
+          {
+            "is_self": false,
+            "name": "John Petrucci",
+            "person_id": "a22e1984-6c6c-530c-8831-c3ea3b5138e7",
+            "phone_number": "+1234560987",
+            "relationship": "enemy",
+            "sandbox_message_index": 25
+          }
+        ],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": []
+      },
+      "task_index_zero_based": 984
+    },
+    {
+      "coverage": [
+        "post_700",
+        "generated_execution",
+        "native_execution",
+        "state_change",
+        "device_state"
+      ],
+      "historical": {
+        "categories": [
+          "SINGLE_TOOL_CALL",
+          "SINGLE_USER_TURN",
+          "NO_DISTRACTION_TOOLS"
+        ],
+        "exception_type": null,
+        "feedback": {
+          "candidate_outcome": 1.0,
+          "candidate_outcome_source": "paper_era_online_feedback",
+          "control_outcome": 1.0,
+          "control_outcome_source": "paper_era_online_feedback",
+          "generated_tools_attempted": [
+            "apply_single_device_state_action"
+          ],
+          "generated_tools_called": [
+            "apply_single_device_state_action"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "apply_single_device_state_action"
+          ],
+          "immediate_actions": [],
+          "outcome_delta": 0.0,
+          "side_effect_failures": [],
+          "task_family_key": "device_state_action"
+        },
+        "outcome_check_count": 2,
+        "outcome_evaluator_version": "sage_outcome_contracts_v9",
+        "outcome_similarity": 1.0,
+        "outcome_state_history_safe": true,
+        "selection": {
+          "base_tool_policy": "upstream",
+          "generated_tools_attempted": [
+            "apply_single_device_state_action"
+          ],
+          "generated_tools_called": [
+            "apply_single_device_state_action"
+          ],
+          "generated_tools_failed": [],
+          "generated_tools_visible": [
+            "apply_single_device_state_action"
+          ],
+          "priority_injection_changed_tool_order": true,
+          "relevance_gating_hid_retained_tool": true,
+          "selection_reason": "retained_tool_invoked",
+          "selection_status": "generated_tool_called",
+          "shortlisted_generated_tools": [
+            "apply_single_device_state_action"
+          ]
+        },
+        "turn_count": 3,
+        "visibility": {
+          "available_tools": [
+            "apply_single_device_state_action",
+            "end_conversation",
+            "set_wifi_status"
+          ],
+          "filtered_out_reasons_sha256": "3a30a8c7e0f6233110dd192011b7af1892c445a7203aa1095182f20738d4bfea",
+          "generated_routing_decisions": {
+            "apply_single_device_state_action": {
+              "fair_chance_candidate": false,
+              "fair_chance_reason": "",
+              "matched_negative_triggers": [],
+              "matched_positive_triggers": [
+                "device_state_action"
+              ],
+              "matched_task_families": [
+                "device_state_action"
+              ],
+              "reason": "visible_context_metadata_match",
+              "score": 8,
+              "status": "shown",
+              "tool_name": "apply_single_device_state_action",
+              "visible": true
+            }
+          },
+          "generated_tools": [
+            "apply_single_device_state_action"
+          ],
+          "shortlisted_generated_tools": [
+            "apply_single_device_state_action"
+          ],
+          "tool_allow_list": [
+            "apply_single_device_state_action",
+            "set_wifi_status",
+            "end_conversation"
+          ]
+        }
+      },
+      "id": "online_rep01_1024_wifi_off",
+      "sandbox_rows": [
+        {
+          "content": "Turn off wifi",
+          "conversation_active": true,
+          "recipient": "AGENT",
+          "sandbox_message_index": 15,
+          "sender": "USER"
+        },
+        {
+          "sandbox_message_index": 16
+        },
+        {
+          "content": "call_1IxDi5lUelUkseqRrPncAaA4_parameters = {'target_service': 'wifi', 'desired_on': False}\ncall_1IxDi5lUelUkseqRrPncAaA4_response = apply_single_device_state_action(**call_1IxDi5lUelUkseqRrPncAaA4_parameters)\nprint(repr(call_1IxDi5lUelUkseqRrPncAaA4_response))",
+          "conversation_active": true,
+          "openai_function_name": "apply_single_device_state_action",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 16,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "{'status': 'success', 'confirmation': 'WiFi service has been updated.', 'abstain_reason': '', 'native_action': 'set_wifi_status', 'native_result': None}",
+          "conversation_active": true,
+          "openai_function_name": "apply_single_device_state_action",
+          "openai_tool_call_id": "fixture_call_001",
+          "recipient": "AGENT",
+          "sandbox_message_index": 17,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"set_wifi_status\", \"arguments\": {\"on\": false}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "AGENT"
+          ]
+        },
+        {
+          "content": "WiFi service has been turned off.",
+          "conversation_active": true,
+          "recipient": "USER",
+          "sandbox_message_index": 18,
+          "sender": "AGENT",
+          "visible_to": [
+            "AGENT",
+            "USER"
+          ]
+        },
+        {
+          "sandbox_message_index": 19
+        },
+        {
+          "content": "call_iN1tdDvNg6rGs7BSvC69RAaI_parameters = {}\ncall_iN1tdDvNg6rGs7BSvC69RAaI_response = end_conversation(**call_iN1tdDvNg6rGs7BSvC69RAaI_parameters)\nprint(repr(call_iN1tdDvNg6rGs7BSvC69RAaI_response))",
+          "conversation_active": false,
+          "recipient": "EXECUTION_ENVIRONMENT",
+          "sandbox_message_index": 19,
+          "sender": "USER",
+          "visible_to": [
+            "USER",
+            "EXECUTION_ENVIRONMENT"
+          ]
+        },
+        {
+          "content": "None",
+          "conversation_active": false,
+          "recipient": "USER",
+          "sandbox_message_index": 20,
+          "sender": "EXECUTION_ENVIRONMENT",
+          "tool_trace": [
+            "{\"tool_name\": \"end_conversation\", \"arguments\": {}, \"result\": null}"
+          ],
+          "visible_to": [
+            "EXECUTION_ENVIRONMENT",
+            "USER"
+          ]
+        }
+      ],
+      "scenario": "wifi_off",
+      "source_record_sha256": {
+        "feedback": "a43829c5a64862b4dbbd741657e7fa7706d5238923a957d261024b1e10194c5d",
+        "result": "639541f8c693c0d6bcec2ba14a6768a643d3b5c7acc7209a457e3ee952ef101a",
+        "selection": "a54b021edd7431a10132af6838ad64c35a8aaa5eec51d99b4f52a34060713a30",
+        "visibility": "e0ee9f715f2fa40fa3553a8a2fbc5d9300f9ece4828e8c8e677326f334badb75"
+      },
+      "state_rows": {
+        "CONTACT": [],
+        "MESSAGING": [],
+        "REMINDER": [],
+        "SETTING": [
+          {
+            "sandbox_message_index": 17
+          },
+          {
+            "cellular": true,
+            "device_id": "04640c30-ec89-5a3c-9fb4-4af3101c8e04",
+            "latitude": 37.334606,
+            "location_service": true,
+            "longitude": -122.009102,
+            "low_battery_mode": false,
+            "sandbox_message_index": 17,
+            "wifi": false
+          }
+        ]
+      },
+      "task_index_zero_based": 1024
+    }
+  ],
+  "cohort_id": "chapter4_final_policy_online_frozen_20260911_4ce1c6d",
+  "fixed_toolsandbox_timestamp": 1784832588,
+  "normalizations": [
+    "provider tool-call request IDs replaced with ordered fixture_call_NNN IDs",
+    "SYSTEM rows excluded, including hidden user-simulator prompts and imports",
+    "schema-fill null fields omitted; null-only snapshot markers retained"
+  ],
+  "schema_version": 1,
+  "shared": {
+    "initial_state": {
+      "CONTACT": [
+        {
+          "sandbox_message_index": 0
+        },
+        {
+          "is_self": true,
+          "name": "Tomas Haake",
+          "person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "phone_number": "+11233344455",
+          "relationship": "self",
+          "sandbox_message_index": 14
+        },
+        {
+          "is_self": false,
+          "name": "Fredrik Thordendal",
+          "person_id": "9e137f06-916a-5310-8174-cf0b7e9f7054",
+          "phone_number": "+12453344098",
+          "relationship": "friend",
+          "sandbox_message_index": 14
+        },
+        {
+          "is_self": false,
+          "name": "John Petrucci",
+          "person_id": "a22e1984-6c6c-530c-8831-c3ea3b5138e7",
+          "phone_number": "+1234560987",
+          "relationship": "friend",
+          "sandbox_message_index": 14
+        },
+        {
+          "is_self": false,
+          "name": "Homer S",
+          "person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+          "phone_number": "+10000000000",
+          "relationship": "boss",
+          "sandbox_message_index": 14
+        }
+      ],
+      "MESSAGING": [
+        {
+          "sandbox_message_index": 0
+        },
+        {
+          "content": "Hey kid, you want some GPU?",
+          "creation_timestamp": 1784558682.0,
+          "message_id": "0d25dbb9-3737-5e0e-b0f0-7c1e359baccc",
+          "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "recipient_phone_number": "+11233344455",
+          "sandbox_message_index": 14,
+          "sender_phone_number": "+18307976530"
+        },
+        {
+          "content": "No leave me alone",
+          "creation_timestamp": 1784562282.0,
+          "message_id": "caaca9e8-7aa9-55a6-9d32-4b4aefed40d1",
+          "recipient_phone_number": "+18307976530",
+          "sandbox_message_index": 14,
+          "sender_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "sender_phone_number": "+11233344455"
+        },
+        {
+          "content": "How's it going",
+          "creation_timestamp": 1784828805.0,
+          "message_id": "0a0102dc-ceaf-5ebb-a665-63da99bf7c47",
+          "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "recipient_phone_number": "+11233344455",
+          "sandbox_message_index": 14,
+          "sender_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+          "sender_phone_number": "+10000000000"
+        },
+        {
+          "content": "Things are proceeding as expected",
+          "creation_timestamp": 1784828865.0,
+          "message_id": "6c9382cb-720e-5f2c-8ac0-77e7ebdea446",
+          "recipient_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+          "recipient_phone_number": "+10000000000",
+          "sandbox_message_index": 14,
+          "sender_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "sender_phone_number": "+11233344455"
+        },
+        {
+          "content": "Good, keep me posted",
+          "creation_timestamp": 1784832526.0,
+          "message_id": "0a0102dc-ceaf-5ebb-a665-63da99bf7c47",
+          "recipient_person_id": "3815cac9-3cab-5d75-89e2-fe12fe19779e",
+          "recipient_phone_number": "+11233344455",
+          "sandbox_message_index": 14,
+          "sender_person_id": "e3570ab6-0819-5032-be1e-2b366390c8ef",
+          "sender_phone_number": "+10000000000"
+        }
+      ],
+      "REMINDER": [
+        {
+          "sandbox_message_index": 0
+        },
+        {
+          "content": "Look for Company SF tickets",
+          "creation_timestamp": 1784573388.0,
+          "reminder_id": "8f5b6fc6-1c25-5467-91ba-d4d1e17c7129",
+          "reminder_timestamp": 1784746188.0,
+          "sandbox_message_index": 14
+        },
+        {
+          "content": "Buy tickets for Merrily next week",
+          "creation_timestamp": 1784746188.0,
+          "reminder_id": "da2b856e-9390-511f-bcbe-7005f72cbf5e",
+          "reminder_timestamp": 1784832528.0,
+          "sandbox_message_index": 14
+        },
+        {
+          "content": "Buy a nice rich navy bathing dress",
+          "creation_timestamp": 1784828988.0,
+          "latitude": 37.3237926356735,
+          "longitude": -122.03961770355414,
+          "reminder_id": "54f20be9-eac3-5e76-8e57-724e48d3d477",
+          "reminder_timestamp": 1784836188.0,
+          "sandbox_message_index": 14
+        }
+      ],
+      "SETTING": [
+        {
+          "sandbox_message_index": 0
+        },
+        {
+          "cellular": true,
+          "device_id": "04640c30-ec89-5a3c-9fb4-4af3101c8e04",
+          "latitude": 37.334606,
+          "location_service": true,
+          "longitude": -122.009102,
+          "low_battery_mode": false,
+          "sandbox_message_index": 0,
+          "wifi": true
+        }
+      ]
+    },
+    "sandbox_prefix": [
+      {
+        "sandbox_message_index": 0
+      },
+      {
+        "content": "I want to send a message to someone.",
+        "conversation_active": true,
+        "recipient": "AGENT",
+        "sandbox_message_index": 3,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "Certainly! I can help you with sending a message. Could you please provide the following details: 1. The phone number of the recipient. 2. The content of the message you'd like to send.",
+        "conversation_active": true,
+        "recipient": "USER",
+        "sandbox_message_index": 4,
+        "sender": "AGENT",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "I don't know the phone number.",
+        "conversation_active": true,
+        "recipient": "AGENT",
+        "sandbox_message_index": 5,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "OK, could you provide some more information about the contact you'd like to send message to?",
+        "conversation_active": true,
+        "recipient": "USER",
+        "sandbox_message_index": 6,
+        "sender": "AGENT",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "It's Bart",
+        "conversation_active": true,
+        "recipient": "AGENT",
+        "sandbox_message_index": 7,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "What would you like to say to Bart?",
+        "conversation_active": true,
+        "recipient": "USER",
+        "sandbox_message_index": 8,
+        "sender": "AGENT",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "Hey what's up",
+        "conversation_active": true,
+        "recipient": "AGENT",
+        "sandbox_message_index": 9,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "I'm about to send a message saying 'Hey what's up.' to Bart. Does this look good?",
+        "conversation_active": true,
+        "recipient": "USER",
+        "sandbox_message_index": 10,
+        "sender": "AGENT",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "Yep",
+        "conversation_active": true,
+        "recipient": "AGENT",
+        "sandbox_message_index": 11,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "Your message has been successfully sent.",
+        "conversation_active": true,
+        "recipient": "USER",
+        "sandbox_message_index": 12,
+        "sender": "AGENT",
+        "visible_to": [
+          "USER"
+        ]
+      },
+      {
+        "content": "end_conversation()",
+        "conversation_active": true,
+        "recipient": "EXECUTION_ENVIRONMENT",
+        "sandbox_message_index": 13,
+        "sender": "USER",
+        "visible_to": [
+          "USER"
+        ]
+      }
+    ]
+  },
+  "source_arm": "online_rep01_candidate",
+  "timezone": "America/New_York"
+}
