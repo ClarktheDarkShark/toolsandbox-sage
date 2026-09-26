@@ -60,6 +60,16 @@ or suppress normalization rules.
   SHA-256 hashes. Its vectors incorporate the relevant historical
   normalization and generated-tool-injection oracle cases without adding tests
   to the production package.
+- `trace_router_edges`: freezes the order-sensitive refactor boundary that the
+  broader runtime matrix can obscure. It records forward/reverse row and
+  within-row trace traversal, malformed and scalar JSON behavior, dict/list/
+  scalar results, latest-invalid-result handling, timestamp tolerance, and
+  setting overwrite order. It also captures exact router score/name ordering,
+  the four-tool cap, lifecycle harm/repair thresholds, downstream all/any/
+  native-alternative/producer-only rules, composite collisions, device-state
+  action order and recovery, every reminder time/location branch, and native
+  output identity before null cleanup. Recursive key order and compact bytes
+  are part of every result.
 - `generation_boundary`: records every exact `ChatRequest` byte stream and hash
   for ordinary generation, native-action generation, cached contract analysis,
   repair analysis, repeated repair, and strategy-specific repair. It also

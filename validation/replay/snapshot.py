@@ -4471,6 +4471,27 @@ def probe_runtime_contracts(_root: Path) -> dict[str, Any]:
     }
 
 
+def probe_trace_router_edges(_root: Path) -> dict[str, Any]:
+    """Load focused validation-only order and collision contracts."""
+
+    module_name = "_sage_replay_trace_router_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "trace_router_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(f"Could not load trace/router probes: {module_path}")
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(
+        tool_spec=_tool_spec,
+        accepted_entry=_accepted_entry,
+        capture=_capture_exact_call,
+        exact=_exact_json_snapshot,
+    )
+
+
 def _probe_step5_contract(name: str) -> dict[str, Any]:
     """Load validation-only generation probes after the selected checkout."""
 
@@ -5462,6 +5483,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "validation": probe_validation,
     "routing": probe_routing,
     "runtime_contracts": probe_runtime_contracts,
+    "trace_router_edges": probe_trace_router_edges,
     "generation_boundary": probe_generation_boundary,
     "validation_distance": probe_validation_distance,
     "native_structural_cases": probe_native_structural_cases,

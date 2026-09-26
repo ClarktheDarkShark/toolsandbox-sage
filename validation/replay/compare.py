@@ -38,6 +38,7 @@ DEFAULT_PROBES = (
     "validation",
     "routing",
     "runtime_contracts",
+    "trace_router_edges",
     "generation_boundary",
     "validation_distance",
     "native_structural_cases",
