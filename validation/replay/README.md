@@ -97,8 +97,15 @@ or suppress normalization rules.
   ordering, the four-tool cap, lifecycle harm/repair thresholds, downstream
   all/any/native-alternative/producer-only rules, composite collisions,
   device-state action order and recovery, every reminder time/location branch,
-  and native output identity before null cleanup. Recursive key order and
-  compact bytes are part of every result.
+  and native output identity before null cleanup. Focused collision vectors
+  freeze `tools=` false-positive stripping, family-only metadata, `None` versus
+  empty context, overlapping message-content/counterparty rules, negative and
+  lifecycle precedence, no-tool guardrails, native-alternative versus generic
+  any-of routing, and evidence retention under composite versus budget
+  suppression. Normalization boundaries include same- and cross-service state
+  requests, zero versus smallest-positive coordinates and timestamps, 23:59,
+  hour 24, and minute 60. Recursive key order and compact bytes are part of
+  every result.
 - `generation_boundary`: records every exact `ChatRequest` byte stream and hash
   for ordinary generation, native-action generation, cached contract analysis,
   repair analysis, repeated repair, and strategy-specific repair. It also
@@ -202,8 +209,8 @@ validator-branch tamper rejection with:
 python -m unittest validation.replay.test_generator_validator_corpus -v
 ```
 
-Verify the trace acquisition return/exception contracts and deliberate tamper
-detection with:
+Verify the trace acquisition, routing-collision, and normalization-boundary
+contracts plus deliberate tamper detection with:
 
 ```bash
 python -m unittest validation.replay.test_trace_router_contracts -v

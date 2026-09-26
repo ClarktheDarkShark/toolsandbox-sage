@@ -453,12 +453,8 @@ def _trace_contracts(
 
     changing_context = InstrumentedContext(
         [
-            FakeSandbox(
-                [{"tool_trace": [trace("get_current_timestamp", 101.25)]}]
-            ),
-            FakeSandbox(
-                [{"tool_trace": [trace("get_current_timestamp", 202.5)]}]
-            ),
+            FakeSandbox([{"tool_trace": [trace("get_current_timestamp", 101.25)]}]),
+            FakeSandbox([{"tool_trace": [trace("get_current_timestamp", 202.5)]}]),
         ]
     )
     changing_snapshots = observe_acquisitions(
@@ -475,9 +471,7 @@ def _trace_contracts(
 
     datetime_context = InstrumentedContext(
         [
-            FakeSandbox(
-                [{"tool_trace": [trace("get_current_timestamp", 200.0)]}]
-            ),
+            FakeSandbox([{"tool_trace": [trace("get_current_timestamp", 200.0)]}]),
             FakeSandbox(
                 [
                     {
@@ -856,6 +850,22 @@ def _normalization_contracts(
             },
             {"visible_state_summary": "low battery mode is off"},
         ),
+        "same_service_on_off_collision_uses_rule_table_order": normalize_case(
+            state,
+            dict(state_blank),
+            {
+                "user_request": ("Turn Wi-Fi off, then turn Wi-Fi on."),
+                "visible_state_or_error": "",
+            },
+        ),
+        "cross_service_collision_uses_rule_table_order": normalize_case(
+            state,
+            dict(state_blank),
+            {
+                "user_request": ("Turn Wi-Fi off, then turn cellular service on."),
+                "visible_state_or_error": "",
+            },
+        ),
     }
 
     relative_inputs = {
@@ -954,6 +964,70 @@ def _normalization_contracts(
                 "resolved_reminder_timestamp": 1_900_000_000.0,
             },
         ),
+        "zero_latitude_is_not_a_concrete_coordinate": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries near the equator",
+                "location_required": True,
+                "location_available": True,
+                "latitude": 0.0,
+                "longitude": -122.0,
+                "resolved_reminder_timestamp": 1_900_000_000.0,
+            },
+        ),
+        "smallest_positive_latitude_is_concrete": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries near the equator",
+                "location_requested": True,
+                "location_available": True,
+                "latitude": 5e-324,
+                "longitude": -122.0,
+                "resolved_reminder_timestamp": 1_900_000_000.0,
+            },
+        ),
+        "zero_prepared_and_resolved_timestamp_is_invalid": normalize_case(
+            reminder,
+            {
+                **copy.deepcopy(reminder_raw),
+                "add_reminder_kwargs": {
+                    "content": "Pick up groceries",
+                    "reminder_timestamp": 0.0,
+                },
+            },
+            {
+                "content": "Pick up groceries",
+                "resolved_reminder_timestamp": 0.0,
+            },
+        ),
+        "smallest_positive_prepared_timestamp_is_valid": normalize_case(
+            reminder,
+            {
+                **copy.deepcopy(reminder_raw),
+                "add_reminder_kwargs": {
+                    "content": "Pick up groceries",
+                    "reminder_timestamp": 5e-324,
+                },
+            },
+            {"content": "Pick up groceries"},
+        ),
+        "relative_time_2359_is_valid": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {**relative_inputs, "hour": 23, "minute": 59},
+        ),
+        "relative_hour_24_is_invalid": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {**relative_inputs, "hour": 24, "minute": 0},
+        ),
+        "relative_minute_60_is_invalid": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {**relative_inputs, "hour": 23, "minute": 60},
+        ),
     }
 
     native = generated(
@@ -1022,6 +1096,7 @@ def _routing_contracts(
         negative: tuple[str, ...] = (),
         preserves: tuple[str, ...] = (),
         required: tuple[str, ...] = (),
+        applicable: tuple[str, ...] = (),
         retired: bool = False,
     ) -> Any:
         normalized_inputs = inputs or (ToolInput("value", "str", "Visible value."),)
@@ -1073,18 +1148,34 @@ def _routing_contracts(
                 }
             normalized_negative = normalized_negative or ("insufficient_information",)
             abstain_behavior = "Abstain on insufficient_information."
+        spec = tool_spec(
+            name=name,
+            family=family,
+            inputs=normalized_inputs,
+            output_properties=normalized_output,
+            positive_triggers=positive,
+            negative_triggers=normalized_negative,
+            preserves=normalized_preserves,
+            required_calls=normalized_required,
+            applicable_task_families=applicable,
+            abstain_behavior=abstain_behavior,
+        )
+        if applicable:
+            spec = replace(
+                spec,
+                estimated_step_compression=3,
+                cross_task_applicability_count=2,
+                reason_tool_is_decisive=(
+                    "This reusable helper replaces three deterministic visible "
+                    "steps across the declared task families."
+                ),
+                shortfall_cluster_evidence=("routing_collision_fixture",),
+                known_failure_mechanisms_addressed=(
+                    "family_metadata_matching_boundary",
+                ),
+            )
         generated = GeneratedTool(
-            spec=tool_spec(
-                name=name,
-                family=family,
-                inputs=normalized_inputs,
-                output_properties=normalized_output,
-                positive_triggers=positive,
-                negative_triggers=normalized_negative,
-                preserves=normalized_preserves,
-                required_calls=normalized_required,
-                abstain_behavior=abstain_behavior,
-            ),
+            spec=spec,
             code=f"def {name}(**kwargs):\n    return {{}}\n",
         )
         result = accepted_entry(generated)
@@ -1093,7 +1184,7 @@ def _routing_contracts(
     def route(
         entries: dict[str, Any],
         *,
-        context: str,
+        context: str | None,
         family: str = "edge_family",
         base_tools: set[str] | None = None,
         lifecycle: dict[str, dict[str, Any]] | None = None,
@@ -1142,6 +1233,73 @@ def _routing_contracts(
             context="request=test signals=one two three",
             base_tools=set(),
             cap=4,
+        ),
+    }
+
+    context_cases = {
+        "tools_field_false_positive_is_stripped": route(
+            {
+                "tool_list_only_helper": entry(
+                    "tool_list_only_helper",
+                    positive=("poison_native_tool",),
+                )
+            },
+            context=(
+                "request=Summarize the visible result "
+                "tools=poison_native_tool signals=unrelated_signal"
+            ),
+            base_tools=set(),
+        ),
+        "tools_field_is_stripped_but_signal_field_is_retained": route(
+            {
+                "tool_list_and_signal_helper": entry(
+                    "tool_list_and_signal_helper",
+                    positive=("poison_native_tool", "real_visible_signal"),
+                )
+            },
+            context=(
+                "request=Summarize the visible result "
+                "tools=poison_native_tool signals=real_visible_signal"
+            ),
+            base_tools=set(),
+        ),
+        "task_family_metadata_match_without_trigger": route(
+            {
+                "family_metadata_only_helper": entry(
+                    "family_metadata_only_helper",
+                    output_properties={"value": string},
+                    positive=("nonmatching_positive",),
+                    negative=("nonmatching_negative",),
+                    required=("search_contacts",),
+                    applicable=(
+                        "metadata_only_family",
+                        "metadata_sibling_family",
+                    ),
+                )
+            },
+            context="request=Summarize the visible result signals=unrelated_signal",
+            family="metadata_only_family",
+            base_tools={"search_contacts"},
+        ),
+        "none_context": route(
+            {
+                "missing_context_helper": entry(
+                    "missing_context_helper",
+                    positive=("otherwise_visible",),
+                )
+            },
+            context=None,
+            base_tools=set(),
+        ),
+        "empty_context": route(
+            {
+                "missing_context_helper": entry(
+                    "missing_context_helper",
+                    positive=("otherwise_visible",),
+                )
+            },
+            context="",
+            base_tools=set(),
         ),
     }
 
@@ -1245,6 +1403,41 @@ def _routing_contracts(
                 }
             },
         ),
+        "negative_trigger_hard_block_beats_clean_lifecycle_family_override": route(
+            {
+                lifecycle_tool_name: entry(
+                    lifecycle_tool_name,
+                    family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+                    inputs=(
+                        ToolInput(
+                            "location_query",
+                            "str",
+                            "Visible qualified place.",
+                        ),
+                    ),
+                    output_properties={
+                        "search_kwargs": mapping,
+                        "abstain_reason": string,
+                    },
+                    positive=("location_phrase", "external_lookup"),
+                    negative=("poison_context",),
+                    preserves=("search_location_around_lat_lon",),
+                    required=("search_location_around_lat_lon",),
+                )
+            },
+            context=(f"{lifecycle_context} poison_context"),
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_families": ["edge_family", "edge_family"],
+                    "helpful_called_families": [],
+                    "failed_count": 0,
+                    "side_effect_incident_count": 0,
+                }
+            },
+        ),
     }
 
     all_required = entry(
@@ -1293,6 +1486,32 @@ def _routing_contracts(
         positive=("downstream_signal",),
         required=("set_wifi_status",),
     )
+    insufficiency_guard = entry(
+        "prepare_safe_action_or_abstain",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        output_properties={
+            "should_abstain": {"type": "boolean"},
+            "missing_information": {"type": "array"},
+            "safe_next_action": string,
+            "final_answer_recommendation": string,
+            "abstain_reason": string,
+        },
+        positive=("insufficient_information", "safe_abstain_needed"),
+        preserves=("search_contacts", "remove_contact"),
+        required=("search_contacts", "remove_contact"),
+    )
+    native_alternative_over_any = entry(
+        "native_alternative_over_any_helper",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties={
+            "downstream_tool_name": string,
+            "downstream_tool_kwargs": mapping,
+            "abstain_reason": string,
+        },
+        positive=("downstream_signal",),
+        preserves=("search_contacts", "remove_contact", "modify_contact"),
+        required=("search_contacts", "remove_contact", "modify_contact"),
+    )
     downstream_cases = {
         "all_required_missing_one": route(
             {"all_required_helper": all_required},
@@ -1334,6 +1553,81 @@ def _routing_contracts(
             context="request=test signals=downstream_signal",
             base_tools=set(),
         ),
+        "guardrail_precedes_insufficiency_downstream_bypass": route(
+            {"prepare_safe_action_or_abstain": insufficiency_guard},
+            context=(
+                "request=remove_contact without a visible target "
+                "signals=insufficient_information safe_abstain_needed"
+            ),
+            base_tools={"remove_contact"},
+        ),
+        "native_alternative_rule_precedes_generic_any_action_only": route(
+            {"native_alternative_over_any_helper": (native_alternative_over_any)},
+            context="request=test signals=downstream_signal",
+            base_tools={"remove_contact"},
+        ),
+        "native_alternative_rule_accepts_producer_plus_one_action": route(
+            {"native_alternative_over_any_helper": (native_alternative_over_any)},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_contacts", "modify_contact"},
+        ),
+    }
+
+    message_content = entry(
+        "select_message_content_by_recency",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible message records."),
+            ToolInput("selection_mode", "str", "Oldest or latest."),
+        ),
+        positive=("message_recency",),
+        preserves=("search_messages",),
+        required=("search_messages",),
+    )
+    message_counterparty = entry(
+        "select_message_counterparty_for_contact_update",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible message records."),
+            ToolInput("selection_mode", "str", "Oldest or latest."),
+        ),
+        positive=("message_counterparty_update",),
+        preserves=("search_messages", "modify_contact"),
+        required=("search_messages", "modify_contact"),
+    )
+    generic_timestamp = entry(
+        "select_record_by_timestamp_extreme",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible records."),
+            ToolInput("selection_mode", "str", "Oldest or latest."),
+        ),
+        positive=("recency_search",),
+        preserves=("search_messages",),
+        required=("search_messages",),
+    )
+    search_window = entry(
+        "resolve_search_window_or_bounds",
+        positive=("recency_search",),
+        required=("search_messages",),
+    )
+    message_collision_cases = {
+        "content_rule_precedes_counterparty_rule_for_generic_selector": route(
+            {
+                "select_record_by_timestamp_extreme": generic_timestamp,
+                "select_message_counterparty_for_contact_update": (
+                    message_counterparty
+                ),
+                "select_message_content_by_recency": message_content,
+                "resolve_search_window_or_bounds": search_window,
+            },
+            context=(
+                "request=Use the latest message to update its sender "
+                "signals=message_recency message_search_followup_possible "
+                "message_counterparty_update contact_lookup recency_search"
+            ),
+            base_tools={"search_messages", "modify_contact"},
+        )
     }
 
     lower = entry(
@@ -1372,12 +1666,40 @@ def _routing_contracts(
             base_tools={"search_contacts"},
         )
     }
+    evidence_cases = {
+        "composite_suppression_preserves_prior_match_evidence": route(
+            {
+                "lower_shared_helper": lower,
+                "alpha_composite_helper": composite_alpha,
+            },
+            context="request=test signals=shared_signal",
+            base_tools={"search_contacts"},
+        ),
+        "budget_suppression_clears_prior_match_evidence": route(
+            {
+                "alpha_budget": entry(
+                    "alpha_budget",
+                    positive=("budget_signal",),
+                ),
+                "zeta_budget": entry(
+                    "zeta_budget",
+                    positive=("budget_signal",),
+                ),
+            },
+            context="request=test signals=budget_signal",
+            base_tools=set(),
+            cap=1,
+        ),
+    }
 
     return {
         "ordering_and_budget": exact(order_cases),
+        "context_boundaries": exact(context_cases),
         "lifecycle_thresholds": exact(lifecycle_cases),
         "downstream_contracts": exact(downstream_cases),
+        "message_rule_collisions": exact(message_collision_cases),
         "subsumption_collisions": exact(subsumption_cases),
+        "evidence_retention": exact(evidence_cases),
     }
 
 
