@@ -2208,6 +2208,748 @@ def probe_lifecycle(_root: Path) -> dict[str, Any]:
         )
 
 
+def _reporting_sanitize(value: Any, temporary_root: Path) -> Any:
+    """Replace probe-local paths while retaining value and container order."""
+
+    if isinstance(value, str):
+        return value.replace(str(temporary_root), "<REPORTING_FIXTURE>")
+    if isinstance(value, dict):
+        return {
+            key: _reporting_sanitize(item, temporary_root)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_reporting_sanitize(item, temporary_root) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_reporting_sanitize(item, temporary_root) for item in value)
+    return value
+
+
+def _reporting_key_order(value: Any, path: str = "") -> list[dict[str, Any]]:
+    """Record insertion order for every nested JSON object."""
+
+    orders: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        orders.append(
+            {
+                "path": path or "/",
+                "keys": [str(key) for key in value],
+            }
+        )
+        for key, item in value.items():
+            escaped = str(key).replace("~", "~0").replace("/", "~1")
+            orders.extend(_reporting_key_order(item, f"{path}/{escaped}"))
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            orders.extend(_reporting_key_order(item, f"{path}/{index}"))
+    return orders
+
+
+def _reporting_value_snapshot(value: Any, temporary_root: Path) -> dict[str, Any]:
+    sanitized = _reporting_sanitize(value, temporary_root)
+    canonical = json.dumps(
+        sanitized,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str,
+    )
+    return {
+        "value": _jsonable(sanitized),
+        "object_key_order": _reporting_key_order(sanitized),
+        "canonical_json": canonical,
+        "canonical_json_byte_count": len(canonical.encode("utf-8")),
+        "canonical_json_sha256": hashlib.sha256(
+            canonical.encode("utf-8")
+        ).hexdigest(),
+    }
+
+
+def _capture_reporting_call(
+    call: Callable[[], Any], temporary_root: Path
+) -> dict[str, Any]:
+    try:
+        return {
+            "status": "returned",
+            "result": _reporting_value_snapshot(call(), temporary_root),
+        }
+    except Exception as exc:  # Validation must snapshot exact legacy failures.
+        details: dict[str, Any] = {
+            "status": "raised",
+            "exception_module": type(exc).__module__,
+            "exception_type": type(exc).__name__,
+            "message": str(exc),
+            "args": list(exc.args),
+        }
+        for name in ("lineno", "colno", "pos"):
+            if hasattr(exc, name):
+                details[name] = getattr(exc, name)
+        return _jsonable(_reporting_sanitize(details, temporary_root))
+
+
+def _write_reporting_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_reporting_jsonl(path: Path, rows: list[Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
+
+
+def _materialize_reporting_run(
+    run_dir: Path,
+    *,
+    rows: list[dict[str, Any]],
+    artifacts: dict[str, Any] | None,
+    started_at: str,
+    updated_at: str,
+    include_final: bool = True,
+    live_rows: list[Any] | None = None,
+) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    if include_final:
+        _write_reporting_json(
+            run_dir / "result_summary.json",
+            {"per_scenario_results": rows},
+        )
+    _write_reporting_json(
+        run_dir / "live_result_summary.json",
+        {
+            "status": "complete" if include_final else "running",
+            "scenario_count": str(len(rows)),
+            "completed_count": len(rows),
+            "updated_at": updated_at,
+            "per_scenario_results": rows if live_rows is None else live_rows,
+        },
+    )
+    _write_reporting_json(
+        run_dir.parent / "sage_ts_run_manifest.json",
+        {"started_at": started_at},
+    )
+    for name, payload in (artifacts or {}).items():
+        path = run_dir / name
+        if name.endswith(".jsonl"):
+            if not isinstance(payload, list):
+                raise ValueError(f"Reporting JSONL fixture is not a list: {name}")
+            _write_reporting_jsonl(path, payload)
+        else:
+            _write_reporting_json(path, payload)
+
+
+def probe_reporting(_root: Path) -> dict[str, Any]:
+    """Freeze report values, serialization order, and artifact edge semantics."""
+
+    fixture_module_path = Path(__file__).resolve().parent / "reporting_fixture.py"
+    fixture_spec = importlib.util.spec_from_file_location(
+        "sage_validation_reporting_fixture",
+        fixture_module_path,
+    )
+    if fixture_spec is None or fixture_spec.loader is None:
+        raise RuntimeError(f"Cannot load reporting fixture helper: {fixture_module_path}")
+    fixture_module = importlib.util.module_from_spec(fixture_spec)
+    fixture_spec.loader.exec_module(fixture_module)
+    fixture, fixture_manifest = fixture_module.load_verified_fixture()
+
+    run_metrics = importlib.import_module("sage_ts.evaluation.run_metrics")
+    helper = importlib.import_module("sage_ts.evaluation.helper_contribution")
+    campaign = importlib.import_module("sage_ts.campaign.artifacts")
+    dashboard = importlib.import_module("sage_ts.dashboard.exporters")
+    adapter = importlib.import_module("sage_ts.adapters.sage_run_adapter")
+    protocol = importlib.import_module("scripts.run_sage_protocol")
+
+    control_rows = copy.deepcopy(fixture["control_rows"])
+    candidate_rows = copy.deepcopy(fixture["candidate_rows"])
+    started_at = str(fixture["started_at"])
+    updated_at = str(fixture["updated_at"])
+
+    with tempfile.TemporaryDirectory(prefix="sage-reporting-replay-") as temporary:
+        temporary_root = Path(temporary)
+        control_dir = temporary_root / "primary" / "control" / "run"
+        candidate_dir = temporary_root / "primary" / "candidate" / "run"
+        registry_dir = temporary_root / "primary" / "registry"
+        _materialize_reporting_run(
+            control_dir,
+            rows=control_rows,
+            artifacts=copy.deepcopy(fixture["control_artifacts"]),
+            started_at=started_at,
+            updated_at=updated_at,
+        )
+        _materialize_reporting_run(
+            candidate_dir,
+            rows=candidate_rows,
+            artifacts=copy.deepcopy(fixture["candidate_artifacts"]),
+            started_at=started_at,
+            updated_at=updated_at,
+        )
+        _write_reporting_json(
+            registry_dir / "registry_manifest.json",
+            copy.deepcopy(fixture["registry_manifest"]),
+        )
+
+        primary = {
+            "summarize_control": _capture_reporting_call(
+                lambda: run_metrics.summarize_run(control_dir), temporary_root
+            ),
+            "summarize_candidate": _capture_reporting_call(
+                lambda: run_metrics.summarize_run(
+                    candidate_dir,
+                    registry_dir=registry_dir,
+                ),
+                temporary_root,
+            ),
+            "compare_complete": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    control_dir,
+                    candidate_dir,
+                    registry_dir=registry_dir,
+                ),
+                temporary_root,
+            ),
+            "helper_contribution": _capture_reporting_call(
+                lambda: helper.build_helper_contribution_summary(
+                    control_dir,
+                    candidate_dir,
+                    registry_dir=registry_dir,
+                ),
+                temporary_root,
+            ),
+        }
+
+        helper_output = temporary_root / "primary" / "helper_contribution.json"
+
+        def write_helper_summary() -> dict[str, Any]:
+            result = helper.write_helper_contribution_summary(
+                control_dir,
+                candidate_dir,
+                helper_output,
+                registry_dir=registry_dir,
+            )
+            return {
+                "returned": result,
+                "serialized_text": helper_output.read_text(encoding="utf-8"),
+                "round_trip": json.loads(helper_output.read_text(encoding="utf-8")),
+            }
+
+        primary["helper_contribution_writer"] = _capture_reporting_call(
+            write_helper_summary,
+            temporary_root,
+        )
+
+        atomic_output = temporary_root / "primary" / "atomic_ordered.json"
+
+        def write_atomic_ordered_json() -> dict[str, Any]:
+            protocol._atomic_write_json(
+                atomic_output,
+                {
+                    "zeta": 1,
+                    "alpha": {"second": 2, "first": 1},
+                    "list": [{"right": True, "left": False}],
+                },
+            )
+            raw = atomic_output.read_bytes()
+            return {
+                "raw_utf8": raw.decode("utf-8"),
+                "byte_count": len(raw),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "terminal_newline": raw.endswith(b"\n"),
+                "temporary_siblings": sorted(
+                    path.name
+                    for path in atomic_output.parent.iterdir()
+                    if path.name.startswith(f".{atomic_output.name}.")
+                ),
+            }
+
+        primary["protocol_atomic_json_writer"] = _capture_reporting_call(
+            write_atomic_ordered_json,
+            temporary_root,
+        )
+
+        def variant_run(
+            case_id: str,
+            arm: str,
+            rows: list[dict[str, Any]],
+        ) -> Path:
+            run_dir = temporary_root / "compare_cases" / case_id / arm / "run"
+            _materialize_reporting_run(
+                run_dir,
+                rows=copy.deepcopy(rows),
+                artifacts={},
+                started_at=started_at,
+                updated_at=updated_at,
+            )
+            return run_dir
+
+        reordered_control = variant_run("reordered", "control", control_rows)
+        reordered_candidate = variant_run(
+            "reordered", "candidate", list(reversed(candidate_rows))
+        )
+        missing_control = variant_run("missing", "control", control_rows)
+        missing_candidate = variant_run(
+            "missing",
+            "candidate",
+            [row for row in candidate_rows if row["name"] not in {"beta_visible_not_called", "delta_runtime_failure"}],
+        )
+        duplicate_control_rows = [
+            copy.deepcopy(control_rows[0]),
+            {**copy.deepcopy(control_rows[0]), "similarity": 0.75},
+        ]
+        duplicate_candidate_rows = [
+            copy.deepcopy(candidate_rows[0]),
+            {**copy.deepcopy(candidate_rows[0]), "similarity": 0.5},
+        ]
+        duplicate_control = variant_run(
+            "duplicate_aligned", "control", duplicate_control_rows
+        )
+        duplicate_candidate = variant_run(
+            "duplicate_aligned", "candidate", duplicate_candidate_rows
+        )
+        bad_control = variant_run("bad_metric", "control", control_rows[:1])
+        bad_candidate_rows = copy.deepcopy(candidate_rows[:1])
+        bad_candidate_rows[0]["similarity"] = "not-a-float"
+        bad_candidate = variant_run("bad_metric", "candidate", bad_candidate_rows)
+        compare_edges = {
+            "reordered_strict": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    reordered_control,
+                    reordered_candidate,
+                ),
+                temporary_root,
+            ),
+            "reordered_partial_mode": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    reordered_control,
+                    reordered_candidate,
+                    require_complete_match=False,
+                ),
+                temporary_root,
+            ),
+            "missing_strict": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    missing_control,
+                    missing_candidate,
+                ),
+                temporary_root,
+            ),
+            "missing_partial_mode": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    missing_control,
+                    missing_candidate,
+                    require_complete_match=False,
+                ),
+                temporary_root,
+            ),
+            "duplicate_aligned": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(
+                    duplicate_control,
+                    duplicate_candidate,
+                ),
+                temporary_root,
+            ),
+            "invalid_similarity_type": _capture_reporting_call(
+                lambda: run_metrics.compare_runs(bad_control, bad_candidate),
+                temporary_root,
+            ),
+        }
+
+        reader_root = temporary_root / "reader_cases"
+        reader_root.mkdir(parents=True)
+        json_paths = {
+            "missing": reader_root / "missing.json",
+            "empty": reader_root / "empty.json",
+            "whitespace": reader_root / "whitespace.json",
+            "ordered_object": reader_root / "ordered_object.json",
+            "array": reader_root / "array.json",
+            "scalar": reader_root / "scalar.json",
+            "malformed": reader_root / "malformed.json",
+        }
+        json_paths["empty"].write_text("", encoding="utf-8")
+        json_paths["whitespace"].write_text(" \n\t", encoding="utf-8")
+        json_paths["ordered_object"].write_text(
+            '{"z":1,"a":{"second":2,"first":1}}\n', encoding="utf-8"
+        )
+        json_paths["array"].write_text('[{"b":2,"a":1},3]\n', encoding="utf-8")
+        json_paths["scalar"].write_text('"scalar-value"\n', encoding="utf-8")
+        json_paths["malformed"].write_text('{"broken":\n', encoding="utf-8")
+
+        prior_sleep = run_metrics.time.sleep
+        run_metrics.time.sleep = lambda _seconds: None
+        try:
+            json_readers: dict[str, Any] = {}
+            for reader_name, reader in (
+                ("run_metrics_strict_retry", run_metrics._read_json),
+                ("campaign_strict", campaign.read_json),
+                (
+                    "dashboard_tolerant_object",
+                    lambda path: dashboard._read_json(
+                        path, {"fallback": "dashboard-object"}
+                    ),
+                ),
+                (
+                    "dashboard_tolerant_value",
+                    lambda path: dashboard._read_json_value(
+                        path, ["dashboard-value-fallback"]
+                    ),
+                ),
+                ("protocol_strict", protocol._read_metrics),
+            ):
+                json_readers[reader_name] = {
+                    case_id: _capture_reporting_call(
+                        lambda path=path, reader=reader: reader(path),
+                        temporary_root,
+                    )
+                    for case_id, path in json_paths.items()
+                }
+        finally:
+            run_metrics.time.sleep = prior_sleep
+
+        jsonl_paths = {
+            "missing": reader_root / "missing.jsonl",
+            "blank": reader_root / "blank.jsonl",
+            "mixed_valid_types": reader_root / "mixed_valid_types.jsonl",
+            "malformed_middle": reader_root / "malformed_middle.jsonl",
+        }
+        jsonl_paths["blank"].write_text("\n \n", encoding="utf-8")
+        jsonl_paths["mixed_valid_types"].write_text(
+            '{"z":1,"a":2}\n\n[1,2]\n"scalar"\n', encoding="utf-8"
+        )
+        jsonl_paths["malformed_middle"].write_text(
+            '{"scenario":"alpha_gain","tool_name":"first"}\n'
+            "not-json\n"
+            '{"scenario":"alpha_gain","tool_name":"second"}\n',
+            encoding="utf-8",
+        )
+        jsonl_readers: dict[str, Any] = {}
+        for reader_name, reader in (
+            ("run_metrics_strict", run_metrics._read_jsonl),
+            ("campaign_strict", campaign.read_jsonl),
+            ("dashboard_strict", dashboard._read_jsonl),
+        ):
+            jsonl_readers[reader_name] = {
+                case_id: _capture_reporting_call(
+                    lambda path=path, reader=reader: reader(path),
+                    temporary_root,
+                )
+                for case_id, path in jsonl_paths.items()
+            }
+
+        tolerant_adapter_root = reader_root / "adapter_tolerant"
+        tolerant_adapter_root.mkdir()
+        (tolerant_adapter_root / "reuse_events.jsonl").write_text(
+            jsonl_paths["malformed_middle"].read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        (tolerant_adapter_root / "scenario_tool_selection.jsonl").write_text(
+            '{"scenario":"alpha_gain","chosen":"first"}\n'
+            "not-json\n"
+            '["ignored-non-object"]\n'
+            '{"scenario":"beta_visible_not_called","chosen":"second"}\n',
+            encoding="utf-8",
+        )
+        jsonl_readers["adapter_tolerant"] = {
+            "reuse_matching_and_deduplicated": _capture_reporting_call(
+                lambda: adapter._reuse_log_tools(
+                    tolerant_adapter_root, "alpha_gain"
+                ),
+                temporary_root,
+            ),
+            "reuse_missing_scenario": _capture_reporting_call(
+                lambda: adapter._reuse_log_tools(tolerant_adapter_root, "absent"),
+                temporary_root,
+            ),
+            "selection_skips_bad_and_non_object": _capture_reporting_call(
+                lambda: adapter._selection_log_rows(tolerant_adapter_root),
+                temporary_root,
+            ),
+        }
+
+        arm_status_cases: dict[str, Any] = {}
+        for case_id, raw in (
+            ("missing", None),
+            ("empty", ""),
+            ("malformed", "not-json"),
+            ("scalar", '"not-an-object"'),
+            ("ordered_object", '{"status":"running","completed_count":2}'),
+        ):
+            case_root = reader_root / "arm_status" / case_id
+            case_root.mkdir(parents=True)
+            if raw is not None:
+                (case_root / "control_arm_status.json").write_text(
+                    raw, encoding="utf-8"
+                )
+            arm_status_cases[case_id] = _capture_reporting_call(
+                lambda case_root=case_root: protocol._read_arm_status(
+                    case_root, "control"
+                ),
+                temporary_root,
+            )
+
+        scenario_loading_root = temporary_root / "scenario_loading"
+        final_preferred = scenario_loading_root / "final_preferred" / "run"
+        _materialize_reporting_run(
+            final_preferred,
+            rows=control_rows[:2],
+            artifacts={},
+            started_at=started_at,
+            updated_at=updated_at,
+            live_rows=[candidate_rows[4]],
+        )
+        live_fallback = scenario_loading_root / "live_fallback" / "run"
+        _materialize_reporting_run(
+            live_fallback,
+            rows=candidate_rows[:2],
+            artifacts={},
+            started_at=started_at,
+            updated_at=updated_at,
+            include_final=False,
+        )
+        no_summaries = scenario_loading_root / "no_summaries" / "run"
+        no_summaries.mkdir(parents=True)
+        scenario_loading = {
+            "run_metrics_final_preferred": _capture_reporting_call(
+                lambda: run_metrics._scenario_rows(final_preferred), temporary_root
+            ),
+            "run_metrics_live_fallback": _capture_reporting_call(
+                lambda: run_metrics._scenario_rows(live_fallback), temporary_root
+            ),
+            "run_metrics_missing": _capture_reporting_call(
+                lambda: run_metrics._scenario_rows(no_summaries), temporary_root
+            ),
+            "dashboard_final_preferred": _capture_reporting_call(
+                lambda: dashboard._scenario_rows(final_preferred), temporary_root
+            ),
+            "dashboard_live_fallback": _capture_reporting_call(
+                lambda: dashboard._scenario_rows(live_fallback), temporary_root
+            ),
+            "protocol_final_complete": _capture_reporting_call(
+                lambda: protocol._run_result_rows(
+                    final_preferred, require_complete=True
+                ),
+                temporary_root,
+            ),
+            "protocol_live_partial": _capture_reporting_call(
+                lambda: protocol._run_result_rows(
+                    live_fallback, require_complete=False
+                ),
+                temporary_root,
+            ),
+            "protocol_live_rejected_as_complete": _capture_reporting_call(
+                lambda: protocol._run_result_rows(
+                    live_fallback, require_complete=True
+                ),
+                temporary_root,
+            ),
+        }
+
+        def uncached_case(
+            case_id: str,
+            rows: list[Any],
+            *,
+            expected: tuple[str, ...] = ("alpha_gain", "beta_visible_not_called"),
+            require_complete: bool = True,
+            include_final: bool = True,
+            cache_artifact: str | None = None,
+            payload_override: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            run_dir = temporary_root / "uncached_cases" / case_id / "run"
+            _materialize_reporting_run(
+                run_dir,
+                rows=[row for row in rows if isinstance(row, dict)],
+                artifacts={},
+                started_at=started_at,
+                updated_at=updated_at,
+                include_final=include_final,
+                live_rows=rows,
+            )
+            source = (
+                run_dir / "result_summary.json"
+                if include_final
+                else run_dir / "live_result_summary.json"
+            )
+            if payload_override is not None:
+                _write_reporting_json(source, payload_override)
+            elif any(not isinstance(row, dict) for row in rows):
+                _write_reporting_json(source, {"per_scenario_results": rows})
+            if cache_artifact is not None:
+                _write_reporting_json(run_dir / cache_artifact, {})
+            return _capture_reporting_call(
+                lambda: protocol._validate_uncached_result_rows(
+                    run_dir,
+                    expected_scenarios=expected,
+                    arm="fixture",
+                    require_complete=require_complete,
+                ),
+                temporary_root,
+            )
+
+        valid_alpha = copy.deepcopy(candidate_rows[0])
+        valid_beta = copy.deepcopy(candidate_rows[1])
+        uncached_validation = {
+            "valid_reordered": uncached_case(
+                "valid_reordered", [valid_beta, valid_alpha]
+            ),
+            "valid_partial": uncached_case(
+                "valid_partial",
+                [valid_alpha],
+                require_complete=False,
+            ),
+            "missing_complete": uncached_case(
+                "missing_complete", [valid_alpha]
+            ),
+            "duplicate_expected_names": uncached_case(
+                "duplicate_expected_names",
+                [valid_alpha],
+                expected=("alpha_gain", "alpha_gain"),
+            ),
+            "duplicate_result_rows": uncached_case(
+                "duplicate_result_rows", [valid_alpha, copy.deepcopy(valid_alpha)]
+            ),
+            "non_object_row_filtered": uncached_case(
+                "non_object_row_filtered",
+                [valid_alpha, "filtered-scalar"],
+                expected=("alpha_gain",),
+            ),
+            "missing_task_name": uncached_case(
+                "missing_task_name",
+                [{**valid_alpha, "name": ""}],
+                expected=("alpha_gain",),
+            ),
+            "unexpected_task_name": uncached_case(
+                "unexpected_task_name",
+                [{**valid_alpha, "name": "unexpected"}],
+            ),
+            "cached_source_marker": uncached_case(
+                "cached_source_marker",
+                [{**valid_alpha, "control_cache_source": "cached"}, valid_beta],
+            ),
+            "cached_detail_source": uncached_case(
+                "cached_detail_source",
+                [
+                    {
+                        **valid_alpha,
+                        "control_cache": {"source": "cached", "record_ids": []},
+                    },
+                    valid_beta,
+                ],
+            ),
+            "cached_detail_record_ids": uncached_case(
+                "cached_detail_record_ids",
+                [
+                    {
+                        **valid_alpha,
+                        "control_cache": {"source": "fresh", "record_ids": ["r1"]},
+                    },
+                    valid_beta,
+                ],
+            ),
+            "missing_replay_provenance": uncached_case(
+                "missing_replay_provenance",
+                [
+                    {
+                        key: value
+                        for key, value in valid_alpha.items()
+                        if key != "llm_cached_call_count"
+                    },
+                    valid_beta,
+                ],
+            ),
+            "nonzero_replay_calls": uncached_case(
+                "nonzero_replay_calls",
+                [{**valid_alpha, "llm_cached_call_count": "2"}, valid_beta],
+            ),
+            "cache_artifact_present": uncached_case(
+                "cache_artifact_present",
+                [valid_alpha, valid_beta],
+                cache_artifact="openai_response_cache_metrics.json",
+            ),
+            "complete_summary_missing": uncached_case(
+                "complete_summary_missing",
+                [valid_alpha, valid_beta],
+                include_final=False,
+            ),
+            "scenario_rows_missing": uncached_case(
+                "scenario_rows_missing",
+                [],
+                expected=(),
+                payload_override={"status": "complete"},
+            ),
+        }
+
+        strict_fresh_reports = {
+            "valid": _capture_reporting_call(
+                lambda: protocol._assert_strict_fresh_report(
+                    {
+                        "mode": "off",
+                        "control_source": "fresh",
+                        "cached_control_tasks": 0,
+                        "fresh_control_tasks": "5",
+                        "cache_accessed": False,
+                    },
+                    scenario_count=5,
+                ),
+                temporary_root,
+            ),
+            "wrong_mode": _capture_reporting_call(
+                lambda: protocol._assert_strict_fresh_report(
+                    {
+                        "mode": "read",
+                        "control_source": "fresh",
+                        "cached_control_tasks": 0,
+                        "fresh_control_tasks": 5,
+                        "cache_accessed": False,
+                    },
+                    scenario_count=5,
+                ),
+                temporary_root,
+            ),
+            "cache_accessed_truthy": _capture_reporting_call(
+                lambda: protocol._assert_strict_fresh_report(
+                    {
+                        "mode": "off",
+                        "control_source": "fresh",
+                        "cached_control_tasks": 0,
+                        "fresh_control_tasks": 5,
+                        "cache_accessed": 0,
+                    },
+                    scenario_count=5,
+                ),
+                temporary_root,
+            ),
+        }
+
+        return {
+            "fixture": {
+                "fixture_id": fixture["fixture_id"],
+                "fixture_byte_count": fixture_manifest["fixture_byte_count"],
+                "fixture_sha256": fixture_manifest["fixture_sha256"],
+                "canonical_payload_sha256": fixture_manifest[
+                    "canonical_payload_sha256"
+                ],
+                "paired_scenario_count": fixture_manifest[
+                    "paired_scenario_count"
+                ],
+                "coverage": fixture["coverage"],
+                "provenance": fixture_manifest["provenance"],
+            },
+            "primary_outputs": primary,
+            "compare_edge_cases": compare_edges,
+            "json_reader_semantics": json_readers,
+            "jsonl_reader_semantics": jsonl_readers,
+            "arm_status_reader_semantics": arm_status_cases,
+            "scenario_row_loading": scenario_loading,
+            "uncached_result_validation": uncached_validation,
+            "strict_fresh_report_validation": strict_fresh_reports,
+        }
+
+
 # Extension point: each deterministic probe receives the selected root and
 # returns JSON-compatible data. Volatile timestamps/PIDs may be normalized only
 # through the checked-in approved_nondeterminism.json allowlist.
@@ -2224,6 +2966,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "validation": probe_validation,
     "routing": probe_routing,
     "lifecycle": probe_lifecycle,
+    "reporting": probe_reporting,
 }
 
 

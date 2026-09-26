@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "fixture_id": "reporting_serialization_v1",
+  "coverage": [
+    "accepted_uncalled_helper",
+    "called_generated_helper",
+    "duplicate_rows",
+    "failure_rows",
+    "metric_type_edges",
+    "missing_rows",
+    "no_visible_helper",
+    "partial_rows",
+    "reordered_rows",
+    "retained_helper",
+    "runtime_exception",
+    "side_effect_incident",
+    "visible_not_called_helper"
+  ],
+  "started_at": "2026-09-11T15:07:19+00:00",
+  "updated_at": "2026-09-11T15:09:49+00:00",
+  "control_rows": [
+    {
+      "name": "alpha_gain",
+      "similarity": 0,
+      "outcome_similarity": "0.0",
+      "turn_count": "2",
+      "categories": ["contact", "early"],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": "2",
+      "llm_live_call_count": 2,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": "10",
+      "llm_provider_cached_prompt_tokens": 1,
+      "llm_provider_cached_prompt_call_count": 1,
+      "llm_provider_cached_prompt_tokens_available_count": 2,
+      "llm_completion_tokens": 3,
+      "llm_total_tokens": "13",
+      "llm_usage_available_count": 2,
+      "control_cache_source": "fresh",
+      "control_cache": {"source": "fresh", "record_ids": []}
+    },
+    {
+      "name": "beta_visible_not_called",
+      "similarity": "1.0",
+      "outcome_similarity": 1,
+      "turn_count": 3,
+      "categories": ["reminder"],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": 1,
+      "llm_live_call_count": "1",
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 20,
+      "llm_provider_cached_prompt_tokens": 0,
+      "llm_provider_cached_prompt_call_count": 0,
+      "llm_provider_cached_prompt_tokens_available_count": 1,
+      "llm_completion_tokens": 4,
+      "llm_total_tokens": 24,
+      "llm_usage_available_count": 1,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "gamma_no_visible",
+      "similarity": "0.25",
+      "outcome_similarity": null,
+      "turn_count": 1,
+      "categories": [],
+      "exception_type": "ControlWarning",
+      "llm_usage_recorded": true,
+      "llm_call_count": 1,
+      "llm_live_call_count": 1,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": "not-an-int",
+      "llm_provider_cached_prompt_tokens": 0,
+      "llm_provider_cached_prompt_call_count": 0,
+      "llm_provider_cached_prompt_tokens_available_count": 1,
+      "llm_completion_tokens": 2,
+      "llm_total_tokens": 2,
+      "llm_usage_available_count": 1,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "delta_runtime_failure",
+      "similarity": 1.0,
+      "outcome_similarity": "1",
+      "turn_count": 4,
+      "categories": ["device_state"],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": 2,
+      "llm_live_call_count": 2,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 30,
+      "llm_provider_cached_prompt_tokens": 2,
+      "llm_provider_cached_prompt_call_count": 1,
+      "llm_provider_cached_prompt_tokens_available_count": 2,
+      "llm_completion_tokens": 5,
+      "llm_total_tokens": 35,
+      "llm_usage_available_count": 2,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "epsilon_missing_selection",
+      "similarity": 0,
+      "outcome_similarity": "0.5",
+      "turn_count": 0,
+      "categories": ["location"],
+      "exception_type": null,
+      "llm_usage_recorded": false,
+      "llm_cached_call_count": 0,
+      "control_cache_source": "fresh"
+    }
+  ],
+  "candidate_rows": [
+    {
+      "name": "alpha_gain",
+      "similarity": "1.0",
+      "outcome_similarity": 1,
+      "turn_count": 2,
+      "categories": ["contact", "early"],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": 3,
+      "llm_live_call_count": 3,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 15,
+      "llm_provider_cached_prompt_tokens": 3,
+      "llm_provider_cached_prompt_call_count": 2,
+      "llm_provider_cached_prompt_tokens_available_count": 3,
+      "llm_completion_tokens": 5,
+      "llm_total_tokens": 20,
+      "llm_usage_available_count": 3,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "beta_visible_not_called",
+      "similarity": 0.5,
+      "outcome_similarity": "0.5",
+      "turn_count": "4",
+      "categories": ["reminder"],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": "2",
+      "llm_live_call_count": 2,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 25,
+      "llm_provider_cached_prompt_tokens": 0,
+      "llm_provider_cached_prompt_call_count": 0,
+      "llm_provider_cached_prompt_tokens_available_count": 2,
+      "llm_completion_tokens": 6,
+      "llm_total_tokens": 31,
+      "llm_usage_available_count": 2,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "gamma_no_visible",
+      "similarity": 0.25,
+      "outcome_similarity": "not-a-number",
+      "turn_count": 1,
+      "categories": [],
+      "exception_type": null,
+      "llm_usage_recorded": true,
+      "llm_call_count": 1,
+      "llm_live_call_count": 1,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 12,
+      "llm_provider_cached_prompt_tokens": 0,
+      "llm_provider_cached_prompt_call_count": 0,
+      "llm_provider_cached_prompt_tokens_available_count": 1,
+      "llm_completion_tokens": 2,
+      "llm_total_tokens": 14,
+      "llm_usage_available_count": 1,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "delta_runtime_failure",
+      "similarity": 0,
+      "outcome_similarity": 0,
+      "turn_count": 5,
+      "categories": ["device_state"],
+      "exception_type": "ReplayRuntimeError",
+      "llm_usage_recorded": true,
+      "llm_call_count": 2,
+      "llm_live_call_count": 2,
+      "llm_cached_call_count": 0,
+      "llm_prompt_tokens": 35,
+      "llm_provider_cached_prompt_tokens": 1,
+      "llm_provider_cached_prompt_call_count": 1,
+      "llm_provider_cached_prompt_tokens_available_count": 2,
+      "llm_completion_tokens": 7,
+      "llm_total_tokens": 42,
+      "llm_usage_available_count": 2,
+      "control_cache_source": "fresh"
+    },
+    {
+      "name": "epsilon_missing_selection",
+      "similarity": 1,
+      "outcome_similarity": "1.0",
+      "turn_count": 2,
+      "categories": ["location"],
+      "exception_type": null,
+      "llm_usage_recorded": false,
+      "llm_cached_call_count": 0,
+      "control_cache_source": "fresh"
+    }
+  ],
+  "candidate_artifacts": {
+    "tool_birth_events.jsonl": [
+      {"tool_name": "gen_alpha", "accepted": true},
+      {"tool_name": "accepted_uncalled", "accepted": true},
+      {"tool_name": "rejected_helper", "accepted": false}
+    ],
+    "reuse_events.jsonl": [
+      {"scenario": "alpha_gain", "tool_name": "gen_alpha"},
+      {"scenario": "epsilon_missing_selection", "tool_name": "gen_alpha"}
+    ],
+    "sage_run_events.jsonl": [
+      {"event": "registry_load", "registry_size": "2"},
+      {"event": "unrelated"},
+      {"event": "run_finished", "final_registry_size": 4}
+    ],
+    "scenario_tool_visibility.jsonl": [
+      {"scenario": "alpha_gain", "generated_tools": ["gen_alpha"], "available_tools": ["native_a", "gen_alpha"]},
+      {"scenario": "beta_visible_not_called", "generated_tools": ["retained_tool"], "available_tools": ["native_b", "retained_tool", "end_conversation"]},
+      {"scenario": "gamma_no_visible", "generated_tools": [], "available_tools": ["native_c"]},
+      {"scenario": "delta_runtime_failure", "generated_tools": ["broken_tool"], "available_tools": ["broken_tool"]},
+      {"scenario": "epsilon_missing_selection", "generated_tools": ["accepted_uncalled"], "available_tools": ["native_e", "accepted_uncalled"]}
+    ],
+    "scenario_tool_selection.jsonl": [
+      {
+        "scenario": "alpha_gain",
+        "selection_status": "generated_tool_called",
+        "visible_generated_tool_count": "1",
+        "called_generated_tool_count": 1,
+        "generated_tools_visible": ["gen_alpha"],
+        "generated_tools_attempted": ["gen_alpha"],
+        "generated_tools_failed": [],
+        "generated_tools_called": ["gen_alpha"],
+        "similarity": 1,
+        "outcome_similarity": 1,
+        "failure_after_selection": false,
+        "failure_after_outcome_selection": false
+      },
+      {
+        "scenario": "beta_visible_not_called",
+        "selection_status": "generated_tool_visible_not_called",
+        "visible_generated_tool_count": 1,
+        "called_generated_tool_count": 0,
+        "generated_tools_visible": ["retained_tool"],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "generated_tools_called": [],
+        "similarity": 0.5,
+        "outcome_similarity": 0.5,
+        "failure_after_selection": true,
+        "failure_after_outcome_selection": true
+      },
+      {
+        "scenario": "gamma_no_visible",
+        "selection_status": "no_visible_generated_tools",
+        "visible_generated_tool_count": 0,
+        "called_generated_tool_count": 0,
+        "generated_tools_visible": [],
+        "generated_tools_attempted": [],
+        "generated_tools_failed": [],
+        "generated_tools_called": [],
+        "similarity": 0.25,
+        "outcome_similarity": null,
+        "failure_after_selection": true,
+        "failure_after_outcome_selection": true
+      },
+      {
+        "scenario": "delta_runtime_failure",
+        "selection_status": "generated_tool_called",
+        "visible_generated_tool_count": 1,
+        "called_generated_tool_count": "1",
+        "generated_tools_visible": ["broken_tool"],
+        "generated_tools_attempted": ["broken_tool"],
+        "generated_tools_failed": ["broken_tool"],
+        "generated_tools_called": ["broken_tool"],
+        "similarity": 0,
+        "outcome_similarity": 0,
+        "exception_type": "ReplayRuntimeError",
+        "failure_after_selection": true,
+        "failure_after_outcome_selection": true
+      }
+    ],
+    "side_effect_preservation_report.jsonl": [
+      {
+        "scenario": "delta_runtime_failure",
+        "side_effect_preservation_failures": ["broken_tool"],
+        "detail": "synthetic validation incident"
+      }
+    ]
+  },
+  "control_artifacts": {
+    "tool_birth_events.jsonl": [],
+    "reuse_events.jsonl": [],
+    "sage_run_events.jsonl": [
+      {"event": "registry_load", "registry_size": 0},
+      {"event": "run_finished", "final_registry_size": 0}
+    ],
+    "scenario_tool_visibility.jsonl": [],
+    "scenario_tool_selection.jsonl": []
+  },
+  "registry_manifest": {
+    "tools": {
+      "broken_tool": {"status": "retained"},
+      "retained_tool": {"status": "retained"}
+    }
+  }
+}

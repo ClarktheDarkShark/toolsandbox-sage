@@ -38,6 +38,7 @@ DEFAULT_PROBES = (
     "validation",
     "routing",
     "lifecycle",
+    "reporting",
 )
 
 

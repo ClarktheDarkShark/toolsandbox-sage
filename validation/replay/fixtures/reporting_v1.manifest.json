@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "fixture_file": "reporting_v1.json",
+  "fixture_byte_count": 10686,
+  "fixture_sha256": "79c56a80fdca3be0a5967381159983abc98dd04eb45d5f045301b3421575897c",
+  "canonical_payload_sha256": "c186656f9aa34663bd4f23b12035238b3a336f7d9f94fb7d3ba15ed85cf38ed6",
+  "paired_scenario_count": 5,
+  "required_coverage": [
+    "accepted_uncalled_helper",
+    "called_generated_helper",
+    "duplicate_rows",
+    "failure_rows",
+    "metric_type_edges",
+    "missing_rows",
+    "no_visible_helper",
+    "partial_rows",
+    "reordered_rows",
+    "retained_helper",
+    "runtime_exception",
+    "side_effect_incident",
+    "visible_not_called_helper"
+  ],
+  "provenance": {
+    "kind": "synthetic_minimal",
+    "reason": "The portable frozen trajectory corpus does not contain the complete paired summary and reporting-ledger set needed to exercise serialization edge behavior without copying mutable run directories.",
+    "network_or_model_calls": false,
+    "absolute_paths": false,
+    "credentials": false
+  }
+}

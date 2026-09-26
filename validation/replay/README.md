@@ -53,6 +53,14 @@ or suppress normalization rules.
   and snapshots feedback records, immediate actions, pulses, registry hash,
   reuse/success-flip counters, retirement state, and final retain, repair, park,
   safety-audit, and adoption-repair decisions.
+- `reporting`: materializes one content-hashed, five-scenario paired artifact
+  set and snapshots exact `summarize_run`, `compare_runs`, helper-contribution,
+  helper-writer, and protocol JSON-writer outputs. It records every nested
+  object key order plus compact JSON bytes/hashes, and preserves the actual
+  indented writer text and terminal newline. Separate cases freeze partial,
+  reordered, missing, duplicate, non-object, and invalidly typed result rows;
+  strict versus tolerant JSON/JSONL readers; final-summary precedence; live
+  fallback; uncached-run rejection reasons; and strict-fresh report checks.
 
 The behavior vectors are validation-only characterization fixtures. Outcome and
 classifier cases are drawn from the committed benchmark and the historical
@@ -62,6 +70,19 @@ vectors are deliberately minimal typed contracts and ordered feedback events,
 so they exercise policy without copying a mutable registry or invoking an LLM.
 No probe calls the network, current clock, model service, or an unseeded random
 source.
+
+Reporting inputs live in `fixtures/reporting_v1.json` and
+`fixtures/reporting_v1.manifest.json`. They are synthetic and deliberately
+small: the portable historical trajectory corpus does not contain the complete
+paired summary, selection, visibility, birth, reuse, side-effect, and registry
+ledger set required to characterize reporting behavior without copying mutable
+run directories. The fixture includes the same artifact shapes and metric type
+edges, but makes no empirical claim. Verify its byte hash, canonical payload
+hash, coverage, and tamper rejection with:
+
+```bash
+python validation/replay/reporting_fixture.py --tamper-self-test
+```
 
 The trajectory corpus and manifest live in `fixtures/full_trajectory_v1.json`
 and `fixtures/full_trajectory_v1.manifest.json`. Provider call IDs are replaced
@@ -110,3 +131,12 @@ If a source artifact contains a timestamp, PID, temporary path, or duration
 that has no behavioral meaning, add the narrowest possible allowlist rule with
 a written reason. Do not normalize prompt text, tool names, schema order, task
 order, registry state, decisions, outcomes, or evaluator identities.
+
+The reporting probe intentionally characterizes existing behavior rather than
+declaring every behavior desirable. In particular, it preserves reordered-row
+strict failures, duplicate-row quirks in `compare_runs`, lossy filtering of
+non-object protocol rows, and the current differences between strict and
+tolerant readers. It does not exercise concurrent writers, filesystem failures,
+permission errors, interrupted atomic replacement, resume-checkpoint mtimes, or
+the full dashboard HTML rendering path; those remain separate integration
+concerns.
