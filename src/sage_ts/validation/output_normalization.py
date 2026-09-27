@@ -13,6 +13,22 @@ from typing import Any
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
 
 
+_AMBIGUITY_MARKERS = ("ambig", "tie", "multiple_match", "multiple match")
+_COMPOSITE_SELECTION_FIELDS = frozenset(
+    {
+        "selected_record",
+        "selected_id",
+        "value",
+        "downstream_tool_name",
+        "downstream_tool_kwargs",
+        "should_call_tool",
+        "abstain_reason",
+    }
+)
+_SEARCH_SELECTION_FIELDS = frozenset({"selected_id", "value", "tie_candidates"})
+_DATETIME_INFO_FIELDS = frozenset({"year", "month", "day", "hour", "minute", "second"})
+
+
 def _dedupe_strings(values: Any) -> list[str]:
     if isinstance(values, str):
         text = values.strip()
@@ -79,6 +95,29 @@ def _infer_matching_records(inputs: dict[str, Any] | None) -> list[dict[str, Any
         ):
             matches.append(dict(record))
     return matches
+
+
+def _is_ambiguous_reason(reason: str) -> bool:
+    return any(token in reason for token in _AMBIGUITY_MARKERS)
+
+
+def _select_ambiguous_ties(
+    existing_ties: list[Any],
+    inferred_matches: list[dict[str, Any]],
+    selected_record: dict[str, Any],
+) -> list[Any]:
+    if len(inferred_matches) > 1:
+        return inferred_matches
+    if selected_record:
+        return [dict(selected_record), *existing_ties]
+    return existing_ties
+
+
+def _clear_selected_value(normalized: dict[str, Any]) -> None:
+    normalized["selected_record"] = {}
+    normalized["selected_index"] = -1
+    normalized["selected_id"] = ""
+    normalized["value"] = ""
 
 
 def _stable_record_id(record: dict[str, Any]) -> str:
@@ -337,22 +376,15 @@ def _normalize_composite_workflow_output(
         normalized["selected_record"] = selected_record
 
     abstain_reason = _normalize_abstain_reason(normalized.get("abstain_reason"))
-    ambiguous = any(
-        token in abstain_reason
-        for token in ("ambig", "tie", "multiple_match", "multiple match")
-    )
-    if ambiguous:
+    if _is_ambiguous_reason(abstain_reason):
         inferred_matches = _infer_matching_records(inputs)
         existing_ties = normalized.get("tie_candidates")
-        tie_candidates = list(existing_ties) if isinstance(existing_ties, list) else []
-        if len(inferred_matches) > 1:
-            tie_candidates = inferred_matches
-        elif selected_record:
-            tie_candidates = [dict(selected_record), *tie_candidates]
-        normalized["selected_record"] = {}
-        normalized["selected_index"] = -1
-        normalized["selected_id"] = ""
-        normalized["value"] = ""
+        tie_candidates = _select_ambiguous_ties(
+            list(existing_ties) if isinstance(existing_ties, list) else [],
+            inferred_matches,
+            selected_record,
+        )
+        _clear_selected_value(normalized)
         normalized["downstream_tool_name"] = ""
         normalized["downstream_tool_kwargs"] = {}
         normalized["should_call_tool"] = False
@@ -993,24 +1025,25 @@ def _has_complete_coordinates(inputs: dict[str, Any] | None) -> bool:
     )
 
 
+def _has_fields(value: Any, required: frozenset[str]) -> bool:
+    return isinstance(value, dict) and required <= set(value)
+
+
+def _positive_timestamp(value: Any) -> float | None:
+    try:
+        timestamp = float(value)
+    except (TypeError, ValueError):
+        return None
+    return timestamp if timestamp > 0.0 else None
+
+
 def _timestamp_source_from_inputs(inputs: dict[str, Any] | None, fallback: Any) -> str:
     if not inputs:
         return str(fallback or "none")
     current_info = inputs.get("current_datetime_info")
-    if isinstance(current_info, dict) and {
-        "year",
-        "month",
-        "day",
-        "hour",
-        "minute",
-        "second",
-    } <= set(current_info):
+    if _has_fields(current_info, _DATETIME_INFO_FIELDS):
         return "current_datetime_info"
-    try:
-        resolved = float(inputs.get("resolved_reminder_timestamp"))
-    except (TypeError, ValueError):
-        resolved = 0.0
-    if resolved > 0.0:
+    if _positive_timestamp(inputs.get("resolved_reminder_timestamp")) is not None:
         return "resolved"
     return str(fallback or "none")
 
@@ -1042,11 +1075,8 @@ def _has_concrete_coordinates(inputs: dict[str, Any] | None) -> bool:
 def _relative_reminder_timestamp(inputs: dict[str, Any] | None) -> float | None:
     if not inputs:
         return None
-    try:
-        resolved = float(inputs.get("resolved_reminder_timestamp"))
-    except (TypeError, ValueError):
-        resolved = 0.0
-    if resolved > 0.0:
+    resolved = _positive_timestamp(inputs.get("resolved_reminder_timestamp"))
+    if resolved is not None:
         return resolved
     current_info = inputs.get("current_datetime_info")
     if not isinstance(current_info, dict) or not current_info:
@@ -1107,12 +1137,10 @@ def _normalize_reminder_creation_output(
     else:
         kwargs_for_time_check = dict(kwargs_for_time_check)
     if bool(normalized.get("should_call_add_reminder")) and not abstain_reason:
-        try:
-            has_prepared_timestamp = (
-                float(kwargs_for_time_check.get("reminder_timestamp")) > 0.0
-            )
-        except (TypeError, ValueError):
-            has_prepared_timestamp = False
+        has_prepared_timestamp = (
+            _positive_timestamp(kwargs_for_time_check.get("reminder_timestamp"))
+            is not None
+        )
         if not has_prepared_timestamp:
             recovered_timestamp = _relative_reminder_timestamp(inputs)
             if recovered_timestamp is not None:
@@ -1124,14 +1152,7 @@ def _normalize_reminder_creation_output(
                 normalized["add_reminder_kwargs"] = kwargs_for_time_check
 
     current_info = (inputs or {}).get("current_datetime_info")
-    has_current_info = isinstance(current_info, dict) and {
-        "year",
-        "month",
-        "day",
-        "hour",
-        "minute",
-        "second",
-    } <= set(current_info)
+    has_current_info = _has_fields(current_info, _DATETIME_INFO_FIELDS)
     relative_fields_present = all(
         (inputs or {}).get(key) is not None
         for key in ("current_timestamp", "day_offset", "hour", "minute")
@@ -1144,14 +1165,9 @@ def _normalize_reminder_creation_output(
     )
     if needs_datetime_info:
         abstain_reason = "missing_current_datetime_info_call_timestamp_to_datetime_info"
-    has_prepared_timestamp = False
-    if isinstance(kwargs_for_time_check, dict):
-        try:
-            has_prepared_timestamp = (
-                float(kwargs_for_time_check.get("reminder_timestamp")) > 0.0
-            )
-        except (TypeError, ValueError):
-            has_prepared_timestamp = False
+    has_prepared_timestamp = (
+        _positive_timestamp(kwargs_for_time_check.get("reminder_timestamp")) is not None
+    )
     if (
         not abstain_reason
         and bool(normalized.get("should_call_add_reminder"))
@@ -1458,25 +1474,13 @@ def normalize_generated_tool_output(
             return _normalize_contact_relationship_batch_output(value, inputs=inputs)
         output_schema = tool.spec.output_schema or {}
         output_props = output_schema.get("properties", {})
-        if isinstance(output_props, dict) and not {
-            "selected_record",
-            "selected_id",
-            "value",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "abstain_reason",
-        } <= set(output_props):
+        if isinstance(output_props, dict) and not _COMPOSITE_SELECTION_FIELDS <= set(
+            output_props
+        ):
             return _normalize_generic_composite_output(value, inputs=inputs)
-        if isinstance(output_props, dict) and {
-            "selected_record",
-            "selected_id",
-            "value",
-            "downstream_tool_name",
-            "downstream_tool_kwargs",
-            "should_call_tool",
-            "abstain_reason",
-        } <= set(output_props):
+        if isinstance(output_props, dict) and _COMPOSITE_SELECTION_FIELDS <= set(
+            output_props
+        ):
             return _normalize_composite_workflow_output(value, inputs=inputs)
         return value
     if tool.spec.family == ToolFamily.VALIDATION_ABSTENTION_HELPER:
@@ -1488,11 +1492,9 @@ def normalize_generated_tool_output(
 
     output_schema = tool.spec.output_schema or {}
     output_props = output_schema.get("properties", {})
-    if not isinstance(output_props, dict) or not {
-        "selected_id",
-        "value",
-        "tie_candidates",
-    } <= set(output_props):
+    if not isinstance(output_props, dict) or not _SEARCH_SELECTION_FIELDS <= set(
+        output_props
+    ):
         return value
 
     normalized = dict(value)
@@ -1502,25 +1504,17 @@ def normalize_generated_tool_output(
     abstain_reason = str(normalized.get("abstain_reason", "")).lower()
     existing_ties = normalized.get("tie_candidates")
     tie_candidates = list(existing_ties) if isinstance(existing_ties, list) else []
-    ambiguous = any(
-        token in abstain_reason
-        for token in ("ambig", "tie", "multiple_match", "multiple match")
-    )
-    if not ambiguous:
+    if not _is_ambiguous_reason(abstain_reason):
         return normalized
 
     inferred_matches = _infer_matching_records(inputs)
-    if len(inferred_matches) > 1:
-        tie_candidates = inferred_matches
-    else:
-        selected_record = normalized.get("selected_record")
-        if isinstance(selected_record, dict) and selected_record:
-            tie_candidates = [dict(selected_record), *tie_candidates]
-
-    normalized["selected_record"] = {}
-    normalized["selected_index"] = -1
-    normalized["selected_id"] = ""
-    normalized["value"] = ""
+    selected_record = normalized.get("selected_record")
+    if not isinstance(selected_record, dict):
+        selected_record = {}
+    tie_candidates = _select_ambiguous_ties(
+        tie_candidates, inferred_matches, selected_record
+    )
+    _clear_selected_value(normalized)
     normalized["tie_candidates"] = tie_candidates
     if (
         not normalized.get("matched_constraints")
