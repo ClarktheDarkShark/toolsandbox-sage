@@ -55,6 +55,180 @@ def _similarity(result: dict[str, Any]) -> float:
         return 0.0
 
 
+def _service_answer_example(
+    service_payload: dict[str, Any],
+    answer_value: str,
+    answer_kind: str,
+    answer_unit: str,
+    exact_answer: str,
+    *,
+    copy_exactly: bool = True,
+    abstain_reason: str = "",
+    requested_unit: str | None = None,
+    answer_subject: str | None = None,
+    requested_metric: str | None = None,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    inputs: dict[str, Any] = {"service_payload": dict(service_payload)}
+    if requested_unit is not None:
+        inputs["requested_unit"] = requested_unit
+    if answer_subject is not None:
+        inputs["answer_subject"] = answer_subject
+    if requested_metric is not None:
+        inputs["requested_metric"] = requested_metric
+    return ToolExample(
+        inputs,
+        {
+            "answer_value": answer_value,
+            "answer_kind": answer_kind,
+            "answer_unit": answer_unit,
+            "should_call_downstream_tool": False,
+            "downstream_tool_name": "",
+            "downstream_tool_kwargs": {},
+            "exact_final_answer": exact_answer,
+            "final_answer_recommendation": exact_answer,
+            "copy_exactly": copy_exactly,
+            "abstain_reason": abstain_reason,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _specific_location_example(
+    user_request: str,
+    location_phrase: str,
+    *,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    should_search = bool(location_phrase)
+    return ToolExample(
+        {"user_request": user_request, "location_phrase": location_phrase},
+        {
+            "search_location_kwargs": (
+                {"location": location_phrase} if should_search else {}
+            ),
+            "should_call_downstream_tool": should_search,
+            "downstream_tool_name": (
+                "search_location_around_lat_lon" if should_search else ""
+            ),
+            "downstream_tool_kwargs": (
+                {"location": location_phrase} if should_search else {}
+            ),
+            "location_query": location_phrase,
+            "abstain_reason": "" if should_search else "missing_location_phrase",
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _broad_location_example(
+    user_request: str,
+    location_phrase: str,
+    latitude: float,
+    longitude: float,
+    *,
+    downstream_tool_name: str,
+    abstain_reason: str,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    search_kwargs = (
+        {
+            "location": location_phrase,
+            "latitude": latitude,
+            "longitude": longitude,
+        }
+        if downstream_tool_name == "search_location_around_lat_lon"
+        else {}
+    )
+    return ToolExample(
+        {
+            "user_request": user_request,
+            "location_phrase": location_phrase,
+            "latitude": latitude,
+            "longitude": longitude,
+        },
+        {
+            "search_location_kwargs": dict(search_kwargs),
+            "should_call_downstream_tool": bool(downstream_tool_name),
+            "downstream_tool_name": downstream_tool_name,
+            "downstream_tool_kwargs": dict(search_kwargs),
+            "location_query": location_phrase,
+            "abstain_reason": abstain_reason,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _bounded_search_example(
+    current_timestamp: float,
+    *,
+    target_tool_name: str,
+    bound_name: str,
+    content_keyword: str | None = None,
+    include_content_keyword: bool = False,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    inputs: dict[str, Any] = {"current_timestamp": current_timestamp}
+    if include_content_keyword:
+        inputs["content_keyword"] = content_keyword or ""
+    search_kwargs: dict[str, Any] = {}
+    if target_tool_name:
+        search_kwargs[bound_name] = current_timestamp
+        if content_keyword:
+            search_kwargs["content"] = content_keyword
+    return ToolExample(
+        inputs,
+        {
+            "target_tool_name": target_tool_name,
+            "search_kwargs": search_kwargs,
+            "should_call_search": bool(target_tool_name),
+            "abstain_reason": ("" if target_tool_name else "missing_current_timestamp"),
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _bounded_search_examples(
+    target_tool_name: str,
+    bound_name: str,
+    *,
+    include_content_keyword: bool = False,
+) -> tuple[ToolExample, ...]:
+    return (
+        _bounded_search_example(
+            1700000000.0,
+            target_tool_name=target_tool_name,
+            bound_name=bound_name,
+            content_keyword="" if include_content_keyword else None,
+            include_content_keyword=include_content_keyword,
+        ),
+        _bounded_search_example(
+            1777380998.0,
+            target_tool_name=target_tool_name,
+            bound_name=bound_name,
+            content_keyword="hello" if include_content_keyword else None,
+            include_content_keyword=include_content_keyword,
+            held_out=True,
+        ),
+        _bounded_search_example(
+            0.0,
+            target_tool_name="",
+            bound_name=bound_name,
+            content_keyword="" if include_content_keyword else None,
+            include_content_keyword=include_content_keyword,
+            negative_applicability=True,
+        ),
+    )
+
+
 def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
@@ -740,101 +914,29 @@ def _location_search_argument_observation(
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "user_request": (
-                        "Remind me to buy chocolate milk tomorrow 5PM at Whole "
-                        "Foods on Stevens Creek."
-                    ),
-                    "location_phrase": "Whole Foods on Stevens Creek",
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "Whole Foods on Stevens Creek",
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "Whole Foods on Stevens Creek",
-                    },
-                    "location_query": "Whole Foods on Stevens Creek",
-                    "abstain_reason": "",
-                },
+            _specific_location_example(
+                "Remind me to buy chocolate milk tomorrow 5PM at Whole Foods on "
+                "Stevens Creek.",
+                "Whole Foods on Stevens Creek",
             ),
-            ToolExample(
-                {
-                    "user_request": (
-                        "Please create a reminder to pick up pasta tomorrow at "
-                        "5 PM near Trader Joe's on Market Street."
-                    ),
-                    "location_phrase": "Trader Joe's on Market Street",
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "Trader Joe's on Market Street",
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "Trader Joe's on Market Street",
-                    },
-                    "location_query": "Trader Joe's on Market Street",
-                    "abstain_reason": "",
-                },
+            _specific_location_example(
+                "Please create a reminder to pick up pasta tomorrow at 5 PM near "
+                "Trader Joe's on Market Street.",
+                "Trader Joe's on Market Street",
             ),
-            ToolExample(
-                {
-                    "user_request": (
-                        "Set a reminder to pick up flowers next Friday at "
-                        "6 PM near Central Market on North Lamar."
-                    ),
-                    "location_phrase": "Central Market on North Lamar",
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "Central Market on North Lamar",
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "Central Market on North Lamar",
-                    },
-                    "location_query": "Central Market on North Lamar",
-                    "abstain_reason": "",
-                },
+            _specific_location_example(
+                "Set a reminder to pick up flowers next Friday at 6 PM near "
+                "Central Market on North Lamar.",
+                "Central Market on North Lamar",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "user_request": "How far am I from the Golden Gate Bridge",
-                    "location_phrase": "Golden Gate Bridge",
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "Golden Gate Bridge",
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "Golden Gate Bridge",
-                    },
-                    "location_query": "Golden Gate Bridge",
-                    "abstain_reason": "",
-                },
+            _specific_location_example(
+                "How far am I from the Golden Gate Bridge",
+                "Golden Gate Bridge",
             ),
-            ToolExample(
-                {
-                    "user_request": "Remind me to buy milk tomorrow at 5 PM.",
-                    "location_phrase": "",
-                },
-                {
-                    "search_location_kwargs": {},
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "location_query": "",
-                    "abstain_reason": "missing_location_phrase",
-                },
+            _specific_location_example(
+                "Remind me to buy milk tomorrow at 5 PM.",
+                "",
                 negative_applicability=True,
             ),
         ),
@@ -875,88 +977,38 @@ def _broad_location_search_argument_observation(
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "user_request": "Remind me to buy chocolate milk at Whole Foods.",
-                    "location_phrase": "Whole Foods",
-                    "latitude": 0.0,
-                    "longitude": 0.0,
-                },
-                {
-                    "search_location_kwargs": {},
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "get_current_location",
-                    "downstream_tool_kwargs": {},
-                    "location_query": "Whole Foods",
-                    "abstain_reason": "need_current_coordinates_for_broad_location_query",
-                },
+            _broad_location_example(
+                "Remind me to buy chocolate milk at Whole Foods.",
+                "Whole Foods",
+                0.0,
+                0.0,
+                downstream_tool_name="get_current_location",
+                abstain_reason="need_current_coordinates_for_broad_location_query",
             ),
-            ToolExample(
-                {
-                    "user_request": "Find a pharmacy near me.",
-                    "location_phrase": "pharmacy",
-                    "latitude": 37.3738083,
-                    "longitude": -122.0314225,
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "pharmacy",
-                        "latitude": 37.3738083,
-                        "longitude": -122.0314225,
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "pharmacy",
-                        "latitude": 37.3738083,
-                        "longitude": -122.0314225,
-                    },
-                    "location_query": "pharmacy",
-                    "abstain_reason": "",
-                },
+            _broad_location_example(
+                "Find a pharmacy near me.",
+                "pharmacy",
+                37.3738083,
+                -122.0314225,
+                downstream_tool_name="search_location_around_lat_lon",
+                abstain_reason="",
             ),
-            ToolExample(
-                {
-                    "user_request": "Remind me to buy chocolate milk at Whole Foods.",
-                    "location_phrase": "Whole Foods",
-                    "latitude": 37.3738083,
-                    "longitude": -122.0314225,
-                },
-                {
-                    "search_location_kwargs": {
-                        "location": "Whole Foods",
-                        "latitude": 37.3738083,
-                        "longitude": -122.0314225,
-                    },
-                    "should_call_downstream_tool": True,
-                    "downstream_tool_name": "search_location_around_lat_lon",
-                    "downstream_tool_kwargs": {
-                        "location": "Whole Foods",
-                        "latitude": 37.3738083,
-                        "longitude": -122.0314225,
-                    },
-                    "location_query": "Whole Foods",
-                    "abstain_reason": "",
-                },
+            _broad_location_example(
+                "Remind me to buy chocolate milk at Whole Foods.",
+                "Whole Foods",
+                37.3738083,
+                -122.0314225,
+                downstream_tool_name="search_location_around_lat_lon",
+                abstain_reason="",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "user_request": (
-                        "Remind me to buy chocolate milk at Whole Foods on Stevens Creek."
-                    ),
-                    "location_phrase": "Whole Foods on Stevens Creek",
-                    "latitude": 37.3738083,
-                    "longitude": -122.0314225,
-                },
-                {
-                    "search_location_kwargs": {},
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "location_query": "Whole Foods on Stevens Creek",
-                    "abstain_reason": "not_broad_location_phrase",
-                },
+            _broad_location_example(
+                "Remind me to buy chocolate milk at Whole Foods on Stevens Creek.",
+                "Whole Foods on Stevens Creek",
+                37.3738083,
+                -122.0314225,
+                downstream_tool_name="",
+                abstain_reason="not_broad_location_phrase",
                 negative_applicability=True,
             ),
         ),
@@ -1360,40 +1412,9 @@ def _prepare_upcoming_reminder_search_args_observation(
             "must preserve the original search_reminder call."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
-        validation_examples=(
-            ToolExample(
-                {"current_timestamp": 1700000000.0},
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1700000000.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-            ),
-            ToolExample(
-                {"current_timestamp": 1777380998.0},
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1777380998.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-                held_out=True,
-            ),
-            ToolExample(
-                {"current_timestamp": 0.0},
-                {
-                    "target_tool_name": "",
-                    "search_kwargs": {},
-                    "should_call_search": False,
-                    "abstain_reason": "missing_current_timestamp",
-                },
-                negative_applicability=True,
-            ),
+        validation_examples=_bounded_search_examples(
+            "search_reminder",
+            "reminder_timestamp_lowerbound",
         ),
         generation_allowed=True,
         reason="upcoming_reminder_search_arguments_gap",
@@ -1422,41 +1443,10 @@ def _prepare_message_recency_search_args_observation(
             "original search_messages call."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
-        validation_examples=(
-            ToolExample(
-                {"current_timestamp": 1700000000.0, "content_keyword": ""},
-                {
-                    "target_tool_name": "search_messages",
-                    "search_kwargs": {
-                        "creation_timestamp_upperbound": 1700000000.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-            ),
-            ToolExample(
-                {"current_timestamp": 1777380998.0, "content_keyword": "hello"},
-                {
-                    "target_tool_name": "search_messages",
-                    "search_kwargs": {
-                        "creation_timestamp_upperbound": 1777380998.0,
-                        "content": "hello",
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-                held_out=True,
-            ),
-            ToolExample(
-                {"current_timestamp": 0.0, "content_keyword": ""},
-                {
-                    "target_tool_name": "",
-                    "search_kwargs": {},
-                    "should_call_search": False,
-                    "abstain_reason": "missing_current_timestamp",
-                },
-                negative_applicability=True,
-            ),
+        validation_examples=_bounded_search_examples(
+            "search_messages",
+            "creation_timestamp_upperbound",
+            include_content_keyword=True,
         ),
         generation_allowed=True,
         reason="message_recency_search_arguments_gap",
@@ -1486,40 +1476,9 @@ def _prepare_past_reminder_recency_search_args_observation(
             "original search_reminder call."
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
-        validation_examples=(
-            ToolExample(
-                {"current_timestamp": 1700000000.0},
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "creation_timestamp_upperbound": 1700000000.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-            ),
-            ToolExample(
-                {"current_timestamp": 1777380998.0},
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "creation_timestamp_upperbound": 1777380998.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                },
-                held_out=True,
-            ),
-            ToolExample(
-                {"current_timestamp": 0.0},
-                {
-                    "target_tool_name": "",
-                    "search_kwargs": {},
-                    "should_call_search": False,
-                    "abstain_reason": "missing_current_timestamp",
-                },
-                negative_applicability=True,
-            ),
+        validation_examples=_bounded_search_examples(
+            "search_reminder",
+            "creation_timestamp_upperbound",
         ),
         generation_allowed=True,
         reason="past_reminder_recency_search_arguments_gap",
@@ -3757,138 +3716,62 @@ def _external_service_answer_extraction_observation(
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
         validation_examples=(
-            ToolExample(
-                {
-                    "service_payload": {
-                        "name": "Main Branch",
-                        "phone_number": "+1 (555) 0100",
-                    }
-                },
-                {
-                    "answer_value": "+1 (555) 0100",
-                    "answer_kind": "phone_number",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "+1 (555) 0100",
-                    "final_answer_recommendation": "+1 (555) 0100",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"name": "Main Branch", "phone_number": "+1 (555) 0100"},
+                "+1 (555) 0100",
+                "phone_number",
+                "",
+                "+1 (555) 0100",
             ),
-            ToolExample(
-                {"service_payload": {"address": "1 Main St, Springfield"}},
-                {
-                    "answer_value": "1 Main St, Springfield",
-                    "answer_kind": "address",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "1 Main St, Springfield",
-                    "final_answer_recommendation": "1 Main St, Springfield",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"address": "1 Main St, Springfield"},
+                "1 Main St, Springfield",
+                "address",
+                "",
+                "1 Main St, Springfield",
             ),
-            ToolExample(
-                {
-                    "service_payload": {
-                        "result": "One Apple Park Way, Cupertino, CA 95014, USA"
-                    }
-                },
-                {
-                    "answer_value": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "answer_kind": "address",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "final_answer_recommendation": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"result": "One Apple Park Way, Cupertino, CA 95014, USA"},
+                "One Apple Park Way, Cupertino, CA 95014, USA",
+                "address",
+                "",
+                "One Apple Park Way, Cupertino, CA 95014, USA",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "service_payload": {
-                        "converted_amount": 123.45,
-                        "currency_code": "EUR",
-                    }
-                },
-                {
-                    "answer_value": "123.45",
-                    "answer_kind": "converted_amount",
-                    "answer_unit": "EUR",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "123.45 EUR",
-                    "final_answer_recommendation": "123.45 EUR",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"converted_amount": 123.45, "currency_code": "EUR"},
+                "123.45",
+                "converted_amount",
+                "EUR",
+                "123.45 EUR",
             ),
-            ToolExample(
-                {
-                    "service_payload": {"result": 13988.4544},
-                    "requested_unit": "CNY",
-                },
-                {
-                    "answer_value": "13988.4544",
-                    "answer_kind": "converted_amount",
-                    "answer_unit": "CNY",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "13988.4544 CNY",
-                    "final_answer_recommendation": "13988.4544 CNY",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"result": 13988.4544},
+                "13988.4544",
+                "converted_amount",
+                "CNY",
+                "13988.4544 CNY",
+                requested_unit="CNY",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "service_payload": {"distance_km": 67.96238310230461},
-                    "requested_unit": "kilometers",
-                    "answer_subject": "Golden Gate Bridge",
-                },
-                {
-                    "answer_value": "67.96238310230461",
-                    "answer_kind": "distance",
-                    "answer_unit": "km",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": (
-                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
-                    ),
-                    "final_answer_recommendation": (
-                        "You are approximately 67.96 kilometers away from Golden Gate Bridge."
-                    ),
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"distance_km": 67.96238310230461},
+                "67.96238310230461",
+                "distance",
+                "km",
+                "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
+                requested_unit="kilometers",
+                answer_subject="Golden Gate Bridge",
                 held_out=True,
             ),
-            ToolExample(
-                {"service_payload": {"name": "Main Branch", "category": "library"}},
-                {
-                    "answer_value": "",
-                    "answer_kind": "",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "no_supported_answer_field",
-                },
+            _service_answer_example(
+                {"name": "Main Branch", "category": "library"},
+                "",
+                "",
+                "",
+                "",
+                copy_exactly=False,
+                abstain_reason="no_supported_answer_field",
                 negative_applicability=True,
             ),
         ),
@@ -3966,55 +3849,29 @@ def _address_answer_extraction_observation(
             "For dict payloads with an address field, return that exact field."
         ),
         examples=(
-            ToolExample(
-                {
-                    "service_payload": {
-                        "result": "One Apple Park Way, Cupertino, CA 95014, USA"
-                    }
-                },
-                {
-                    "answer_value": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "answer_kind": "address",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "final_answer_recommendation": "One Apple Park Way, Cupertino, CA 95014, USA",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"result": "One Apple Park Way, Cupertino, CA 95014, USA"},
+                "One Apple Park Way, Cupertino, CA 95014, USA",
+                "address",
+                "",
+                "One Apple Park Way, Cupertino, CA 95014, USA",
             ),
-            ToolExample(
-                {"service_payload": {"address": "1 Main St, Springfield"}},
-                {
-                    "answer_value": "1 Main St, Springfield",
-                    "answer_kind": "address",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "1 Main St, Springfield",
-                    "final_answer_recommendation": "1 Main St, Springfield",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"address": "1 Main St, Springfield"},
+                "1 Main St, Springfield",
+                "address",
+                "",
+                "1 Main St, Springfield",
                 held_out=True,
             ),
-            ToolExample(
-                {"service_payload": {"name": "No address here"}},
-                {
-                    "answer_value": "",
-                    "answer_kind": "",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "no_supported_answer_field",
-                },
+            _service_answer_example(
+                {"name": "No address here"},
+                "",
+                "",
+                "",
+                "",
+                copy_exactly=False,
+                abstain_reason="no_supported_answer_field",
                 negative_applicability=True,
             ),
         ),
@@ -4035,40 +3892,20 @@ def _currency_answer_extraction_observation(
             "as answer_unit and make exact_final_answer exactly '<value> <unit>'."
         ),
         examples=(
-            ToolExample(
-                {
-                    "service_payload": {
-                        "converted_amount": 123.45,
-                        "currency_code": "EUR",
-                    }
-                },
-                {
-                    "answer_value": "123.45",
-                    "answer_kind": "converted_amount",
-                    "answer_unit": "EUR",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "123.45 EUR",
-                    "final_answer_recommendation": "123.45 EUR",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"converted_amount": 123.45, "currency_code": "EUR"},
+                "123.45",
+                "converted_amount",
+                "EUR",
+                "123.45 EUR",
             ),
-            ToolExample(
-                {"service_payload": {"result": 13988.4544}, "requested_unit": "CNY"},
-                {
-                    "answer_value": "13988.4544",
-                    "answer_kind": "converted_amount",
-                    "answer_unit": "CNY",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "13988.4544 CNY",
-                    "final_answer_recommendation": "13988.4544 CNY",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"result": 13988.4544},
+                "13988.4544",
+                "converted_amount",
+                "CNY",
+                "13988.4544 CNY",
+                requested_unit="CNY",
                 held_out=True,
             ),
         ),
@@ -4090,55 +3927,21 @@ def _phone_answer_extraction_observation(
             "recommendation 'The phone number for <answer_subject> is <phone_number>'."
         ),
         examples=(
-            ToolExample(
-                {
-                    "service_payload": {
-                        "name": "Main Branch",
-                        "phone_number": "+1 (555) 0100",
-                    },
-                    "answer_subject": "Main Branch",
-                },
-                {
-                    "answer_value": "+1 (555) 0100",
-                    "answer_kind": "phone_number",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": (
-                        "The phone number for Main Branch is +1 (555) 0100"
-                    ),
-                    "final_answer_recommendation": (
-                        "The phone number for Main Branch is +1 (555) 0100"
-                    ),
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"name": "Main Branch", "phone_number": "+1 (555) 0100"},
+                "+1 (555) 0100",
+                "phone_number",
+                "",
+                "The phone number for Main Branch is +1 (555) 0100",
+                answer_subject="Main Branch",
             ),
-            ToolExample(
-                {
-                    "service_payload": {
-                        "name": "Fallback Branch",
-                        "phone_number": "650-555-0199",
-                    },
-                    "answer_subject": "Fallback Branch",
-                },
-                {
-                    "answer_value": "650-555-0199",
-                    "answer_kind": "phone_number",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": (
-                        "The phone number for Fallback Branch is 650-555-0199"
-                    ),
-                    "final_answer_recommendation": (
-                        "The phone number for Fallback Branch is 650-555-0199"
-                    ),
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"name": "Fallback Branch", "phone_number": "650-555-0199"},
+                "650-555-0199",
+                "phone_number",
+                "",
+                "The phone number for Fallback Branch is 650-555-0199",
+                answer_subject="Fallback Branch",
                 held_out=True,
             ),
         ),
@@ -4160,42 +3963,22 @@ def _distance_answer_extraction_observation(
             "in the final recommendation when visible."
         ),
         examples=(
-            ToolExample(
-                {
-                    "service_payload": {"result": 67.96238310230461},
-                    "requested_unit": "kilometers",
-                    "answer_subject": "Golden Gate Bridge",
-                },
-                {
-                    "answer_value": "67.96238310230461",
-                    "answer_kind": "distance",
-                    "answer_unit": "km",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
-                    "final_answer_recommendation": "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"result": 67.96238310230461},
+                "67.96238310230461",
+                "distance",
+                "km",
+                "You are approximately 67.96 kilometers away from Golden Gate Bridge.",
+                requested_unit="kilometers",
+                answer_subject="Golden Gate Bridge",
             ),
-            ToolExample(
-                {
-                    "service_payload": {"distance_km": 12.5},
-                    "answer_subject": "Central Park",
-                },
-                {
-                    "answer_value": "12.5",
-                    "answer_kind": "distance",
-                    "answer_unit": "km",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "You are approximately 12.50 kilometers away from Central Park.",
-                    "final_answer_recommendation": "You are approximately 12.50 kilometers away from Central Park.",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"distance_km": 12.5},
+                "12.5",
+                "distance",
+                "km",
+                "You are approximately 12.50 kilometers away from Central Park.",
+                answer_subject="Central Park",
                 held_out=True,
             ),
         ),
@@ -4222,98 +4005,54 @@ def _temperature_answer_extraction_observation(
             "without delegating to another deterministic conversion tool."
         ),
         examples=(
-            ToolExample(
-                {
-                    "service_payload": {
-                        "current_temperature": 21.5,
-                        "temperature_unit": "Celsius",
-                    },
-                    "requested_unit": "Fahrenheit",
-                    "answer_subject": "Grand Canyon",
-                    "requested_metric": "current",
-                },
-                {
-                    "answer_value": "70.7",
-                    "answer_kind": "temperature",
-                    "answer_unit": "Fahrenheit",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "The current temperature in Grand Canyon is 70.7 Fahrenheit.",
-                    "final_answer_recommendation": "The current temperature in Grand Canyon is 70.7 Fahrenheit.",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"current_temperature": 21.5, "temperature_unit": "Celsius"},
+                "70.7",
+                "temperature",
+                "Fahrenheit",
+                "The current temperature in Grand Canyon is 70.7 Fahrenheit.",
+                requested_unit="Fahrenheit",
+                answer_subject="Grand Canyon",
+                requested_metric="current",
             ),
-            ToolExample(
-                {
-                    "service_payload": {
-                        "current_temperature": 12,
-                        "temperature_unit": "Celsius",
-                    },
-                    "requested_unit": "Celsius",
-                    "answer_subject": "Paris",
-                    "requested_metric": "current",
-                },
-                {
-                    "answer_value": "12",
-                    "answer_kind": "temperature",
-                    "answer_unit": "Celsius",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "The current temperature in Paris is 12 Celsius.",
-                    "final_answer_recommendation": "The current temperature in Paris is 12 Celsius.",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _service_answer_example(
+                {"current_temperature": 12, "temperature_unit": "Celsius"},
+                "12",
+                "temperature",
+                "Celsius",
+                "The current temperature in Paris is 12 Celsius.",
+                requested_unit="Celsius",
+                answer_subject="Paris",
+                requested_metric="current",
             ),
-            ToolExample(
+            _service_answer_example(
                 {
-                    "service_payload": {
-                        "result": 15.1,
-                        "current_temperature": 15.1,
-                        "average_temperature": 12.7,
-                        "max_temperature": 17.6,
-                        "min_temperature": 8.9,
-                        "temperature_unit": "Celsius",
-                    },
-                    "requested_unit": "Fahrenheit",
-                    "answer_subject": "Grand Canyon",
-                    "requested_metric": "min",
+                    "result": 15.1,
+                    "current_temperature": 15.1,
+                    "average_temperature": 12.7,
+                    "max_temperature": 17.6,
+                    "min_temperature": 8.9,
+                    "temperature_unit": "Celsius",
                 },
-                {
-                    "answer_value": "48.02",
-                    "answer_kind": "temperature",
-                    "answer_unit": "Fahrenheit",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "The min temperature in Grand Canyon is 48.02 Fahrenheit.",
-                    "final_answer_recommendation": "The min temperature in Grand Canyon is 48.02 Fahrenheit.",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+                "48.02",
+                "temperature",
+                "Fahrenheit",
+                "The min temperature in Grand Canyon is 48.02 Fahrenheit.",
+                requested_unit="Fahrenheit",
+                answer_subject="Grand Canyon",
+                requested_metric="min",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "service_payload": {"humidity": 50},
-                    "requested_unit": "Fahrenheit",
-                    "requested_metric": "current",
-                },
-                {
-                    "answer_value": "",
-                    "answer_kind": "",
-                    "answer_unit": "",
-                    "should_call_downstream_tool": False,
-                    "downstream_tool_name": "",
-                    "downstream_tool_kwargs": {},
-                    "exact_final_answer": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "no_supported_answer_field",
-                },
+            _service_answer_example(
+                {"humidity": 50},
+                "",
+                "",
+                "",
+                "",
+                copy_exactly=False,
+                abstain_reason="no_supported_answer_field",
+                requested_unit="Fahrenheit",
+                requested_metric="current",
                 negative_applicability=True,
             ),
         ),
