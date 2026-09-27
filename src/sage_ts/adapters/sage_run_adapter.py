@@ -982,6 +982,23 @@ def run_sage_with_registry(
         result: dict[str, object],
         output_directory: Path,
     ) -> dict[str, object]:
+        def checkpoint_registry() -> None:
+            checkpoint = _snapshot_registry_checkpoint(
+                output_directory=output_directory,
+                registry_dir=config.registry_dir,
+                scenario_name=name,
+            )
+            if checkpoint is not None:
+                append_jsonl(
+                    output_directory / "sage_run_events.jsonl",
+                    {
+                        "event": "registry_checkpoint_written",
+                        "scenario": name,
+                        "checkpoint_dir": str(checkpoint),
+                        "registry_dir": str(config.registry_dir),
+                    },
+                )
+
         generated_visible = visible_generated_by_scenario.get(name, [])
         generated_called = list(called_generated_by_scenario.get(name, []))
         for tool_name in _reuse_log_tools(output_directory, name):
@@ -1161,21 +1178,7 @@ def run_sage_with_registry(
             )
 
         if birth_controller is None:
-            checkpoint = _snapshot_registry_checkpoint(
-                output_directory=output_directory,
-                registry_dir=config.registry_dir,
-                scenario_name=name,
-            )
-            if checkpoint is not None:
-                append_jsonl(
-                    output_directory / "sage_run_events.jsonl",
-                    {
-                        "event": "registry_checkpoint_written",
-                        "scenario": name,
-                        "checkpoint_dir": str(checkpoint),
-                        "registry_dir": str(config.registry_dir),
-                    },
-                )
+            checkpoint_registry()
             return result
         # Prefer the validated paper-era feedback when it exists. New explicit
         # contracts may not have that legacy signal, so fall back to their
@@ -1217,21 +1220,7 @@ def run_sage_with_registry(
                 )
             birth_controller.observe(observation)
         result["sage_observations"] = [item.to_json() for item in observations]
-        checkpoint = _snapshot_registry_checkpoint(
-            output_directory=output_directory,
-            registry_dir=config.registry_dir,
-            scenario_name=name,
-        )
-        if checkpoint is not None:
-            append_jsonl(
-                output_directory / "sage_run_events.jsonl",
-                {
-                    "event": "registry_checkpoint_written",
-                    "scenario": name,
-                    "checkpoint_dir": str(checkpoint),
-                    "registry_dir": str(config.registry_dir),
-                },
-            )
+        checkpoint_registry()
         return result
 
     output_directory = run_scenario_sequence(

@@ -338,19 +338,25 @@ def run_scenario_sequence(
         )
     result_summary: list[dict[str, Any]] = []
     ordered_items = [(name, name_to_scenario[name]) for name in config.scenario_names]
-    write_live_result_summary(
-        output_directory=output_directory,
-        result_summary=result_summary,
-        status="running",
-        scenario_count=len(config.scenario_names),
-    )
-    if progress_hook is not None:
-        progress_hook(
-            output_directory,
-            result_summary,
-            "running",
-            len(config.scenario_names),
+
+    def publish_progress(status: str, *, include_usage_artifacts: bool) -> None:
+        write_live_result_summary(
+            output_directory=output_directory,
+            result_summary=result_summary,
+            status=status,
+            scenario_count=len(config.scenario_names),
         )
+        if include_usage_artifacts:
+            write_llm_usage_artifacts(output_directory)
+        if progress_hook is not None:
+            progress_hook(
+                output_directory,
+                result_summary,
+                status,
+                len(config.scenario_names),
+            )
+
+    publish_progress("running", include_usage_artifacts=False)
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
         os.environ["SAGE_TS_CURRENT_SCENARIO"] = name
         os.environ["SAGE_TS_SCENARIO_ORDER_INDEX"] = str(len(result_summary))
@@ -435,39 +441,13 @@ def run_scenario_sequence(
                     "scenario_count": len(config.scenario_names),
                 },
             )
-        write_live_result_summary(
-            output_directory=output_directory,
-            result_summary=result_summary,
-            status="running",
-            scenario_count=len(config.scenario_names),
-        )
-        write_llm_usage_artifacts(output_directory)
-        if progress_hook is not None:
-            progress_hook(
-                output_directory,
-                result_summary,
-                "running",
-                len(config.scenario_names),
-            )
+        publish_progress("running", include_usage_artifacts=True)
     write_result_summary(
         result_summary=result_summary,
         category_summary=get_category_summary(result_summary),
         output_directory=output_directory,
     )
-    write_live_result_summary(
-        output_directory=output_directory,
-        result_summary=result_summary,
-        status="complete",
-        scenario_count=len(config.scenario_names),
-    )
-    write_llm_usage_artifacts(output_directory)
-    if progress_hook is not None:
-        progress_hook(
-            output_directory,
-            result_summary,
-            "complete",
-            len(config.scenario_names),
-        )
+    publish_progress("complete", include_usage_artifacts=True)
     return output_directory
 
 
