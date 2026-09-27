@@ -8,6 +8,9 @@ from typing import Any
 
 from sage_ts.facts import TaskFacts
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
+from sage_ts.generation.family_catalog import (
+    VISIBLE_LAT_LON_REQUEST_RE as _VISIBLE_LAT_LON_REQUEST_RE,
+)
 from sage_ts.generation.tool_spec import StructuredInadequacyEvidence, ToolFamily
 from sage_ts.validation.sandbox_validator import ToolExample
 from tool_sandbox.common.scenario import Scenario
@@ -4482,15 +4485,6 @@ def visible_task_context_from_scenario(scenario: Scenario) -> VisibleTaskContext
 
 _UUID_LIKE_RE = re.compile(
     r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
-    re.IGNORECASE,
-)
-
-
-_VISIBLE_LAT_LON_REQUEST_RE = re.compile(
-    r"\b(?:lat(?:itude)?|lattitude)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?"
-    r".{0,80}\b(?:lon(?:gitude)?|lng)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?|"
-    r"\b(?:lon(?:gitude)?|lng)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?"
-    r".{0,80}\b(?:lat(?:itude)?|lattitude)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?",
     re.IGNORECASE,
 )
 

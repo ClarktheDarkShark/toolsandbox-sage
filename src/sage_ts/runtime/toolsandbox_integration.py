@@ -16,6 +16,11 @@ from sage_ts.generation.complete_tools import (
     native_action_names_for_tool,
     native_action_tool_enabled,
 )
+from sage_ts.generation.family_catalog import (
+    SETTING_SETTER_TOOL_NAME_ORDER,
+    VISIBLE_LAT_LON_REQUEST_RE as _VISIBLE_LAT_LON_REQUEST_RE,
+    visible_context_signals_by_tool,
+)
 from sage_ts.generation.tool_spec import ToolFamily, ToolSpec
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
@@ -84,12 +89,7 @@ OPTIONAL_HELPER_DEFAULTS: dict[str, Any] = {
     "current_datetime_info": {},
 }
 
-SETTING_SETTER_TOOL_NAMES = {
-    "set_cellular_service_status",
-    "set_location_service_status",
-    "set_low_battery_mode_status",
-    "set_wifi_status",
-}
+SETTING_SETTER_TOOL_NAMES = set(SETTING_SETTER_TOOL_NAME_ORDER)
 
 SETTING_STATE_LABELS = {
     "set_cellular_service_status": "cellular service",
@@ -1224,71 +1224,7 @@ def inject_registry_tools_into_context(
     return injected
 
 
-VISIBLE_CONTEXT_TOOL_SIGNALS: dict[str, tuple[str, ...]] = {
-    "prepare_safe_action_or_abstain": (
-        "insufficient_information",
-        "safe_abstain_needed",
-    ),
-    "plan_device_status_lookup": ("device_status_read",),
-    "plan_device_state_action_sequence_v3": (
-        "device_state_action",
-        "direct_device_state_action",
-        "state_precondition_possible",
-    ),
-    "plan_device_state_action_sequence_location_recovery": ("location_phrase",),
-    "next_service_tool_call": ("state_precondition_possible",),
-    "prepare_reminder_creation_args": ("reminder_create",),
-    "relative_day_time_to_timestamp": ("relative_time",),
-    "next_weekday_time_to_timestamp": ("weekday_time",),
-    "prepare_location_search_args": (
-        "location_phrase",
-        "external_lookup",
-    ),
-    "prepare_specific_location_search_args": (
-        "location_phrase",
-        "external_lookup",
-    ),
-    "prepare_broad_location_search_args": (
-        "location_phrase",
-        "external_lookup",
-    ),
-    "prepare_add_contact_args": ("add_contact",),
-    "prepare_direct_contact_action_args": ("direct_contact_action",),
-    "plan_contact_lookup_query": ("contact_lookup",),
-    "plan_send_message_contact_lookup": ("named_message_recipient",),
-    "plan_contact_relationship_batch_update": ("relationship_batch_update",),
-    "select_message_counterparty_for_contact_update": (
-        "contact_lookup",
-        "message_counterparty_lookup",
-        "message_counterparty_update",
-    ),
-    "plan_message_counterparty_search": (
-        "message_counterparty_lookup",
-        "message_counterparty_update",
-    ),
-    "resolve_search_window_or_bounds": (
-        "recency_search",
-        "message_search_followup_possible",
-    ),
-    "select_record_by_timestamp_extreme": (
-        "recency_search",
-        "message_search_followup_possible",
-    ),
-    "select_message_content_by_recency": (
-        "message_recency",
-        "message_search_followup_possible",
-    ),
-    "select_action_target_by_recency": ("recency_action",),
-    "prepare_holiday_search_args": ("holiday",),
-    "days_between_timestamps": ("calendar_distance",),
-    "extract_stock_symbol": ("stock_lookup",),
-    "extract_service_answer_field": ("service_answer_extraction",),
-    "extract_address_result": ("service_answer_extraction",),
-    "extract_converted_amount_result": ("service_answer_extraction",),
-    "extract_phone_number_result": ("service_answer_extraction",),
-    "extract_distance_result": ("service_answer_extraction",),
-    "extract_temperature_result": ("service_answer_extraction",),
-}
+VISIBLE_CONTEXT_TOOL_SIGNALS = visible_context_signals_by_tool()
 
 # Each row is: tool, all required tokens, any required token, forbidden tokens,
 # decision reason, score, and whether matched signal evidence is retained.
@@ -1399,14 +1335,6 @@ _VISIBLE_ABSOLUTE_DATE_RE = re.compile(
     r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|"
     r"dec(?:ember)?)\s+\d{1,2}"
     r")\b",
-    re.IGNORECASE,
-)
-
-_VISIBLE_LAT_LON_REQUEST_RE = re.compile(
-    r"\b(?:lat(?:itude)?|lattitude)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?"
-    r".{0,80}\b(?:lon(?:gitude)?|lng)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?|"
-    r"\b(?:lon(?:gitude)?|lng)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?"
-    r".{0,80}\b(?:lat(?:itude)?|lattitude)\b[^a-z0-9+-]+[-+]?\d+(?:\.\d+)?",
     re.IGNORECASE,
 )
 

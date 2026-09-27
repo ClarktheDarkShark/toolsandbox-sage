@@ -26,6 +26,11 @@ from openai.types.chat import (
 from sage_ts.config.models import reasoning_effort_kwargs, resolve_model_name
 from sage_ts.config.openai_client import build_robust_openai_client
 from sage_ts.evaluation.llm_usage import record_chat_completion_usage
+from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
+from sage_ts.generation.family_catalog import (
+    LOCATION_SEARCH_ARGUMENT_TOOL_NAME_ORDER,
+    SETTING_SETTER_TOOL_NAME_ORDER,
+)
 from sage_ts.runtime.trace_facts import OpenAITraceFacts
 from tool_sandbox.common.execution_context import get_current_context
 from tool_sandbox.common.utils import all_logging_disabled
@@ -195,26 +200,9 @@ GENERATED_EXTRACTION_SOURCE_TOOL_NAMES = {
     "search_stock",
 }
 
-ORIGINAL_SIDE_EFFECT_TOOL_NAMES = {
-    "add_contact",
-    "modify_contact",
-    "remove_contact",
-    "set_cellular_service_status",
-    "set_location_service_status",
-    "set_low_battery_mode_status",
-    "set_wifi_status",
-    "send_message_with_phone_number",
-    "add_reminder",
-    "modify_reminder",
-    "remove_reminder",
-}
+ORIGINAL_SIDE_EFFECT_TOOL_NAMES = set(COMPLETE_TOOLS_NATIVE_NAMES)
 
-SETTING_SETTER_TOOL_NAMES = {
-    "set_cellular_service_status",
-    "set_location_service_status",
-    "set_low_battery_mode_status",
-    "set_wifi_status",
-}
+SETTING_SETTER_TOOL_NAMES = set(SETTING_SETTER_TOOL_NAME_ORDER)
 
 SETTING_GETTER_TOOL_NAMES = {
     "get_cellular_service_status",
@@ -1467,11 +1455,7 @@ def _generated_tool_choice_priority(openai_tools: object, tool_name: str) -> int
         or tool_lower.endswith("_args")
         or "action" in tool_lower
     )
-    if tool_lower in {
-        "prepare_broad_location_search_args",
-        "prepare_location_search_args",
-        "prepare_specific_location_search_args",
-    }:
+    if tool_lower in LOCATION_SEARCH_ARGUMENT_TOOL_NAME_ORDER:
         return 0
     if (
         "timestamp" in tool_lower
@@ -7342,11 +7326,7 @@ def _helper_output_handoff_actor_policy_message(
             "If should_call_add_reminder is false, the side-effect call is not "
             "permitted yet."
         )
-    elif helper_name in {
-        "prepare_broad_location_search_args",
-        "prepare_location_search_args",
-        "prepare_specific_location_search_args",
-    }:
+    elif helper_name in LOCATION_SEARCH_ARGUMENT_TOOL_NAME_ORDER:
         abstain_reason = str(payload.get("abstain_reason") or "").strip()
         current_coordinate_abstain_reasons = {
             "missing_current_coordinates_for_broad_location_query",
@@ -9559,9 +9539,7 @@ def _reminder_missing_time_actor_policy_message(
         "relative_day_time_to_timestamp",
         "next_weekday_time_to_timestamp",
         "prepare_reminder_creation_args",
-        "prepare_broad_location_search_args",
-        "prepare_location_search_args",
-        "prepare_specific_location_search_args",
+        *LOCATION_SEARCH_ARGUMENT_TOOL_NAME_ORDER,
     } & available_names
     if not generated_reminder_tools or "add_reminder" not in available_names:
         return None
@@ -10631,11 +10609,7 @@ def _latest_current_timestamp(openai_messages: object) -> float | None:
 
 def _location_search_arg_tool_execution_name(openai_tools: object) -> str:
     available_names = _tool_names_execution_facing(openai_tools)
-    for name in (
-        "prepare_broad_location_search_args",
-        "prepare_specific_location_search_args",
-        "prepare_location_search_args",
-    ):
+    for name in LOCATION_SEARCH_ARGUMENT_TOOL_NAME_ORDER:
         if name in available_names:
             return name
     return ""
@@ -11346,13 +11320,8 @@ def _holiday_context_label(openai_messages: object) -> str | None:
     return None
 
 
-SERVICE_ANSWER_PRODUCER_TOOLS = {
-    "search_location_around_lat_lon",
-    "search_lat_lon",
-    "search_weather_around_lat_lon",
-    "calculate_lat_lon_distance",
-    "convert_currency",
-    "unit_conversion",
+SERVICE_ANSWER_PRODUCER_TOOLS = GENERATED_EXTRACTION_SOURCE_TOOL_NAMES - {
+    "search_stock"
 }
 SERVICE_ANSWER_EXTRACTOR_TOOLS = {
     "extract_service_answer_field",

@@ -18,6 +18,7 @@ from sage_ts.adequacy.inadequacy_classifier import (
 )
 from sage_ts.evaluation.task_strata import base_task_family, expected_helper_fit
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
+from sage_ts.generation.family_catalog import generated_tool_applicable_task_families
 from sage_ts.generation.tool_generator import ToolGenerationRequest
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
@@ -261,25 +262,17 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
         "named_message_recipient",
         "send_message",
     ),
-    "composite:plan_contact_relationship_batch_update": (
-        "relationship_batch_update",
-        "contact_bulk_update",
-        "contact_lookup",
+    "composite:plan_contact_relationship_batch_update": generated_tool_applicable_task_families(
+        "plan_contact_relationship_batch_update"
     ),
-    "composite:prepare_location_search_args": (
-        "location_phrase",
-        "reminder_create",
-        "external_lookup",
+    "composite:prepare_location_search_args": generated_tool_applicable_task_families(
+        "prepare_location_search_args"
     ),
-    "composite:prepare_specific_location_search_args": (
-        "location_phrase",
-        "reminder_create",
-        "external_lookup",
+    "composite:prepare_specific_location_search_args": generated_tool_applicable_task_families(
+        "prepare_specific_location_search_args"
     ),
-    "composite:prepare_broad_location_search_args": (
-        "location_phrase",
-        "reminder_create",
-        "external_lookup",
+    "composite:prepare_broad_location_search_args": generated_tool_applicable_task_families(
+        "prepare_broad_location_search_args"
     ),
     "composite:prepare_reminder_creation_args": (
         "reminder_create",
@@ -296,47 +289,34 @@ VISIBLE_ROUTING_FAMILIES_BY_KEY = {
         "stock_lookup",
         "external_lookup",
     ),
-    "composite:plan_message_counterparty_search": (
-        "message_counterparty_lookup",
-        "message",
-        "contact_lookup",
+    "composite:plan_message_counterparty_search": generated_tool_applicable_task_families(
+        "plan_message_counterparty_search"
     ),
-    "composite:select_message_counterparty_for_contact_update": (
-        "message_counterparty_update",
-        "message_recency",
-        "modify_contact",
+    "composite:select_message_counterparty_for_contact_update": generated_tool_applicable_task_families(
+        "select_message_counterparty_for_contact_update"
     ),
-    "derived_value:resolve_search_window_or_bounds": (
-        "recency_search",
-        "message_recency",
-        "reminder_recency",
-        "recency_action",
+    "derived_value:resolve_search_window_or_bounds": generated_tool_applicable_task_families(
+        "resolve_search_window_or_bounds"
     ),
     "derived_value:prepare_upcoming_reminder_search_args": (
         "upcoming_reminder_search",
     ),
-    "derived_value:prepare_message_recency_search_args": (
-        "message_recency_search",
-        "message_recency",
-        "message_counterparty_update",
+    "derived_value:prepare_message_recency_search_args": generated_tool_applicable_task_families(
+        "prepare_message_recency_search_args"
     ),
     "derived_value:prepare_past_reminder_recency_search_args": (
         "past_reminder_recency_search",
     ),
-    "search_filter:select_record_by_timestamp_extreme": (
-        "recency_search",
-        "message_recency",
-        "reminder_recency",
+    "search_filter:select_record_by_timestamp_extreme": generated_tool_applicable_task_families(
+        "select_record_by_timestamp_extreme"
     ),
     "search_filter:select_message_content_by_recency": (
         "message_recency",
         "recency_search",
         "answer_extraction",
     ),
-    "search_filter:select_action_target_by_recency": (
-        "recency_action",
-        "modify_reminder",
-        "remove_reminder",
+    "search_filter:select_action_target_by_recency": generated_tool_applicable_task_families(
+        "select_action_target_by_recency"
     ),
     "derived_value:days_between_timestamps": (
         "calendar_distance",
