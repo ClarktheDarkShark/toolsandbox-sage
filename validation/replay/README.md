@@ -77,6 +77,29 @@ or suppress normalization rules.
   a seventh base-signal case must emit nothing. Two complete runs plus a mutation
   and third run prove that dispatch products do not share mutable state. This is
   external validation only and is never imported by live SAGE.
+- `visible_signal_trace`: calls the live visible signal and primary-family
+  functions as black boxes over 49 isolated positive/negative rule carriers,
+  covering all 44 emitted signals in exact order. It additionally freezes 397
+  positive and suppressing literal-alias cases, discriminating near misses,
+  seven-, fifteen-, and dotted-digit phone positives versus six-/sixteen-digit,
+  alphanumeric, UUID, and latitude/longitude negatives, all exact native
+  tool-name boundaries, reordered/duplicate/unknown
+  tool inventories, known substring behavior, duplicate insertion position,
+  the counterparty and holiday forward-order traps, primary-family precedence,
+  immutable str/tuple input-value preservation, and deterministic repeated
+  calls. The separate validation-only mutation audit parses the current
+  function and compiles 931 isolated source mutants: all 419 `_has_any`
+  literals, 101 exact tool roles, 223 boolean operands, 122 remaining task
+  string occurrences, 51 helper-string occurrences, and all 15 temporal-prefix
+  alternatives. The black-box corpus distinguishes 862 mutants. The remaining
+  69 are explicitly reviewed
+  equivalence groups backed by substring dominance, downstream implication,
+  boolean absorption, or a documented forward-dead holiday check; any new
+  invisible mutant fails. Targeted source mutants also cover absolute-date
+  recognition, natural `text Alice`, safe-abstention precedence, reverse
+  geocoding, parenthesized phone numbers, and the `tell ` boundary. Source
+  parsing never occurs in the runtime replay probe. None of this validation
+  code instruments or ships with the production classifier.
 - `family_catalog`: freezes recursive Python types, values, and insertion order
   for the duplicated generator family/original-call/output-enum maps, runtime
   visible-context signals, online visible-routing families, native/actor tool
@@ -318,6 +341,24 @@ PYTHONPATH="$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
   python validation/replay/visible_route_contracts.py --tamper-self-test
 PYTHONPATH=".:$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
   python -m pytest validation/replay/test_visible_route_contracts.py -q
+```
+
+Verify the independent 49-site visible-signal trace, semantic mutants, and
+focused lexical/tool boundaries with the same immutable reference import:
+
+```bash
+PYTHONPATH="$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
+  python validation/replay/visible_signal_contracts.py --tamper-self-test
+PYTHONPATH=".:$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
+  python -m pytest \
+    validation/replay/test_visible_signal_contracts.py \
+    validation/replay/test_visible_signal_mutation_audit.py -q
+python validation/replay/compare.py \
+  --reference-root "$REFERENCE_ROOT" \
+  --candidate-root /absolute/path/to/current-candidate \
+  --python /absolute/path/to/publication/python \
+  --probes visible_signal_trace \
+  --output /tmp/sage-visible-signal-replay.json
 ```
 
 The generator/validator corpus is readable Python rather than a generated data

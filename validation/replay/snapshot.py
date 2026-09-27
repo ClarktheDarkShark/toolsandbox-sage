@@ -917,6 +917,24 @@ def probe_visible_route_trace(root: Path) -> dict[str, Any]:
     return module.probe_visible_route_trace(root)
 
 
+def probe_visible_signal_trace(root: Path) -> dict[str, Any]:
+    """Load the validation-only black-box visible-signal contract."""
+
+    module_name = "_sage_replay_visible_signal_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "visible_signal_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load visible-signal replay contracts: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.probe_visible_signal_trace(root)
+
+
 def _openai_tool(
     name: str,
     *,
@@ -6316,6 +6334,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "classifier": probe_classifier,
     "classifier_corpus": probe_classifier_corpus,
     "visible_route_trace": probe_visible_route_trace,
+    "visible_signal_trace": probe_visible_signal_trace,
     "family_catalog": probe_family_catalog,
     "actor": probe_actor,
     "actor_model_inference": probe_actor_model_inference,
