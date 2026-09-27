@@ -351,7 +351,6 @@ def run_scenario_sequence(
             "running",
             len(config.scenario_names),
         )
-    final_status = "complete"
     for name, scenario in tqdm(ordered_items, desc="Scenarios"):
         os.environ["SAGE_TS_CURRENT_SCENARIO"] = name
         os.environ["SAGE_TS_SCENARIO_ORDER_INDEX"] = str(len(result_summary))
@@ -458,7 +457,7 @@ def run_scenario_sequence(
     write_live_result_summary(
         output_directory=output_directory,
         result_summary=result_summary,
-        status=final_status,
+        status="complete",
         scenario_count=len(config.scenario_names),
     )
     write_llm_usage_artifacts(output_directory)
@@ -466,7 +465,7 @@ def run_scenario_sequence(
         progress_hook(
             output_directory,
             result_summary,
-            final_status,
+            "complete",
             len(config.scenario_names),
         )
     return output_directory

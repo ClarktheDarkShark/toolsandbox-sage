@@ -1005,12 +1005,6 @@ def run_sage_with_registry(
                 for tool_name in generated_called
                 if tool_name not in failed_set
             ]
-        generated_not_called = [
-            tool for tool in generated_visible if tool not in set(generated_called)
-        ]
-        generated_not_attempted = [
-            tool for tool in generated_visible if tool not in set(generated_attempted)
-        ]
         raw_similarity = result.get("similarity", 0.0)
         try:
             similarity = (

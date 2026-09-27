@@ -503,7 +503,6 @@ def compare_runs(
             candidate_by_name = {str(row["name"]): row for row in candidate_list}
             candidate_list = [candidate_by_name[name] for name in shared_names]
             control_names = shared_names
-            candidate_names = shared_names
         else:
             raise ValueError(
                 "paired_run_mismatch:"

@@ -65,14 +65,6 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
-
-
 def _read_lock(lock_path: Path) -> dict[str, tuple[str, str]]:
     if not lock_path.is_file():
         raise EnvironmentVerificationError(
@@ -141,7 +133,7 @@ def _editable_repository_url(direct_url_json: str | None, repo_root: Path) -> bo
         source = Path(unquote(parsed.path)).resolve()
     except (AttributeError, json.JSONDecodeError, OSError, TypeError, ValueError):
         return False
-    return source == repo_root or _is_relative_to(source, repo_root)
+    return source == repo_root or source.is_relative_to(repo_root)
 
 
 def _is_repository_distribution(record: DistributionRecord, repo_root: Path) -> bool:
@@ -149,7 +141,7 @@ def _is_repository_distribution(record: DistributionRecord, repo_root: Path) -> 
     if name not in REPOSITORY_DISTRIBUTIONS:
         return False
     metadata_path = record.metadata_path.resolve()
-    return _is_relative_to(metadata_path, repo_root) or _editable_repository_url(
+    return metadata_path.is_relative_to(repo_root) or _editable_repository_url(
         record.direct_url_json, repo_root
     )
 
@@ -203,7 +195,7 @@ def _run_isolated_repository_import_check(
             prefix="sage-publication-import-check-"
         ) as temporary_directory:
             temporary_path = Path(temporary_directory).resolve()
-            if _is_relative_to(temporary_path, repo_root):
+            if temporary_path.is_relative_to(repo_root):
                 raise EnvironmentVerificationError(
                     "isolated repository import check could not obtain a neutral "
                     "working directory outside the repository"
@@ -276,7 +268,7 @@ def _validate_repository_import_paths(
                 "isolated repository import path is missing for "
                 f"{module_name}: {raw_path}"
             ) from exc
-        if not module_path.is_file() or not _is_relative_to(module_path, expected_root):
+        if not module_path.is_file() or not module_path.is_relative_to(expected_root):
             raise EnvironmentVerificationError(
                 "isolated repository import provenance mismatch for "
                 f"{module_name}: expected a file under {expected_root}, "
