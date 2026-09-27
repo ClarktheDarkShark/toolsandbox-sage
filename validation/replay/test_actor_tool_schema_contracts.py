@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import ast
 import copy
-import inspect
 import json
 import os
 from pathlib import Path
 import re
 import sys
-import textwrap
 from typing import Any
 
 import pytest
 
 from validation.replay import actor_tool_schema_contracts as contracts
+from validation.replay import actor_tool_schema_source_contracts as source_contracts
 
 
 @pytest.fixture(scope="module")
@@ -104,61 +102,6 @@ def _category_field_normalization_mutant(
 
 def _collapse_internal_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value)
-
-
-def _is_name_description_join(node: ast.AST) -> bool:
-    if not isinstance(node, ast.JoinedStr) or len(node.values) != 3:
-        return False
-    first, separator, second = node.values
-    return (
-        isinstance(first, ast.FormattedValue)
-        and isinstance(first.value, ast.Name)
-        and first.value.id == "name"
-        and isinstance(separator, ast.Constant)
-        and separator.value == " "
-        and isinstance(second, ast.FormattedValue)
-        and isinstance(second.value, ast.Name)
-        and second.value.id == "description"
-    )
-
-
-def _joined_markers_from_source(function: Any) -> tuple[str, ...]:
-    tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
-    join_variables = {
-        target.id
-        for assignment in ast.walk(tree)
-        if isinstance(assignment, ast.Assign)
-        and _is_name_description_join(assignment.value)
-        for target in assignment.targets
-        if isinstance(target, ast.Name)
-    }
-    generators = sorted(
-        (node for node in ast.walk(tree) if isinstance(node, ast.GeneratorExp)),
-        key=lambda node: (node.lineno, node.col_offset),
-    )
-    markers: list[str] = []
-    for generator in generators:
-        comparison = generator.elt
-        if not isinstance(comparison, ast.Compare) or len(comparison.comparators) != 1:
-            continue
-        compared_text = comparison.comparators[0]
-        reads_join = _is_name_description_join(compared_text) or (
-            isinstance(compared_text, ast.Name) and compared_text.id in join_variables
-        )
-        if not reads_join or len(generator.generators) != 1:
-            continue
-        iterable = generator.generators[0].iter
-        if isinstance(iterable, (ast.Tuple, ast.List, ast.Set)):
-            markers.extend(
-                element.value
-                for element in iterable.elts
-                if isinstance(element, ast.Constant) and isinstance(element.value, str)
-            )
-        elif isinstance(iterable, ast.Name) and iterable.id == (
-            "ORIGINAL_SIDE_EFFECT_TOOL_NAMES"
-        ):
-            markers.extend(contracts.EXPECTED_ORIGINAL_SIDE_EFFECT_TOOL_NAMES)
-    return tuple(markers)
 
 
 def test_inventory_and_reference_digest_are_frozen(contract: dict[str, Any]) -> None:
@@ -713,16 +656,76 @@ def test_non_subset_exact_input_code_mutants_are_rejected(
 def test_joined_name_description_inventory_matches_accepted_source() -> None:
     from sage_ts.adapters import openai_toolsandbox_roles as actor
 
-    source_inventory: dict[str, tuple[str, ...]] = {}
-    for case_id in contracts.CATEGORY_BRANCH_CASE_IDS:
-        operation = contracts.FIELD_NORMALIZATION_PLANS[case_id]["operation"]
-        markers = _joined_markers_from_source(getattr(actor, operation))
-        if markers:
-            source_inventory[case_id] = markers
-    assert source_inventory == (
-        contracts.JOINED_NAME_DESCRIPTION_MARKERS_BY_CATEGORY_CASE
+    source_profile = source_contracts.inspect_actor_schema_source(actor)
+    assert source_profile["joined_marker_categories"] == (
+        contracts.JOINED_NAME_DESCRIPTION_CATEGORY_CASES
     )
-    assert tuple(source_inventory) == contracts.JOINED_NAME_DESCRIPTION_CATEGORY_CASES
+    assert source_contracts.assert_runtime_dependency_mutants_rejected(actor) == (
+        "live_Any_rebind",
+        "live_Exception_rebind",
+        "live_Iterable_rebind",
+        "live_Mapping_rebind",
+        "live_NOT_GIVEN_rebind",
+        "live_TypeError_rebind",
+        "live_any_rebind",
+        "live_bool_rebind",
+        "live_cast_rebind",
+        "live_dict_rebind",
+        "live_get_current_context_rebind",
+        "live_isinstance_rebind",
+        "live_json_rebind",
+        "live_len_rebind",
+        "live_set_rebind",
+        "live_sorted_rebind",
+        "live_str_rebind",
+        "live_tuple_rebind",
+    )
+    assert source_contracts.assert_mutable_inventory_mutants_rejected(actor) == (
+        "live_ORIGINAL_SIDE_EFFECT_TOOL_NAMES_subclass",
+        "live_ORIGINAL_SIDE_EFFECT_TOOL_NAMES_content",
+        "live_ORIGINAL_TOOLSANDBOX_TOOL_NAMES_subclass",
+        "live_ORIGINAL_TOOLSANDBOX_TOOL_NAMES_content",
+        "live_SERVICE_ANSWER_PRODUCER_TOOLS_subclass",
+        "live_SERVICE_ANSWER_PRODUCER_TOOLS_content",
+    )
+    if source_profile["profile"] == "typed_v1":
+        assert source_contracts.assert_typed_mutants_rejected(actor) == (
+            "dropped_wrapper_delegation",
+            "raw_description_strip",
+            "broadened_function_mapping",
+            "eager_inventory_materialization",
+            "sentinel_equality",
+            "nested_output_overrides_direct",
+            "schema_order_generated_names",
+            "producer_reads_parsed_function",
+            "cached_inventory",
+            "frozen_side_effect_inventory",
+            "post_definition_predicate_rebind",
+            "post_definition_code_object_rebind",
+            "extra_live_magic_method",
+            "canonical_sentinel_rebind",
+            "eager_cast_rebind",
+        )
+        assert source_contracts.assert_typed_runtime_boundaries(actor) == {
+            "frozen_slots": True,
+            "lazy_one_shot_fresh": True,
+            "sentinel_identity": True,
+            "producer_second_read": True,
+            "mutable_constants_live": True,
+        }
+        assert source_contracts.assert_live_rebinding_mutants_rejected(actor) == (
+            "live_predicate_rebind",
+            "live_sentinel_rebind",
+            "live_eager_cast_rebind",
+            "live_context_rebind",
+            "live_Exception_rebind",
+            "live_dict_rebind",
+            "live_code_object_rebind",
+            "live_extra_magic_method",
+            "live_alternate_globals_clone",
+            "live_captured_builtins_clone",
+            "live_spoofed_init_closure",
+        )
 
 
 def test_field_normalization_matrix_is_complete_and_exact(

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -3798,7 +3799,42 @@ def _run_seed_zero_child(root: Path) -> dict[str, Any]:
     return _run_seeded_child(root, 0)
 
 
+def _verify_actor_schema_source_profile() -> None:
+    """Fail closed on unknown legacy/typed schema implementations."""
+
+    from sage_ts.adapters import openai_toolsandbox_roles as actor
+
+    try:
+        from validation.replay import actor_tool_schema_source_contracts
+    except ModuleNotFoundError:
+        module_name = "_sage_replay_actor_tool_schema_source_contracts"
+        actor_tool_schema_source_contracts = sys.modules.get(module_name)
+        if actor_tool_schema_source_contracts is None:
+            module_path = Path(__file__).with_name(
+                "actor_tool_schema_source_contracts.py"
+            )
+            module_spec = importlib.util.spec_from_file_location(
+                module_name, module_path
+            )
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError(
+                    f"Could not load actor schema source contracts: {module_path}"
+                )
+            actor_tool_schema_source_contracts = importlib.util.module_from_spec(
+                module_spec
+            )
+            sys.modules[module_name] = actor_tool_schema_source_contracts
+            module_spec.loader.exec_module(actor_tool_schema_source_contracts)
+
+    source_profile = actor_tool_schema_source_contracts.inspect_actor_schema_source(
+        actor
+    )
+    if source_profile["profile"] == "typed_v1":
+        actor_tool_schema_source_contracts.assert_typed_runtime_boundaries(actor)
+
+
 def run_probe(root: Any) -> dict[str, Any]:
+    _verify_actor_schema_source_profile()
     contract = build_actor_tool_schema_contract()
     verify_actor_tool_schema_contract(contract)
     body = {key: value for key, value in contract.items() if key != "integrity"}
@@ -3879,6 +3915,7 @@ def main() -> int:
             )
         )
         return 0
+    _verify_actor_schema_source_profile()
     contract = build_actor_tool_schema_contract()
     if args.print_canonical_sha:
         print(contract["integrity"]["canonical_manifest_sha256"])

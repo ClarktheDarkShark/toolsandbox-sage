@@ -134,6 +134,15 @@ only generated-name order and set-derived duplicate-alias call-name receipts.
 Both are included in the snapshots, so the driver's outer `python -I` processes
 cannot silently randomize away schema-order versus set-order differences.
 
+The focused suite also accepts exactly two source profiles: the immutable
+loop-based reference and the reviewed typed `ToolSchemaFacts`/inventory
+candidate. Each profile has frozen source, AST, and dependency digests. The
+typed profile additionally verifies thin wrapper delegation, marker ownership,
+dict/Mapping boundaries, direct-before-nested output schemas, `NOT_GIVEN`
+identity, lazy one-shot iteration, set-derived ordering, original-schema
+producer rereads, and call-time reads of mutable tool-name inventories. Unknown
+or partial profiles fail closed.
+
 Run its integrity and tamper checks against the immutable reference checkout:
 
 ```bash
