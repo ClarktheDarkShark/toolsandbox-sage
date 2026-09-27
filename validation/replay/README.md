@@ -63,6 +63,20 @@ or suppress normalization rules.
   Recursive type tags distinguish tuple/list, bool/int/float, dataclass, set,
   and insertion-ordered dictionary values; hashes are therefore not based on
   lossy sorted JSON.
+- `visible_route_trace`: supplies fixed visible contexts directly to the public
+  classifier and freezes all 39 ordered dispatch sites without reading or
+  depending on an internal route table. Each case records the supplied request,
+  ordered signals and tools, the target occurrence, and the complete emitted
+  product sequence: canonical key, exact reason, task family, raw factory
+  scenario label, visible task-context label, evidence source, and a recursive
+  typed dataclass digest. Focused guards preserve terminal insufficient-
+  information output, nonterminal safe-abstention continuation and global
+  ordering, and the deliberate duplicate route in
+  `modify_contact_with_message_recency_alt`. Six layered nonterminal collisions
+  freeze reminder, recency, location, holiday, and service-selector precedence;
+  a seventh base-signal case must emit nothing. Two complete runs plus a mutation
+  and third run prove that dispatch products do not share mutable state. This is
+  external validation only and is never imported by live SAGE.
 - `family_catalog`: freezes recursive Python types, values, and insertion order
   for the duplicated generator family/original-call/output-enum maps, runtime
   visible-context signals, online visible-routing families, native/actor tool
@@ -292,6 +306,18 @@ tamper rejection for each integrity domain, with:
 
 ```bash
 python validation/replay/classifier_contracts.py --tamper-self-test
+```
+
+From this validation worktree, point `REFERENCE_ROOT` at the immutable SAGE
+reference checkout. Then verify the independent 39-site visible-route trace,
+seven layered collision cases, and the unhashed/rehashed tamper checks with:
+
+```bash
+REFERENCE_ROOT=/absolute/path/to/toolsandbox-sage-refactor-reference
+PYTHONPATH="$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
+  python validation/replay/visible_route_contracts.py --tamper-self-test
+PYTHONPATH=".:$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
+  python -m pytest validation/replay/test_visible_route_contracts.py -q
 ```
 
 The generator/validator corpus is readable Python rather than a generated data

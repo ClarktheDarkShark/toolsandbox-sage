@@ -42,6 +42,7 @@ DEFAULT_PROBES = (
     "trajectory",
     "classifier",
     "classifier_corpus",
+    "visible_route_trace",
     "family_catalog",
     "actor",
     "actor_model_inference",
