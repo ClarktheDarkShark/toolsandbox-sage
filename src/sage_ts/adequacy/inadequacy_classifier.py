@@ -229,6 +229,273 @@ def _bounded_search_examples(
     )
 
 
+def _local_datetime_info(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: int,
+    isoweekday: int,
+) -> dict[str, int]:
+    return {
+        "year": year,
+        "month": month,
+        "day": day,
+        "hour": hour,
+        "minute": minute,
+        "second": second,
+        "isoweekday": isoweekday,
+    }
+
+
+def _timestamp_conversion_example(
+    current_timestamp: float,
+    conversion_key: str,
+    conversion_value: int,
+    hour: int,
+    minute: int | None,
+    local_utc_offset_hours: int,
+    current_datetime_info: dict[str, int],
+    expected: float,
+    *,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    inputs: dict[str, Any] = {
+        "current_timestamp": current_timestamp,
+        conversion_key: conversion_value,
+        "hour": hour,
+    }
+    if minute is not None:
+        inputs["minute"] = minute
+    inputs["local_utc_offset_hours"] = local_utc_offset_hours
+    inputs["current_datetime_info"] = dict(current_datetime_info)
+    return ToolExample(
+        inputs,
+        expected,
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _search_window_example(
+    current_timestamp: float,
+    phrase: str,
+    timestamp_intent: str,
+    direction: str,
+    search_kwargs: dict[str, float],
+    interpretation: str,
+    *,
+    target_tool_name: str = "search_reminder",
+    abstain_reason: str = "",
+    bounds_source: str = "resolved_direction",
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    return ToolExample(
+        {
+            "current_timestamp": current_timestamp,
+            "phrase": phrase,
+            "target_domain": "reminder",
+            "timestamp_intent": timestamp_intent,
+            "direction": direction,
+            "content_keyword": "",
+            "lookback_days": 0,
+            "timezone_offset": 0.0,
+        },
+        {
+            "target_tool_name": target_tool_name,
+            "search_kwargs": dict(search_kwargs),
+            "should_call_search": bool(target_tool_name),
+            "abstain_reason": abstain_reason,
+            "interpretation": interpretation,
+            "bounds_source": bounds_source,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _holiday_search_example(
+    user_request: str,
+    holiday_name: str,
+    *,
+    year: int | None = None,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    should_search = bool(holiday_name)
+    search_kwargs: dict[str, Any] = {}
+    if should_search:
+        search_kwargs["holiday_name"] = holiday_name
+        if year is not None:
+            search_kwargs["year"] = year
+    missing_answer = (
+        "I need the holiday name before I can look up its timestamp."
+        if not should_search
+        else ""
+    )
+    return ToolExample(
+        {"user_request": user_request, "visible_current_year": 0},
+        {
+            "should_call_search_holiday": should_search,
+            "search_holiday_kwargs": search_kwargs,
+            "holiday_name": holiday_name,
+            "year_policy": (
+                "explicit_year"
+                if year is not None
+                else "environment_resolves_year"
+                if should_search
+                else "missing_holiday_name"
+            ),
+            "final_answer_recommendation": missing_answer,
+            "abstain_reason": "" if should_search else "missing_holiday_name",
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _contact_lookup_example(
+    contact_name: str,
+    phone_number: str,
+    relationship: str,
+    requested_field: str,
+    *,
+    selected_record: dict[str, Any] | None = None,
+    answer_value: str = "",
+    final_answer_recommendation: str = "",
+    abstain_reason: str = "",
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    inputs: dict[str, Any] = {
+        "contact_name": contact_name,
+        "phone_number": phone_number,
+        "relationship": relationship,
+        "requested_field": requested_field,
+    }
+    if selected_record is not None:
+        inputs["selected_record"] = dict(selected_record)
+    search_kwargs = {
+        key: value
+        for key, value in (
+            ("name", contact_name),
+            ("phone_number", phone_number),
+            ("relationship", relationship),
+        )
+        if value
+    }
+    has_selection = selected_record is not None
+    return ToolExample(
+        inputs,
+        {
+            "should_call_search_contacts": bool(search_kwargs) and not has_selection,
+            "search_contacts_kwargs": search_kwargs,
+            "answer_field": requested_field,
+            "selected_record": dict(selected_record or {}),
+            "answer_value": answer_value,
+            "final_answer_recommendation": final_answer_recommendation,
+            "copy_exactly": has_selection,
+            "abstain_reason": abstain_reason,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _fresh_records(records: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
+    return [dict(record) for record in records]
+
+
+def _message_recency_example(
+    records: tuple[dict[str, Any], ...],
+    selection_mode: str,
+    *,
+    selected_index: int | None = None,
+    selection_reason: str = "",
+    exact_final_answer: str = "",
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    selected = records[selected_index] if selected_index is not None else None
+    abstain_reason = "" if selected is not None else "ambiguous_timestamp_tie"
+    selected_timestamp = float(
+        selected["creation_timestamp"]
+        if selected is not None
+        else records[0]["creation_timestamp"]
+    )
+    return ToolExample(
+        {"records": _fresh_records(records), "selection_mode": selection_mode},
+        {
+            "selected_record": dict(selected or {}),
+            "selected_message": dict(selected or {}),
+            "selected_message_id": str(selected["message_id"]) if selected else "",
+            "selected_content": str(selected["content"]) if selected else "",
+            "selected_timestamp": selected_timestamp,
+            "should_answer": selected is not None,
+            "abstain_reason": abstain_reason,
+            "tie_candidates": [] if selected is not None else _fresh_records(records),
+            "selection_reason": selection_reason,
+            "exact_final_answer": exact_final_answer,
+            "final_answer_recommendation": (
+                exact_final_answer
+                if selected is not None
+                else f"abstain:{abstain_reason}"
+            ),
+            "copy_exactly": selected is not None,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
+def _send_message_lookup_example(
+    recipient_name: str,
+    message_content: str,
+    *,
+    held_out: bool = False,
+    negative_applicability: bool = False,
+) -> ToolExample:
+    trimmed_name = recipient_name.strip()
+    trimmed_message = message_content.strip()
+    should_search = bool(trimmed_name and trimmed_message)
+    if not trimmed_name:
+        abstain_reason = "missing_recipient_name"
+        next_step = "ask_for_recipient_or_phone_number"
+        final_answer = (
+            "I need the recipient name or phone number before I can send that message."
+        )
+    elif not trimmed_message:
+        abstain_reason = "missing_message_content"
+        next_step = "ask_for_message_content"
+        final_answer = f"What message would you like to send to {trimmed_name}?"
+    else:
+        abstain_reason = ""
+        next_step = "call search_contacts, then send_message_with_phone_number"
+        final_answer = (
+            "search_contacts first; if cellular is disabled during send, "
+            "enable cellular and retry once"
+        )
+    return ToolExample(
+        {"recipient_name": recipient_name, "message_content": message_content},
+        {
+            "should_call_search_contacts": should_search,
+            "search_contacts_kwargs": {"name": trimmed_name} if should_search else {},
+            "downstream_tool_name": (
+                "send_message_with_phone_number" if should_search else ""
+            ),
+            "message_content": trimmed_message,
+            "abstain_reason": abstain_reason,
+            "next_step": next_step,
+            "final_answer_recommendation": final_answer,
+        },
+        held_out=held_out,
+        negative_applicability=negative_applicability,
+    )
+
+
 def _safe_action_or_abstain_observation(scenario_name: str) -> CapabilityObservation:
     return CapabilityObservation(
         scenario_name=scenario_name,
@@ -1148,114 +1415,68 @@ def _next_weekday_timestamp_observation(scenario_name: str) -> CapabilityObserva
         ),
         allowed_families=(str(ToolFamily.CANONICALIZER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "current_timestamp": 1778595707.0,
-                    "target_isoweekday": 5,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": -4,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 5,
-                        "day": 12,
-                        "hour": 10,
-                        "minute": 21,
-                        "second": 47,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1778595707.0,
+                "target_isoweekday",
+                5,
+                17,
+                0,
+                -4,
+                _local_datetime_info(2026, 5, 12, 10, 21, 47, 2),
                 1778878800.0,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1778860800.0,
-                    "target_isoweekday": 5,
-                    "hour": 8,
-                    "minute": 30,
-                    "local_utc_offset_hours": -4,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 5,
-                        "day": 15,
-                        "hour": 12,
-                        "minute": 0,
-                        "second": 0,
-                        "isoweekday": 5,
-                    },
-                },
+            _timestamp_conversion_example(
+                1778860800.0,
+                "target_isoweekday",
+                5,
+                8,
+                30,
+                -4,
+                _local_datetime_info(2026, 5, 15, 12, 0, 0, 5),
                 1779453000.0,
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1778595707.0,
-                    "target_isoweekday": 8,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": -4,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 5,
-                        "day": 12,
-                        "hour": 10,
-                        "minute": 21,
-                        "second": 47,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1778595707.0,
+                "target_isoweekday",
+                8,
+                17,
+                0,
+                -4,
+                _local_datetime_info(2026, 5, 12, 10, 21, 47, 2),
                 0.0,
                 negative_applicability=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1780609395.536667,
-                    "target_isoweekday": 5,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": -4,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 6,
-                        "day": 4,
-                        "hour": 14,
-                        "minute": 43,
-                        "second": 15,
-                        "isoweekday": 4,
-                    },
-                },
+            _timestamp_conversion_example(
+                1780609395.536667,
+                "target_isoweekday",
+                5,
+                17,
+                0,
+                -4,
+                _local_datetime_info(2026, 6, 4, 14, 43, 15, 4),
                 1780704000.0,
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1780644041.436888,
-                    "target_isoweekday": 5,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 6,
-                        "day": 5,
-                        "hour": 0,
-                        "minute": 20,
-                        "second": 41,
-                        "isoweekday": 5,
-                    },
-                },
+            _timestamp_conversion_example(
+                1780644041.436888,
+                "target_isoweekday",
+                5,
+                17,
+                0,
+                0,
+                _local_datetime_info(2026, 6, 5, 0, 20, 41, 5),
                 1780704000.0,
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1780609395.536667,
-                    "target_isoweekday": 5,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": -4,
-                    "current_datetime_info": {},
-                },
+            _timestamp_conversion_example(
+                1780609395.536667,
+                "target_isoweekday",
+                5,
+                17,
+                0,
+                -4,
+                {},
                 0.0,
                 negative_applicability=True,
             ),
@@ -1294,93 +1515,57 @@ def _relative_day_time_timestamp_observation(
         ),
         allowed_families=(str(ToolFamily.CANONICALIZER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 1,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 4,
-                        "day": 28,
-                        "hour": 22,
-                        "minute": 15,
-                        "second": 6,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1777428906.194959,
+                "day_offset",
+                1,
+                17,
+                0,
+                0,
+                _local_datetime_info(2026, 4, 28, 22, 15, 6, 2),
                 1777496400.0,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 2,
-                    "hour": 8,
-                    "minute": 30,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 4,
-                        "day": 28,
-                        "hour": 22,
-                        "minute": 15,
-                        "second": 6,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1777428906.194959,
+                "day_offset",
+                2,
+                8,
+                30,
+                0,
+                _local_datetime_info(2026, 4, 28, 22, 15, 6, 2),
                 1777552200.0,
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 1,
-                    "hour": 25,
-                    "minute": 0,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 4,
-                        "day": 28,
-                        "hour": 22,
-                        "minute": 15,
-                        "second": 6,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1777428906.194959,
+                "day_offset",
+                1,
+                25,
+                0,
+                0,
+                _local_datetime_info(2026, 4, 28, 22, 15, 6, 2),
                 0.0,
                 negative_applicability=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 1,
-                    "hour": 17,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {
-                        "year": 2026,
-                        "month": 4,
-                        "day": 28,
-                        "hour": 22,
-                        "minute": 15,
-                        "second": 6,
-                        "isoweekday": 2,
-                    },
-                },
+            _timestamp_conversion_example(
+                1777428906.194959,
+                "day_offset",
+                1,
+                17,
+                None,
+                0,
+                _local_datetime_info(2026, 4, 28, 22, 15, 6, 2),
                 0.0,
                 negative_applicability=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1777428906.194959,
-                    "day_offset": 1,
-                    "hour": 17,
-                    "minute": 0,
-                    "local_utc_offset_hours": 0,
-                    "current_datetime_info": {},
-                },
+            _timestamp_conversion_example(
+                1777428906.194959,
+                "day_offset",
+                1,
+                17,
+                0,
+                0,
+                {},
                 0.0,
                 negative_applicability=True,
             ),
@@ -1510,167 +1695,84 @@ def _resolve_search_window_or_bounds_observation(
         ),
         allowed_families=(str(ToolFamily.DERIVED_VALUE_CALCULATOR),),
         validation_examples=(
-            ToolExample(
+            _search_window_example(
+                1777380998.0,
+                "todo item I made yesterday",
+                "creation",
+                "yesterday",
                 {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "todo item I made yesterday",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "creation",
-                    "direction": "yesterday",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
+                    "creation_timestamp_lowerbound": 1777294478.0,
+                    "creation_timestamp_upperbound": 1777294718.0,
                 },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "creation_timestamp_lowerbound": 1777294478.0,
-                        "creation_timestamp_upperbound": 1777294718.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "yesterday",
-                    "bounds_source": "resolved_direction",
-                },
+                "yesterday",
             ),
-            ToolExample(
+            _search_window_example(
+                1777380998.0,
+                "yesterday",
+                "reminder",
+                "yesterday",
                 {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "yesterday",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "reminder",
-                    "direction": "yesterday",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
+                    "reminder_timestamp_lowerbound": 1777294478.0,
+                    "reminder_timestamp_upperbound": 1777294718.0,
                 },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1777294478.0,
-                        "reminder_timestamp_upperbound": 1777294718.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "yesterday",
-                    "bounds_source": "resolved_direction",
-                },
+                "yesterday",
                 held_out=True,
             ),
-            ToolExample(
+            _search_window_example(
+                1777380998.0,
+                "the reminder I created yesterday",
+                "creation",
+                "latest",
                 {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "the reminder I created yesterday",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "creation",
-                    "direction": "latest",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
+                    "creation_timestamp_lowerbound": 1777294478.0,
+                    "creation_timestamp_upperbound": 1777294718.0,
                 },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "creation_timestamp_lowerbound": 1777294478.0,
-                        "creation_timestamp_upperbound": 1777294718.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "yesterday",
-                    "bounds_source": "resolved_direction",
-                },
+                "yesterday",
                 held_out=True,
             ),
-            ToolExample(
+            _search_window_example(
+                1777380998.0,
+                "the reminder from yesterday",
+                "reminder",
+                "latest",
                 {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "the reminder from yesterday",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "reminder",
-                    "direction": "latest",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
+                    "reminder_timestamp_lowerbound": 1777294478.0,
+                    "reminder_timestamp_upperbound": 1777294718.0,
                 },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1777294478.0,
-                        "reminder_timestamp_upperbound": 1777294718.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "yesterday",
-                    "bounds_source": "resolved_direction",
-                },
+                "yesterday",
                 held_out=True,
             ),
-            ToolExample(
+            _search_window_example(
+                1777380998.0,
+                "today",
+                "reminder",
+                "today",
                 {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "today",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "reminder",
-                    "direction": "today",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
+                    "reminder_timestamp_lowerbound": 1777334400.0,
+                    "reminder_timestamp_upperbound": 1777420799.0,
                 },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1777334400.0,
-                        "reminder_timestamp_upperbound": 1777420799.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "today",
-                    "bounds_source": "resolved_direction",
-                },
+                "today",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 1777380998.0,
-                    "phrase": "upcoming",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "upcoming",
-                    "direction": "upcoming",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
-                },
-                {
-                    "target_tool_name": "search_reminder",
-                    "search_kwargs": {
-                        "reminder_timestamp_lowerbound": 1777380998.0,
-                    },
-                    "should_call_search": True,
-                    "abstain_reason": "",
-                    "interpretation": "upcoming",
-                    "bounds_source": "resolved_direction",
-                },
+            _search_window_example(
+                1777380998.0,
+                "upcoming",
+                "upcoming",
+                "upcoming",
+                {"reminder_timestamp_lowerbound": 1777380998.0},
+                "upcoming",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "current_timestamp": 0.0,
-                    "phrase": "yesterday",
-                    "target_domain": "reminder",
-                    "timestamp_intent": "creation",
-                    "direction": "yesterday",
-                    "content_keyword": "",
-                    "lookback_days": 0,
-                    "timezone_offset": 0.0,
-                },
-                {
-                    "target_tool_name": "",
-                    "search_kwargs": {},
-                    "should_call_search": False,
-                    "abstain_reason": "missing_current_timestamp",
-                    "interpretation": "",
-                    "bounds_source": "abstain",
-                },
+            _search_window_example(
+                0.0,
+                "yesterday",
+                "creation",
+                "yesterday",
+                {},
+                "",
+                target_tool_name="",
+                abstain_reason="missing_current_timestamp",
+                bounds_source="abstain",
                 negative_applicability=True,
             ),
         ),
@@ -1799,6 +1901,41 @@ def _latest_record_selection_observation(
 def _message_content_by_recency_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
+    latest_records = (
+        {"message_id": "old", "content": "bring milk", "creation_timestamp": 10.0},
+        {"message_id": "new", "content": "call me", "creation_timestamp": 20.0},
+    )
+    oldest_records = (
+        {"message_id": "old", "content": "first", "creation_timestamp": 5.0},
+        {"message_id": "new", "content": "second", "creation_timestamp": 15.0},
+    )
+    duplicate_records = (
+        {
+            "message_id": "m1",
+            "sender_person_id": "self",
+            "recipient_person_id": "friend",
+            "content": "keep me posted",
+            "creation_timestamp": 30.0,
+        },
+        {
+            "message_id": "m1",
+            "sender_person_id": "self",
+            "recipient_person_id": "friend",
+            "content": "keep me posted",
+            "creation_timestamp": 30.0,
+        },
+        {
+            "message_id": "m0",
+            "sender_person_id": "friend",
+            "recipient_person_id": "self",
+            "content": "earlier",
+            "creation_timestamp": 10.0,
+        },
+    )
+    tie_records = (
+        {"message_id": "a", "content": "same", "creation_timestamp": 5.0},
+        {"message_id": "b", "content": "same", "creation_timestamp": 5.0},
+    )
     return CapabilityObservation(
         scenario_name=scenario_name,
         canonical_key="search_filter:select_message_content_by_recency",
@@ -1818,181 +1955,32 @@ def _message_content_by_recency_observation(
         ),
         allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "records": [
-                        {
-                            "message_id": "old",
-                            "content": "bring milk",
-                            "creation_timestamp": 10.0,
-                        },
-                        {
-                            "message_id": "new",
-                            "content": "call me",
-                            "creation_timestamp": 20.0,
-                        },
-                    ],
-                    "selection_mode": "latest",
-                },
-                {
-                    "selected_record": {
-                        "message_id": "new",
-                        "content": "call me",
-                        "creation_timestamp": 20.0,
-                    },
-                    "selected_message": {
-                        "message_id": "new",
-                        "content": "call me",
-                        "creation_timestamp": 20.0,
-                    },
-                    "selected_message_id": "new",
-                    "selected_content": "call me",
-                    "selected_timestamp": 20.0,
-                    "should_answer": True,
-                    "abstain_reason": "",
-                    "tie_candidates": [],
-                    "selection_reason": "selected_latest_message_by_creation_timestamp_at_index_1",
-                    "exact_final_answer": "Your most recent message says 'call me'.",
-                    "final_answer_recommendation": "Your most recent message says 'call me'.",
-                    "copy_exactly": True,
-                },
+            _message_recency_example(
+                latest_records,
+                "latest",
+                selected_index=1,
+                selection_reason="selected_latest_message_by_creation_timestamp_at_index_1",
+                exact_final_answer="Your most recent message says 'call me'.",
             ),
-            ToolExample(
-                {
-                    "records": [
-                        {
-                            "message_id": "old",
-                            "content": "first",
-                            "creation_timestamp": 5.0,
-                        },
-                        {
-                            "message_id": "new",
-                            "content": "second",
-                            "creation_timestamp": 15.0,
-                        },
-                    ],
-                    "selection_mode": "oldest",
-                },
-                {
-                    "selected_record": {
-                        "message_id": "old",
-                        "content": "first",
-                        "creation_timestamp": 5.0,
-                    },
-                    "selected_message": {
-                        "message_id": "old",
-                        "content": "first",
-                        "creation_timestamp": 5.0,
-                    },
-                    "selected_message_id": "old",
-                    "selected_content": "first",
-                    "selected_timestamp": 5.0,
-                    "should_answer": True,
-                    "abstain_reason": "",
-                    "tie_candidates": [],
-                    "selection_reason": "selected_oldest_message_by_creation_timestamp_at_index_0",
-                    "exact_final_answer": "Your oldest message says 'first'.",
-                    "final_answer_recommendation": "Your oldest message says 'first'.",
-                    "copy_exactly": True,
-                },
+            _message_recency_example(
+                oldest_records,
+                "oldest",
+                selected_index=0,
+                selection_reason="selected_oldest_message_by_creation_timestamp_at_index_0",
+                exact_final_answer="Your oldest message says 'first'.",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "records": [
-                        {
-                            "message_id": "m1",
-                            "sender_person_id": "self",
-                            "recipient_person_id": "friend",
-                            "content": "keep me posted",
-                            "creation_timestamp": 30.0,
-                        },
-                        {
-                            "message_id": "m1",
-                            "sender_person_id": "self",
-                            "recipient_person_id": "friend",
-                            "content": "keep me posted",
-                            "creation_timestamp": 30.0,
-                        },
-                        {
-                            "message_id": "m0",
-                            "sender_person_id": "friend",
-                            "recipient_person_id": "self",
-                            "content": "earlier",
-                            "creation_timestamp": 10.0,
-                        },
-                    ],
-                    "selection_mode": "latest",
-                },
-                {
-                    "selected_record": {
-                        "message_id": "m1",
-                        "sender_person_id": "self",
-                        "recipient_person_id": "friend",
-                        "content": "keep me posted",
-                        "creation_timestamp": 30.0,
-                    },
-                    "selected_message": {
-                        "message_id": "m1",
-                        "sender_person_id": "self",
-                        "recipient_person_id": "friend",
-                        "content": "keep me posted",
-                        "creation_timestamp": 30.0,
-                    },
-                    "selected_message_id": "m1",
-                    "selected_content": "keep me posted",
-                    "selected_timestamp": 30.0,
-                    "should_answer": True,
-                    "abstain_reason": "",
-                    "tie_candidates": [],
-                    "selection_reason": "selected_latest_message_by_creation_timestamp_at_index_0",
-                    "exact_final_answer": "Your most recent message says 'keep me posted'.",
-                    "final_answer_recommendation": "Your most recent message says 'keep me posted'.",
-                    "copy_exactly": True,
-                },
+            _message_recency_example(
+                duplicate_records,
+                "latest",
+                selected_index=0,
+                selection_reason="selected_latest_message_by_creation_timestamp_at_index_0",
+                exact_final_answer="Your most recent message says 'keep me posted'.",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "records": [
-                        {
-                            "message_id": "a",
-                            "content": "same",
-                            "creation_timestamp": 5.0,
-                        },
-                        {
-                            "message_id": "b",
-                            "content": "same",
-                            "creation_timestamp": 5.0,
-                        },
-                    ],
-                    "selection_mode": "latest",
-                },
-                {
-                    "selected_record": {},
-                    "selected_message": {},
-                    "selected_message_id": "",
-                    "selected_content": "",
-                    "selected_timestamp": 5.0,
-                    "should_answer": False,
-                    "abstain_reason": "ambiguous_timestamp_tie",
-                    "tie_candidates": [
-                        {
-                            "message_id": "a",
-                            "content": "same",
-                            "creation_timestamp": 5.0,
-                        },
-                        {
-                            "message_id": "b",
-                            "content": "same",
-                            "creation_timestamp": 5.0,
-                        },
-                    ],
-                    "selection_reason": "",
-                    "exact_final_answer": "",
-                    "final_answer_recommendation": "abstain:ambiguous_timestamp_tie",
-                    "copy_exactly": False,
-                },
+            _message_recency_example(
+                tie_records,
+                "latest",
                 negative_applicability=True,
             ),
         ),
@@ -2064,81 +2052,27 @@ def _holiday_search_args_observation(scenario_name: str) -> CapabilityObservatio
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "user_request": "What is the timestamp for Thanksgiving?",
-                    "visible_current_year": 0,
-                },
-                {
-                    "should_call_search_holiday": True,
-                    "search_holiday_kwargs": {"holiday_name": "Thanksgiving"},
-                    "holiday_name": "Thanksgiving",
-                    "year_policy": "environment_resolves_year",
-                    "final_answer_recommendation": "",
-                    "abstain_reason": "",
-                },
+            _holiday_search_example(
+                "What is the timestamp for Thanksgiving?",
+                "Thanksgiving",
             ),
-            ToolExample(
-                {
-                    "user_request": "What is the timestamp for Thanksgiving in 2027?",
-                    "visible_current_year": 0,
-                },
-                {
-                    "should_call_search_holiday": True,
-                    "search_holiday_kwargs": {
-                        "holiday_name": "Thanksgiving",
-                        "year": 2027,
-                    },
-                    "holiday_name": "Thanksgiving",
-                    "year_policy": "explicit_year",
-                    "final_answer_recommendation": "",
-                    "abstain_reason": "",
-                },
+            _holiday_search_example(
+                "What is the timestamp for Thanksgiving in 2027?",
+                "Thanksgiving",
+                year=2027,
             ),
-            ToolExample(
-                {
-                    "user_request": "How many days is it till Christmas Day?",
-                    "visible_current_year": 0,
-                },
-                {
-                    "should_call_search_holiday": True,
-                    "search_holiday_kwargs": {"holiday_name": "Christmas Day"},
-                    "holiday_name": "Christmas Day",
-                    "year_policy": "environment_resolves_year",
-                    "final_answer_recommendation": "",
-                    "abstain_reason": "",
-                },
+            _holiday_search_example(
+                "How many days is it till Christmas Day?",
+                "Christmas Day",
             ),
-            ToolExample(
-                {
-                    "user_request": "What is the timestamp for Labor Day?",
-                    "visible_current_year": 0,
-                },
-                {
-                    "should_call_search_holiday": True,
-                    "search_holiday_kwargs": {"holiday_name": "Labor Day"},
-                    "holiday_name": "Labor Day",
-                    "year_policy": "environment_resolves_year",
-                    "final_answer_recommendation": "",
-                    "abstain_reason": "",
-                },
+            _holiday_search_example(
+                "What is the timestamp for Labor Day?",
+                "Labor Day",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "user_request": "What is the holiday timestamp?",
-                    "visible_current_year": 0,
-                },
-                {
-                    "should_call_search_holiday": False,
-                    "search_holiday_kwargs": {},
-                    "holiday_name": "",
-                    "year_policy": "missing_holiday_name",
-                    "final_answer_recommendation": (
-                        "I need the holiday name before I can look up its timestamp."
-                    ),
-                    "abstain_reason": "missing_holiday_name",
-                },
+            _holiday_search_example(
+                "What is the holiday timestamp?",
+                "",
                 negative_applicability=True,
             ),
         ),
@@ -2158,6 +2092,12 @@ def _holiday_search_args_observation(scenario_name: str) -> CapabilityObservatio
 def _contact_lookup_query_planner_observation(
     scenario_name: str,
 ) -> CapabilityObservation:
+    homer_record = {
+        "person_id": "p1",
+        "name": "Homer S",
+        "phone_number": "+10000000000",
+        "relationship": "boss",
+    }
     return CapabilityObservation(
         scenario_name=scenario_name,
         canonical_key="composite:plan_contact_lookup_query",
@@ -2201,159 +2141,58 @@ def _contact_lookup_query_planner_observation(
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "contact_name": "Homer S",
-                    "phone_number": "",
-                    "relationship": "",
-                    "requested_field": "phone_number",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"name": "Homer S"},
-                    "answer_field": "phone_number",
-                    "selected_record": {},
-                    "answer_value": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "Homer S",
+                "",
+                "",
+                "phone_number",
             ),
-            ToolExample(
-                {
-                    "contact_name": "",
-                    "phone_number": "",
-                    "relationship": "boss",
-                    "requested_field": "name",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"relationship": "boss"},
-                    "answer_field": "name",
-                    "selected_record": {},
-                    "answer_value": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "",
+                "",
+                "boss",
+                "name",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "contact_name": "",
-                    "phone_number": "+10000000000",
-                    "relationship": "",
-                    "requested_field": "relationship",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"phone_number": "+10000000000"},
-                    "answer_field": "relationship",
-                    "selected_record": {},
-                    "answer_value": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "",
+                "+10000000000",
+                "",
+                "relationship",
             ),
-            ToolExample(
-                {
-                    "contact_name": "",
-                    "phone_number": "+10000000000",
-                    "relationship": "",
-                    "requested_field": "relationship",
-                    "selected_record": {
-                        "person_id": "p1",
-                        "name": "Homer S",
-                        "phone_number": "+10000000000",
-                        "relationship": "boss",
-                    },
-                },
-                {
-                    "should_call_search_contacts": False,
-                    "search_contacts_kwargs": {"phone_number": "+10000000000"},
-                    "answer_field": "relationship",
-                    "selected_record": {
-                        "person_id": "p1",
-                        "name": "Homer S",
-                        "phone_number": "+10000000000",
-                        "relationship": "boss",
-                    },
-                    "answer_value": "boss",
-                    "final_answer_recommendation": "+10000000000 is your boss",
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "",
+                "+10000000000",
+                "",
+                "relationship",
+                selected_record=homer_record,
+                answer_value="boss",
+                final_answer_recommendation="+10000000000 is your boss",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "contact_name": "Homer S",
-                    "phone_number": "",
-                    "relationship": "",
-                    "requested_field": "phone_number",
-                    "selected_record": {
-                        "person_id": "p1",
-                        "name": "Homer S",
-                        "phone_number": "+10000000000",
-                        "relationship": "boss",
-                    },
-                },
-                {
-                    "should_call_search_contacts": False,
-                    "search_contacts_kwargs": {"name": "Homer S"},
-                    "answer_field": "phone_number",
-                    "selected_record": {
-                        "person_id": "p1",
-                        "name": "Homer S",
-                        "phone_number": "+10000000000",
-                        "relationship": "boss",
-                    },
-                    "answer_value": "+10000000000",
-                    "final_answer_recommendation": (
-                        "Homer S's phone number is +10000000000"
-                    ),
-                    "copy_exactly": True,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "Homer S",
+                "",
+                "",
+                "phone_number",
+                selected_record=homer_record,
+                answer_value="+10000000000",
+                final_answer_recommendation="Homer S's phone number is +10000000000",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "contact_name": "",
-                    "phone_number": "+12453344098",
-                    "relationship": "",
-                    "requested_field": "person_id",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"phone_number": "+12453344098"},
-                    "answer_field": "person_id",
-                    "selected_record": {},
-                    "answer_value": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "",
-                },
+            _contact_lookup_example(
+                "",
+                "+12453344098",
+                "",
+                "person_id",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "contact_name": "",
-                    "phone_number": "",
-                    "relationship": "",
-                    "requested_field": "phone_number",
-                },
-                {
-                    "should_call_search_contacts": False,
-                    "search_contacts_kwargs": {},
-                    "answer_field": "phone_number",
-                    "selected_record": {},
-                    "answer_value": "",
-                    "final_answer_recommendation": "",
-                    "copy_exactly": False,
-                    "abstain_reason": "missing_lookup_constraint",
-                },
+            _contact_lookup_example(
+                "",
+                "",
+                "",
+                "phone_number",
+                abstain_reason="missing_lookup_constraint",
                 negative_applicability=True,
             ),
         ),
@@ -2408,82 +2247,23 @@ def _send_message_contact_lookup_observation(
         ),
         allowed_families=(str(ToolFamily.COMPOSITE_WORKFLOW_HELPER),),
         validation_examples=(
-            ToolExample(
-                {
-                    "recipient_name": "Ada Lovelace",
-                    "message_content": "Please call me.",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"name": "Ada Lovelace"},
-                    "downstream_tool_name": "send_message_with_phone_number",
-                    "message_content": "Please call me.",
-                    "abstain_reason": "",
-                    "next_step": (
-                        "call search_contacts, then send_message_with_phone_number"
-                    ),
-                    "final_answer_recommendation": (
-                        "search_contacts first; if cellular is disabled during "
-                        "send, enable cellular and retry once"
-                    ),
-                },
+            _send_message_lookup_example(
+                "Ada Lovelace",
+                "Please call me.",
             ),
-            ToolExample(
-                {
-                    "recipient_name": " Grace Hopper ",
-                    "message_content": "  ETA is 5.  ",
-                },
-                {
-                    "should_call_search_contacts": True,
-                    "search_contacts_kwargs": {"name": "Grace Hopper"},
-                    "downstream_tool_name": "send_message_with_phone_number",
-                    "message_content": "ETA is 5.",
-                    "abstain_reason": "",
-                    "next_step": (
-                        "call search_contacts, then send_message_with_phone_number"
-                    ),
-                    "final_answer_recommendation": (
-                        "search_contacts first; if cellular is disabled during "
-                        "send, enable cellular and retry once"
-                    ),
-                },
+            _send_message_lookup_example(
+                " Grace Hopper ",
+                "  ETA is 5.  ",
                 held_out=True,
             ),
-            ToolExample(
-                {
-                    "recipient_name": "",
-                    "message_content": "Please call me.",
-                },
-                {
-                    "should_call_search_contacts": False,
-                    "search_contacts_kwargs": {},
-                    "downstream_tool_name": "",
-                    "message_content": "Please call me.",
-                    "abstain_reason": "missing_recipient_name",
-                    "next_step": "ask_for_recipient_or_phone_number",
-                    "final_answer_recommendation": (
-                        "I need the recipient name or phone number before I can "
-                        "send that message."
-                    ),
-                },
+            _send_message_lookup_example(
+                "",
+                "Please call me.",
                 negative_applicability=True,
             ),
-            ToolExample(
-                {
-                    "recipient_name": "Fredrik Thordendal",
-                    "message_content": "",
-                },
-                {
-                    "should_call_search_contacts": False,
-                    "search_contacts_kwargs": {},
-                    "downstream_tool_name": "",
-                    "message_content": "",
-                    "abstain_reason": "missing_message_content",
-                    "next_step": "ask_for_message_content",
-                    "final_answer_recommendation": (
-                        "What message would you like to send to Fredrik Thordendal?"
-                    ),
-                },
+            _send_message_lookup_example(
+                "Fredrik Thordendal",
+                "",
                 negative_applicability=True,
                 held_out=True,
             ),
