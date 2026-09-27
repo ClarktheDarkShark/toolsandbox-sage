@@ -1263,6 +1263,65 @@ def _routing_contracts(
             ),
             base_tools=set(),
         ),
+        "tools_field_without_signals_marker_is_not_stripped": route(
+            {
+                "unstripped_tools_helper": entry(
+                    "unstripped_tools_helper",
+                    positive=("unstripped_tool_token",),
+                )
+            },
+            context=(
+                "request=Summarize the visible result "
+                "tools=unstripped_tool_token"
+            ),
+            base_tools=set(),
+        ),
+        "multiple_marker_pairs_strip_only_the_first_tools_segment": route(
+            {
+                "first_signal_helper": entry(
+                    "first_signal_helper",
+                    positive=("first_visible_signal",),
+                ),
+                "first_tools_helper": entry(
+                    "first_tools_helper",
+                    positive=("first_hidden_tool_token",),
+                ),
+                "second_signal_helper": entry(
+                    "second_signal_helper",
+                    positive=("second_visible_signal",),
+                ),
+                "second_tools_helper": entry(
+                    "second_tools_helper",
+                    positive=("second_retained_tool_token",),
+                ),
+            },
+            context=(
+                "request=Summarize the visible result "
+                "tools=first_hidden_tool_token "
+                "signals=first_visible_signal "
+                "tools=second_retained_tool_token "
+                "signals=second_visible_signal"
+            ),
+            base_tools=set(),
+        ),
+        "reversed_signals_then_tools_markers_retain_the_tools_suffix": route(
+            {
+                "reversed_signal_helper": entry(
+                    "reversed_signal_helper",
+                    positive=("early_visible_signal",),
+                ),
+                "reversed_tools_helper": entry(
+                    "reversed_tools_helper",
+                    positive=("late_retained_tool_token",),
+                ),
+            },
+            context=(
+                "request=Summarize the visible result "
+                "signals=early_visible_signal "
+                "tools=late_retained_tool_token"
+            ),
+            base_tools=set(),
+        ),
         "task_family_metadata_match_without_trigger": route(
             {
                 "family_metadata_only_helper": entry(
@@ -1279,6 +1338,21 @@ def _routing_contracts(
             },
             context="request=Summarize the visible result signals=unrelated_signal",
             family="metadata_only_family",
+            base_tools={"search_contacts"},
+        ),
+        "task_family_augmentation_matches_both_metadata_channels": route(
+            {
+                "augmented_family_helper": entry(
+                    "augmented_family_helper",
+                    output_properties={"value": string},
+                    positive=("augmented_family",),
+                    negative=("nonmatching_negative",),
+                    required=("search_contacts",),
+                    applicable=("augmented_family",),
+                )
+            },
+            context="request=Summarize the visible result signals=unrelated_signal",
+            family="augmented_family",
             base_tools={"search_contacts"},
         ),
         "none_context": route(
@@ -1627,7 +1701,15 @@ def _routing_contracts(
                 "message_counterparty_update contact_lookup recency_search"
             ),
             base_tools={"search_messages", "modify_contact"},
-        )
+        ),
+        "raw_tools_message_recency_activates_post_route_suppression": route(
+            {"resolve_search_window_or_bounds": search_window},
+            context=(
+                "request=Find the latest visible result "
+                "tools=message_recency signals=recency_search"
+            ),
+            base_tools={"search_messages"},
+        ),
     }
 
     lower = entry(
@@ -1690,6 +1772,64 @@ def _routing_contracts(
             base_tools=set(),
             cap=1,
         ),
+        "service_scalar_suppression_copies_matched_signal_as_family_evidence": route(
+            {
+                "extract_temperature_result": entry(
+                    "extract_temperature_result",
+                    family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+                    positive=("service_answer_extraction",),
+                )
+            },
+            context=(
+                "request=Extract a generic service field "
+                "signals=service_answer_extraction"
+            ),
+            base_tools=set(),
+        ),
+        "recency_action_context_suppression_does_not_copy_signal_evidence": route(
+            {
+                "select_action_target_by_recency": entry(
+                    "select_action_target_by_recency",
+                    family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+                    inputs=(
+                        ToolInput("records", "list", "Visible records."),
+                        ToolInput("selection_mode", "str", "Oldest or latest."),
+                    ),
+                    positive=("recency_action",),
+                    preserves=("search_reminder",),
+                    required=("search_reminder",),
+                )
+            },
+            context=(
+                "request=Select the latest visible contact "
+                "signals=recency_action"
+            ),
+            base_tools={"search_reminder"},
+        ),
+    }
+
+    mismatched_entry = entry(
+        "spec_identity_helper",
+        positive=("mismatch_signal",),
+    )
+    identity_cases = {
+        "registry_key_controls_decision_identity_but_spec_name_is_selected": route(
+            {"registry_alias": mismatched_entry},
+            context="request=test signals=mismatch_signal",
+            base_tools=set(),
+        ),
+        "lifecycle_row_keyed_by_spec_name_does_not_match_registry_alias": route(
+            {"registry_alias": mismatched_entry},
+            context="request=test signals=mismatch_signal",
+            base_tools=set(),
+            lifecycle={"spec_identity_helper": {"decision": "parked"}},
+        ),
+        "lifecycle_row_keyed_by_registry_alias_suppresses_mismatched_spec": route(
+            {"registry_alias": mismatched_entry},
+            context="request=test signals=mismatch_signal",
+            base_tools=set(),
+            lifecycle={"registry_alias": {"decision": "parked"}},
+        ),
     }
 
     return {
@@ -1700,6 +1840,7 @@ def _routing_contracts(
         "message_rule_collisions": exact(message_collision_cases),
         "subsumption_collisions": exact(subsumption_cases),
         "evidence_retention": exact(evidence_cases),
+        "registry_identity_mismatches": exact(identity_cases),
     }
 
 

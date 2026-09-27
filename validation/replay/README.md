@@ -98,14 +98,16 @@ or suppress normalization rules.
   all/any/native-alternative/producer-only rules, composite collisions,
   device-state action order and recovery, every reminder time/location branch,
   and native output identity before null cleanup. Focused collision vectors
-  freeze `tools=` false-positive stripping, family-only metadata, `None` versus
-  empty context, overlapping message-content/counterparty rules, negative and
-  lifecycle precedence, no-tool guardrails, native-alternative versus generic
-  any-of routing, and evidence retention under composite versus budget
-  suppression. Normalization boundaries include same- and cross-service state
-  requests, zero versus smallest-positive coordinates and timestamps, 23:59,
-  hour 24, and minute 60. Recursive key order and compact bytes are part of
-  every result.
+  freeze `tools=` false-positive stripping, the no-`signals=` exception, first
+  versus repeated and reversed marker behavior, family-only metadata
+  augmentation, `None` versus empty context, raw `tools=message_recency`
+  post-route activation, overlapping message-content/counterparty rules,
+  negative and lifecycle precedence, no-tool guardrails, native-alternative
+  versus generic any-of routing, exact evidence retention or loss under each
+  suppression shape, and registry-key/spec-name identity mismatches.
+  Normalization boundaries include same- and cross-service state requests, zero
+  versus smallest-positive coordinates and timestamps, 23:59, hour 24, and
+  minute 60. Recursive key order and compact bytes are part of every result.
 - `generation_boundary`: records every exact `ChatRequest` byte stream and hash
   for ordinary generation, native-action generation, cached contract analysis,
   repair analysis, repeated repair, and strategy-specific repair. It also

@@ -214,6 +214,44 @@ class RouterCollisionContractTests(unittest.TestCase):
             ["real_visible_signal"],
         )
 
+    def test_marker_shape_controls_exact_tools_field_stripping_boundary(self) -> None:
+        no_signals = self.case(
+            "context_boundaries",
+            "tools_field_without_signals_marker_is_not_stripped",
+        )
+        repeated = self.case(
+            "context_boundaries",
+            "multiple_marker_pairs_strip_only_the_first_tools_segment",
+        )
+        reversed_markers = self.case(
+            "context_boundaries",
+            "reversed_signals_then_tools_markers_retain_the_tools_suffix",
+        )
+
+        self.assertEqual(no_signals["selected_order"], ["unstripped_tools_helper"])
+        self.assertEqual(
+            no_signals["decisions"]["unstripped_tools_helper"][
+                "matched_positive_triggers"
+            ],
+            ["unstripped_tool_token"],
+        )
+        self.assertEqual(
+            repeated["selected_order"],
+            [
+                "first_signal_helper",
+                "second_signal_helper",
+                "second_tools_helper",
+            ],
+        )
+        self.assertEqual(
+            repeated["decisions"]["first_tools_helper"]["reason"],
+            "visible_context_no_match",
+        )
+        self.assertEqual(
+            reversed_markers["selected_order"],
+            ["reversed_signal_helper", "reversed_tools_helper"],
+        )
+
     def test_family_only_metadata_match_and_missing_context_equivalence(self) -> None:
         family = self.case(
             "context_boundaries",
@@ -226,6 +264,18 @@ class RouterCollisionContractTests(unittest.TestCase):
         self.assertEqual(family["matched_positive_triggers"], [])
         self.assertEqual(family["matched_task_families"], ["metadata_only_family"])
         self.assertEqual(none_context, empty_context)
+
+    def test_task_family_key_is_appended_to_both_metadata_match_channels(self) -> None:
+        observed = self.case(
+            "context_boundaries",
+            "task_family_augmentation_matches_both_metadata_channels",
+        )
+        decision = observed["decisions"]["augmented_family_helper"]
+
+        self.assertEqual(observed["selected_order"], ["augmented_family_helper"])
+        self.assertEqual(decision["reason"], "visible_context_metadata_match")
+        self.assertEqual(decision["matched_positive_triggers"], ["augmented_family"])
+        self.assertEqual(decision["matched_task_families"], ["augmented_family"])
 
     def test_overlapping_message_rules_keep_both_specific_selectors(self) -> None:
         observed = self.case(
@@ -248,6 +298,21 @@ class RouterCollisionContractTests(unittest.TestCase):
             observed["decisions"]["resolve_search_window_or_bounds"]["reason"],
             "message_recency_uses_content_selector_not_search_window",
         )
+
+    def test_raw_tools_message_recency_activates_post_route_suppression(self) -> None:
+        observed = self.case(
+            "message_rule_collisions",
+            "raw_tools_message_recency_activates_post_route_suppression",
+        )
+        decision = observed["decisions"]["resolve_search_window_or_bounds"]
+
+        self.assertEqual(observed["selected_order"], [])
+        self.assertEqual(
+            decision["reason"],
+            "message_recency_uses_content_selector_not_search_window",
+        )
+        self.assertEqual(decision["matched_positive_triggers"], ["recency_search"])
+        self.assertEqual(decision["matched_task_families"], ["recency_search"])
 
     def test_negative_and_exact_scenario_blocks_win_lifecycle_collisions(self) -> None:
         negative = self.case(
@@ -305,6 +370,75 @@ class RouterCollisionContractTests(unittest.TestCase):
         self.assertEqual(composite["matched_positive_triggers"], ["shared_signal"])
         self.assertEqual(budget["matched_positive_triggers"], [])
         self.assertEqual(budget["reason"], "blocked_by_context_budget")
+
+    def test_suppression_evidence_payloads_copy_or_drop_signals_exactly(self) -> None:
+        copied = self.case(
+            "evidence_retention",
+            "service_scalar_suppression_copies_matched_signal_as_family_evidence",
+        )["decisions"]["extract_temperature_result"]
+        dropped = self.case(
+            "evidence_retention",
+            "recency_action_context_suppression_does_not_copy_signal_evidence",
+        )["decisions"]["select_action_target_by_recency"]
+
+        self.assertEqual(
+            copied,
+            {
+                "tool_name": "extract_temperature_result",
+                "visible": False,
+                "status": "hidden",
+                "reason": "service_scalar_extractor_requires_matching_visible_request",
+                "score": -25,
+                "matched_positive_triggers": [],
+                "matched_negative_triggers": [],
+                "matched_task_families": ["service_answer_extraction"],
+                "fair_chance_candidate": False,
+                "fair_chance_reason": "",
+            },
+        )
+        self.assertEqual(
+            dropped,
+            {
+                "tool_name": "select_action_target_by_recency",
+                "visible": False,
+                "status": "hidden",
+                "reason": "recency_action_selector_requires_reminder_action_context",
+                "score": -25,
+                "matched_positive_triggers": [],
+                "matched_negative_triggers": [],
+                "matched_task_families": [],
+                "fair_chance_candidate": False,
+                "fair_chance_reason": "",
+            },
+        )
+
+    def test_registry_key_controls_routing_identity_when_spec_name_differs(self) -> None:
+        visible = self.case(
+            "registry_identity_mismatches",
+            "registry_key_controls_decision_identity_but_spec_name_is_selected",
+        )
+        spec_lifecycle = self.case(
+            "registry_identity_mismatches",
+            "lifecycle_row_keyed_by_spec_name_does_not_match_registry_alias",
+        )
+        registry_lifecycle = self.case(
+            "registry_identity_mismatches",
+            "lifecycle_row_keyed_by_registry_alias_suppresses_mismatched_spec",
+        )
+
+        self.assertEqual(visible["input_entry_order"], ["registry_alias"])
+        self.assertEqual(visible["decision_order"], ["registry_alias"])
+        self.assertEqual(visible["selected_order"], ["spec_identity_helper"])
+        self.assertEqual(
+            visible["decisions"]["registry_alias"]["tool_name"],
+            "registry_alias",
+        )
+        self.assertEqual(spec_lifecycle["selected_order"], ["spec_identity_helper"])
+        self.assertEqual(registry_lifecycle["selected_order"], [])
+        self.assertEqual(
+            registry_lifecycle["decisions"]["registry_alias"]["reason"],
+            "lifecycle_suppressed_parked_tool",
+        )
 
 
 class NormalizationBoundaryContractTests(unittest.TestCase):
@@ -394,6 +528,67 @@ class RouterAndNormalizerTamperTests(unittest.TestCase):
         self.assertIn(
             "/value/budget_suppression_clears_prior_match_evidence/value/"
             "decisions/zeta_budget/matched_positive_triggers/0",
+            paths,
+        )
+
+    def test_detects_marker_boundary_tamper(self) -> None:
+        reference = self.routing["context_boundaries"]
+        tampered = copy.deepcopy(reference)
+        case = tampered["value"][
+            "multiple_marker_pairs_strip_only_the_first_tools_segment"
+        ]["value"]
+        case["selected_order"].append("first_tools_helper")
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/multiple_marker_pairs_strip_only_the_first_tools_segment/"
+            "value/selected_order/3",
+            paths,
+        )
+
+    def test_detects_raw_post_route_activation_tamper(self) -> None:
+        reference = self.routing["message_rule_collisions"]
+        tampered = copy.deepcopy(reference)
+        decision = tampered["value"][
+            "raw_tools_message_recency_activates_post_route_suppression"
+        ]["value"]["decisions"]["resolve_search_window_or_bounds"]
+        decision["visible"] = True
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/raw_tools_message_recency_activates_post_route_suppression/"
+            "value/decisions/resolve_search_window_or_bounds/visible",
+            paths,
+        )
+
+    def test_detects_suppression_evidence_tamper(self) -> None:
+        reference = self.routing["evidence_retention"]
+        tampered = copy.deepcopy(reference)
+        decision = tampered["value"][
+            "service_scalar_suppression_copies_matched_signal_as_family_evidence"
+        ]["value"]["decisions"]["extract_temperature_result"]
+        decision["matched_task_families"] = []
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/"
+            "service_scalar_suppression_copies_matched_signal_as_family_evidence/"
+            "value/decisions/extract_temperature_result/matched_task_families/0",
+            paths,
+        )
+
+    def test_detects_registry_and_spec_identity_tamper(self) -> None:
+        reference = self.routing["registry_identity_mismatches"]
+        tampered = copy.deepcopy(reference)
+        case = tampered["value"][
+            "registry_key_controls_decision_identity_but_spec_name_is_selected"
+        ]["value"]
+        case["decisions"]["registry_alias"]["tool_name"] = "spec_identity_helper"
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/registry_key_controls_decision_identity_but_spec_name_is_selected/"
+            "value/decisions/registry_alias/tool_name",
             paths,
         )
 
