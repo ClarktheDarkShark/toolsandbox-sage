@@ -149,7 +149,6 @@ def _source_policy_inventory(root: Path) -> dict[str, Any]:
                 pending.append(node.func.id)
     nested = reachable - direct
     return {
-        "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
         "direct_count": len(direct),
         "direct": sorted(direct, key=lambda name: functions[name].lineno),
         "nested_count": len(nested),
