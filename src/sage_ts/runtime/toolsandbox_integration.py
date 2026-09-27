@@ -22,6 +22,7 @@ from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proo
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.routing_scorer import (
     DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
+    RoutingTextFacts,
     RuntimeRoutingDecision,
     _is_insufficient_information_guard,
 )
@@ -1288,6 +1289,27 @@ VISIBLE_CONTEXT_TOOL_SIGNALS: dict[str, tuple[str, ...]] = {
     "extract_temperature_result": ("service_answer_extraction",),
 }
 
+# Each row is: tool, all required tokens, any required token, forbidden tokens,
+# decision reason, score, and whether matched signal evidence is retained.
+# fmt: off
+_VISIBLE_CONTEXT_EXACT_NAME_GATES = (
+    ("relative_day_time_to_timestamp", ("external_lookup", "service_answer_extraction"), (), ("reminder", "message"),
+     "relative_time_suppressed_for_external_service_lookup", -25, True),
+    ("extract_service_answer_field", (), ("temperature", " temp ", "celsius", "fahrenheit"), (),
+     "service_answer_extractor_suppressed_temperature_unit_context", -25, True),
+    ("select_action_target_by_recency", (), (), ("recency_action",),
+     "recency_action_selector_requires_visible_action_signal", -25, False),
+    ("select_action_target_by_recency", (), (), ("reminder",),
+     "recency_action_selector_requires_reminder_action_context", -25, False),
+    ("plan_send_message_contact_lookup", ("has_phone_number",), (), (),
+     "direct_phone_message_does_not_need_contact_lookup", -20, False),
+    ("prepare_direct_contact_action_args", ("message_counterparty_update",), (), (),
+     "direct_contact_action_suppressed_for_message_counterparty_update", -30, False),
+    ("prepare_direct_contact_action_args", (), (), ("direct_contact_action",),
+     "direct_scalar_action_signal_required", -20, False),
+)
+# fmt: on
+
 LOWER_LEVEL_TOOL_FAMILIES = {
     ToolFamily.CANONICALIZER,
     ToolFamily.DERIVED_VALUE_CALCULATOR,
@@ -1545,6 +1567,17 @@ def _visible_context_route_decision(
     task_context_text: str | None,
     task_family_key: str | None,
 ) -> RuntimeRoutingDecision:
+    return _visible_context_route_decision_from_facts(
+        entry,
+        facts=RoutingTextFacts.from_context(task_context_text, task_family_key),
+    )
+
+
+def _visible_context_route_decision_from_facts(
+    entry: RegistryEntry,
+    *,
+    facts: RoutingTextFacts,
+) -> RuntimeRoutingDecision:
     spec = entry.tool.spec
     tool_name = spec.tool_name
     if entry.retired or not entry.validation.accepted:
@@ -1555,16 +1588,11 @@ def _visible_context_route_decision(
         return RuntimeRoutingDecision(
             tool_name, False, "hidden", "legacy_validation_missing_current_proof", -100
         )
-    if not task_context_text:
+    if not facts.has_visible_context:
         return RuntimeRoutingDecision(
             tool_name, False, "hidden", "missing_visible_task_context", -20
         )
-    context = f"{task_context_text} family={task_family_key or ''}".lower()
-    match_context = context
-    if " tools=" in context and " signals=" in context:
-        request_part = context.split(" tools=", 1)[0]
-        signal_part = context.split(" signals=", 1)[1]
-        match_context = f"{request_part} signals={signal_part}"
+    match_context = facts.match_context
     matched_negative = tuple(
         token
         for token in spec.negative_triggers
@@ -1622,21 +1650,35 @@ def _visible_context_route_decision(
             "visible_context_required_signal_missing",
             -20,
         )
-    if (
-        tool_name == "relative_day_time_to_timestamp"
-        and "external_lookup" in match_context
-        and "service_answer_extraction" in match_context
-        and "reminder" not in match_context
-        and "message" not in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "relative_time_suppressed_for_external_service_lookup",
-            -25,
-            matched_task_families=matched_signals,
+    for (
+        gated_tool_name,
+        required_all,
+        required_any,
+        forbidden,
+        reason,
+        score,
+        retain_signal_evidence,
+    ) in _VISIBLE_CONTEXT_EXACT_NAME_GATES:
+        matches_gate = (
+            tool_name == gated_tool_name
+            and all(token in match_context for token in required_all)
+            and (
+                not required_any
+                or any(token in match_context for token in required_any)
+            )
+            and all(token not in match_context for token in forbidden)
         )
+        if matches_gate:
+            return RuntimeRoutingDecision(
+                tool_name,
+                False,
+                "hidden",
+                reason,
+                score,
+                matched_task_families=(
+                    matched_signals if retain_signal_evidence else ()
+                ),
+            )
     if tool_name in {
         "prepare_location_search_args",
         "prepare_specific_location_search_args",
@@ -1706,18 +1748,6 @@ def _visible_context_route_decision(
                 -25,
                 matched_task_families=matched_signals,
             )
-    if tool_name == "extract_service_answer_field" and any(
-        token in match_context
-        for token in ("temperature", " temp ", "celsius", "fahrenheit")
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "service_answer_extractor_suppressed_temperature_unit_context",
-            -25,
-            matched_task_families=matched_signals,
-        )
     service_scalar_requirements = {
         "extract_address_result": lambda text: _visible_reverse_geocode_context(text),
         "extract_converted_amount_result": lambda text: (
@@ -1759,61 +1789,6 @@ def _visible_context_route_decision(
             "service_scalar_extractor_requires_matching_visible_request",
             -25,
             matched_task_families=matched_signals,
-        )
-    if (
-        tool_name == "select_action_target_by_recency"
-        and "recency_action" not in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "recency_action_selector_requires_visible_action_signal",
-            -25,
-        )
-    if (
-        tool_name == "select_action_target_by_recency"
-        and "reminder" not in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "recency_action_selector_requires_reminder_action_context",
-            -25,
-        )
-    if (
-        tool_name == "plan_send_message_contact_lookup"
-        and "has_phone_number" in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "direct_phone_message_does_not_need_contact_lookup",
-            -20,
-        )
-    if (
-        tool_name == "prepare_direct_contact_action_args"
-        and "message_counterparty_update" in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "direct_contact_action_suppressed_for_message_counterparty_update",
-            -30,
-        )
-    if (
-        tool_name == "prepare_direct_contact_action_args"
-        and "direct_contact_action" not in match_context
-    ):
-        return RuntimeRoutingDecision(
-            tool_name,
-            False,
-            "hidden",
-            "direct_scalar_action_signal_required",
-            -20,
         )
     if (
         spec.family
@@ -2139,7 +2114,8 @@ def route_registry_entries(
     max_bundle_size = _runtime_generated_tool_bundle_size(max_bundle_size)
     decisions: dict[str, RuntimeRoutingDecision] = {}
     visible: list[tuple[int, str, RegistryEntry]] = []
-    routing_lower = (task_context_text or "").lower()
+    routing_facts = RoutingTextFacts.from_context(task_context_text, task_family_key)
+    routing_lower = routing_facts.routing_lower
     prefer_message_content_selector = (
         "select_message_content_by_recency" in entries
         and "insufficient_information" not in routing_lower
@@ -2150,6 +2126,22 @@ def route_registry_entries(
         and "insufficient_information" not in routing_lower
         and "message_counterparty_update" in routing_lower
     )
+    message_recency_context = (
+        routing_facts.has_visible_context and "message_recency" in routing_lower
+    )
+    # Ordered first-match rules: registry key, condition, decision reason.
+    # fmt: off
+    message_post_visibility_rules = (
+        ("select_record_by_timestamp_extreme", prefer_message_content_selector,
+         "message_content_selector_preferred_over_generic_timestamp_selector"),
+        ("select_record_by_timestamp_extreme", prefer_message_counterparty_update_selector,
+         "message_counterparty_selector_preferred_over_generic_timestamp_selector"),
+        ("resolve_search_window_or_bounds", message_recency_context,
+         "message_recency_uses_content_selector_not_search_window"),
+        ("select_record_by_timestamp_extreme", message_recency_context,
+         "message_recency_answer_requires_content_selector"),
+    )
+    # fmt: on
     generic_hard_blocks = {
         "blocked_by_negative_trigger",
         "blocked_by_visible_not_called_adoption_risk",
@@ -2160,11 +2152,10 @@ def route_registry_entries(
         "post_selection_composite_requires_downstream_action_task",
     }
     for tool_name, entry in sorted(entries.items()):
-        if task_context_text:
-            generic = _visible_context_route_decision(
+        if routing_facts.has_visible_context:
+            generic = _visible_context_route_decision_from_facts(
                 entry,
-                task_context_text=task_context_text,
-                task_family_key=task_family_key,
+                facts=routing_facts,
             )
             is_visible = generic.visible
             reason = generic.reason
@@ -2265,42 +2256,13 @@ def route_registry_entries(
             is_visible = False
             status = "hidden"
             reason = "generated_substitute_suppressed_original_available"
-        if (
-            is_visible
-            and prefer_message_content_selector
-            and tool_name == "select_record_by_timestamp_extreme"
-        ):
-            is_visible = False
-            status = "hidden"
-            reason = (
-                "message_content_selector_preferred_over_generic_timestamp_selector"
-            )
-        if (
-            is_visible
-            and prefer_message_counterparty_update_selector
-            and tool_name == "select_record_by_timestamp_extreme"
-        ):
-            is_visible = False
-            status = "hidden"
-            reason = "message_counterparty_selector_preferred_over_generic_timestamp_selector"
-        if (
-            is_visible
-            and task_context_text
-            and tool_name == "resolve_search_window_or_bounds"
-            and "message_recency" in routing_lower
-        ):
-            is_visible = False
-            status = "hidden"
-            reason = "message_recency_uses_content_selector_not_search_window"
-        if (
-            is_visible
-            and task_context_text
-            and tool_name == "select_record_by_timestamp_extreme"
-            and "message_recency" in routing_lower
-        ):
-            is_visible = False
-            status = "hidden"
-            reason = "message_recency_answer_requires_content_selector"
+        if is_visible:
+            for gated_tool_name, applies, gated_reason in message_post_visibility_rules:
+                if applies and tool_name == gated_tool_name:
+                    is_visible = False
+                    status = "hidden"
+                    reason = gated_reason
+                    break
         if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
             producer_tools = {
                 tool_name

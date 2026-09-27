@@ -8,6 +8,31 @@ from typing import Any
 DEFAULT_MAX_RUNTIME_BUNDLE_SIZE = 5
 
 
+@dataclass(frozen=True, slots=True)
+class RoutingTextFacts:
+    """The two exact text views consumed by runtime routing rules."""
+
+    has_visible_context: bool
+    routing_lower: str
+    match_context: str
+
+    @classmethod
+    def from_context(
+        cls,
+        task_context_text: str | None,
+        task_family_key: str | None,
+    ) -> RoutingTextFacts:
+        routing_lower = (task_context_text or "").lower()
+        if not task_context_text:
+            return cls(False, routing_lower, "")
+        match_context = f"{task_context_text} family={task_family_key or ''}".lower()
+        if " tools=" in match_context and " signals=" in match_context:
+            request_part = match_context.split(" tools=", 1)[0]
+            signal_part = match_context.split(" signals=", 1)[1]
+            match_context = f"{request_part} signals={signal_part}"
+        return cls(True, routing_lower, match_context)
+
+
 @dataclass(frozen=True)
 class RuntimeRoutingDecision:
     tool_name: str
