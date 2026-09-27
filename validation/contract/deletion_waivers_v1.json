@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "waivers": [
+    {
+      "waiver_id": "dead-tool-generation-request-prompt-v1",
+      "kind": "obsolete_historical_test",
+      "symbol": "sage_ts.generation.tool_generator.ToolGenerationRequest.prompt",
+      "reference_commit": "2518a2a134c50d603d6250b08f47623b27e7737f",
+      "pre_deletion_commit": "572d13bec3c76254a6c377f2923fba29b9232f99",
+      "source_sha256": "b3e3afa1129741734c301fe0bd09dbaf5c8b33c856edb7c45a65326a04cc70fa",
+      "removed_physical_lines": 252,
+      "allowed_failures": [
+        "tests/unit/test_tool_generator.py::test_generation_request_includes_reusable_name_hint",
+        "tests/unit/test_tool_generator.py::test_generation_request_preserves_negative_applicability_metadata",
+        "tests/unit/test_tool_generator.py::test_generation_request_includes_family_contract_guidance",
+        "tests/unit/test_tool_generator.py::test_generation_request_includes_exact_contact_phone_normalization",
+        "tests/unit/test_tool_generator.py::test_generation_request_requires_contract_fields",
+        "tests/unit/test_tool_generator.py::test_generation_request_includes_medium_grain_guidance",
+        "tests/unit/test_tool_generator.py::test_generation_request_includes_failure_memory_and_cluster_context"
+      ],
+      "replacement_gate": "generator_profile_corpus.legacy_prompt_nonreachability",
+      "permitted_replay_differences": []
+    }
+  ]
+}

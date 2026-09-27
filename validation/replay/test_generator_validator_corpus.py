@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 from validation.replay.generator_validator_corpus import (
     GENERIC_PROFILE_NAME,
@@ -53,6 +55,31 @@ class ValidatorBranchIntegrityTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "native_action_arguments_invalid"):
             _assert_validator_error_coverage(errors)
+
+
+class DeletionWaiverIntegrityTests(unittest.TestCase):
+    def test_legacy_prompt_waiver_is_exact_and_allows_no_replay_difference(
+        self,
+    ) -> None:
+        path = Path(__file__).parents[1] / "contract" / "deletion_waivers_v1.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(len(payload["waivers"]), 1)
+        waiver = payload["waivers"][0]
+        self.assertEqual(waiver["removed_physical_lines"], 252)
+        self.assertEqual(waiver["permitted_replay_differences"], [])
+        self.assertEqual(
+            waiver["allowed_failures"],
+            [
+                "tests/unit/test_tool_generator.py::test_generation_request_includes_reusable_name_hint",
+                "tests/unit/test_tool_generator.py::test_generation_request_preserves_negative_applicability_metadata",
+                "tests/unit/test_tool_generator.py::test_generation_request_includes_family_contract_guidance",
+                "tests/unit/test_tool_generator.py::test_generation_request_includes_exact_contact_phone_normalization",
+                "tests/unit/test_tool_generator.py::test_generation_request_requires_contract_fields",
+                "tests/unit/test_tool_generator.py::test_generation_request_includes_medium_grain_guidance",
+                "tests/unit/test_tool_generator.py::test_generation_request_includes_failure_memory_and_cluster_context",
+            ],
+        )
 
 
 if __name__ == "__main__":

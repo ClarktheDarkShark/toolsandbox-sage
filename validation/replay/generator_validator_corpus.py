@@ -783,14 +783,17 @@ def _prompt_nonreachability_proof() -> dict[str, Any]:
     request = _profile_request("unknown_reusable_profile")
     completer = _StaticCompleter(_response_for("unknown_reusable_profile"))
     generator = ToolGenerator(completer)
-    original = ToolGenerationRequest.prompt
+    original = getattr(ToolGenerationRequest, "prompt", None)
 
     def fail_if_used(_self: Any) -> str:
         raise RuntimeError("legacy_request_prompt_was_called")
 
-    ToolGenerationRequest.prompt = fail_if_used
+    if original is not None:
+        ToolGenerationRequest.prompt = fail_if_used
     try:
-        direct_call = _capture(request.prompt)
+        direct_call = _capture(
+            request.prompt if original is not None else lambda: fail_if_used(request)
+        )
         generated = generator.generate(request)
         repaired = generator.repair_candidates(
             request,
@@ -850,7 +853,8 @@ def _prompt_nonreachability_proof() -> dict[str, Any]:
             online_outcome = controller.observe(observation)
             online_registry_names = sorted(controller.store.load_entries())
     finally:
-        ToolGenerationRequest.prompt = original
+        if original is not None:
+            ToolGenerationRequest.prompt = original
     if (
         direct_call.get("status") != "raised"
         or len(completer.calls) != 2
@@ -870,9 +874,9 @@ def _prompt_nonreachability_proof() -> dict[str, Any]:
             _chat_request_projection(item) for item in online_completer.calls
         ],
         "proof": (
-            "ToolGenerationRequest.prompt raised under the patch while "
-            "ToolGenerator.generate, ToolGenerator.repair_candidates, and the "
-            "OnlineBirthController generation path all completed."
+            "The legacy prompt path raised while ToolGenerator.generate, "
+            "ToolGenerator.repair_candidates, and the OnlineBirthController "
+            "generation path all completed."
         ),
     }
 
