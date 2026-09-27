@@ -9,6 +9,7 @@ part of the frozen implementation contract.
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -33,6 +34,23 @@ def _tool(name: str) -> dict[str, Any]:
             "description": f"Replay tool {name}.",
             "parameters": {"type": "object", "properties": {}},
         },
+    }
+
+
+def _tool_call(
+    name: str,
+    arguments: Mapping[str, Any] | str | None = None,
+    *,
+    call_id: str = "call-1",
+) -> dict[str, Any]:
+    raw_arguments = (
+        arguments
+        if isinstance(arguments, str)
+        else json.dumps(dict(arguments or {}), separators=(",", ":"))
+    )
+    return {
+        "id": call_id,
+        "function": {"name": name, "arguments": raw_arguments},
     }
 
 
@@ -185,6 +203,54 @@ def _recorded_call(
     }
 
 
+def _recorded_structural_call(
+    actor: Any,
+    inputs: dict[str, Any],
+    operation: Callable[[dict[str, Any]], Any],
+) -> dict[str, Any]:
+    """Record exact helper behavior without mutating the supplied fixtures."""
+
+    original_normalizer = actor._execution_facing_tool_name
+    normalizer_calls: list[str] = []
+    before = copy.deepcopy(inputs)
+
+    def normalize(value: str) -> str:
+        text = str(value)
+        normalizer_calls.append(text)
+        if text == "explode":
+            raise LookupError("recorded normalizer failure")
+        aliases = {
+            "functions.search_contacts": "search_contacts",
+            "agent_search_contacts": "search_contacts",
+        }
+        return aliases.get(text, text.removeprefix("functions."))
+
+    actor._execution_facing_tool_name = normalize
+    try:
+        try:
+            value = operation(inputs)
+        except Exception as error:  # noqa: BLE001 - exception behavior is frozen.
+            outcome = {
+                "status": "raised",
+                "exception_type": type(error).__name__,
+                "message": str(error),
+            }
+        else:
+            outcome = {
+                "status": "returned",
+                "python_type": type(value).__name__,
+                "value": _wire(value),
+            }
+    finally:
+        actor._execution_facing_tool_name = original_normalizer
+    return {
+        "outcome": outcome,
+        "normalizer_calls": normalizer_calls,
+        "inputs_unchanged": inputs == before,
+        "inputs_after": _wire(inputs),
+    }
+
+
 def _operations(
     actor: Any,
     messages: list[Any],
@@ -264,6 +330,508 @@ def _operations(
     }
 
 
+def _specialized_structural_cases(actor: Any) -> dict[str, Any]:
+    """Freeze correlation, bounded-scan, and precedence quirks used by policy."""
+
+    generated_tools = [_tool("generated_helper")]
+    record_source_inputs = {
+        "generated_then_contact_records": {
+            "messages": [
+                {"role": "user", "content": "Find Ada"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [_tool_call("generated_helper")],
+                },
+                {
+                    "role": "tool",
+                    "name": "functions.search_contacts",
+                    "content": "[{'person_id': 'person-1'}]",
+                },
+                {"role": "tool", "name": "search_messages", "content": "[]"},
+            ],
+            "tools": generated_tools,
+            "require_prior_generated_call": True,
+        },
+        "records_without_prior_generated_call": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "search_contacts",
+                    "content": '[{"person_id":"person-1"}]',
+                }
+            ],
+            "tools": generated_tools,
+            "require_prior_generated_call": True,
+        },
+        "records_allowed_without_prior_generated_call": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "search_contacts",
+                    "content": '[{"person_id":"person-1"}]',
+                }
+            ],
+            "tools": generated_tools,
+            "require_prior_generated_call": False,
+        },
+        "generated_then_extraction_source": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [_tool_call("generated_helper")],
+                },
+                {
+                    "role": "tool",
+                    "name": "search_stock",
+                    "content": '{"ticker":"SAGE","price":42.5}',
+                },
+            ],
+            "tools": generated_tools,
+            "require_prior_generated_call": True,
+        },
+        "malformed_and_empty_records": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [None, {"function": []}, _tool_call("other")],
+                },
+                {"role": "tool", "name": "search_reminder", "content": "[]"},
+                {"role": "tool", "name": "search_contacts", "content": "bad"},
+            ],
+            "tools": generated_tools,
+            "require_prior_generated_call": False,
+        },
+    }
+    record_sources = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._latest_record_source_after_generated_call(
+                values["messages"],
+                values["tools"],
+                require_prior_generated_call=values["require_prior_generated_call"],
+            ),
+        )
+        for case_id, inputs in record_source_inputs.items()
+    }
+
+    setting_inputs = {
+        "matching_correlated_success": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "functions.set_wifi_status",
+                            {"on": True},
+                            call_id="wifi-1",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "set_wifi_status",
+                    "tool_call_id": "wifi-1",
+                    "content": "None",
+                },
+            ],
+            "action": {"tool_name": "set_wifi_status", "arguments": {"on": True}},
+        },
+        "matching_correlated_failure": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call("set_wifi_status", {"on": True}, call_id="wifi-2")
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "set_wifi_status",
+                    "tool_call_id": "wifi-2",
+                    "content": "Error: failed",
+                },
+            ],
+            "action": {"tool_name": "set_wifi_status", "arguments": {"on": True}},
+        },
+        "successful_result_but_arguments_differ": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call("set_wifi_status", {"on": False}, call_id="wifi-3")
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "set_wifi_status",
+                    "tool_call_id": "wifi-3",
+                    "content": "null",
+                },
+            ],
+            "action": {"tool_name": "set_wifi_status", "arguments": {"on": True}},
+        },
+        "uncorrelated_named_success": {
+            "messages": [{"role": "tool", "name": "set_wifi_status", "content": ""}],
+            "action": {"tool_name": "set_wifi_status", "arguments": {"on": True}},
+        },
+        "invalid_action": {
+            "messages": [],
+            "action": {"tool_name": "search_contacts", "arguments": {"query": "Ada"}},
+        },
+    }
+    satisfied_settings = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._setting_action_already_satisfied(
+                values["messages"], values["action"]
+            ),
+        )
+        for case_id, inputs in setting_inputs.items()
+    }
+
+    precondition_inputs = {
+        "correlated_native_retry": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "search_weather_around_lat_lon",
+                            {"latitude": 1.0, "longitude": 2.0},
+                            call_id="weather-1",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "search_weather_around_lat_lon",
+                    "tool_call_id": "weather-1",
+                    "content": "Wifi is not enabled",
+                },
+            ]
+        },
+        "uncorrelated_native_retry": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "search_location_around_lat_lon",
+                    "content": "Location service is not enabled",
+                }
+            ]
+        },
+        "setting_setter_is_excluded": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "set_wifi_status",
+                    "content": "blocked by low battery",
+                }
+            ]
+        },
+        "error_outside_sixteen_message_window": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "search_weather_around_lat_lon",
+                    "content": "Wifi is not enabled",
+                },
+                *[
+                    {"role": "system", "content": f"padding-{index}"}
+                    for index in range(16)
+                ],
+            ]
+        },
+        "non_precondition_error": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "search_weather_around_lat_lon",
+                    "content": "HTTP 500",
+                }
+            ]
+        },
+    }
+    precondition_retries = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._latest_non_setting_state_precondition_retry_call(
+                values["messages"]
+            ),
+        )
+        for case_id, inputs in precondition_inputs.items()
+    }
+
+    timestamp_inputs = {
+        "correlated_timestamp_within_tolerance": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "timestamp_to_datetime_info",
+                            {"timestamp": 100.25},
+                            call_id="time-1",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "timestamp_to_datetime_info",
+                    "tool_call_id": "time-1",
+                    "content": "{'year': 2026, 'month': 9, 'day': 27}",
+                },
+            ],
+            "timestamp": 100.9,
+        },
+        "correlated_timestamp_outside_tolerance": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "timestamp_to_datetime_info",
+                            {"timestamp": 100.25},
+                            call_id="time-2",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "timestamp_to_datetime_info",
+                    "tool_call_id": "time-2",
+                    "content": '{"year":2026}',
+                },
+            ],
+            "timestamp": 102.0,
+        },
+        "latest_empty_payload_shadows_earlier_payload": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "timestamp_to_datetime_info",
+                            {"timestamp": 100.0},
+                            call_id="time-old",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "timestamp_to_datetime_info",
+                    "tool_call_id": "time-old",
+                    "content": '{"year":2026}',
+                },
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "timestamp_to_datetime_info",
+                            {"timestamp": 100.0},
+                            call_id="time-new",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "timestamp_to_datetime_info",
+                    "tool_call_id": "time-new",
+                    "content": "{}",
+                },
+            ],
+            "timestamp": 100.0,
+        },
+        "invalid_call_arguments": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "timestamp_to_datetime_info", "not-json", call_id="time-3"
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "timestamp_to_datetime_info",
+                    "tool_call_id": "time-3",
+                    "content": '{"year":2026}',
+                },
+            ],
+            "timestamp": 100.0,
+        },
+        "non_mapping_message_raises": {
+            "messages": ["not-a-message"],
+            "timestamp": 100.0,
+        },
+    }
+    timestamp_lookups = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._timestamp_to_datetime_info_for_timestamp(
+                values["messages"], values["timestamp"]
+            ),
+        )
+        for case_id, inputs in timestamp_inputs.items()
+    }
+
+    reminder_inputs = {
+        "matching_reason_returns_correlated_args": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "prepare_reminder_creation_args",
+                            {"content": "Call Ada", "reminder_timestamp": 123.0},
+                            call_id="reminder-1",
+                        )
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "name": "prepare_reminder_creation_args",
+                    "tool_call_id": "reminder-1",
+                    "content": '{"abstain_reason":"missing_time"}',
+                },
+            ],
+            "abstain_reason": "missing_time",
+        },
+        "reason_mismatch": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "prepare_reminder_creation_args",
+                    "content": '{"abstain_reason":"missing_location"}',
+                }
+            ],
+            "abstain_reason": "missing_time",
+        },
+        "matching_uncorrelated_result_returns_empty_args": {
+            "messages": [
+                {
+                    "role": "tool",
+                    "name": "prepare_reminder_creation_args",
+                    "tool_call_id": "unknown",
+                    "content": '{"abstain_reason":"missing_time"}',
+                }
+            ],
+            "abstain_reason": "missing_time",
+        },
+        "tuple_tool_calls_are_scanned": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": (
+                        _tool_call(
+                            "prepare_reminder_creation_args",
+                            {"content": "Call Ada"},
+                            call_id="reminder-2",
+                        ),
+                    ),
+                },
+                {
+                    "role": "tool",
+                    "name": "prepare_reminder_creation_args",
+                    "tool_call_id": "reminder-2",
+                    "content": '{"abstain_reason":"missing_time"}',
+                },
+            ],
+            "abstain_reason": "missing_time",
+        },
+    }
+    reminder_args = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._latest_reminder_creation_args_for_abstain_reason(
+                values["messages"], values["abstain_reason"]
+            ),
+        )
+        for case_id, inputs in reminder_inputs.items()
+    }
+
+    holiday_inputs = {
+        "latest_known_user_holiday_wins": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call("search_holiday", {"holiday_name": "Christmas"})
+                    ],
+                },
+                {"role": "user", "content": "What date is Thanksgiving?"},
+            ]
+        },
+        "holiday_from_search_call_arguments": {
+            "messages": [
+                {"role": "user", "content": "Find that holiday"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call(
+                            "functions.search_holiday",
+                            {"holiday_name": "Christmas"},
+                        )
+                    ],
+                },
+            ]
+        },
+        "unknown_holiday": {
+            "messages": [
+                {"role": "user", "content": "Find Founders Day"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call("search_holiday", {"holiday_name": "Founders Day"})
+                    ],
+                },
+            ]
+        },
+        "tuple_tool_calls_are_ignored": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": (
+                        _tool_call("search_holiday", {"holiday_name": "New Years"}),
+                    ),
+                }
+            ]
+        },
+        "normalizer_failure_is_visible": {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        _tool_call("explode", {"holiday_name": "Christmas"})
+                    ],
+                }
+            ]
+        },
+    }
+    holiday_labels = {
+        case_id: _recorded_structural_call(
+            actor,
+            inputs,
+            lambda values: actor._holiday_context_label(values["messages"]),
+        )
+        for case_id, inputs in holiday_inputs.items()
+    }
+
+    return {
+        "latest_record_source_after_generated_call": record_sources,
+        "setting_action_already_satisfied": satisfied_settings,
+        "latest_non_setting_state_precondition_retry_call": precondition_retries,
+        "timestamp_to_datetime_info_for_timestamp": timestamp_lookups,
+        "latest_reminder_creation_args_for_abstain_reason": reminder_args,
+        "holiday_context_label": holiday_labels,
+    }
+
+
 def run_probe(_root: Any) -> dict[str, Any]:
     from sage_ts.adapters import openai_toolsandbox_roles as actor
 
@@ -293,7 +861,8 @@ def run_probe(_root: Any) -> dict[str, Any]:
         for case_id, value in payload_cases.items()
     }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "message_cases": cases,
         "payload_parsers": parsed_payloads,
+        "specialized_structural_cases": _specialized_structural_cases(actor),
     }
