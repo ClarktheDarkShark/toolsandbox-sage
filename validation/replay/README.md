@@ -111,7 +111,13 @@ or suppress normalization rules.
   alias tie ordering, and the public router signature/import identity.
   Normalization boundaries include same- and cross-service state requests, zero
   versus smallest-positive coordinates and timestamps, 23:59, hour 24, and
-  minute 60. Recursive key order and compact bytes are part of every result.
+  minute 60. They also pin non-mapping identity returns, exact composite-schema
+  dispatch, mixed-case ambiguity handling, selected-record fallback with zero
+  or one inferred match, false/malformed/zero-longitude coordinate handling,
+  datetime key-presence quirks, numeric-string timestamp type preservation, and
+  shallow-only null cleanup with survivor order. Recursive key order and exact
+  compact bytes are part of every result, including fields appended during
+  selection normalization.
 - `generation_boundary`: records every exact `ChatRequest` byte stream and hash
   for ordinary generation, native-action generation, cached contract analysis,
   repair analysis, repeated repair, and strategy-specific repair. It also

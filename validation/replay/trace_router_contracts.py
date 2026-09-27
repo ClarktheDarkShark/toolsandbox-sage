@@ -763,6 +763,11 @@ def _normalization_contracts(
         return exact(
             {
                 "result": result,
+                "result_compact_json": json.dumps(
+                    result,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
                 "result_is_input_object": result is raw,
                 "raw_before": before,
                 "raw_after": raw,
@@ -1029,6 +1034,224 @@ def _normalization_contracts(
             copy.deepcopy(reminder_raw),
             {**relative_inputs, "hour": 23, "minute": 60},
         ),
+        "false_location_availability_rejects_nonzero_coordinates": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries near Market Street",
+                "location_required": True,
+                "location_available": False,
+                "latitude": 37.0,
+                "longitude": -122.0,
+                "resolved_reminder_timestamp": 1_900_000_000.0,
+            },
+        ),
+        "malformed_available_coordinates_are_not_concrete": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries near Market Street",
+                "location_required": True,
+                "location_available": True,
+                "latitude": "north",
+                "longitude": -122.0,
+                "resolved_reminder_timestamp": 1_900_000_000.0,
+            },
+        ),
+        "zero_longitude_is_not_a_concrete_coordinate": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries near the prime meridian",
+                "location_required": True,
+                "location_available": True,
+                "latitude": 37.0,
+                "longitude": 0.0,
+                "resolved_reminder_timestamp": 1_900_000_000.0,
+            },
+        ),
+        "invalid_calendar_values_with_full_datetime_keys_are_accepted": (
+            normalize_case(
+                reminder,
+                copy.deepcopy(reminder_raw),
+                {
+                    "content": "Pick up groceries",
+                    "current_timestamp": 1_790_422_496.0,
+                    "day_offset": 1,
+                    "hour": 9,
+                    "minute": 30,
+                    "current_datetime_info": {
+                        "year": "not-a-year",
+                        "month": 99,
+                        "day": -7,
+                        "hour": 12,
+                        "minute": 34,
+                        "second": 56,
+                    },
+                },
+            )
+        ),
+        "clock_only_datetime_recovers_then_requires_full_key_set": normalize_case(
+            reminder,
+            copy.deepcopy(reminder_raw),
+            {
+                "content": "Pick up groceries",
+                "current_timestamp": 1_790_422_496.0,
+                "day_offset": 1,
+                "hour": 9,
+                "minute": 30,
+                "current_datetime_info": {
+                    "hour": 12,
+                    "minute": 34,
+                    "second": 56,
+                },
+            },
+        ),
+        "numeric_string_prepared_timestamp_keeps_its_string_type": normalize_case(
+            reminder,
+            {
+                **copy.deepcopy(reminder_raw),
+                "add_reminder_kwargs": {
+                    "content": "Pick up groceries",
+                    "reminder_timestamp": "1900000000.5",
+                },
+            },
+            {"content": "Pick up groceries"},
+        ),
+    }
+
+    composite_properties = {
+        "selected_record": mapping,
+        "selected_id": string,
+        "value": string,
+        "downstream_tool_name": string,
+        "downstream_tool_kwargs": mapping,
+        "should_call_tool": boolean,
+        "abstain_reason": string,
+    }
+    composite_exact = generated(
+        "composite_schema_dispatch_probe",
+        ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties=composite_properties,
+    )
+    composite_missing_property = GeneratedTool(
+        spec=replace(
+            composite_exact.spec,
+            output_schema={
+                "type": "object",
+                "properties": {
+                    key: schema
+                    for key, schema in composite_properties.items()
+                    if key != "should_call_tool"
+                },
+            },
+        ),
+        code=composite_exact.code,
+    )
+    composite_non_dict_properties = GeneratedTool(
+        spec=replace(
+            composite_exact.spec,
+            output_schema={
+                "type": "object",
+                "properties": list(composite_properties),
+            },
+        ),
+        code=composite_exact.code,
+    )
+    composite_no_schema = GeneratedTool(
+        spec=replace(composite_exact.spec, output_schema=None),
+        code=composite_exact.code,
+    )
+
+    def composite_raw() -> dict[str, Any]:
+        return {
+            "selected_record": {"person_id": "selected", "name": "Selected"},
+            "selected_id": "selected",
+            "value": "selected",
+            "downstream_tool_name": "remove_contact",
+            "downstream_tool_kwargs": {
+                "person_id": "selected",
+                "optional": None,
+            },
+            "should_call_tool": True,
+            "abstain_reason": "AmBiGuOuS TiE!!!",
+            "tie_candidates": {"wrong": "shape"},
+        }
+
+    selection_inputs = {
+        "records": [
+            {"person_id": "only-inferred", "relationship": "friend"},
+            {"person_id": "nonmatch", "relationship": "coworker"},
+        ],
+        "field_name": "relationship",
+        "expected_value": "friend",
+    }
+    composite_cases = {
+        "exact_selection_schema_uses_composite_normalizer": normalize_case(
+            composite_exact,
+            composite_raw(),
+            selection_inputs,
+        ),
+        "one_missing_selection_property_uses_generic_normalizer": normalize_case(
+            composite_missing_property,
+            composite_raw(),
+            selection_inputs,
+        ),
+        "non_dict_properties_skip_both_composite_normalizers": normalize_case(
+            composite_non_dict_properties,
+            composite_raw(),
+            selection_inputs,
+        ),
+        "no_output_schema_uses_generic_normalizer": normalize_case(
+            composite_no_schema,
+            composite_raw(),
+            selection_inputs,
+        ),
+    }
+
+    selector = generated(
+        "select_visible_record_by_constraints",
+        ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        output_properties={
+            "selected_record": mapping,
+            "selected_index": {"type": "integer"},
+            "selected_id": string,
+            "value": string,
+            "matched_constraints": array,
+            "tie_candidates": array,
+            "abstain_reason": string,
+        },
+    )
+    selector_cases = {
+        "mixed_case_punctuated_ambiguity_uses_selected_record_fallback": (
+            normalize_case(
+                selector,
+                {
+                    "abstain_reason": "AmBiGuOuS TiE!!!",
+                    "selected_record": {
+                        "person_id": "selected",
+                        "name": "Selected",
+                    },
+                    "tie_candidates": {"wrong": "shape"},
+                },
+                selection_inputs,
+            )
+        ),
+        "zero_inferred_matches_also_uses_selected_record_fallback": normalize_case(
+            selector,
+            {
+                "abstain_reason": "multiple_match.",
+                "selected_record": {
+                    "person_id": "selected-zero",
+                    "name": "Selected Zero",
+                },
+                "tie_candidates": "not-a-list",
+            },
+            {
+                **selection_inputs,
+                "expected_value": "family",
+            },
+        ),
     }
 
     native = generated(
@@ -1066,11 +1289,54 @@ def _normalization_contracts(
             non_native_raw,
             {},
         ),
+        "non_dict_output_is_returned_by_identity": normalize_case(
+            non_native,
+            ["opaque", {"deep_null": None}, 0, False],
+            {"ignored": True},
+        ),
+        "deep_nested_nulls_survive_and_shallow_survivors_keep_order": (
+            normalize_case(
+                non_native,
+                {
+                    "downstream_tool_kwargs": {
+                        "drop_leading": None,
+                        "first_survivor": 1,
+                        "nested": {
+                            "deep_null": None,
+                            "deep_value": "kept",
+                        },
+                        "drop_middle": None,
+                        "second_survivor": False,
+                    },
+                    "downstream_tool_kwargs_list": [
+                        {
+                            "drop_leading": None,
+                            "alpha": "A",
+                            "nested": {"deep_null": None},
+                            "omega": 0,
+                        },
+                        "opaque-list-entry",
+                        {
+                            "first": 1,
+                            "drop_middle": None,
+                            "second": 2,
+                        },
+                    ],
+                    "ordinary_mapping": {
+                        "ordinary_null": None,
+                        "ordinary_value": "untouched",
+                    },
+                },
+                {},
+            )
+        ),
     }
 
     return {
         "device_state": exact(device_cases),
         "reminder": exact(reminder_cases),
+        "composite_schema_dispatch": exact(composite_cases),
+        "selector_ambiguity": exact(selector_cases),
         "native_and_null_order": exact(passthrough_cases),
     }
 

@@ -786,8 +786,12 @@ class NormalizationBoundaryContractTests(unittest.TestCase):
         )
 
     @classmethod
+    def case(cls, section: str, name: str) -> dict[str, object]:
+        return cls.contracts[section]["value"][name]["value"]
+
+    @classmethod
     def result(cls, section: str, name: str) -> dict[str, object]:
-        return cls.contracts[section]["value"][name]["value"]["result"]
+        return cls.case(section, name)["result"]
 
     def test_device_state_collisions_use_fixed_rule_order(self) -> None:
         same_service = self.result(
@@ -837,6 +841,178 @@ class NormalizationBoundaryContractTests(unittest.TestCase):
         self.assertTrue(latest_valid["should_call_add_reminder"])
         self.assertFalse(invalid_hour["should_call_add_reminder"])
         self.assertFalse(invalid_minute["should_call_add_reminder"])
+
+    def test_non_dict_output_identity_is_a_hard_early_return(self) -> None:
+        observed = self.case(
+            "native_and_null_order",
+            "non_dict_output_is_returned_by_identity",
+        )
+
+        self.assertTrue(observed["result_is_input_object"])
+        self.assertEqual(
+            observed["result"],
+            ["opaque", {"deep_null": None}, 0, False],
+        )
+        self.assertEqual(
+            observed["result_compact_json"],
+            '["opaque",{"deep_null":null},0,false]',
+        )
+
+    def test_composite_dispatch_depends_on_the_exact_schema_shape(self) -> None:
+        exact_schema = self.result(
+            "composite_schema_dispatch",
+            "exact_selection_schema_uses_composite_normalizer",
+        )
+        missing_property = self.result(
+            "composite_schema_dispatch",
+            "one_missing_selection_property_uses_generic_normalizer",
+        )
+        non_dict_properties = self.result(
+            "composite_schema_dispatch",
+            "non_dict_properties_skip_both_composite_normalizers",
+        )
+        no_schema = self.result(
+            "composite_schema_dispatch",
+            "no_output_schema_uses_generic_normalizer",
+        )
+
+        self.assertEqual(exact_schema["selected_record"], {})
+        self.assertFalse(exact_schema["should_call_tool"])
+        self.assertEqual(exact_schema["abstain_reason"], "ambiguous tie")
+        self.assertEqual(
+            exact_schema["tie_candidates"],
+            [{"person_id": "selected", "name": "Selected"}],
+        )
+        for observed in (missing_property, no_schema):
+            self.assertEqual(observed["selected_id"], "selected")
+            self.assertTrue(observed["should_call_tool"])
+            self.assertEqual(observed["abstain_reason"], "ambiguous tie")
+        self.assertEqual(
+            non_dict_properties["abstain_reason"],
+            "AmBiGuOuS TiE!!!",
+        )
+        self.assertTrue(non_dict_properties["should_call_tool"])
+
+    def test_selector_preserves_reason_bytes_and_uses_selected_fallback(self) -> None:
+        observed = self.case(
+            "selector_ambiguity",
+            "mixed_case_punctuated_ambiguity_uses_selected_record_fallback",
+        )
+        result = observed["result"]
+
+        self.assertEqual(result["abstain_reason"], "AmBiGuOuS TiE!!!")
+        self.assertEqual(
+            result["tie_candidates"],
+            [{"person_id": "selected", "name": "Selected"}],
+        )
+        self.assertNotIn("only-inferred", observed["result_compact_json"])
+        self.assertEqual(
+            observed["result_compact_json"],
+            (
+                '{"abstain_reason":"AmBiGuOuS TiE!!!","selected_record":{},'
+                '"tie_candidates":[{"person_id":"selected","name":"Selected"}],'
+                '"matched_constraints":["relationship"],"selected_index":-1,'
+                '"selected_id":"","value":""}'
+            ),
+        )
+
+    def test_zero_inferred_matches_and_non_list_ties_use_selected_fallback(
+        self,
+    ) -> None:
+        result = self.result(
+            "selector_ambiguity",
+            "zero_inferred_matches_also_uses_selected_record_fallback",
+        )
+
+        self.assertEqual(result["abstain_reason"], "multiple_match.")
+        self.assertEqual(
+            result["tie_candidates"],
+            [{"person_id": "selected-zero", "name": "Selected Zero"}],
+        )
+
+    def test_false_malformed_and_zero_longitude_coordinates_are_unavailable(
+        self,
+    ) -> None:
+        names = (
+            "false_location_availability_rejects_nonzero_coordinates",
+            "malformed_available_coordinates_are_not_concrete",
+            "zero_longitude_is_not_a_concrete_coordinate",
+        )
+        for name in names:
+            with self.subTest(name=name):
+                result = self.result("reminder", name)
+                self.assertFalse(result["should_call_add_reminder"])
+                self.assertEqual(
+                    result["abstain_reason"],
+                    "required_location_unresolved",
+                )
+                self.assertEqual(result["add_reminder_kwargs"], {})
+
+    def test_datetime_key_presence_and_timestamp_type_quirks_are_frozen(self) -> None:
+        invalid_calendar = self.result(
+            "reminder",
+            "invalid_calendar_values_with_full_datetime_keys_are_accepted",
+        )
+        clock_only = self.result(
+            "reminder",
+            "clock_only_datetime_recovers_then_requires_full_key_set",
+        )
+        numeric_string = self.result(
+            "reminder",
+            "numeric_string_prepared_timestamp_keeps_its_string_type",
+        )
+
+        self.assertTrue(invalid_calendar["should_call_add_reminder"])
+        self.assertEqual(
+            invalid_calendar["timestamp_source"],
+            "current_datetime_info",
+        )
+        self.assertEqual(
+            invalid_calendar["add_reminder_kwargs"]["reminder_timestamp"],
+            1_790_497_800.0,
+        )
+        self.assertFalse(clock_only["should_call_add_reminder"])
+        self.assertEqual(
+            clock_only["abstain_reason"],
+            "missing_current_datetime_info_call_timestamp_to_datetime_info",
+        )
+        prepared = numeric_string["add_reminder_kwargs"]["reminder_timestamp"]
+        self.assertIsInstance(prepared, str)
+        self.assertEqual(prepared, "1900000000.5")
+
+    def test_null_cleanup_is_shallow_and_preserves_survivor_order(self) -> None:
+        observed = self.case(
+            "native_and_null_order",
+            "deep_nested_nulls_survive_and_shallow_survivors_keep_order",
+        )
+        result = observed["result"]
+
+        self.assertEqual(
+            list(result["downstream_tool_kwargs"]),
+            ["first_survivor", "nested", "second_survivor"],
+        )
+        self.assertIsNone(
+            result["downstream_tool_kwargs"]["nested"]["deep_null"]
+        )
+        self.assertEqual(
+            list(result["downstream_tool_kwargs_list"][0]),
+            ["alpha", "nested", "omega"],
+        )
+        self.assertIsNone(
+            result["downstream_tool_kwargs_list"][0]["nested"]["deep_null"]
+        )
+        self.assertIsNone(result["ordinary_mapping"]["ordinary_null"])
+        self.assertEqual(
+            observed["result_compact_json"],
+            (
+                '{"downstream_tool_kwargs":{"first_survivor":1,"nested":'
+                '{"deep_null":null,"deep_value":"kept"},"second_survivor":false},'
+                '"downstream_tool_kwargs_list":[{"alpha":"A","nested":'
+                '{"deep_null":null},"omega":0},"opaque-list-entry",'
+                '{"first":1,"second":2}],"ordinary_mapping":'
+                '{"ordinary_null":null,"ordinary_value":"untouched"}}'
+            ),
+        )
 
 
 class RouterAndNormalizerTamperTests(unittest.TestCase):
