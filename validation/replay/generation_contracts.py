@@ -200,8 +200,7 @@ def probe_generation_boundary() -> dict[str, Any]:
         f"def {canonical_name}(value: str) -> str:\n    return value.casefold().strip()\n",
     )
     canonical_candidates = [
-        {"spec": canonical_spec.to_json(), "code": code}
-        for code in canonical_codes
+        {"spec": canonical_spec.to_json(), "code": code} for code in canonical_codes
     ]
     canonical_response = json.dumps(
         {"candidates": ["skip-non-object", {"spec": {}}, *canonical_candidates]},
@@ -366,9 +365,7 @@ def probe_generation_boundary() -> dict[str, Any]:
             "user_byte_count": len(request.user.encode("utf-8")),
             "user_sha256": hashlib.sha256(request.user.encode("utf-8")).hexdigest(),
             "system_byte_count": len(request.system.encode("utf-8")),
-            "system_sha256": hashlib.sha256(
-                request.system.encode("utf-8")
-            ).hexdigest(),
+            "system_sha256": hashlib.sha256(request.system.encode("utf-8")).hexdigest(),
         }
 
     call_roles: list[str] = []
@@ -392,9 +389,7 @@ def probe_generation_boundary() -> dict[str, Any]:
         "repair",
     ]
     if call_roles != expected_roles:
-        raise RuntimeError(
-            f"generator analysis-cache order changed: {call_roles!r}"
-        )
+        raise RuntimeError(f"generator analysis-cache order changed: {call_roles!r}")
     if "return value.strip().lower()" not in selected_standard.code:
         raise RuntimeError(
             "candidate selection no longer chooses first accepted tool: "
@@ -406,9 +401,7 @@ def probe_generation_boundary() -> dict[str, Any]:
         fenced, default_tool_name=canonical_name
     )
     parsing_errors = {
-        "top_level_list": _capture(
-            lambda: parse_generated_tool_candidates_json("[]")
-        ),
+        "top_level_list": _capture(lambda: parse_generated_tool_candidates_json("[]")),
         "no_valid_candidates": _capture(
             lambda: parse_generated_tool_candidates_json(
                 '{"candidates":[null,{"spec":{}}]}'
@@ -438,12 +431,8 @@ def probe_generation_boundary() -> dict[str, Any]:
             "standard": _exact(selected_standard.to_json()),
             "native": _exact(selected_native.to_json()),
             "first_repairs": _exact([tool.to_json() for tool in first_repairs]),
-            "repeated_repairs": _exact(
-                [tool.to_json() for tool in repeated_repairs]
-            ),
-            "strategy_repairs": _exact(
-                [tool.to_json() for tool in strategy_repairs]
-            ),
+            "repeated_repairs": _exact([tool.to_json() for tool in repeated_repairs]),
+            "strategy_repairs": _exact([tool.to_json() for tool in strategy_repairs]),
         },
     }
 
@@ -476,6 +465,23 @@ def probe_validation_distance() -> dict[str, Any]:
         "source_0_native_action_arguments:{'name': 'Dana'}!={'name': 'Dana', 'phone': '1'}",
         "source_0_mismatch:not-python!=also-not-python",
         "source_0_mismatch:{'same': 1}!={'same': 1}",
+        "source_0_mismatch:True!=1",
+        "source_0_mismatch:1!=1.0",
+        "source_0_mismatch:(1, 2)!=[1, 2]",
+        "source_0_mismatch:{'missing': None}!={}",
+        "source_0_mismatch:[1, None]!=[1]",
+        "source_0_mismatch:{1}!={2}",
+        "source_0_mismatch:{'nested': [NOT_GIVEN]}!={'nested': ['visible']}",
+        "source_0_mismatch:{NOT_GIVEN: 1}!={'__NOT_GIVEN__': 1}",
+        "source_0_mismatch:'NOT_GIVEN'!='visible'",
+        "source_0_mismatch:1",
+        "source_0_mismatch:1!=2!=3",
+        "source_0_mismatch:'a!=b'!='a!=b'",
+        "source_0_mismatch:1!=2_native_action_arguments:3!=4",
+        "source_0_native_action_arguments:1!=2_mismatch:3!=4",
+        "source_0_native_action_count_native_action_execution_error:broken",
+        "source_0_native_action_execution_error_native_action_count:broken",
+        "",
     ]
     rows = []
     for error in errors:
@@ -488,6 +494,23 @@ def probe_validation_distance() -> dict[str, Any]:
                 "error": error,
                 "generator_distance": generator_distance,
                 "online_birth_distance": online_distance,
+            }
+        )
+    non_string_rows = []
+    for value in (None, 7, ["source_0_mismatch:1!=2"], {"error": "generic"}):
+        generator_result = _capture(
+            lambda value=value: generator._single_validation_error_distance(value)  # type: ignore[arg-type]  # noqa: SLF001
+        )
+        online_result = _capture(
+            lambda value=value: online_birth._validation_error_distance(value)  # type: ignore[arg-type]  # noqa: SLF001
+        )
+        if generator_result != online_result:
+            raise RuntimeError(f"distance exceptions diverged for {value!r}")
+        non_string_rows.append(
+            {
+                "value": _jsonable(value),
+                "generator": generator_result,
+                "online_birth": online_result,
             }
         )
     aggregate = tuple(errors[11:16])
@@ -531,6 +554,7 @@ def probe_validation_distance() -> dict[str, Any]:
         )
     return {
         "error_rows": _exact(rows),
+        "non_string_rows": _exact(non_string_rows),
         "aggregate_scores": _exact(failure_results),
         "frontier_vectors": _exact(frontier_vectors),
     }
@@ -730,8 +754,7 @@ def probe_schema_ast_matrix() -> dict[str, Any]:
             "    return str(first) + str(second)\n"
         ),
         "denied_attribute_roots": (
-            "def replay(value):\n"
-            "    return subprocess.run(value)\n"
+            "def replay(value):\n    return subprocess.run(value)\n"
         ),
         "allowed_comprehension": (
             "def replay(values: list) -> list:\n"
@@ -739,8 +762,7 @@ def probe_schema_ast_matrix() -> dict[str, Any]:
         ),
     }
     ast_results = {
-        case_id: asdict(check_ast_safety(code))
-        for case_id, code in ast_cases.items()
+        case_id: asdict(check_ast_safety(code)) for case_id, code in ast_cases.items()
     }
 
     base = _tool(
@@ -762,10 +784,7 @@ def probe_schema_ast_matrix() -> dict[str, Any]:
                 base.spec,
                 inputs=(ToolInput("value", "str | None", "Visible value."),),
             ),
-            code=(
-                "def replay_schema_tool(value: str) -> str:\n"
-                "    return value\n"
-            ),
+            code=("def replay_schema_tool(value: str) -> str:\n    return value\n"),
         ),
         "syntax": replace(base, code="def replay_schema_tool(:\n    pass\n"),
         "zero_functions": replace(base, code="value = 1\n"),
@@ -799,15 +818,13 @@ def probe_schema_ast_matrix() -> dict[str, Any]:
         "wrong_input_annotation": replace(
             base,
             code=(
-                "def replay_schema_tool(value: int) -> str:\n"
-                "    return str(value)\n"
+                "def replay_schema_tool(value: int) -> str:\n    return str(value)\n"
             ),
         ),
         "wrong_return_annotation": replace(
             base,
             code=(
-                "def replay_schema_tool(value: str) -> int:\n"
-                "    return len(value)\n"
+                "def replay_schema_tool(value: str) -> int:\n    return len(value)\n"
             ),
         ),
     }
@@ -1074,9 +1091,7 @@ def probe_validator_matrix() -> dict[str, Any]:
         "unexpected_action_on_negative": native_tool(success),
     }
     native_results = {
-        case_id: _validation_payload(
-            validate_generated_tool(tool, native_examples)
-        )
+        case_id: _validation_payload(validate_generated_tool(tool, native_examples))
         for case_id, tool in native_cases.items()
     }
     expected_action_vectors = {
@@ -1163,10 +1178,7 @@ def probe_online_birth_repair() -> dict[str, Any]:
         return _tool(
             name,
             ToolFamily.CANONICALIZER,
-            (
-                f"def {name}(value: str) -> str:\n"
-                f"    return value\n# marker:{label}"
-            ),
+            (f"def {name}(value: str) -> str:\n    return value\n# marker:{label}"),
             inputs=(ToolInput("value", "str", "Visible value."),),
             output_annotation="str",
             positive=("repair_replay",),
@@ -1174,15 +1186,11 @@ def probe_online_birth_repair() -> dict[str, Any]:
 
     def observation(name: str, *, native: bool = False) -> CapabilityObservation:
         family = (
-            ToolFamily.COMPOSITE_WORKFLOW_HELPER
-            if native
-            else ToolFamily.CANONICALIZER
+            ToolFamily.COMPOSITE_WORKFLOW_HELPER if native else ToolFamily.CANONICALIZER
         )
         return CapabilityObservation(
             scenario_name=f"visible_{name}",
-            canonical_key=(
-                f"composite:{name}" if native else f"canonicalizer:{name}"
-            ),
+            canonical_key=(f"composite:{name}" if native else f"canonicalizer:{name}"),
             observation=(
                 "Repeated visible values require deterministic repair behavior "
                 "across several related requests."
@@ -1281,7 +1289,11 @@ def probe_online_birth_repair() -> dict[str, Any]:
         )
         return {
             "event": event,
-            **{key: copy.deepcopy(payload[key]) for key in stable_keys if key in payload},
+            **{
+                key: copy.deepcopy(payload[key])
+                for key in stable_keys
+                if key in payload
+            },
         }
 
     def run_case(
@@ -1349,9 +1361,7 @@ def probe_online_birth_repair() -> dict[str, Any]:
             for index in range(3, CANDIDATE_REPAIR_ATTEMPTS + 1)
         },
     }
-    initial_error = (
-        "source_0_mismatch:{'a': 1, 'b': 2}!={'a': 9, 'b': 8}",
-    )
+    initial_error = ("source_0_mismatch:{'a': 1, 'b': 2}!={'a': 9, 'b': 8}",)
     plateau_error = ("source_1_mismatch:1!=2",)
     nonnative_validations = {
         "initial": ValidationResult(False, initial_error),
@@ -1389,18 +1399,10 @@ def probe_online_birth_repair() -> dict[str, Any]:
         },
     )
     native_validations = {
-        "native_initial": ValidationResult(
-            False, ("source_0_mismatch:1!=2",)
-        ),
-        "frontier_one": ValidationResult(
-            False, ("held_out_0_mismatch:1!=2",)
-        ),
-        "frontier_stuck": ValidationResult(
-            False, ("held_out_0_error:still failing",)
-        ),
-        "frontier_two": ValidationResult(
-            False, ("negative_0_mismatch:1!=2",)
-        ),
+        "native_initial": ValidationResult(False, ("source_0_mismatch:1!=2",)),
+        "frontier_one": ValidationResult(False, ("held_out_0_mismatch:1!=2",)),
+        "frontier_stuck": ValidationResult(False, ("held_out_0_error:still failing",)),
+        "frontier_two": ValidationResult(False, ("negative_0_mismatch:1!=2",)),
         "native_accepted": ValidationResult(
             True,
             (),
@@ -1416,9 +1418,7 @@ def probe_online_birth_repair() -> dict[str, Any]:
         native_validations,
         native=True,
     )
-    native_seed_order = [
-        item["seed_marker"] for item in native_generator.repair_calls
-    ]
+    native_seed_order = [item["seed_marker"] for item in native_generator.repair_calls]
     if native_seed_order != [
         "native_initial",
         "frontier_one",
