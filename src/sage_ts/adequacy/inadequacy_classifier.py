@@ -4165,195 +4165,166 @@ def _visible_broad_location_phrase_requested(text: str) -> bool:
 
 
 def _visible_task_signals(
-    user_request: str,
-    available_tools: tuple[str, ...],
+    user_request: str, available_tools: tuple[str, ...]
 ) -> tuple[str, ...]:
     text = user_request.lower()
     tools = set(available_tools)
     signals: list[str] = []
+
+    def has_text(*phrases: str) -> bool:
+        return _has_any(text, phrases)
+
+    def has_tool(*names: str) -> bool:
+        return not tools.isdisjoint(names)
+
+    def has_signal(*names: str) -> bool:
+        return any(name in signals for name in names)
+
+    contact_recency_core = has_text(
+        "whoever i contacted",
+        "contacted last",
+        "last contacted",
+        "who did i talk to",
+        "who did i speak to",
+        "talk to last",
+        "talked to last",
+        "spoke to last",
+    )
+    message_counterparty_core = contact_recency_core or has_text(
+        "who sent",
+        "asked me",
+        "sent me",
+        "which contact",
+        "last conversation",
+        "last chat",
+    )
+    message_chronology_core = has_text(
+        "latest",
+        "oldest",
+        "earliest",
+        "first message",
+        "first text",
+        "first ever",
+        "last message",
+        "most recent",
+    )
+    basic_change_intent = has_text("update", "modify", "change")
+    basic_removal_intent = has_text("remove", "delete", "get rid")
+    singular_contact_role = has_text("friend", "enemy", "coworker", "boss")
+    plural_contact_role = has_text("friends", "enemies", "coworkers", "bosses")
     has_visible_identifier = bool(
         re.search(r"\b(?:id|person id|contact id)\s+[a-z0-9-]{6,}", text)
     )
-    contacted_recency_target = _has_any(
-        text,
-        (
-            "whoever i contacted",
-            "whoever contacted me",
-            "contacted last",
-            "last contacted",
-            "i contacted last",
-            "contacted most recently",
-            "most recently contacted",
-            "who did i talk to",
-            "who did i speak to",
-            "talk to last",
-            "talked to last",
-            "speak to last",
-            "spoke to last",
-            "last talked",
-            "last spoke",
-            "most recently talked",
-            "most recently spoke",
-        ),
+    contacted_recency_target = contact_recency_core or has_text(
+        "whoever contacted me",
+        "i contacted last",
+        "contacted most recently",
+        "most recently contacted",
+        "speak to last",
+        "last talked",
+        "last spoke",
+        "most recently talked",
+        "most recently spoke",
     )
     message_counterparty_text = (
         contacted_recency_target
-        or _has_any(
-            text,
-            (
-                "latest",
-                "oldest",
-                "recent",
-                "last message",
-                "last person",
-                "last contact",
-                "most recent message",
-                "last conversation",
-                "last chat",
-            ),
-        )
-        and _has_any(
-            text,
-            (
-                "contacted",
-                "message",
-                "messages",
-                "text",
-                "sent",
-                "wrote",
-                "written",
-                "writer",
-                "author",
-                "asked me",
-                "talk",
-                "talked",
-                "speak",
-                "spoke",
-                "chat",
-                "conversation",
-            ),
-        )
-    )
-    message_counterparty_target = (
-        "search_messages" in tools and message_counterparty_text
-    )
-    contact_change_intent = _has_any(
-        text,
-        (
-            "update",
-            "modify",
-            "change",
-            "mark ",
-            "mark as",
-            "marked",
-            "classify",
-            "classified",
-            "label ",
-            "labeled",
-            "set ",
-        ),
-    )
-    recency_or_indirect_target = message_counterparty_target or _has_any(
-        text,
-        (
+        or has_text(
             "latest",
             "oldest",
             "recent",
             "last message",
             "last person",
             "last contact",
-            "first text",
-            "first ever",
-            "first message",
-            "earliest",
-            "most recent",
-            "who sent",
-            "whoever i contacted",
-            "contacted last",
-            "last contacted",
-            "asked me",
-            "sent me",
-            "which contact",
-            "who did i talk to",
-            "who did i speak to",
-            "talk to last",
-            "talked to last",
-            "spoke to last",
+            "most recent message",
             "last conversation",
             "last chat",
-        ),
+        )
+        and has_text(
+            "contacted",
+            "message",
+            "messages",
+            "text",
+            "sent",
+            "wrote",
+            "written",
+            "writer",
+            "author",
+            "asked me",
+            "talk",
+            "talked",
+            "speak",
+            "spoke",
+            "chat",
+            "conversation",
+        )
+    )
+    message_counterparty_target = (
+        "search_messages" in tools and message_counterparty_text
+    )
+    contact_change_intent = basic_change_intent or has_text(
+        "mark ",
+        "mark as",
+        "marked",
+        "classify",
+        "classified",
+        "label ",
+        "labeled",
+        "set ",
+    )
+    recency_or_indirect_target = (
+        message_counterparty_target
+        or message_counterparty_core
+        or message_chronology_core
+        or has_text("recent", "last person", "last contact")
     )
 
     def add(signal: str, condition: bool) -> None:
         if condition and signal not in signals:
             signals.append(signal)
 
+    external_contact_role = singular_contact_role or has_text(
+        "contact", "person", "relationship"
+    )
     external_location_phone_request = (
         "phone number" in text
-        and bool(tools & {"search_location_around_lat_lon", "search_lat_lon"})
+        and has_tool("search_location_around_lat_lon", "search_lat_lon")
         and _visible_location_phrase_requested(text)
-        and not _has_any(
-            text,
-            (
-                "contact",
-                "friend",
-                "enemy",
-                "boss",
-                "coworker",
-                "person",
-                "relationship",
-            ),
-        )
+        and not external_contact_role
     )
 
     add("insufficient_information", "insufficient information" in text)
     add("has_phone_number", _has_phone_like_value(text))
     add(
         "contact",
-        bool(
-            tools
-            & {"search_contacts", "add_contact", "modify_contact", "remove_contact"}
-        )
+        has_tool("search_contacts", "add_contact", "modify_contact", "remove_contact")
         and (
             "has_phone_number" in signals
             or has_visible_identifier
-            or _has_any(
-                text,
-                (
-                    "contact",
-                    "phone",
-                    "relationship",
-                    "person",
-                    "friend",
-                    "enemy",
-                    "enemies",
-                    "coworker",
-                    "coworkers",
-                    "boss",
-                    "bosses",
-                ),
+            or singular_contact_role
+            or has_text(
+                "contact",
+                "phone",
+                "relationship",
+                "person",
+                "enemies",
+                "coworkers",
+                "bosses",
             )
         ),
     )
     add(
         "add_contact",
         "add_contact" in tools
-        and _has_any(text, ("add ", "create ", "save "))
+        and has_text("add ", "create ", "save ")
         and "contact" in text,
     )
-    remove_contact_intent = _has_any(
-        text,
-        (
-            "remove",
-            "delete",
-            "get rid",
-            "get him out",
-            "get her out",
-            "get them out",
-            "get this person out",
-            "out of my contact",
-            "out of my contacts",
-        ),
+    remove_contact_intent = basic_removal_intent or has_text(
+        "get him out",
+        "get her out",
+        "get them out",
+        "get this person out",
+        "out of my contact",
+        "out of my contacts",
     )
     add(
         "requested_remove_contact",
@@ -4369,9 +4340,7 @@ def _visible_task_signals(
     )
     add(
         "contact_update_by_id",
-        "modify_contact" in tools
-        and has_visible_identifier
-        and _has_any(text, ("update", "modify", "change")),
+        "modify_contact" in tools and has_visible_identifier and basic_change_intent,
     )
     phone_contact_target_lookup = "has_phone_number" in signals and (
         "requested_remove_contact" in signals or "modify_contact" in signals
@@ -4387,51 +4356,24 @@ def _visible_task_signals(
         and not external_location_phone_request
         and not (message_counterparty_target and contact_change_intent)
         and (
-            _has_any(
-                text,
-                ("phone number", "relationship", "who is", "what is", "who are"),
-            )
+            has_text("phone number", "relationship", "who is", "what is", "who are")
             or phone_contact_target_lookup
             or underspecified_contact_action_lookup
         )
         and (
-            _has_any(
-                text,
-                ("contact", "friend", "enemy", "boss", "coworker", "phone", "number"),
-            )
+            singular_contact_role
+            or has_text("contact", "phone", "number")
             or "has_phone_number" in signals
         ),
     )
-    relationship_update_request = _has_any(
-        text,
-        ("update", "modify", "change", "make", "turn", "set "),
+    relationship_update_request = basic_change_intent or has_text(
+        "make", "turn", "set "
     )
-    relationship_group_request = _has_any(
-        text,
-        (
-            "all ",
-            "all of",
-            "everyone",
-            "them",
-            "friends",
-            "enemies",
-            "coworkers",
-            "bosses",
-        ),
+    relationship_group_request = plural_contact_role or has_text(
+        "all ", "all of", "everyone", "them"
     )
-    relationship_target_request = _has_any(
-        text,
-        (
-            "friend",
-            "friends",
-            "enemy",
-            "enemies",
-            "coworker",
-            "coworkers",
-            "boss",
-            "bosses",
-            "relationship",
-        ),
+    relationship_target_request = (
+        singular_contact_role or plural_contact_role or "relationship" in text
     )
     relationship_group_lookup_for_possible_followup = (
         "search_contacts" in tools
@@ -4439,7 +4381,7 @@ def _visible_task_signals(
         and not relationship_update_request
         and relationship_group_request
         and relationship_target_request
-        and _has_any(text, ("who are", "which", "list", "show", "find", "search"))
+        and has_text("who are", "which", "list", "show", "find", "search")
     )
     add(
         "relationship_batch_update",
@@ -4455,20 +4397,17 @@ def _visible_task_signals(
     direct_scalar_action = (
         not recency_or_indirect_target
         and "relationship_batch_update" not in signals
-        and bool(
-            tools
-            & {
-                "add_contact",
-                "modify_contact",
-                "remove_contact",
-                "send_message_with_phone_number",
-            }
+        and has_tool(
+            "add_contact",
+            "modify_contact",
+            "remove_contact",
+            "send_message_with_phone_number",
         )
         and (
             (
                 "send_message_with_phone_number" in tools
                 and "has_phone_number" in signals
-                and _has_any(text, ("send", "text", "message"))
+                and has_text("send", "text", "message")
             )
             or (
                 "add_contact" in tools
@@ -4476,9 +4415,9 @@ def _visible_task_signals(
                 and "has_phone_number" in signals
             )
             or (
-                bool(tools & {"modify_contact", "remove_contact"})
+                has_tool("modify_contact", "remove_contact")
                 and has_visible_identifier
-                and _has_any(text, ("remove", "delete", "update", "modify"))
+                and has_text("remove", "delete", "update", "modify")
             )
         )
     )
@@ -4505,48 +4444,28 @@ def _visible_task_signals(
 
     add(
         "message",
-        bool(tools & {"search_messages", "send_message_with_phone_number"})
-        and _has_any(
-            text,
-            (
-                "message",
-                "messages",
-                "text",
-                "contacted",
-                "send",
-                "sent me",
-                "asked me",
-            ),
+        has_tool("search_messages", "send_message_with_phone_number")
+        and has_text(
+            "message", "messages", "text", "contacted", "send", "sent me", "asked me"
         ),
     )
-    message_lookup_intent = _has_any(
-        text,
-        (
-            "find",
-            "look for",
-            "search",
-            "what does",
-            "what's",
-            "which message",
-            "which text",
-            "oldest",
-            "latest",
-            "earliest",
-            "first message",
-            "first text",
-            "first ever",
-            "last message",
-            "last text",
-            "most recent",
-            "sent me",
-            "asked me",
-        ),
+    message_lookup_intent = message_chronology_core or has_text(
+        "find",
+        "look for",
+        "search",
+        "what does",
+        "what's",
+        "which message",
+        "which text",
+        "last text",
+        "sent me",
+        "asked me",
     )
     explicit_send_message_intent = (
         "send_message_with_phone_number" in tools
         and not message_lookup_intent
         and (
-            _has_any(text, ("send", "message to", "text to", "tell ", "ask "))
+            has_text("send", "message to", "text to", "tell ", "ask ")
             or bool(re.search(r"\btext\s+(?:\+?\d|[a-z][a-z0-9_'-]+)\b", text))
         )
     )
@@ -4565,65 +4484,32 @@ def _visible_task_signals(
     )
     message_search_followup_possible = (
         "search_messages" in tools
-        and _has_any(text, ("find", "look for", "search"))
-        and _has_any(text, ("message", "messages", "text"))
-        and not _has_any(text, ("send", "sent me", "asked me", "which phone number"))
+        and has_text("find", "look for", "search")
+        and has_text("message", "messages", "text")
+        and not has_text("send", "sent me", "asked me", "which phone number")
     )
     add(
         "message_recency",
         "search_messages" in tools
-        and bool(
-            {
-                "message",
-                "message_counterparty_lookup",
-                "message_counterparty_update",
-            }
-            & set(signals)
+        and has_signal(
+            "message", "message_counterparty_lookup", "message_counterparty_update"
         )
-        and _has_any(
-            text,
-            (
-                "latest",
-                "oldest",
-                "earliest",
-                "recent",
-                "last message",
-                "last text",
-                "first message",
-                "first text",
-                "first ever",
-                "most recent",
-            ),
-        ),
+        and (message_chronology_core or has_text("recent", "last text")),
     )
     add("message_search_followup_possible", message_search_followup_possible)
     add(
         "message_counterparty_lookup",
         "search_messages" in tools
-        and _has_any(
-            text,
-            (
+        and (
+            message_counterparty_core
+            or has_text(
                 "which phone number",
                 "who asked",
-                "who sent",
-                "asked me",
-                "sent me",
                 "wrote to me",
                 "written to me",
                 "who wrote",
                 "author",
-                "which contact",
-                "whoever i contacted",
-                "contacted last",
-                "last contacted",
-                "who did i talk to",
-                "who did i speak to",
-                "talk to last",
-                "talked to last",
-                "spoke to last",
-                "last conversation",
-                "last chat",
-            ),
+            )
         ),
     )
     add(
@@ -4637,94 +4523,66 @@ def _visible_task_signals(
         "insufficient_information",
         "search_messages" not in tools
         and message_counterparty_text
-        and bool(tools & {"modify_contact", "remove_contact", "search_contacts"})
-        and _has_any(text, ("update", "modify", "change", "remove", "delete")),
+        and has_tool("modify_contact", "remove_contact", "search_contacts")
+        and (basic_change_intent or has_text("remove", "delete")),
     )
 
-    request_mentions_reminder = _has_any(text, ("reminder", "remind", "todo", "to-do"))
-    reminder_creation_request = _has_any(
-        text,
-        (
-            "remind me to",
-            "add a reminder",
-            "add reminder",
-            "create a reminder",
-            "create reminder",
-            "set a reminder",
-            "set reminder",
-            "add a todo",
-            "add todo",
-            "create a todo",
-            "create todo",
-            "new reminder",
-            "new todo",
-        ),
+    request_mentions_reminder = has_text("reminder", "remind", "todo", "to-do")
+    reminder_creation_request = has_text(
+        "remind me to",
+        "add a reminder",
+        "add reminder",
+        "create a reminder",
+        "create reminder",
+        "set a reminder",
+        "set reminder",
+        "add a todo",
+        "add todo",
+        "create a todo",
+        "create todo",
+        "new reminder",
+        "new todo",
     )
     add(
         "reminder",
-        bool(
-            tools
-            & {"add_reminder", "modify_reminder", "remove_reminder", "search_reminder"}
+        has_tool(
+            "add_reminder", "modify_reminder", "remove_reminder", "search_reminder"
         )
         and request_mentions_reminder,
     )
-    add(
-        "reminder_create",
-        "add_reminder" in tools and reminder_creation_request,
-    )
+    add("reminder_create", "add_reminder" in tools and reminder_creation_request)
     add(
         "reminder_modify",
         "modify_reminder" in tools
-        and _has_any(
-            text,
-            (
-                "modify",
-                "update",
-                "change",
-                "postpone",
-                "reschedule",
-                "move",
-                "push",
-                "shift",
-                "delay",
-                "defer",
-            ),
+        and (
+            basic_change_intent
+            or has_text(
+                "postpone", "reschedule", "move", "push", "shift", "delay", "defer"
+            )
         )
         and "reminder" in text,
     )
     add(
         "reminder_remove",
         "remove_reminder" in tools
-        and _has_any(text, ("remove", "delete", "get rid", "cancel", "clear"))
+        and (basic_removal_intent or has_text("cancel", "clear"))
         and "reminder" in text,
     )
-    has_relative_time_signal = _has_any(
-        text,
-        (
-            "tomorrow",
-            "tonight",
-            "next ",
-            "in a week",
-            "in two",
-            "days from",
-            "weeks from",
-            "today",
-            "yesterday",
-            "upcoming",
-            "later",
-        ),
+    has_relative_time_signal = has_text(
+        "tomorrow",
+        "tonight",
+        "next ",
+        "in a week",
+        "in two",
+        "days from",
+        "weeks from",
+        "today",
+        "yesterday",
+        "upcoming",
+        "later",
     )
-    has_weekday_time_signal = _has_any(
-        text,
-        (
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-        ),
+    has_weekday_time_signal = has_text(
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
     )
     has_explicit_time_signal = bool(re.search(r"\b\d{1,2}(:\d{2})?\s*(am|pm)\b", text))
     has_absolute_date_signal = bool(
@@ -4752,64 +4610,55 @@ def _visible_task_signals(
             or has_absolute_date_signal
         ),
     )
-    visible_contact_workflow = bool(
-        {
-            "add_contact",
-            "requested_remove_contact",
-            "remove_contact",
-            "modify_contact",
-            "contact_update_by_id",
-            "direct_contact_action",
-            "relationship_batch_update",
-            "contact_lookup",
-        }
-        & set(signals)
+    visible_contact_workflow = has_signal(
+        "add_contact",
+        "requested_remove_contact",
+        "remove_contact",
+        "modify_contact",
+        "contact_update_by_id",
+        "direct_contact_action",
+        "relationship_batch_update",
+        "contact_lookup",
     )
     add(
         "location_phrase",
-        bool(tools & {"search_location_around_lat_lon", "search_lat_lon"})
+        has_tool("search_location_around_lat_lon", "search_lat_lon")
         and _visible_location_phrase_requested(text)
         and (external_location_phone_request or not visible_contact_workflow),
     )
-    recency_search_domain = bool(
-        {
-            "message",
-            "message_recency",
-            "message_counterparty_lookup",
-            "message_counterparty_update",
-            "reminder",
-            "reminder_create",
-            "reminder_modify",
-            "reminder_remove",
-        }
-        & set(signals)
+    recency_search_domain = has_signal(
+        "message",
+        "message_recency",
+        "message_counterparty_lookup",
+        "message_counterparty_update",
+        "reminder",
+        "reminder_create",
+        "reminder_modify",
+        "reminder_remove",
     )
     add(
         "recency_search",
         recency_search_domain
-        and bool(tools & {"search_reminder", "search_messages"})
-        and _has_any(
-            text,
-            (
-                "latest",
-                "oldest",
-                "earliest",
-                "first ",
-                "first ever",
-                "recent",
-                "yesterday",
-                "today",
-                "upcoming",
-                "next",
-                "later",
-                "made",
-                "created",
-                "last ",
-                "contacted last",
-                "sent last",
-                "received last",
-                "texted last",
-            ),
+        and has_tool("search_reminder", "search_messages")
+        and has_text(
+            "latest",
+            "oldest",
+            "earliest",
+            "first ",
+            "first ever",
+            "recent",
+            "yesterday",
+            "today",
+            "upcoming",
+            "next",
+            "later",
+            "made",
+            "created",
+            "last ",
+            "contacted last",
+            "sent last",
+            "received last",
+            "texted last",
         ),
     )
     relative_anchor_requires_current_time = (
@@ -4824,38 +4673,29 @@ def _visible_task_signals(
             )
         )
     )
-    add(
-        "missing_current_time_prerequisite",
-        relative_anchor_requires_current_time,
-    )
+    add("missing_current_time_prerequisite", relative_anchor_requires_current_time)
     add("safe_abstain_needed", relative_anchor_requires_current_time)
     add(
         "upcoming_reminder_search",
         "recency_search" in signals
         and "reminder" in signals
-        and _has_any(
-            text,
-            (
-                "next reminder",
-                "upcoming reminder",
-                "next todo",
-                "next to-do",
-                "upcoming todo",
-                "upcoming to-do",
-            ),
+        and has_text(
+            "next reminder",
+            "upcoming reminder",
+            "next todo",
+            "next to-do",
+            "upcoming todo",
+            "upcoming to-do",
         ),
     )
     add(
         "message_recency_search",
         "recency_search" in signals
-        and bool(
-            {
-                "message",
-                "message_recency",
-                "message_counterparty_lookup",
-                "message_counterparty_update",
-            }
-            & set(signals)
+        and has_signal(
+            "message",
+            "message_recency",
+            "message_counterparty_lookup",
+            "message_counterparty_update",
         ),
     )
     add(
@@ -4863,91 +4703,75 @@ def _visible_task_signals(
         "recency_search" in signals
         and "reminder" in signals
         and "upcoming_reminder_search" not in signals
-        and _has_any(
-            text,
-            (
-                "latest reminder",
-                "most recent reminder",
-                "oldest reminder",
-                "earliest reminder",
-                "last reminder",
-            ),
+        and has_text(
+            "latest reminder",
+            "most recent reminder",
+            "oldest reminder",
+            "earliest reminder",
+            "last reminder",
         ),
     )
     add(
         "recency_action",
         "recency_search" in signals
         and "reminder" in signals
-        and bool(tools & {"modify_reminder", "remove_reminder"})
-        and bool({"reminder_modify", "reminder_remove"} & set(signals)),
+        and has_tool("modify_reminder", "remove_reminder")
+        and has_signal("reminder_modify", "reminder_remove"),
     )
 
     add(
         "device_status_read",
-        bool(
-            tools
-            & {
-                "get_wifi_status",
-                "get_cellular_service_status",
-                "get_location_service_status",
-                "get_low_battery_mode_status",
-            }
+        has_tool(
+            "get_wifi_status",
+            "get_cellular_service_status",
+            "get_location_service_status",
+            "get_low_battery_mode_status",
         )
-        and _has_any(text, ("is my", "whether", "status", "check"))
-        and _has_any(text, ("wifi", "cellular", "location", "low battery")),
+        and has_text("is my", "whether", "status", "check")
+        and has_text("wifi", "cellular", "location", "low battery"),
     )
-    state_precondition_setters = {
+    has_state_precondition_setter = has_tool(
         "set_wifi_status",
         "set_cellular_service_status",
         "set_location_service_status",
         "set_low_battery_mode_status",
-    }
-    has_state_precondition_setter = bool(tools & state_precondition_setters)
-    direct_device_state_request = has_state_precondition_setter and (
-        _has_any(text, ("turn on", "turn off", "enable", "disable"))
-        and _has_any(text, ("wifi", "cellular", "location", "low battery"))
     )
-    dependent_state_need = _has_any(
-        text,
-        (
-            "resolve any issue",
-            "issue alone",
-            "whatever you need",
-            "if needed",
-            "can't send",
-            "cannot send",
-            "can't access",
-            "cannot access",
-            "can't connect",
-            "cannot connect",
-            "cellphone signal",
-            "current location",
-            "connected to the internet",
-            "access my current location",
-            "so you can",
-            "in order to",
-        ),
+    direct_device_state_request = has_state_precondition_setter and (
+        has_text("turn on", "turn off", "enable", "disable")
+        and has_text("wifi", "cellular", "location", "low battery")
+    )
+    dependent_state_need = has_text(
+        "resolve any issue",
+        "issue alone",
+        "whatever you need",
+        "if needed",
+        "can't send",
+        "cannot send",
+        "can't access",
+        "cannot access",
+        "can't connect",
+        "cannot connect",
+        "cellphone signal",
+        "current location",
+        "connected to the internet",
+        "access my current location",
+        "so you can",
+        "in order to",
     )
     add("direct_device_state_action", direct_device_state_request)
-    add(
-        "device_state_action",
-        direct_device_state_request or dependent_state_need,
-    )
-    stateful_downstream_tool = bool(
-        tools
-        & {
-            "send_message_with_phone_number",
-            "search_location_around_lat_lon",
-            "search_lat_lon",
-            "calculate_lat_lon_distance",
-            "search_holiday",
-        }
+    add("device_state_action", direct_device_state_request or dependent_state_need)
+    stateful_downstream_tool = has_tool(
+        "send_message_with_phone_number",
+        "search_location_around_lat_lon",
+        "search_lat_lon",
+        "calculate_lat_lon_distance",
+        "search_holiday",
     )
     visible_stateful_dependency = (
         (
             "location_phrase" in signals
             and not external_location_phone_request
-            and bool(tools & {"search_location_around_lat_lon", "search_lat_lon"})
+            and has_tool("search_location_around_lat_lon", "search_lat_lon")
         )
         or ("send_message" in signals and "send_message_with_phone_number" in tools)
         or ("holiday" in signals and "search_holiday" in tools)
@@ -4960,34 +4784,29 @@ def _visible_task_signals(
         and (
             dependent_state_need
             or visible_stateful_dependency
-            or _has_any(
-                text, ("cellular off", "wifi off", "location off", "low battery")
-            )
+            or has_text("cellular off", "wifi off", "location off", "low battery")
         ),
     )
 
     add(
         "holiday",
         "search_holiday" in tools
-        and _has_any(
-            text,
-            (
-                "holiday",
-                "christmas",
-                "thanksgiving",
-                "easter",
-                "halloween",
-                "memorial day",
-                "labor day",
-                "independence day",
-                "veterans day",
-            ),
+        and has_text(
+            "holiday",
+            "christmas",
+            "thanksgiving",
+            "easter",
+            "halloween",
+            "memorial day",
+            "labor day",
+            "independence day",
+            "veterans day",
         ),
     )
     add(
         "calendar_distance",
         "holiday" in signals
-        and _has_any(text, ("how many days", "days until", "days till", "when is")),
+        and has_text("how many days", "days until", "days till", "when is"),
     )
     add(
         "insufficient_information",
@@ -4997,126 +4816,84 @@ def _visible_task_signals(
         "currency_lookup",
         "convert_currency" in tools
         and (
-            _has_any(
-                text, ("currency", "convert", "usd", "cny", "eur", "gbp", "jpy", "$")
-            )
+            has_text("currency", "convert", "usd", "cny", "eur", "gbp", "jpy", "$")
             or "how much is" in text
         ),
     )
-    contact_workflow = bool(
-        {
-            "contact",
-            "add_contact",
-            "requested_remove_contact",
-            "remove_contact",
-            "modify_contact",
-            "direct_contact_action",
-            "relationship_batch_update",
-        }
-        & set(signals)
+    contact_workflow = has_signal(
+        "contact",
+        "add_contact",
+        "requested_remove_contact",
+        "remove_contact",
+        "modify_contact",
+        "direct_contact_action",
+        "relationship_batch_update",
+    )
+    service_value_term = has_text(
+        "temperature",
+        "temp",
+        "weather",
+        "celsius",
+        "fahrenheit",
+        "distance",
+        "how far",
+        "how many km",
+        "how many miles",
+        "km to",
+        "miles to",
+        "convert",
+        "address",
     )
     external_query_text = (
-        _has_any(
-            text,
-            (
-                "temperature",
-                "temp",
-                "weather",
-                "celsius",
-                "fahrenheit",
-                "distance",
-                "how far",
-                "how many km",
-                "how many miles",
-                "km to",
-                "miles to",
-                "currency",
-                "convert",
-                "stock",
-                "address",
-                "business",
-                "restaurant",
-                "store",
-                "venue",
-            ),
-        )
+        service_value_term
+        or has_text("currency", "stock", "business", "restaurant", "store", "venue")
         or external_location_phone_request
         or (
             "phone number" in text
             and not contact_workflow
-            and _has_any(
-                text,
-                (
-                    "find",
-                    "what is",
-                    "what's",
-                    "lookup",
-                    "look up",
-                    "business",
-                    "restaurant",
-                    "store",
-                    "venue",
-                ),
+            and has_text(
+                "find",
+                "what is",
+                "what's",
+                "lookup",
+                "look up",
+                "business",
+                "restaurant",
+                "store",
+                "venue",
             )
         )
     )
     add(
         "external_lookup",
-        bool(
-            tools
-            & {
-                "search_lat_lon",
-                "search_location_around_lat_lon",
-                "search_weather_around_lat_lon",
-                "calculate_lat_lon_distance",
-                "convert_currency",
-                "search_stock",
-            }
+        has_tool(
+            "search_lat_lon",
+            "search_location_around_lat_lon",
+            "search_weather_around_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
+            "search_stock",
         )
         and (external_query_text or "currency_lookup" in signals),
     )
     add(
         "stock_lookup",
-        "search_stock" in tools and _has_any(text, ("stock", "ticker", "symbol")),
+        "search_stock" in tools and has_text("stock", "ticker", "symbol"),
     )
     add(
         "service_answer_extraction",
         "external_lookup" in signals
         and "stock_lookup" not in signals
-        and bool(
-            tools
-            & {
-                "search_lat_lon",
-                "search_location_around_lat_lon",
-                "search_weather_around_lat_lon",
-                "calculate_lat_lon_distance",
-                "convert_currency",
-            }
+        and has_tool(
+            "search_lat_lon",
+            "search_location_around_lat_lon",
+            "search_weather_around_lat_lon",
+            "calculate_lat_lon_distance",
+            "convert_currency",
         )
         and (
-            _has_any(
-                text,
-                (
-                    "what is",
-                    "what's",
-                    "find",
-                    "how far",
-                    "how many km",
-                    "how many miles",
-                    "km to",
-                    "miles to",
-                    "convert",
-                    "phone number",
-                    "address",
-                    "distance",
-                    "temperature",
-                    "temp",
-                    "weather",
-                    "forecast",
-                    "celsius",
-                    "fahrenheit",
-                ),
-            )
+            service_value_term
+            or has_text("what is", "what's", "find", "phone number", "forecast")
             or "currency_lookup" in signals
         ),
     )
