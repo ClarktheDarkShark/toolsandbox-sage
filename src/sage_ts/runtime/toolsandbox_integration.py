@@ -8,12 +8,11 @@ import inspect
 import json
 import re
 from collections.abc import Iterable, Mapping, MutableMapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Literal, cast
 
-from sage_ts.evaluation.task_strata import base_task_family
 from sage_ts.generation.complete_tools import (
-    COMPLETE_TOOLS_NATIVE_NAMES,
     native_action_names_for_tool,
     native_action_tool_enabled,
 )
@@ -22,6 +21,8 @@ from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proo
 from sage_ts.registry.store import RegistryStore
 from sage_ts.runtime.routing_scorer import (
     DEFAULT_MAX_RUNTIME_BUNDLE_SIZE,
+    DownstreamRequirement,
+    LifecycleRoutingFacts,
     RoutingTextFacts,
     RuntimeRoutingDecision,
     _is_insufficient_information_guard,
@@ -1872,143 +1873,6 @@ def load_tool_lifecycle_routing_state(registry_root: Path) -> dict[str, dict[str
     }
 
 
-def _lifecycle_visibility_override(
-    *,
-    tool_name: str,
-    scenario_name: str | None,
-    lifecycle_state: dict[str, dict[str, Any]] | None,
-) -> tuple[bool, str] | None:
-    if not scenario_name or not lifecycle_state:
-        return None
-    row = lifecycle_state.get(tool_name)
-    if not row:
-        return None
-    decision = str(row.get("decision") or "")
-    if decision in {"park", "parked"}:
-        return False, "lifecycle_suppressed_parked_tool"
-
-    scenario_family = base_task_family(scenario_name)
-    route_repair_families = {
-        str(item) for item in row.get("route_repair_families", []) if item
-    }
-    harmful_scenarios = [
-        str(item) for item in row.get("harmful_called_scenarios", []) if item
-    ]
-    harmful_count = row.get("harmful_called_count")
-    try:
-        harmful_count_int = int(harmful_count)
-    except (TypeError, ValueError):
-        harmful_count_int = len(harmful_scenarios)
-    helpful_families = [
-        str(item) for item in row.get("helpful_called_families", []) if item
-    ]
-    harmful_families_list = [
-        str(item) for item in row.get("harmful_called_families", []) if item
-    ]
-    if not harmful_families_list:
-        harmful_families_list = harmful_scenarios
-    if not helpful_families:
-        helpful_families = [
-            str(item) for item in row.get("helpful_called_scenarios", []) if item
-        ]
-
-    def same_family(value: str) -> bool:
-        family = str(value or "")
-        return family == scenario_family or base_task_family(family) == scenario_family
-
-    harmful_family_count = sum(1 for item in harmful_families_list if same_family(item))
-    helpful_family_count = sum(1 for item in helpful_families if same_family(item))
-    is_validation_abstention_tool = tool_name == "prepare_safe_action_or_abstain"
-    if is_validation_abstention_tool:
-        try:
-            side_effect_incident_count = int(row.get("side_effect_incident_count") or 0)
-        except (TypeError, ValueError):
-            side_effect_incident_count = 0
-        try:
-            failed_count = int(row.get("failed_count") or 0)
-        except (TypeError, ValueError):
-            failed_count = 0
-        operationally_clean = side_effect_incident_count == 0 and failed_count == 0
-    else:
-        operationally_clean = False
-
-    if decision == "retain_with_route_repair":
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if scenario_name in harmful_scenarios:
-            return False, "lifecycle_suppressed_exact_harmful_called_scenario"
-        if (
-            harmful_family_count >= 2
-            and harmful_family_count > helpful_family_count
-            and scenario_family in route_repair_families
-        ):
-            return False, "lifecycle_suppressed_harmful_called_family"
-        return None
-
-    if scenario_family in route_repair_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if harmful_family_count < 2 and not (
-            is_validation_abstention_tool and not operationally_clean
-        ):
-            return None
-        if harmful_family_count and harmful_family_count <= helpful_family_count:
-            return None
-        return False, "lifecycle_suppressed_harmful_called_family"
-    if decision not in {
-        "needs_route_repair",
-        "needs_repair",
-    }:
-        return None
-
-    harmful_families = {base_task_family(str(item)) for item in harmful_families_list}
-    if scenario_family in harmful_families:
-        if is_validation_abstention_tool and operationally_clean:
-            return None
-        if (
-            harmful_family_count < 2
-            and harmful_count_int < 2
-            and not (is_validation_abstention_tool and not operationally_clean)
-        ):
-            return None
-        return False, "lifecycle_suppressed_harmful_called_family"
-    return None
-
-
-def _visible_signal_can_override_lifecycle_family_suppression(
-    *,
-    tool_name: str,
-    generic_decision: RuntimeRoutingDecision,
-    lifecycle_state: dict[str, dict[str, Any]] | None,
-) -> bool:
-    """Let strict visible-context evidence repair coarse lifecycle suppression.
-
-    Lifecycle feedback is allowed to suppress tools after harmful calls, but a
-    broad family label is intentionally coarse. If a retained tool is validated,
-    operationally clean, and the current task text/tools/signals explicitly
-    match that tool, the visible route is the more specific self-evolution
-    signal. Parked tools and tools needing implementation repair remain hidden.
-    """
-    if not lifecycle_state:
-        return False
-    if not generic_decision.visible:
-        return False
-    if generic_decision.reason != "visible_context_signal_match":
-        return False
-    row = lifecycle_state.get(tool_name)
-    if not row:
-        return False
-    if str(row.get("decision") or "") != "retain_with_route_repair":
-        return False
-    for key in ("failed_count", "side_effect_incident_count"):
-        try:
-            if int(row.get(key) or 0) > 0:
-                return False
-        except (TypeError, ValueError):
-            return False
-    return True
-
-
 def _abstention_guard_call_would_be_scored_as_forbidden_action(
     entry: RegistryEntry,
     task_context_text: str | None,
@@ -2152,6 +2016,7 @@ def route_registry_entries(
         "post_selection_composite_requires_downstream_action_task",
     }
     for tool_name, entry in sorted(entries.items()):
+        spec = entry.tool.spec
         if routing_facts.has_visible_context:
             generic = _visible_context_route_decision_from_facts(
                 entry,
@@ -2169,21 +2034,19 @@ def route_registry_entries(
             )
             is_visible = False
             reason = generic.reason
-        lifecycle_override = _lifecycle_visibility_override(
+        lifecycle_facts = LifecycleRoutingFacts.from_state(
             tool_name=tool_name,
-            scenario_name=task_family_key,
+            task_family_key=task_family_key,
             lifecycle_state=lifecycle_state,
         )
+        lifecycle_override = lifecycle_facts.override if lifecycle_facts else None
         if lifecycle_override is not None:
             lifecycle_visible, lifecycle_reason = lifecycle_override
             if not (
                 task_context_text
                 and lifecycle_reason == "lifecycle_suppressed_harmful_called_family"
-                and _visible_signal_can_override_lifecycle_family_suppression(
-                    tool_name=tool_name,
-                    generic_decision=generic,
-                    lifecycle_state=lifecycle_state,
-                )
+                and lifecycle_facts is not None
+                and lifecycle_facts.can_override_family_suppression(generic)
             ):
                 is_visible, reason = lifecycle_visible, lifecycle_reason
         status = "shown" if is_visible else "hidden"
@@ -2199,57 +2062,19 @@ def route_registry_entries(
                 "insufficient_information" in routing_lower
                 or "insufficient information" in routing_lower
             )
-            and entry.tool.spec.family != ToolFamily.VALIDATION_ABSTENTION_HELPER
+            and spec.family != ToolFamily.VALIDATION_ABSTENTION_HELPER
         ):
             is_visible = False
             status = "hidden"
             reason = "generated_tool_suppressed_for_insufficient_information_context"
-        downstream_tools = set(entry.tool.spec.required_original_tool_calls)
-        requires_any_downstream = False
-        raw_output_schema = entry.tool.spec.output_schema or {}
-        output_schema = raw_output_schema if isinstance(raw_output_schema, dict) else {}
-        output_props = output_schema.get("properties", {})
-        if isinstance(output_props, dict):
-            tool_name_schema = output_props.get("tool_name", {})
-            if isinstance(tool_name_schema, dict):
-                emitted = {
-                    str(item) for item in tool_name_schema.get("enum", ()) if str(item)
-                }
-                if emitted:
-                    downstream_tools = emitted
-                    requires_any_downstream = True
-            if "downstream_tool_name" in output_props and (
-                entry.tool.spec.family
-                in {
-                    ToolFamily.COMPOSITE_WORKFLOW_HELPER,
-                    ToolFamily.SEARCH_FILTER_RANKING_HELPER,
-                }
-            ):
-                # Action-target selectors and side-effect argument preparers return
-                # one downstream ToolSandbox action, not all actions named in
-                # their preservation contract. Requiring every preserved action to
-                # be available hides valid candidate tools on narrower per-scenario
-                # allow-lists.
-                downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
-                requires_any_downstream = True
-        if (
-            entry.tool.spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
-            and len(downstream_tools) > 1
-        ):
-            # Generic derived extractors may preserve one of several producer
-            # lookups depending on the scenario. Requiring all producers to be
-            # available hides valid cross-family extractors before they get a
-            # fair callability chance.
-            requires_any_downstream = True
-        if not downstream_tools:
-            downstream_tools = set(entry.tool.spec.preserves_side_effect_tools)
+        downstream_requirement = DownstreamRequirement.from_spec(spec)
         suppress_original_substitute = _generated_tool_substitutes_available_original(
             entry, available_base_tools
         )
         if (
             suppress_original_substitute
             and task_context_text
-            and entry.tool.spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
+            and spec.family == ToolFamily.DERIVED_VALUE_CALCULATOR
         ):
             suppress_original_substitute = False
         if is_visible and suppress_original_substitute:
@@ -2263,17 +2088,17 @@ def route_registry_entries(
                     status = "hidden"
                     reason = gated_reason
                     break
-        if entry.tool.spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
-            producer_tools = {
-                tool_name
-                for tool_name in downstream_tools
-                | set(entry.tool.spec.preserves_side_effect_tools)
-                if tool_name.startswith(("search_", "get_", "find_"))
-            }
-            if producer_tools:
-                downstream_tools = producer_tools
-                requires_any_downstream = True
-        if is_visible and available_base_tools is not None and downstream_tools:
+        if spec.family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
+            downstream_requirement = (
+                downstream_requirement.narrowed_to_search_producers(
+                    spec.preserves_side_effect_tools
+                )
+            )
+        if (
+            is_visible
+            and available_base_tools is not None
+            and downstream_requirement.tool_names
+        ):
             if _abstention_guard_call_would_be_scored_as_forbidden_action(
                 entry,
                 task_context_text,
@@ -2286,43 +2111,21 @@ def route_registry_entries(
             elif (
                 "insufficient_information" in routing_lower
                 or "safe_abstain_needed" in routing_lower
-            ) and _is_insufficient_information_guard(entry.tool.spec):
+            ) and _is_insufficient_information_guard(spec):
                 # Abstention guards prevent unsafe downstream calls on missing-info
                 # and visible missing-precondition tasks. They must not be hidden
                 # just because the original producer or forbidden downstream tool is
                 # absent from this scenario allow-list.
                 missing: set[str] = set()
-            elif entry.tool.spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
+            elif spec.family == ToolFamily.STATE_PRECONDITION_HELPER:
                 # State helpers emit the next original ToolSandbox side-effect call,
                 # but the exact callable may be represented by scrambled execution
                 # names or a bridge policy outside this static allow-list. Keep the
                 # helper scenario-gated instead of treating a minimal/scrambled
                 # allow-list as proof that the downstream action is impossible.
                 missing = set()
-            elif (
-                len(
-                    alternative_actions := (
-                        downstream_tools & set(COMPLETE_TOOLS_NATIVE_NAMES)
-                    )
-                )
-                > 1
-            ):
-                # A generated contract may support mutually exclusive native
-                # actions. Require every producer dependency, but only one
-                # compatible action. Complete tools are separately validated to
-                # execute at most one native action per invocation.
-                producer_dependencies = downstream_tools - alternative_actions
-                missing = producer_dependencies - available_base_tools
-                if not alternative_actions & available_base_tools:
-                    missing.update(alternative_actions)
-            elif requires_any_downstream:
-                missing = (
-                    downstream_tools
-                    if not downstream_tools & available_base_tools
-                    else set()
-                )
             else:
-                missing = downstream_tools - available_base_tools
+                missing = downstream_requirement.missing_from(available_base_tools)
             if missing:
                 is_visible = False
                 status = "hidden"
@@ -2369,20 +2172,14 @@ def route_registry_entries(
             ]
             for lower_tool_name, composite_tool_name in suppressed_by_composite.items():
                 prior = decisions[lower_tool_name]
-                decisions[lower_tool_name] = RuntimeRoutingDecision(
-                    tool_name=lower_tool_name,
+                decisions[lower_tool_name] = replace(
+                    prior,
                     visible=False,
                     status="deprioritized",
                     reason=(
                         "more_specific_generated_tool_preferred_over_redundant_"
                         f"lower_level_tool:{composite_tool_name}"
                     ),
-                    score=prior.score,
-                    matched_positive_triggers=prior.matched_positive_triggers,
-                    matched_negative_triggers=prior.matched_negative_triggers,
-                    matched_task_families=prior.matched_task_families,
-                    fair_chance_candidate=prior.fair_chance_candidate,
-                    fair_chance_reason=prior.fair_chance_reason,
                 )
     visible.sort(key=lambda item: (-item[0], item[1]))
     selected = visible[:max_bundle_size]
