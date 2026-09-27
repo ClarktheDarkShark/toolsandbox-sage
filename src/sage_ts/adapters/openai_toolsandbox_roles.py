@@ -2982,19 +2982,445 @@ def _messages_show_prior_structured_payload(openai_messages: object) -> bool:
     return False
 
 
-def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
-    latest_user = ""
+_FOLLOWUP_ANSWER_ACK_PHRASES = (
+    "thanks for finding",
+    "thank you for finding",
+    "thanks for looking that up",
+    "thank you for looking that up",
+    "got it, i need that info",
+    "got it i need that info",
+    "i need that info",
+    "i needed that info",
+    "that's the info i need",
+    "that is the info i need",
+    "thats the info i need",
+)
+
+_RETENTION_CLOSING_ACK_PHRASES = (
+    "end the conversation",
+    "end conversation",
+    "you can end",
+    "we can end",
+    "conversation can end",
+)
+
+_BRIEF_CLOSING_ACK_PHRASES = (
+    "end this conversation",
+    "let's end",
+    "lets end",
+    *_RETENTION_CLOSING_ACK_PHRASES,
+)
+
+_RETENTION_ACKNOWLEDGEMENT_PREFIXES = (
+    "yep",
+    "yes",
+    "yeah",
+    "that's",
+    "that is",
+    "thats",
+)
+
+_BRIEF_ACKNOWLEDGEMENT_PREFIXES = (
+    "ok",
+    "okay",
+    *_RETENTION_ACKNOWLEDGEMENT_PREFIXES,
+)
+
+_STRONG_FOLLOWUP_TOKENS = (
+    "can you",
+    "could you",
+    "please",
+    "help me",
+    "i need",
+    "need you",
+    "search for",
+    "find me",
+    "send ",
+)
+
+_FOLLOWUP_QUESTION_STARTS = ("what ", "why ", "how ", "who ", "when ", "where ")
+
+_RETENTION_COMMAND_TOKENS = (
+    "can you",
+    "could you",
+    "you can",
+    "i need ",
+    "need help",
+    "help me",
+    "look for",
+    "look up",
+    "list",
+    "show",
+    "check ",
+    "add ",
+    "remove ",
+    "modify ",
+    "update ",
+    "change ",
+    "move ",
+    "postpone ",
+    "push ",
+    "reschedule ",
+    "set ",
+    "shift ",
+    "send ",
+    "turn on",
+    "turn off",
+    "turn it on",
+    "turn it off",
+    "turned on",
+    "turned off",
+    "switch it on",
+    "switch it off",
+    "switch them",
+    "switch those",
+    "flip it on",
+    "flip it off",
+    "make them",
+    "get that",
+)
+
+_BRIEF_COMMAND_TOKENS = (*_RETENTION_COMMAND_TOKENS, "search", "find")
+
+_BRIEF_AND_RETENTION_PHRASES = (
+    "got it",
+    "that's correct",
+    "that is correct",
+    "thats correct",
+    "that's right",
+    "that is right",
+    "that's what",
+    "thats what",
+    "that's the message",
+    "that's the one",
+    "that's it",
+    "that's the number",
+    "thats the one",
+    "thats it",
+    "thats the number",
+    "still accurate",
+    "that's still accurate",
+    "that is still accurate",
+    "covered this",
+    "good for now",
+    "all good",
+    "all set",
+    "good to go",
+    "should be good to go",
+    "works for me",
+    "that works for me",
+    "that works",
+    "that should work",
+    "that will work",
+    "that'll work",
+    "fine by me",
+    "good enough",
+    "nice",
+    "nice!",
+    "that helps",
+    "this helps",
+    "makes sense",
+    "that makes sense",
+    "i'm good",
+    "im good",
+    "i'm all good",
+    "im all good",
+    "i'm all set",
+    "im all set",
+    "i see",
+    "i see that",
+    "i get it",
+    "i understand",
+    "understood",
+    "anything else right now",
+    "don't have anything else",
+    "do not have anything else",
+    "nothing else",
+    "you got it",
+    "absolutely",
+    "exactly",
+    "sounds like a plan",
+    "counting down",
+    "count down",
+    "already know",
+    "already know the",
+    "already knew",
+    "already knew that",
+    "i already knew",
+    "i already knew that",
+    "no need to repeat",
+    "don't need to repeat",
+    "do not need to repeat",
+)
+
+_BRIEF_ONLY_PHRASES = (
+    "you found it",
+    "good to know",
+    "appreciate",
+    "sounds good",
+    "that sounds good",
+    "will do",
+    "i will",
+    "you too",
+    "take care",
+    "i know",
+    "already have that noted",
+    "have that noted",
+    "already noted",
+)
+
+_BRIEF_AND_REPEAT_PHRASES = ("perfect",)
+
+_BRIEF_REPEAT_AND_RETENTION_PHRASES = (
+    "thanks for checking",
+    "thanks for confirming",
+    "move on",
+)
+
+_REPEAT_AND_RETENTION_PHRASES = (
+    "still need to search",
+    "still want to search",
+    "really want to search",
+    "need to search",
+    "want to search",
+    "can't access",
+    "cannot access",
+    "can't complete",
+    "cannot complete",
+    "can't find anything else",
+    "cannot find anything else",
+    "just wanted to check",
+    "just want to check",
+    "wanted to check it",
+    "wanted to check",
+    "just checking",
+    "can you check that for me",
+    "check that for me",
+    "check it for me",
+    "check your reminder",
+    "check your reminders",
+    "check your reminder app",
+    "check your reminders later",
+    "try using your device",
+    "use your device to check",
+    "can't check it now",
+    "cannot check it now",
+    "try again later",
+    "can you help me with that",
+    "help me with that",
+    "just need to get",
+    "definitely",
+    "need to check the content",
+    "check it for myself",
+    "check it directly",
+    "look it up myself",
+    "look it up directly",
+    "look it up for myself",
+    "see it myself",
+    "want to see it myself",
+    "still want to see it",
+    "get that message sent",
+    "let's get that message sent",
+    "lets get that message sent",
+    "send that message",
+    "send the message",
+    "send a message",
+    "next task",
+    "that's what i need to remember",
+    "that is what i need to remember",
+    "thats what i need to remember",
+    "what i need to remember",
+    "what i needed to remember",
+)
+
+_REPEAT_ONLY_PHRASES = (
+    "check it out",
+    "map app",
+    "use a map",
+    "using a map",
+    "without a map",
+    "directions",
+    "direction",
+    "navigation",
+    "navigate",
+    "route",
+    "get there",
+    "how to get there",
+    "use a calculator",
+    "using a calculator",
+    "can't verify",
+    "cannot verify",
+    "can't validate",
+    "cannot validate",
+    "location services",
+    "turn on location",
+    "turn it on",
+    "settings",
+)
+
+_PRIVACY_AND_RETENTION_PHRASES = (
+    "keep that a secret",
+    "keep it a secret",
+    "keep this a secret",
+    "keep that secret",
+    "keep it secret",
+    "keep this secret",
+    "need to keep that a secret",
+    "need to keep it a secret",
+    "keep that private",
+    "keep it private",
+    "keep this private",
+    "keep that confidential",
+    "keep it confidential",
+    "keep it to yourself",
+    "keep that to yourself",
+    "hide that message",
+    "hide the message",
+    "hide it",
+    "not visible anymore",
+    "not visible",
+    "make sure that message is not visible",
+    "make sure it is not visible",
+    "don't share",
+    "do not share",
+    "do not leak",
+    "don't leak",
+)
+
+_PRIVACY_ONLY_PHRASES = (
+    "prefer not to discuss",
+    "rather not discuss",
+    "do not want to discuss",
+    "don't want to discuss",
+    "not discuss that",
+    "not discussing that",
+    "rather not confirm",
+    "rather not confirm that",
+    "prefer not to confirm",
+    "not confirm that",
+    "keep this to yourself",
+)
+
+_PRIVACY_RETENTION_PHRASES = (
+    *_PRIVACY_AND_RETENTION_PHRASES,
+    *_PRIVACY_ONLY_PHRASES,
+)
+
+_RETENTION_ONLY_PHRASES = (
+    "got the distance",
+    "got distance",
+    "have the distance",
+    "have got the distance",
+    "i've got the distance",
+    "ive got the distance",
+    "already have that",
+    "already had that",
+    "don't have more info",
+    "do not have more info",
+    "don't have any more info",
+    "do not have any more info",
+    "don't have any other info",
+    "do not have any other info",
+    "don't have other info",
+    "do not have other info",
+    "don't have any more questions",
+    "do not have any more questions",
+    "i don't have any more questions",
+    "i do not have any more questions",
+    "no more questions",
+    "help me with something else",
+    "something else",
+    "any other inquiries",
+    "no other inquiries",
+    "just need to search",
+    "just need to find",
+    "just needed to search",
+    "just needed to find",
+    "just trying to get",
+    "just want the",
+    "just needed the",
+    "double-check",
+    "double check",
+    "verify",
+    "confirmation",
+    "confirm",
+    "calendar",
+    "countdown",
+    "can't help",
+    "cannot help",
+    "can't share anything more",
+    "cannot share anything more",
+    "can't share any more",
+    "cannot share any more",
+    "can't provide anything more",
+    "cannot provide anything more",
+    "can't provide any extra info",
+    "cannot provide any extra info",
+    "check it yourself",
+    "try checking",
+    "that's all i needed",
+    "that is all i needed",
+    "all i needed",
+    "stay private",
+    "don't have enough information",
+    "do not have enough information",
+    "not enough information",
+    "don't have any details",
+    "do not have any details",
+    "no details",
+    "not share",
+    "not leak",
+    "not go over it",
+    "won't share",
+    "wont share",
+    "private",
+    "confidential",
+)
+
+_BRIEF_ACKNOWLEDGEMENT_PHRASES = (
+    *_BRIEF_AND_RETENTION_PHRASES,
+    *_BRIEF_ONLY_PHRASES,
+    *_BRIEF_AND_REPEAT_PHRASES,
+    *_BRIEF_REPEAT_AND_RETENTION_PHRASES,
+    "got it",
+)
+
+_REPEAT_LOOKUP_TOKENS = (
+    *_BRIEF_AND_REPEAT_PHRASES,
+    *_BRIEF_REPEAT_AND_RETENTION_PHRASES,
+    *_REPEAT_AND_RETENTION_PHRASES,
+    *_REPEAT_ONLY_PHRASES,
+)
+
+_ANSWER_RETENTION_PHRASES = (
+    *_BRIEF_AND_RETENTION_PHRASES,
+    *_BRIEF_REPEAT_AND_RETENTION_PHRASES,
+    *_REPEAT_AND_RETENTION_PHRASES,
+    *_PRIVACY_AND_RETENTION_PHRASES,
+    *_RETENTION_ONLY_PHRASES,
+)
+
+
+def _normalized_latest_user_for_followup(openai_messages: object) -> str:
     messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
     for message in reversed(messages):
         if message.get("role") == "user":
-            latest_user = (
+            return (
                 str(message.get("content", ""))
                 .strip()
                 .lower()
                 .replace("’", "'")
                 .replace("‘", "'")
             )
-            break
+    return ""
+
+
+def _followup_words(latest_user: str) -> set[str]:
+    return set("".join(char if char.isalnum() else " " for char in latest_user).split())
+
+
+def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
+    latest_user = _normalized_latest_user_for_followup(openai_messages)
     if not latest_user:
         return False
     if "now i can " in latest_user and "?" not in latest_user:
@@ -3011,203 +3437,27 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
         )
     ):
         return True
-    answer_ack_phrases = (
-        "thanks for finding",
-        "thank you for finding",
-        "thanks for looking that up",
-        "thank you for looking that up",
-        "got it, i need that info",
-        "got it i need that info",
-        "i need that info",
-        "i needed that info",
-        "that's the info i need",
-        "that is the info i need",
-        "thats the info i need",
-    )
-    if any(phrase in latest_user for phrase in answer_ack_phrases):
+    if any(phrase in latest_user for phrase in _FOLLOWUP_ANSWER_ACK_PHRASES):
         return True
-    closing_ack_phrases = (
-        "end the conversation",
-        "end this conversation",
-        "end conversation",
-        "let's end",
-        "lets end",
-        "you can end",
-        "we can end",
-        "conversation can end",
-    )
     if "?" not in latest_user and any(
-        phrase in latest_user for phrase in closing_ack_phrases
+        phrase in latest_user for phrase in _BRIEF_CLOSING_ACK_PHRASES
     ):
         return True
-    acknowledgement_prefixes = (
-        "ok",
-        "okay",
-        "yep",
-        "yes",
-        "yeah",
-        "that's",
-        "that is",
-        "thats",
-    )
-    strong_followup_tokens = (
-        "can you",
-        "could you",
-        "please",
-        "help me",
-        "i need",
-        "need you",
-        "search for",
-        "find me",
-        "send ",
-    )
     if (
-        latest_user.startswith(acknowledgement_prefixes)
+        latest_user.startswith(_BRIEF_ACKNOWLEDGEMENT_PREFIXES)
         and "?" not in latest_user
-        and not any(token in latest_user for token in strong_followup_tokens)
+        and not any(token in latest_user for token in _STRONG_FOLLOWUP_TOKENS)
     ):
         return True
-    question_starts = ("what ", "why ", "how ", "who ", "when ", "where ")
-    command_tokens = (
-        "can you",
-        "could you",
-        "you can",
-        "i need ",
-        "need help",
-        "help me",
-        "search",
-        "find",
-        "look for",
-        "look up",
-        "list",
-        "show",
-        "check ",
-        "add ",
-        "remove ",
-        "modify ",
-        "update ",
-        "change ",
-        "move ",
-        "postpone ",
-        "push ",
-        "reschedule ",
-        "set ",
-        "shift ",
-        "send ",
-        "turn on",
-        "turn off",
-        "turn it on",
-        "turn it off",
-        "turned on",
-        "turned off",
-        "switch it on",
-        "switch it off",
-        "switch them",
-        "switch those",
-        "flip it on",
-        "flip it off",
-        "make them",
-        "get that",
-    )
     if (
         "?" in latest_user
-        or latest_user.startswith(question_starts)
-        or any(token in latest_user for token in command_tokens)
+        or latest_user.startswith(_FOLLOWUP_QUESTION_STARTS)
+        or any(token in latest_user for token in _BRIEF_COMMAND_TOKENS)
     ):
         return False
-    words = set(
-        "".join(char if char.isalnum() else " " for char in latest_user).split()
-    )
-    acknowledgement_phrases = (
-        "got it",
-        "you found it",
-        "good to know",
-        "appreciate",
-        "perfect",
-        "that's correct",
-        "that is correct",
-        "thats correct",
-        "that's right",
-        "that is right",
-        "that's what",
-        "thats what",
-        "got it",
-        "thanks for checking",
-        "thanks for confirming",
-        "that's the message",
-        "that's the one",
-        "that's it",
-        "that's the number",
-        "thats the one",
-        "thats it",
-        "thats the number",
-        "still accurate",
-        "that's still accurate",
-        "that is still accurate",
-        "covered this",
-        "good for now",
-        "all good",
-        "all set",
-        "good to go",
-        "should be good to go",
-        "sounds good",
-        "that sounds good",
-        "works for me",
-        "that works for me",
-        "that works",
-        "that should work",
-        "that will work",
-        "that'll work",
-        "fine by me",
-        "good enough",
-        "nice",
-        "nice!",
-        "that helps",
-        "this helps",
-        "makes sense",
-        "that makes sense",
-        "i'm good",
-        "im good",
-        "i'm all good",
-        "im all good",
-        "i'm all set",
-        "im all set",
-        "i see",
-        "i see that",
-        "i get it",
-        "i understand",
-        "understood",
-        "anything else right now",
-        "don't have anything else",
-        "do not have anything else",
-        "nothing else",
-        "move on",
-        "you got it",
-        "absolutely",
-        "exactly",
-        "will do",
-        "i will",
-        "you too",
-        "take care",
-        "sounds like a plan",
-        "counting down",
-        "count down",
-        "i know",
-        "already know",
-        "already know the",
-        "already knew",
-        "already knew that",
-        "i already knew",
-        "i already knew that",
-        "no need to repeat",
-        "don't need to repeat",
-        "do not need to repeat",
-        "already have that noted",
-        "have that noted",
-        "already noted",
-    )
+    words = _followup_words(latest_user)
     return (
-        any(phrase in latest_user for phrase in acknowledgement_phrases)
+        any(phrase in latest_user for phrase in _BRIEF_ACKNOWLEDGEMENT_PHRASES)
         or any(word.startswith("thank") for word in words)
         or bool(
             words
@@ -3236,436 +3486,44 @@ def _latest_user_is_brief_acknowledgement(openai_messages: object) -> bool:
 
 
 def _latest_user_is_answer_retention_followup(openai_messages: object) -> bool:
-    latest_user = ""
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    for message in reversed(messages):
-        if message.get("role") == "user":
-            latest_user = (
-                str(message.get("content", ""))
-                .strip()
-                .lower()
-                .replace("’", "'")
-                .replace("‘", "'")
-            )
-            break
+    latest_user = _normalized_latest_user_for_followup(openai_messages)
     if not latest_user:
         return False
     if _latest_user_is_privacy_retention_followup(openai_messages):
         return True
     if "now i can " in latest_user and "?" not in latest_user:
         return True
-    answer_ack_phrases = (
-        "thanks for finding",
-        "thank you for finding",
-        "thanks for looking that up",
-        "thank you for looking that up",
-        "got it, i need that info",
-        "got it i need that info",
-        "i need that info",
-        "i needed that info",
-        "that's the info i need",
-        "that is the info i need",
-        "thats the info i need",
-    )
-    if any(phrase in latest_user for phrase in answer_ack_phrases):
+    if any(phrase in latest_user for phrase in _FOLLOWUP_ANSWER_ACK_PHRASES):
         return True
-    closing_ack_phrases = (
-        "end the conversation",
-        "end conversation",
-        "you can end",
-        "we can end",
-        "conversation can end",
-    )
     if "?" not in latest_user and any(
-        phrase in latest_user for phrase in closing_ack_phrases
+        phrase in latest_user for phrase in _RETENTION_CLOSING_ACK_PHRASES
     ):
         return True
-    acknowledgement_prefixes = (
-        "yep",
-        "yes",
-        "yeah",
-        "that's",
-        "that is",
-        "thats",
-    )
-    strong_followup_tokens = (
-        "can you",
-        "could you",
-        "please",
-        "help me",
-        "i need",
-        "need you",
-        "search for",
-        "find me",
-        "send ",
-    )
     if (
-        latest_user.startswith(acknowledgement_prefixes)
+        latest_user.startswith(_RETENTION_ACKNOWLEDGEMENT_PREFIXES)
         and "?" not in latest_user
-        and not any(token in latest_user for token in strong_followup_tokens)
+        and not any(token in latest_user for token in _STRONG_FOLLOWUP_TOKENS)
     ):
         return True
-    question_starts = ("what ", "why ", "how ", "who ", "when ", "where ")
-    command_tokens = (
-        "can you",
-        "could you",
-        "you can",
-        "i need ",
-        "need help",
-        "help me",
-        "look for",
-        "look up",
-        "list",
-        "show",
-        "check ",
-        "add ",
-        "remove ",
-        "modify ",
-        "update ",
-        "change ",
-        "move ",
-        "postpone ",
-        "push ",
-        "reschedule ",
-        "set ",
-        "shift ",
-        "send ",
-        "turn on",
-        "turn off",
-        "turn it on",
-        "turn it off",
-        "turned on",
-        "turned off",
-        "switch it on",
-        "switch it off",
-        "switch them",
-        "switch those",
-        "flip it on",
-        "flip it off",
-        "make them",
-        "get that",
-    )
-    repeat_lookup_tokens = (
-        "still need to search",
-        "still want to search",
-        "really want to search",
-        "need to search",
-        "want to search",
-        "can't access",
-        "cannot access",
-        "can't complete",
-        "cannot complete",
-        "can't find anything else",
-        "cannot find anything else",
-        "just wanted to check",
-        "just want to check",
-        "wanted to check it",
-        "wanted to check",
-        "just checking",
-        "can you check that for me",
-        "check that for me",
-        "check it for me",
-        "check your reminder",
-        "check your reminders",
-        "check your reminder app",
-        "check your reminders later",
-        "try using your device",
-        "use your device to check",
-        "can't check it now",
-        "cannot check it now",
-        "try again later",
-        "can you help me with that",
-        "help me with that",
-        "just need to get",
-        "move on",
-        "thanks for checking",
-        "thanks for confirming",
-        "perfect",
-        "definitely",
-        "need to check the content",
-        "check it for myself",
-        "check it directly",
-        "check it out",
-        "look it up myself",
-        "look it up directly",
-        "look it up for myself",
-        "map app",
-        "use a map",
-        "using a map",
-        "without a map",
-        "directions",
-        "direction",
-        "navigation",
-        "navigate",
-        "route",
-        "get there",
-        "how to get there",
-        "use a calculator",
-        "using a calculator",
-        "can't verify",
-        "cannot verify",
-        "can't validate",
-        "cannot validate",
-        "location services",
-        "turn on location",
-        "turn it on",
-        "settings",
-        "see it myself",
-        "want to see it myself",
-        "still want to see it",
-        "get that message sent",
-        "let's get that message sent",
-        "lets get that message sent",
-        "send that message",
-        "send the message",
-        "send a message",
-        "next task",
-        "that's what i need to remember",
-        "that is what i need to remember",
-        "thats what i need to remember",
-        "what i need to remember",
-        "what i needed to remember",
-    )
-    has_repeat_followup = any(token in latest_user for token in repeat_lookup_tokens)
+    has_repeat_followup = any(token in latest_user for token in _REPEAT_LOOKUP_TOKENS)
     if (
         ("?" in latest_user and not has_repeat_followup)
-        or (latest_user.startswith(question_starts) and not has_repeat_followup)
         or (
-            any(token in latest_user for token in command_tokens)
+            latest_user.startswith(_FOLLOWUP_QUESTION_STARTS)
+            and not has_repeat_followup
+        )
+        or (
+            any(token in latest_user for token in _RETENTION_COMMAND_TOKENS)
             and not has_repeat_followup
         )
     ):
         return False
     if _latest_user_is_brief_acknowledgement(openai_messages):
         return True
-    retention_phrases = (
-        "that's correct",
-        "that is correct",
-        "thats correct",
-        "that's right",
-        "that is right",
-        "you got it",
-        "that's what",
-        "thats what",
-        "got it",
-        "thanks for checking",
-        "thanks for confirming",
-        "absolutely",
-        "definitely",
-        "works for me",
-        "that works for me",
-        "that works",
-        "that should work",
-        "that will work",
-        "that'll work",
-        "fine by me",
-        "good enough",
-        "nice",
-        "nice!",
-        "that helps",
-        "this helps",
-        "makes sense",
-        "that makes sense",
-        "that's the message",
-        "that's the one",
-        "that's it",
-        "that's the number",
-        "thats the one",
-        "thats it",
-        "thats the number",
-        "still accurate",
-        "that's still accurate",
-        "that is still accurate",
-        "covered this",
-        "good for now",
-        "all good",
-        "all set",
-        "good to go",
-        "should be good to go",
-        "i'm good",
-        "im good",
-        "i'm all good",
-        "im all good",
-        "i'm all set",
-        "im all set",
-        "i see",
-        "i see that",
-        "i get it",
-        "i understand",
-        "understood",
-        "that's what i need to remember",
-        "that is what i need to remember",
-        "thats what i need to remember",
-        "what i need to remember",
-        "what i needed to remember",
-        "got the distance",
-        "got distance",
-        "have the distance",
-        "have got the distance",
-        "i've got the distance",
-        "ive got the distance",
-        "already know",
-        "already know the",
-        "already knew",
-        "already knew that",
-        "i already knew",
-        "i already knew that",
-        "already have that",
-        "already had that",
-        "anything else right now",
-        "don't have anything else",
-        "do not have anything else",
-        "don't have more info",
-        "do not have more info",
-        "don't have any more info",
-        "do not have any more info",
-        "don't have any other info",
-        "do not have any other info",
-        "don't have other info",
-        "do not have other info",
-        "don't have any more questions",
-        "do not have any more questions",
-        "i don't have any more questions",
-        "i do not have any more questions",
-        "no more questions",
-        "nothing else",
-        "no need to repeat",
-        "don't need to repeat",
-        "do not need to repeat",
-        "move on",
-        "exactly",
-        "help me with something else",
-        "something else",
-        "any other inquiries",
-        "no other inquiries",
-        "just need to search",
-        "just need to find",
-        "just needed to search",
-        "just needed to find",
-        "still need to search",
-        "still want to search",
-        "really want to search",
-        "need to search",
-        "want to search",
-        "just trying to get",
-        "just need to get",
-        "just want the",
-        "just needed the",
-        "can you help me with that",
-        "help me with that",
-        "double-check",
-        "double check",
-        "verify",
-        "confirmation",
-        "confirm",
-        "calendar",
-        "countdown",
-        "counting down",
-        "count down",
-        "sounds like a plan",
-        "can't help",
-        "cannot help",
-        "can't share anything more",
-        "cannot share anything more",
-        "can't share any more",
-        "cannot share any more",
-        "can't provide anything more",
-        "cannot provide anything more",
-        "can't provide any extra info",
-        "cannot provide any extra info",
-        "can't access",
-        "cannot access",
-        "can't complete",
-        "cannot complete",
-        "can't find anything else",
-        "cannot find anything else",
-        "check it yourself",
-        "try checking",
-        "just wanted to check",
-        "just want to check",
-        "wanted to check it",
-        "wanted to check",
-        "just checking",
-        "can you check that for me",
-        "check that for me",
-        "check it for me",
-        "check your reminder",
-        "check your reminders",
-        "check your reminder app",
-        "check your reminders later",
-        "try using your device",
-        "use your device to check",
-        "can't check it now",
-        "cannot check it now",
-        "try again later",
-        "need to check the content",
-        "check it for myself",
-        "check it directly",
-        "look it up myself",
-        "look it up directly",
-        "look it up for myself",
-        "see it myself",
-        "want to see it myself",
-        "still want to see it",
-        "get that message sent",
-        "let's get that message sent",
-        "lets get that message sent",
-        "send that message",
-        "send the message",
-        "send a message",
-        "next task",
-        "that's all i needed",
-        "that is all i needed",
-        "all i needed",
-        "keep that private",
-        "keep that a secret",
-        "keep that secret",
-        "keep it private",
-        "keep it a secret",
-        "keep it secret",
-        "keep this private",
-        "keep this a secret",
-        "keep this secret",
-        "need to keep that a secret",
-        "need to keep it a secret",
-        "keep that confidential",
-        "keep it confidential",
-        "stay private",
-        "hide that message",
-        "hide the message",
-        "hide it",
-        "not visible anymore",
-        "not visible",
-        "make sure that message is not visible",
-        "make sure it is not visible",
-        "don't have enough information",
-        "do not have enough information",
-        "not enough information",
-        "don't have any details",
-        "do not have any details",
-        "no details",
-        "keep it to yourself",
-        "keep that to yourself",
-        "do not share",
-        "don't share",
-        "not share",
-        "do not leak",
-        "don't leak",
-        "not leak",
-        "not go over it",
-        "won't share",
-        "wont share",
-        "private",
-        "confidential",
-    )
-    words = set(
-        "".join(char if char.isalnum() else " " for char in latest_user).split()
-    )
-    if any(phrase in latest_user for phrase in retention_phrases) or bool(
+    words = _followup_words(latest_user)
+    return any(phrase in latest_user for phrase in _ANSWER_RETENTION_PHRASES) or bool(
         words & {"accurate", "correct", "right"}
-    ):
-        return True
-    return False
+    )
 
 
 def _latest_user_is_device_status_retention_followup(openai_messages: object) -> bool:
@@ -3730,46 +3588,7 @@ def _latest_user_is_privacy_retention_followup(openai_messages: object) -> bool:
     )
     if not latest_user:
         return False
-    privacy_phrases = (
-        "prefer not to discuss",
-        "rather not discuss",
-        "do not want to discuss",
-        "don't want to discuss",
-        "not discuss that",
-        "not discussing that",
-        "rather not confirm",
-        "rather not confirm that",
-        "prefer not to confirm",
-        "not confirm that",
-        "keep that a secret",
-        "keep it a secret",
-        "keep this a secret",
-        "keep that secret",
-        "keep it secret",
-        "keep this secret",
-        "need to keep that a secret",
-        "need to keep it a secret",
-        "keep that private",
-        "keep it private",
-        "keep this private",
-        "keep that confidential",
-        "keep it confidential",
-        "keep it to yourself",
-        "keep that to yourself",
-        "keep this to yourself",
-        "hide that message",
-        "hide the message",
-        "hide it",
-        "not visible anymore",
-        "not visible",
-        "make sure that message is not visible",
-        "make sure it is not visible",
-        "don't share",
-        "do not share",
-        "do not leak",
-        "don't leak",
-    )
-    return any(phrase in latest_user for phrase in privacy_phrases)
+    return any(phrase in latest_user for phrase in _PRIVACY_RETENTION_PHRASES)
 
 
 def _recent_tool_backed_answer_text(openai_messages: object) -> str | None:
