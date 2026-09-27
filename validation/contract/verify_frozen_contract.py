@@ -28,6 +28,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+if __package__:
+    from validation.production_source_identity import (
+        PRODUCTION_PYTHON_SOURCE_SCOPE,
+        production_python_source_identity,
+    )
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from production_source_identity import (
+        PRODUCTION_PYTHON_SOURCE_SCOPE,
+        production_python_source_identity,
+    )
+
 
 DEFAULT_CONTRACT = Path(__file__).with_name("sage_frozen_behavior_contract_v1.json")
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -203,7 +215,7 @@ def _verify_actor_source_equivalence_report(
     actor_source: dict[str, Any],
     report: VerificationReport,
 ) -> bool:
-    """Validate exact replay evidence for the sole actor-source hash waiver."""
+    """Validate replay and full-source binding for the sole actor hash waiver."""
 
     error_count = len(report.errors)
     check_prefix = "actor_source_equivalence_report"
@@ -265,6 +277,45 @@ def _verify_actor_source_equivalence_report(
             actor_source["sha256"],
         )
 
+    production_identity = payload.get("production_python_sources")
+    production_identity_valid = (
+        isinstance(production_identity, dict)
+        and set(production_identity) == {"reference", "candidate"}
+        and all(
+            isinstance(production_identity.get(side), dict)
+            for side in ("reference", "candidate")
+        )
+    )
+    report.condition(
+        f"{check_prefix}.production_python_sources.structure",
+        production_identity_valid,
+        production_identity,
+        "object containing exactly reference and candidate source identities",
+    )
+    if production_identity_valid:
+        for side in ("reference", "candidate"):
+            identity = production_identity[side]
+            report.equal(
+                f"{check_prefix}.production_python_sources.{side}.scope",
+                identity.get("scope"),
+                PRODUCTION_PYTHON_SOURCE_SCOPE,
+            )
+            file_count = identity.get("file_count")
+            report.condition(
+                f"{check_prefix}.production_python_sources.{side}.file_count",
+                type(file_count) is int and file_count > 0,
+                file_count,
+                "positive integer",
+            )
+            sha256 = identity.get("sha256")
+            report.condition(
+                f"{check_prefix}.production_python_sources.{side}.sha256",
+                isinstance(sha256, str)
+                and re.fullmatch(r"[0-9a-f]{64}", sha256) is not None,
+                sha256,
+                "lowercase SHA-256 hex digest",
+            )
+
     candidate_root_value = payload.get("candidate_root")
     reference_root_value = payload.get("reference_root")
     candidate_root: Path | None = None
@@ -314,6 +365,44 @@ def _verify_actor_source_equivalence_report(
             f"{check_prefix}.reference_root",
             reference_root_value,
             "absolute immutable-reference checkout path",
+        )
+
+    current_reference_identity: dict[str, Any] | None = None
+    if reference_root is not None and reference_root.is_dir():
+        try:
+            current_reference_identity = production_python_source_identity(
+                reference_root
+            )
+        except (OSError, ValueError) as exc:
+            report.fail(
+                f"{check_prefix}.production_python_sources.reference_report_binding",
+                str(exc),
+                "identity of current reference production Python sources",
+            )
+        else:
+            report.equal(
+                f"{check_prefix}.production_python_sources.reference_report_binding",
+                production_identity.get("reference")
+                if isinstance(production_identity, dict)
+                else None,
+                current_reference_identity,
+            )
+    current_candidate_identity: dict[str, Any] | None = None
+    try:
+        current_candidate_identity = production_python_source_identity(repo_root)
+    except (OSError, ValueError) as exc:
+        report.fail(
+            f"{check_prefix}.production_python_sources.candidate_report_binding",
+            str(exc),
+            "identity of current candidate production Python sources",
+        )
+    else:
+        report.equal(
+            f"{check_prefix}.production_python_sources.candidate_report_binding",
+            production_identity.get("candidate")
+            if isinstance(production_identity, dict)
+            else None,
+            current_candidate_identity,
         )
 
     frozen_commit = str(contract["reference_source"]["git_commit"])
@@ -412,7 +501,74 @@ def _verify_actor_source_equivalence_report(
             "report mtime >= candidate actor source mtime",
         )
 
+    for side, root, initial_identity in (
+        ("reference", reference_root, current_reference_identity),
+        ("candidate", repo_root, current_candidate_identity),
+    ):
+        if root is None or initial_identity is None:
+            continue
+        try:
+            final_identity = production_python_source_identity(root)
+        except (OSError, ValueError) as exc:
+            report.fail(
+                f"{check_prefix}.production_python_sources.{side}.stable",
+                str(exc),
+                "unchanged identity throughout report verification",
+            )
+        else:
+            report.equal(
+                f"{check_prefix}.production_python_sources.{side}.stable",
+                final_identity,
+                initial_identity,
+            )
+
     return len(report.errors) == error_count
+
+
+def _verify_final_production_source_bindings(
+    report_path: Path,
+    repo_root: Path,
+    report: VerificationReport,
+) -> None:
+    """Rebind replay evidence after all other frozen-contract checks finish."""
+
+    check_prefix = "actor_source_equivalence_report.production_python_sources"
+    try:
+        payload = _load_object(report_path.expanduser().resolve())
+        identities = payload["production_python_sources"]
+        reference_root_value = payload["reference_root"]
+        if not isinstance(identities, dict) or not isinstance(
+            reference_root_value, str
+        ):
+            raise ValueError("replay report has malformed production source identity")
+        roots = {
+            "reference": Path(reference_root_value).expanduser().resolve(),
+            "candidate": repo_root.expanduser().resolve(),
+        }
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        report.fail(
+            f"{check_prefix}.final_binding",
+            str(exc),
+            "current reference and candidate production source identities",
+        )
+        return
+
+    for side, root in roots.items():
+        try:
+            observed = production_python_source_identity(root)
+            expected = identities[side]
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            report.fail(
+                f"{check_prefix}.{side}.final_binding",
+                str(exc),
+                "identity recorded by the exact replay report",
+            )
+        else:
+            report.equal(
+                f"{check_prefix}.{side}.final_binding",
+                observed,
+                expected,
+            )
 
 
 def _verify_reference_identity(
@@ -1431,6 +1587,12 @@ def verify(
             report.fail("results.read", str(exc), "JSON object")
         else:
             _apply_results_gates(contract, results, report)
+    if actor_source_equivalence_report is not None:
+        _verify_final_production_source_bindings(
+            actor_source_equivalence_report,
+            repo_root,
+            report,
+        )
     return contract, report
 
 
@@ -1460,7 +1622,8 @@ def _parser() -> argparse.ArgumentParser:
         help=(
             "Optional exact replay report permitting only the actor_policy source "
             "SHA check to be marked waived. The report must prove a complete, "
-            "zero-difference replay against the immutable reference checkout."
+            "zero-difference replay against the immutable reference checkout and "
+            "bind every current production Python source in both checkouts."
         ),
     )
     parser.add_argument(

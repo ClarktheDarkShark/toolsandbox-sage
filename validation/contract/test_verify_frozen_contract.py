@@ -30,6 +30,12 @@ class ActorSourceEquivalenceReportTest(unittest.TestCase):
         self.candidate_actor.parent.mkdir(parents=True)
         self.reference_actor.write_text("reference actor\n", encoding="utf-8")
         self.candidate_actor.write_text("refactored actor\n", encoding="utf-8")
+        self.reference_other = self.reference_root / "src/sage_ts/runtime/other.py"
+        self.candidate_other = self.candidate_root / "src/sage_ts/runtime/other.py"
+        self.reference_other.parent.mkdir(parents=True)
+        self.candidate_other.parent.mkdir(parents=True)
+        self.reference_other.write_text("reference helper\n", encoding="utf-8")
+        self.candidate_other.write_text("candidate helper\n", encoding="utf-8")
         self.reference_sha = hashlib.sha256(
             self.reference_actor.read_bytes()
         ).hexdigest()
@@ -55,6 +61,14 @@ class ActorSourceEquivalenceReportTest(unittest.TestCase):
                 "candidate_sha256": hashlib.sha256(
                     self.candidate_actor.read_bytes()
                 ).hexdigest(),
+            },
+            "production_python_sources": {
+                "reference": verifier.production_python_source_identity(
+                    self.reference_root
+                ),
+                "candidate": verifier.production_python_source_identity(
+                    self.candidate_root
+                ),
             },
             "probes": verifier._expected_replay_probes(),
             "approved_normalizations": {"reference": [], "candidate": []},
@@ -164,6 +178,99 @@ class ActorSourceEquivalenceReportTest(unittest.TestCase):
         )
         self.assertEqual(freshness_check["status"], "pass")
 
+    def test_rejects_non_actor_source_changed_after_report(self) -> None:
+        self.candidate_other.write_text("changed after replay\n", encoding="utf-8")
+        report_mtime = self.evidence_path.stat().st_mtime_ns
+        os.utime(
+            self.candidate_other,
+            ns=(report_mtime - 1_000_000, report_mtime - 1_000_000),
+        )
+
+        valid, report = self._verify()
+
+        self.assertFalse(valid)
+        binding_check = next(
+            check
+            for check in report.checks
+            if check["name"]
+            == "actor_source_equivalence_report.production_python_sources."
+            "candidate_report_binding"
+        )
+        self.assertEqual(binding_check["status"], "fail")
+        actor_binding = next(
+            check
+            for check in report.checks
+            if check["name"] == "actor_source_equivalence_report.actor_source."
+            "candidate_report_binding"
+        )
+        self.assertEqual(actor_binding["status"], "pass")
+
+    def test_rejects_source_change_during_report_verification(self) -> None:
+        identity = verifier.production_python_source_identity
+        candidate_reads = 0
+
+        def mutate_between_hashes(root: Path) -> dict[str, object]:
+            nonlocal candidate_reads
+            if root.resolve() == self.candidate_root:
+                candidate_reads += 1
+                if candidate_reads == 2:
+                    self.candidate_other.write_text(
+                        "changed during verification\n", encoding="utf-8"
+                    )
+            return identity(root)
+
+        report = verifier.VerificationReport()
+        with (
+            mock.patch.object(verifier, "_git", side_effect=self._git),
+            mock.patch.object(
+                verifier,
+                "production_python_source_identity",
+                side_effect=mutate_between_hashes,
+            ),
+        ):
+            valid = verifier._verify_actor_source_equivalence_report(
+                self.evidence_path,
+                self.contract,
+                self.candidate_root,
+                self.actor_source,
+                report,
+            )
+
+        self.assertFalse(valid)
+        stability_check = next(
+            check
+            for check in report.checks
+            if check["name"]
+            == "actor_source_equivalence_report.production_python_sources."
+            "candidate.stable"
+        )
+        self.assertEqual(stability_check["status"], "fail")
+
+    def test_final_binding_rejects_change_after_report_verification(self) -> None:
+        valid, inner_report = self._verify()
+        self.assertTrue(valid)
+        self.assertEqual(inner_report.errors, [])
+        self.candidate_other.write_text(
+            "changed after inner verification\n", encoding="utf-8"
+        )
+        final_report = verifier.VerificationReport()
+
+        verifier._verify_final_production_source_bindings(
+            self.evidence_path,
+            self.candidate_root,
+            final_report,
+        )
+
+        self.assertEqual(len(final_report.errors), 1)
+        candidate_check = next(
+            check
+            for check in final_report.checks
+            if check["name"]
+            == "actor_source_equivalence_report.production_python_sources."
+            "candidate.final_binding"
+        )
+        self.assertEqual(candidate_check["status"], "fail")
+
     def test_rejects_a_dirty_reference_checkout(self) -> None:
         def dirty_reference_git(root: Path, *arguments: str) -> str:
             if root.resolve() == self.reference_root and arguments == (
@@ -222,6 +329,18 @@ class ActorSourceEquivalenceReportTest(unittest.TestCase):
             "wrong_candidate_actor_hash": lambda payload: payload[
                 "actor_source"
             ].update(candidate_sha256="f" * 64),
+            "missing_production_source_identity": lambda payload: payload.pop(
+                "production_python_sources"
+            ),
+            "wrong_reference_production_hash": lambda payload: payload[
+                "production_python_sources"
+            ]["reference"].update(sha256="e" * 64),
+            "wrong_candidate_production_hash": lambda payload: payload[
+                "production_python_sources"
+            ]["candidate"].update(sha256="f" * 64),
+            "wrong_production_scope": lambda payload: payload[
+                "production_python_sources"
+            ]["candidate"]["scope"].update(include="*.py"),
         }
         baseline = deepcopy(self.payload)
         for name, mutate in invalid_mutations.items():

@@ -336,6 +336,15 @@ python validation/replay/compare.py \
 Exit status is `0` for equivalence, `1` for semantic differences, and `2` when
 a probe or the harness fails. Probe failures never count as equivalence.
 
+The report also binds the result to the exact actor bytes and to one
+deterministic identity for every Python file under `src/sage_ts`. The latter
+hash covers each sorted repository-relative path and the file's exact bytes,
+and records its scope and file count. The frozen-contract actor waiver
+recomputes both the reference and candidate identities from the checkouts named
+in the report. Any production-source change after replay therefore invalidates
+the report and requires a fresh complete replay; this binding does not relax
+the default strict contract when no waiver report is supplied.
+
 ## Known historical boundary gap
 
 The frozen run recorded routed tool names, tool calls/results, state changes,

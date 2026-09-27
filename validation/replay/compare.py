@@ -19,8 +19,14 @@ if __package__:
         load_rules,
         normalize_snapshot,
     )
+    from validation.production_source_identity import (
+        production_python_source_identity,
+    )
 else:
     from normalization import AppliedNormalization, load_rules, normalize_snapshot
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from production_source_identity import production_python_source_identity
 
 
 HERE = Path(__file__).resolve().parent
@@ -250,6 +256,10 @@ def main() -> int:
 
     try:
         rules = load_rules(NORMALIZATION_RULES)
+        production_python_sources = {
+            "reference": production_python_source_identity(reference_root),
+            "candidate": production_python_source_identity(candidate_root),
+        }
         with tempfile.TemporaryDirectory(prefix="sage-replay-") as temporary:
             temporary_root = Path(temporary)
             reference = _run_snapshot(
@@ -274,6 +284,14 @@ def main() -> int:
         )
         differences = _diff(normalized_reference, normalized_candidate)
         actor_source = _actor_source_identity(reference_root, candidate_root)
+        final_production_python_sources = {
+            "reference": production_python_source_identity(reference_root),
+            "candidate": production_python_source_identity(candidate_root),
+        }
+        if final_production_python_sources != production_python_sources:
+            raise RuntimeError(
+                "production Python sources changed while replay probes were running"
+            )
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
         report = {
             "schema_version": 1,
@@ -293,6 +311,7 @@ def main() -> int:
         "reference_root": str(reference_root),
         "candidate_root": str(candidate_root),
         "actor_source": actor_source,
+        "production_python_sources": production_python_sources,
         "probes": list(probes),
         "approved_normalizations": {
             "reference": _applied_payload(reference_normalizations),
