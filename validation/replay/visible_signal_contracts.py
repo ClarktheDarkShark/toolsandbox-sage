@@ -1807,6 +1807,11 @@ def _evaluate(
     request_before = call.request
     tools_before = tuple(call.tools)
     signals = signal_fn(call.request, call.tools)
+    if type(signals) is not tuple:
+        raise ValueError(
+            "visible task signals must return an exact tuple, "
+            f"got {type(signals).__name__}"
+        )
     return {
         "request": call.request,
         "tools": list(call.tools),
@@ -1988,6 +1993,20 @@ def _semantic_body(
         }
         for signal in _PRIMARY_PRIORITY
     ]
+    dynamic_primary_signal = "".join(("recency", "_search"))
+    canonical_primary_signal = "recency_search"
+    if (
+        dynamic_primary_signal != canonical_primary_signal
+        or dynamic_primary_signal is canonical_primary_signal
+    ):
+        raise AssertionError("primary-family identity carrier was interned or changed")
+    primary_families.append(
+        {
+            "case_id": "dynamic_equal_nonidentical_recency_search",
+            "signals": [dynamic_primary_signal],
+            "primary_family": family_fn((dynamic_primary_signal,)),
+        }
+    )
     primary_families.extend(
         (
             {
@@ -2138,8 +2157,8 @@ _ALL_FINAL_SIGNALS = (
 
 EXPECTED_VISIBLE_SIGNAL_TRACE: dict[str, Any] = {
     "body": {
-        "byte_count": 562_418,
-        "sha256": "e317e7a5bdddb39ac15a2ee76dfe31b4cbab36cd887b43ead9ed92b369f2ccc8",
+        "byte_count": 562_729,
+        "sha256": "4a05de2f3d47c824ecf83d6a461dbab0358cf2125b00485c71b3db796b7ec434",
     },
     "schema_version": 1,
     "site_case_count": 49,
@@ -2196,12 +2215,12 @@ EXPECTED_VISIBLE_SIGNAL_TRACE: dict[str, Any] = {
         "sha256": "e9dfee8f77cce178d31024e9b6a97b38422903493c0d830cf6d0e8f41d0829be",
     },
     "primary_family_cases": {
-        "byte_count": 8_407,
-        "sha256": "b65cc7c7da7300e1135a326a4ea19713037ebb4c81429c78908e6171eb60677b",
+        "byte_count": 8_718,
+        "sha256": "d13e6fcc2c2166a60af4580fcc62994d00c30bb112e21b9895dfff215fcbeca0",
     },
     "deterministic_repeated_calls": {
         "byte_count": 594,
-        "sha256": "0f7b8996fe7297aeaa880907b63f2b9ab7dce0c1ad7f9658a876d97562d358ba",
+        "sha256": "087895d8bb3c42a80ea63272f766bb598127d2d32800b7a44f7e51c7da06cd7b",
     },
 }
 

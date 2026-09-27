@@ -91,11 +91,34 @@ or suppress normalization rules.
   function and compiles 931 isolated source mutants: all 419 `_has_any`
   literals, 101 exact tool roles, 223 boolean operands, 122 remaining task
   string occurrences, 51 helper-string occurrences, and all 15 temporal-prefix
-  alternatives. The black-box corpus distinguishes 862 mutants. The remaining
-  69 are explicitly reviewed
+  alternatives. The immutable-reference profile remains frozen at 931 mutants:
+  the black-box corpus distinguishes 862 and the remaining 69 are explicitly
+  reviewed
   equivalence groups backed by substring dominance, downstream implication,
   boolean absorption, or a documented forward-dead holiday check; any new
-  invisible mutant fails. Targeted source mutants also cover absolute-date
+  invisible mutant fails. A separately frozen candidate profile is bound to
+  both the exact source bytes and a formatting-independent AST identity, plus
+  separate exact/AST identities for `_has_any`, the four external parsing
+  helpers, the temporal-prefix regex, and `_visible_primary_family`. It
+  audits 8,736 semantic mutants. Its 1,479 base mutants cover 336 `has_text`
+  arguments, 89 tool roles, 117 signal roles, 12 direct-text memberships, six
+  regexes, 258 Boolean operands, 154 whole helper calls, 51 external-helper
+  strings, and 15 temporal alternatives. It additionally exhausts the finite
+  replacement domains for every tool and signal role: all 5,031 nonidentity
+  substitutions across 117 signal occurrences and all 2,225 substitutions
+  across 89 tool occurrences, including local-helper arguments, direct
+  memberships, and emitted `add` labels. Text aliases have exhaustive deletion
+  coverage; no claim is made over an unbounded free-form replacement universe.
+  It also forces both values for all 43 top-level facts, forces both values at
+  every consumer of the nine shared cores, tests all 256 pairwise definition
+  and use-edge substitutions, mutates 38 local-helper semantics, checks exact
+  tuple return shape, text/tool normalization boundaries, and eight
+  evaluation-order seams (plus the local eager-snapshot mutant), and rejects an
+  identity-based primary-family membership mutant. It rejects 8,374 mutants;
+  362 are individually or group-wise documented external equivalences. Adding,
+  removing, moving, or changing a shared fact
+  invalidates the source profile before its mutation report can pass. Targeted
+  source mutants also cover absolute-date
   recognition, natural `text Alice`, safe-abstention precedence, reverse
   geocoding, parenthesized phone numbers, and the `tell ` boundary. Source
   parsing never occurs in the runtime replay probe. None of this validation
@@ -344,7 +367,7 @@ PYTHONPATH=".:$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
 ```
 
 Verify the independent 49-site visible-signal trace, semantic mutants, and
-focused lexical/tool boundaries with the same immutable reference import:
+focused lexical/tool boundaries with both frozen source profiles:
 
 ```bash
 PYTHONPATH="$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
@@ -353,6 +376,16 @@ PYTHONPATH=".:$REFERENCE_ROOT/src:$REFERENCE_ROOT" \
   python -m pytest \
     validation/replay/test_visible_signal_contracts.py \
     validation/replay/test_visible_signal_mutation_audit.py -q
+python -I validation/replay/visible_signal_mutation_runner.py \
+  --root "$REFERENCE_ROOT" \
+  --profile reference_v1 \
+  --output /tmp/sage-visible-signal-reference-mutations.json \
+  --tamper-self-test
+python -I validation/replay/visible_signal_mutation_runner.py \
+  --root /absolute/path/to/current-candidate \
+  --profile candidate_shared_facts_v1 \
+  --output /tmp/sage-visible-signal-candidate-mutations.json \
+  --tamper-self-test
 python validation/replay/compare.py \
   --reference-root "$REFERENCE_ROOT" \
   --candidate-root /absolute/path/to/current-candidate \
