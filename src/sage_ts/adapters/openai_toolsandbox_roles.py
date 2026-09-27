@@ -7,7 +7,8 @@ import json
 import os
 import re
 import time
-from typing import Any, Iterable, Literal, Mapping, Union, cast
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Literal, Mapping, Union, cast
 
 from openai import (
     NOT_GIVEN,
@@ -257,20 +258,6 @@ def _with_transient_openai_retries(call: Any) -> ChatCompletion:
     raise RuntimeError("unreachable_openai_retry_state")
 
 
-def _tool_names(
-    openai_tools: object,
-) -> set[str]:
-    if openai_tools is NOT_GIVEN:
-        return set()
-    names: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        name = function.get("name") if isinstance(function, dict) else None
-        if isinstance(name, str):
-            names.add(name)
-    return names
-
-
 def _agent_facing_tool_name(tool_name: str) -> str:
     if not tool_name:
         return tool_name
@@ -292,6 +279,286 @@ def _execution_facing_tool_name(tool_name: str) -> str:
     return mapped
 
 
+_DERIVED_INPUT_TYPES = {"object", "array", "string", "number", "integer", "boolean"}
+_SCHEDULING_INPUTS = {"current_timestamp", "hour", "minute", "local_utc_offset_hours"}
+_PRIOR_RECORD_INPUTS = {"records", "candidates", "selected_record", "contact_record"}
+_WINDOW_MARKERS = ("time-window", "recency phrase", "search kwargs", "bounded search")
+_DERIVED_MARKERS = ("extract", "normalize", "canonicalize", "deterministic extraction")
+_LOOKUP_QUERY_MARKERS = (
+    "search_contacts_kwargs",
+    "lookup query",
+    "query planner",
+    "prepare search",
+    "search kwargs",
+)
+_RELATIVE_TIME_MARKERS = ("relative local day", "relative day", "tomorrow", "timestamp")
+_SHARED_ACTION_ARGUMENT_MARKERS = (
+    "downstream_tool_kwargs",
+    "side-effect",
+    "prepare arguments",
+    "prepare the arguments",
+    "prepares the arguments",
+    "prepare the call",
+    "prepares the call",
+    "safe downstream kwargs",
+)
+_ACTION_ARGUMENT_MARKERS = _SHARED_ACTION_ARGUMENT_MARKERS + (
+    "prepares arguments",
+    "prepare final",
+    "prepares final",
+    "prepare exact kwargs",
+    "prepares exact kwargs",
+    "action argument",
+)
+_DOWNSTREAM_CALL_MARKERS = (
+    "should_call_tool",
+    "should_call_add_reminder",
+    "downstream tool",
+    "downstream_tool_name",
+    "downstream_tool_kwargs",
+    "original toolsandbox",
+)
+_POST_SELECTION_MARKERS = _SHARED_ACTION_ARGUMENT_MARKERS + ("selected record",)
+
+
+@dataclass(frozen=True, slots=True)
+class _ToolSchemaFacts:
+    function: dict[str, Any]
+    name: object
+    description: str
+    properties: object
+    input_names: set[Any]
+
+    @classmethod
+    def from_tool(cls, tool: Mapping[str, Any]) -> _ToolSchemaFacts | None:
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            return None
+        name = function.get("name")
+        description = str(function.get("description", "")).lower()
+        parameters = function.get("parameters", {})
+        properties: object = (
+            parameters.get("properties", {}) if isinstance(parameters, dict) else {}
+        )
+        input_names = set(properties) if isinstance(properties, dict) else set()
+        return cls(function, name, description, properties, input_names)
+
+    @property
+    def marker_text(self) -> str:
+        return f"{self.name} {self.description}"
+
+    def description_has(self, *markers: str) -> bool:
+        return any(marker in self.description for marker in markers)
+
+    def marker_has(self, *markers: str) -> bool:
+        return any(marker in self.marker_text for marker in markers)
+
+    def has_inputs(self, *names: str) -> bool:
+        return set(names).issubset(self.input_names)
+
+    def has_any_input(self, *names: str) -> bool:
+        return bool(set(names) & self.input_names)
+
+    def is_selector(self) -> bool:
+        name = self.name
+        if not isinstance(name, str) or "records" not in self.input_names:
+            return False
+        return self.description_has(
+            "visible-record constraint selection",
+            "selection/action usage",
+            "medium-grain workflow usage",
+            "constraint-to-action",
+            "selected_record",
+        ) or ("select" in name and "record" in self.description)
+
+    def is_derived_value(self) -> bool:
+        if not isinstance(self.name, str) or not self.input_names:
+            return False
+        properties = self.properties if isinstance(self.properties, dict) else {}
+        input_types = {
+            prop.get("type") for prop in properties.values() if isinstance(prop, dict)
+        }
+        valid_inputs = len(self.input_names) == 1 or (
+            bool(input_types & {"object", "array"})
+            and input_types <= _DERIVED_INPUT_TYPES
+        )
+        return valid_inputs and self.marker_has(*_DERIVED_MARKERS)
+
+    def is_lookup_query_planner(self) -> bool:
+        output_schema = self.function.get("output_schema")
+        output_properties: object = {}
+        if isinstance(output_schema, dict):
+            output_properties = output_schema.get("properties", {})
+        if not isinstance(output_properties, dict):
+            output_properties = {}
+        if not isinstance(self.name, str) or not self.input_names:
+            return False
+        prepares_search_kwargs = any(
+            str(key).startswith(("search_", "find_", "get_"))
+            and str(key).endswith("_kwargs")
+            for key in output_properties
+        ) or self.marker_has(*_LOOKUP_QUERY_MARKERS)
+        return prepares_search_kwargs and not bool(
+            self.input_names & _PRIOR_RECORD_INPUTS
+        )
+
+    def is_search_window(self) -> bool:
+        name = self.name
+        if not isinstance(name, str):
+            return False
+        named = name in {
+            "prepare_message_recency_search_args",
+            "prepare_past_reminder_recency_search_args",
+            "resolve_search_window_or_bounds",
+            "prepare_upcoming_reminder_search_args",
+        }
+        reminder_kwargs = (
+            "current_timestamp" in self.input_names
+            and "search kwargs" in self.description
+            and "reminder" in self.description
+        )
+        structured_window = self.has_inputs(
+            "current_timestamp",
+            "phrase",
+            "target_domain",
+            "timestamp_intent",
+            "direction",
+        ) and self.description_has(*_WINDOW_MARKERS)
+        return named or reminder_kwargs or structured_window
+
+    def is_scheduling_timestamp(self) -> bool:
+        name = self.name
+        if not isinstance(name, str):
+            return False
+        return name in {
+            "next_weekday_time_to_timestamp",
+            "relative_weeks_time_to_timestamp",
+            "weeks_from_now_time_to_timestamp",
+            "week_delta_time_to_timestamp",
+            "weekday_delta_time_to_timestamp",
+        } or (
+            _SCHEDULING_INPUTS.issubset(self.input_names)
+            and "reminder_timestamp" in self.description
+            and self.description_has("week", "weekday", "scheduling")
+        )
+
+    def is_state_action_planner(self) -> bool:
+        name = self.name
+        if not isinstance(name, str):
+            return False
+        device_state = self.description_has("device-state", "device state")
+        plan_sequence = name.startswith("plan_device_state_action_sequence")
+        classic = self.has_inputs("user_request", "visible_state_or_error")
+        next_service = name == "next_service_tool_call" or (
+            self.has_any_input("target_service", "tool_name", "should_call")
+            and device_state
+        )
+        classic_match = classic and (
+            plan_sequence
+            or "state action sequence" in self.description
+            or (device_state and "setter sequence" in self.description)
+        )
+        structured_match = self.has_inputs("target_service", "desired_on") and (
+            plan_sequence
+            or name.startswith("apply_single_device_state_action")
+            or device_state
+        )
+        return next_service or classic_match or structured_match
+
+    def is_validation_abstention(self) -> bool:
+        name = self.name
+        if not isinstance(name, str):
+            return False
+        return name == "prepare_safe_action_or_abstain" or (
+            self.has_inputs(
+                "user_request",
+                "requested_action",
+                "required_original_tools",
+                "available_original_tools",
+            )
+            and self.description_has(
+                "abstain", "insufficient information", "safe action"
+            )
+        )
+
+    def is_relative_time(self) -> bool:
+        return isinstance(self.name, str) and (
+            self.name == "relative_day_time_to_timestamp"
+            or (
+                self.has_inputs("current_timestamp", "day_offset", "hour", "minute")
+                and self.marker_has(*_RELATIVE_TIME_MARKERS)
+            )
+        )
+
+    def is_action_argument_helper(self) -> bool:
+        if not isinstance(self.name, str) or not self.input_names:
+            return False
+        prepares_args = self.marker_has(*_ACTION_ARGUMENT_MARKERS)
+        returns_call = self.marker_has(*_DOWNSTREAM_CALL_MARKERS) or any(
+            name in self.marker_text for name in ORIGINAL_SIDE_EFFECT_TOOL_NAMES
+        )
+        return (
+            prepares_args
+            and returns_call
+            and not bool(self.input_names & _PRIOR_RECORD_INPUTS)
+        )
+
+    def is_post_selection_action_helper(self) -> bool:
+        if not isinstance(self.name, str):
+            return False
+        needs_record = self.has_any_input(
+            "selected_record", "contact_record", "record", "records", "candidates"
+        )
+        prepares_args = self.marker_has(*_POST_SELECTION_MARKERS) or any(
+            name in self.marker_text for name in ORIGINAL_SIDE_EFFECT_TOOL_NAMES
+        )
+        return needs_record and prepares_args
+
+
+_ToolSchemaMatch = tuple[Mapping[str, Any], Mapping[str, Any]]
+_CategoryPredicate = Callable[[_ToolSchemaFacts], bool]
+
+
+@dataclass(frozen=True, slots=True)
+class _ToolSchemaInventory:
+    source: object
+
+    def tools(self) -> Iterable[Mapping[str, Any]]:
+        if self.source is NOT_GIVEN:
+            return
+        yield from cast(Iterable[Mapping[str, Any]], self.source)
+
+    def raw_names(self) -> set[str]:
+        return {
+            name
+            for tool in self.tools()
+            if isinstance(function := tool.get("function", {}), dict)
+            if isinstance(name := function.get("name"), str)
+        }
+
+    def find(self, execution_name: str) -> _ToolSchemaMatch | None:
+        if self.source is NOT_GIVEN:
+            return None
+        target = _execution_facing_tool_name(execution_name)
+        for tool in self.tools():
+            function = tool.get("function", {})
+            if not isinstance(function, Mapping):
+                continue
+            name = function.get("name")
+            if isinstance(name, str) and _execution_facing_tool_name(name) == target:
+                return tool, function
+        return None
+
+
+def _schema_property_names(schema: object) -> set[str]:
+    properties = schema.get("properties", {}) if isinstance(schema, Mapping) else {}
+    return set(properties) if isinstance(properties, Mapping) else set()
+
+
+def _tool_names(openai_tools: object) -> set[str]:
+    return _ToolSchemaInventory(openai_tools).raw_names()
+
+
 def _tool_names_execution_facing(openai_tools: object) -> set[str]:
     return {_execution_facing_tool_name(name) for name in _tool_names(openai_tools)}
 
@@ -300,65 +567,32 @@ def _tool_input_names_execution_facing(
     openai_tools: object,
     execution_tool_name: str,
 ) -> set[str]:
-    if openai_tools is NOT_GIVEN:
-        return set()
-    target = _execution_facing_tool_name(execution_tool_name)
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, Mapping):
-            continue
-        name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
-            continue
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, Mapping):
-            properties = parameters.get("properties", {})
-        return set(properties) if isinstance(properties, Mapping) else set()
-    return set()
+    found = _ToolSchemaInventory(openai_tools).find(execution_tool_name)
+    parameters = found[1].get("parameters", {}) if found is not None else {}
+    return _schema_property_names(parameters)
 
 
 def _tool_output_names_execution_facing(
     openai_tools: object,
     execution_tool_name: str,
 ) -> set[str]:
-    if openai_tools is NOT_GIVEN:
+    found = _ToolSchemaInventory(openai_tools).find(execution_tool_name)
+    if found is None:
         return set()
-    target = _execution_facing_tool_name(execution_tool_name)
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, Mapping):
-            continue
-        name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
-            continue
-        parameters = function.get("parameters", {})
-        output_schema: object = function.get("output_schema", {})
-        if not output_schema and isinstance(parameters, Mapping):
-            output_schema = parameters.get("output_schema", {})
-        properties: object = {}
-        if isinstance(output_schema, Mapping):
-            properties = output_schema.get("properties", {})
-        return set(properties) if isinstance(properties, Mapping) else set()
-    return set()
+    function = found[1]
+    parameters = function.get("parameters", {})
+    output_schema: object = function.get("output_schema", {})
+    if not output_schema and isinstance(parameters, Mapping):
+        output_schema = parameters.get("output_schema", {})
+    return _schema_property_names(output_schema)
 
 
 def _tool_description_execution_facing(
     openai_tools: object,
     execution_tool_name: str,
 ) -> str:
-    if openai_tools is NOT_GIVEN:
-        return ""
-    target = _execution_facing_tool_name(execution_tool_name)
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, Mapping):
-            continue
-        name = function.get("name")
-        if not isinstance(name, str) or _execution_facing_tool_name(name) != target:
-            continue
-        return str(function.get("description") or "")
-    return ""
+    found = _ToolSchemaInventory(openai_tools).find(execution_tool_name)
+    return str(found[1].get("description") or "") if found is not None else ""
 
 
 def _tool_name_for_call(openai_tools: object, execution_tool_name: str) -> str:
@@ -614,22 +848,17 @@ def _device_status_completion_tool_choice(
 
 
 def _generated_tool_names_execution_facing(openai_tools: object) -> list[str]:
-    if openai_tools is NOT_GIVEN:
-        return []
-    generated: list[str] = []
-    for tool_name in _tool_names(openai_tools):
-        execution_name = _execution_facing_tool_name(tool_name)
-        if execution_name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
-            continue
-        generated.append(execution_name)
-    return generated
+    return [
+        execution_name
+        for tool_name in _tool_names(openai_tools)
+        if (execution_name := _execution_facing_tool_name(tool_name))
+        not in ORIGINAL_TOOLSANDBOX_TOOL_NAMES
+    ]
 
 
 def _tool_schema_execution_name(tool: Mapping[str, Any]) -> str:
     function = tool.get("function", {})
-    if not isinstance(function, Mapping):
-        return ""
-    name = function.get("name")
+    name = function.get("name") if isinstance(function, Mapping) else None
     return _execution_facing_tool_name(str(name or "")) if isinstance(name, str) else ""
 
 
@@ -682,19 +911,8 @@ def _declared_service_answer_producers(
 ) -> tuple[str, ...]:
     """Read producer dependencies from all visible parts of the tool schema."""
 
-    schema_text = ""
-    if openai_tools is not NOT_GIVEN:
-        target = _execution_facing_tool_name(tool_name)
-        for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-            function = tool.get("function", {})
-            if not isinstance(function, Mapping):
-                continue
-            name = function.get("name")
-            if not isinstance(name, str):
-                continue
-            if _execution_facing_tool_name(name) == target:
-                schema_text = _tool_schema_text(tool)
-                break
+    found = _ToolSchemaInventory(openai_tools).find(tool_name)
+    schema_text = _tool_schema_text(found[0]) if found is not None else ""
     return tuple(
         name for name in sorted(SERVICE_ANSWER_PRODUCER_TOOLS) if name in schema_text
     )
@@ -2604,461 +2822,58 @@ def _latest_search_contacts_has_records(openai_messages: object) -> bool:
     return bool(_parse_sequence_payload(message.get("content")))
 
 
+def _category_names(
+    openai_tools: object,
+    predicate: _CategoryPredicate,
+) -> set[str]:
+    return {
+        cast(str, facts.name)
+        for tool in _ToolSchemaInventory(openai_tools).tools()
+        if (facts := _ToolSchemaFacts.from_tool(tool)) is not None
+        if predicate(facts)
+    }
+
+
 def _selector_tool_names(openai_tools: object) -> set[str]:
-    """Return visible deterministic selector helpers from OpenAI tool schemas."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    selectors: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        is_visible_record_selector = "records" in input_names and (
-            "visible-record constraint selection" in description
-            or "selection/action usage" in description
-            or "medium-grain workflow usage" in description
-            or "constraint-to-action" in description
-            or "selected_record" in description
-            or ("select" in name and "record" in description)
-        )
-        if is_visible_record_selector:
-            selectors.add(name)
-    return selectors
+    return _category_names(openai_tools, _ToolSchemaFacts.is_selector)
 
 
 def _derived_value_tool_names(openai_tools: object) -> set[str]:
-    """Return visible deterministic extraction/canonicalization helpers."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str) or not input_names:
-            continue
-        input_types = (
-            {prop.get("type") for prop in properties.values() if isinstance(prop, dict)}
-            if isinstance(properties, dict)
-            else set()
-        )
-        has_payload_input = bool(input_types & {"object", "array"})
-        scalar_only_extra_inputs = input_types <= {
-            "object",
-            "array",
-            "string",
-            "number",
-            "integer",
-            "boolean",
-        }
-        if len(input_names) != 1 and not (
-            has_payload_input and scalar_only_extra_inputs
-        ):
-            continue
-        is_extractor = any(
-            token in f"{name} {description}"
-            for token in (
-                "extract",
-                "normalize",
-                "canonicalize",
-                "deterministic extraction",
-            )
-        )
-        if is_extractor:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_derived_value)
 
 
 def _lookup_query_planner_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that prepare original lookup/search kwargs before search."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    planners: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        output_schema = function.get("output_schema")
-        output_properties: object = {}
-        if isinstance(output_schema, dict):
-            output_properties = output_schema.get("properties", {})
-        if not isinstance(output_properties, dict):
-            # OpenAI function schemas usually do not carry output_schema. Fall
-            # back to description/name markers from generated helper docstrings.
-            output_properties = {}
-        if not isinstance(name, str) or not input_names:
-            continue
-        prepares_search_kwargs = any(
-            str(key).startswith(("search_", "find_", "get_"))
-            and str(key).endswith("_kwargs")
-            for key in output_properties
-        ) or any(
-            token in f"{name} {description}"
-            for token in (
-                "search_contacts_kwargs",
-                "lookup query",
-                "query planner",
-                "prepare search",
-                "search kwargs",
-            )
-        )
-        requires_prior_records = bool(
-            input_names & {"records", "candidates", "selected_record", "contact_record"}
-        )
-        if prepares_search_kwargs and not requires_prior_records:
-            planners.add(name)
-    return planners
+    return _category_names(openai_tools, _ToolSchemaFacts.is_lookup_query_planner)
 
 
 def _search_window_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that prepare bounded search kwargs from recency phrases."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        is_window_helper = (
-            name
-            in {
-                "prepare_message_recency_search_args",
-                "prepare_past_reminder_recency_search_args",
-                "resolve_search_window_or_bounds",
-                "prepare_upcoming_reminder_search_args",
-            }
-            or (
-                "current_timestamp" in input_names
-                and "search kwargs" in description
-                and "reminder" in description
-            )
-            or (
-                {
-                    "current_timestamp",
-                    "phrase",
-                    "target_domain",
-                    "timestamp_intent",
-                    "direction",
-                }.issubset(input_names)
-                and any(
-                    token in description
-                    for token in (
-                        "time-window",
-                        "recency phrase",
-                        "search kwargs",
-                        "bounded search",
-                    )
-                )
-            )
-        )
-        if is_window_helper:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_search_window)
 
 
 def _relative_time_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that convert visible relative local times to timestamps."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        is_relative_time_helper = name == "relative_day_time_to_timestamp" or (
-            {"current_timestamp", "day_offset", "hour", "minute"}.issubset(input_names)
-            and any(
-                token in f"{name} {description}"
-                for token in (
-                    "relative local day",
-                    "relative day",
-                    "tomorrow",
-                    "timestamp",
-                )
-            )
-        )
-        if is_relative_time_helper:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_relative_time)
 
 
 def _scheduling_timestamp_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that produce reminder timestamps from scheduling phrases."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        is_scheduling_timestamp_helper = name in {
-            "next_weekday_time_to_timestamp",
-            "relative_weeks_time_to_timestamp",
-            "weeks_from_now_time_to_timestamp",
-            "week_delta_time_to_timestamp",
-            "weekday_delta_time_to_timestamp",
-        } or (
-            {"current_timestamp", "hour", "minute", "local_utc_offset_hours"}.issubset(
-                input_names
-            )
-            and "reminder_timestamp" in description
-            and any(token in description for token in ("week", "weekday", "scheduling"))
-        )
-        if is_scheduling_timestamp_helper:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_scheduling_timestamp)
 
 
 def _state_action_planner_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that plan original device-state setter calls."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        is_next_service_planner = name == "next_service_tool_call" or (
-            {"target_service", "tool_name", "should_call"} & input_names
-            and ("device-state" in description or "device state" in description)
-        )
-        has_structured_state_action_inputs = {
-            "target_service",
-            "desired_on",
-        }.issubset(input_names)
-        has_state_action_inputs = {"user_request", "visible_state_or_error"}.issubset(
-            input_names
-        )
-        is_named_state_action_planner = (
-            name == "plan_device_state_action_sequence"
-            or name.startswith("plan_device_state_action_sequence")
-        ) and has_state_action_inputs
-        is_described_state_action_planner = has_state_action_inputs and (
-            "state action sequence" in description
-            or ("device-state" in description and "setter sequence" in description)
-            or ("device state" in description and "setter sequence" in description)
-        )
-        is_structured_state_action_tool = has_structured_state_action_inputs and (
-            name.startswith("plan_device_state_action_sequence")
-            or name.startswith("apply_single_device_state_action")
-            or "device-state" in description
-            or "device state" in description
-        )
-        is_state_action_planner = (
-            is_named_state_action_planner
-            or is_next_service_planner
-            or is_described_state_action_planner
-            or is_structured_state_action_tool
-        )
-        if is_state_action_planner:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_state_action_planner)
 
 
 def _validation_abstention_tool_names(openai_tools: object) -> set[str]:
-    """Return visible helpers whose contract is to abstain from unsafe actions."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        has_abstention_inputs = {
-            "user_request",
-            "requested_action",
-            "required_original_tools",
-            "available_original_tools",
-        }.issubset(input_names)
-        is_abstention_helper = name == "prepare_safe_action_or_abstain" or (
-            has_abstention_inputs
-            and any(
-                token in description
-                for token in (
-                    "abstain",
-                    "insufficient information",
-                    "safe action",
-                )
-            )
-        )
-        if is_abstention_helper:
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_validation_abstention)
 
 
 def _action_argument_helper_tool_names(openai_tools: object) -> set[str]:
-    """Return visible helpers that prepare original side-effect tool arguments."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str) or not input_names:
-            continue
-        marker_text = f"{name} {description}"
-        prepares_side_effect_args = any(
-            token in marker_text
-            for token in (
-                "prepare the arguments",
-                "prepares the arguments",
-                "prepare arguments",
-                "prepares arguments",
-                "prepare the call",
-                "prepares the call",
-                "prepare final",
-                "prepares final",
-                "prepare exact kwargs",
-                "prepares exact kwargs",
-                "safe downstream kwargs",
-                "downstream_tool_kwargs",
-                "side-effect",
-                "action argument",
-            )
-        )
-        returns_downstream_call = any(
-            token in marker_text
-            for token in (
-                "should_call_tool",
-                "should_call_add_reminder",
-                "downstream tool",
-                "downstream_tool_name",
-                "downstream_tool_kwargs",
-                "original toolsandbox",
-            )
-        ) or any(
-            tool_name in marker_text for tool_name in ORIGINAL_SIDE_EFFECT_TOOL_NAMES
-        )
-        requires_prior_records = bool(
-            input_names & {"records", "candidates", "selected_record", "contact_record"}
-        )
-        if (
-            prepares_side_effect_args
-            and returns_downstream_call
-            and not requires_prior_records
-        ):
-            helpers.add(name)
-    return helpers
+    return _category_names(openai_tools, _ToolSchemaFacts.is_action_argument_helper)
 
 
 def _post_selection_action_helper_tool_names(openai_tools: object) -> set[str]:
-    """Return helpers that need a visible selected record before side effects."""
-    if openai_tools is NOT_GIVEN:
-        return set()
-    helpers: set[str] = set()
-    for tool in cast(Iterable[Mapping[str, Any]], openai_tools):
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        name = function.get("name")
-        description = str(function.get("description", "")).lower()
-        parameters = function.get("parameters", {})
-        properties: object = {}
-        if isinstance(parameters, dict):
-            properties = parameters.get("properties", {})
-        input_names = set(properties) if isinstance(properties, dict) else set()
-        if not isinstance(name, str):
-            continue
-        needs_selected_record = bool(
-            input_names
-            & {"selected_record", "contact_record", "record", "records", "candidates"}
-        )
-        prepares_downstream_args = any(
-            token in f"{name} {description}"
-            for token in (
-                "downstream_tool_kwargs",
-                "side-effect",
-                "prepare arguments",
-                "prepare the arguments",
-                "prepares the arguments",
-                "prepare the call",
-                "prepares the call",
-                "safe downstream kwargs",
-                "selected record",
-            )
-        ) or any(
-            tool_name in f"{name} {description}"
-            for tool_name in ORIGINAL_SIDE_EFFECT_TOOL_NAMES
-        )
-        if needs_selected_record and prepares_downstream_args:
-            helpers.add(name)
-    return helpers
+    return _category_names(
+        openai_tools, _ToolSchemaFacts.is_post_selection_action_helper
+    )
 
 
 def _tool_content_has_candidate_records(content: object) -> bool:
