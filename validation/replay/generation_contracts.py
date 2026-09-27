@@ -602,6 +602,20 @@ def probe_native_structural_cases() -> dict[str, Any]:
             "held_out": held_out,
         }
 
+    def raw_example_without_mode(
+        records: list[dict[str, Any]],
+        *,
+        identifier: str,
+        timestamp_key: str,
+    ) -> dict[str, Any]:
+        item = raw_example(
+            records,
+            identifier=identifier,
+            timestamp_key=timestamp_key,
+        )
+        item["inputs"].pop("selection_mode")
+        return item
+
     vectors: dict[str, tuple[dict[str, Any], ...]] = {
         "explicit_latest": (
             raw_example(
@@ -712,6 +726,27 @@ def probe_native_structural_cases() -> dict[str, Any]:
                 mode=" EARLIEST ",
             ),
         ),
+        "timestamp_key_strips_and_mode_case_folds": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 1},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                ],
+                identifier="r1",
+                timestamp_key=" created_timestamp ",
+                mode="EARLIEST",
+            ),
+        ),
+        "missing_mode_defaults_latest": (
+            raw_example_without_mode(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 1},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
         "equal_extreme_duplicates_first_winner": (
             raw_example(
                 [
@@ -736,6 +771,13 @@ def probe_native_structural_cases() -> dict[str, Any]:
         "empty_records": (
             raw_example([], identifier="none", timestamp_key="created_timestamp"),
         ),
+        "records_must_be_list": (
+            raw_example(  # type: ignore[arg-type] - malformed replay boundary.
+                "not-a-list",
+                identifier="none",
+                timestamp_key="created_timestamp",
+            ),
+        ),
         "mixed_record_shapes": (
             raw_example(
                 [
@@ -743,6 +785,38 @@ def probe_native_structural_cases() -> dict[str, Any]:
                     None,  # type: ignore[list-item] - malformed replay boundary.
                 ],
                 identifier="r1",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "scan_continues_after_no_structural_case": (
+            raw_example(
+                [{"reminder_id": "skip-1"}, {"reminder_id": "skip-2"}],
+                identifier="skip-2",
+            ),
+            raw_example(
+                [
+                    {"reminder_id": "use-1", "created_timestamp": 1},
+                    {"reminder_id": "use-2", "created_timestamp": 2},
+                ],
+                identifier="use-2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "malformed_only_stops_scan": (
+            raw_example(
+                [
+                    {"reminder_id": "stop-1", "created_timestamp": "one"},
+                    {"reminder_id": "stop-2", "created_timestamp": "two"},
+                ],
+                identifier="stop-2",
+                timestamp_key="created_timestamp",
+            ),
+            raw_example(
+                [
+                    {"reminder_id": "unused-1", "created_timestamp": 1},
+                    {"reminder_id": "unused-2", "created_timestamp": 2},
+                ],
+                identifier="unused-2",
                 timestamp_key="created_timestamp",
             ),
         ),
@@ -769,6 +843,7 @@ def probe_native_structural_cases() -> dict[str, Any]:
 
     results: dict[str, Any] = {}
     for vector_id, items in vectors.items():
+        items_before = copy.deepcopy(items)
         request = ToolGenerationRequest(
             scenario_name=f"native structural {vector_id}",
             observation="Select one visible reminder and remove it safely.",
@@ -794,6 +869,8 @@ def probe_native_structural_cases() -> dict[str, Any]:
             "validator_augmented_examples": _exact(
                 [asdict(example) for example in augmented]
             ),
+            "source_examples_after": _exact(items),
+            "source_examples_unchanged": items == items_before,
         }
 
     explicit = vectors["explicit_latest"][0]
@@ -808,8 +885,88 @@ def probe_native_structural_cases() -> dict[str, Any]:
         "before": _exact([asdict(example) for example in preexisting]),
         "after": _exact([asdict(example) for example in deduped]),
     }
+
+    tied_inputs = copy.deepcopy(explicit["inputs"])
+    tied_inputs["records"].append(copy.deepcopy(tied_inputs["records"][-1]))
+    preexisting_tie_item = {
+        "inputs": tied_inputs,
+        "expected": {},
+        "negative_applicability": True,
+    }
+    tie_request = ToolGenerationRequest(
+        scenario_name="native structural preexisting tie",
+        observation="Select one visible reminder and remove it safely.",
+        allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
+        validation_examples=(explicit, preexisting_tie_item),
+        suggested_tool_name="select_action_target_by_recency",
+    )
+    tie_validator_examples = (
+        ToolExample(dict(explicit["inputs"]), explicit["expected"]),
+        ToolExample(tied_inputs, {}, negative_applicability=True),
+    )
+    results["preexisting_tie_deduplication_and_labels"] = {
+        "generator_projection": _exact(_native_action_validation_examples(tie_request)),
+        "validator_labeled_projection": _exact(
+            _native_action_validator_labeled_examples(tie_request)
+        ),
+        "validator_augmented_examples": _exact(
+            [
+                asdict(example)
+                for example in _with_native_action_structural_negatives(
+                    tie_validator_examples
+                )
+            ]
+        ),
+    }
+
+    exception_vectors = {
+        "integer_only_common_key": (
+            {
+                "inputs": {"records": [{1: 10}, {1: 20}]},
+                "expected": expected_action("unused"),
+            },
+        ),
+        "heterogeneous_common_keys": (
+            {
+                "inputs": {
+                    "records": [
+                        {1: 10, (2,): 1},
+                        {1: 20, (2,): 2},
+                    ]
+                },
+                "expected": expected_action("unused"),
+            },
+        ),
+    }
+    exception_results: dict[str, Any] = {}
+    for vector_id, items in exception_vectors.items():
+        request = ToolGenerationRequest(
+            scenario_name=f"native structural exception {vector_id}",
+            observation="Freeze malformed key exception behavior.",
+            allowed_families=(str(ToolFamily.SEARCH_FILTER_RANKING_HELPER),),
+            validation_examples=items,
+        )
+        validator_examples = tuple(
+            ToolExample(dict(item["inputs"]), item["expected"]) for item in items
+        )
+        exception_results[vector_id] = {
+            "generator_projection": _capture(
+                lambda request=request: _native_action_validation_examples(request)
+            ),
+            "validator_labeled_projection": _capture(
+                lambda request=request: _native_action_validator_labeled_examples(
+                    request
+                )
+            ),
+            "validator_augmented_examples": _capture(
+                lambda validator_examples=validator_examples: (
+                    _with_native_action_structural_negatives(validator_examples)
+                )
+            ),
+        }
     return {
         "vectors": results,
+        "exception_vectors": exception_results,
         "invariants": {
             "generator_structural_order": ["missing_rank_field", "tied_rank"],
             "only_first_eligible_contract_augmented": True,
