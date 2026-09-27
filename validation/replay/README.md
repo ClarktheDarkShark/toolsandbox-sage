@@ -48,6 +48,14 @@ or suppress normalization rules.
   insufficient-information versus nonterminal safe-abstention behavior, fresh
   factory materialization and mutation isolation, empty/malformed/temporal/
   precondition trace behavior, and the generic external-service fallback.
+  A separately hashed refactor guard directly calls the 11 service-answer,
+  specific/broad-location, and reminder/message search-argument factories. It
+  requires fresh mutable products from every call, freezes the total mutable
+  container count and zero within-product aliases for every factory, records
+  exact per-example values plus ordered recursive input/expected shapes, and
+  proves the two location kwargs mappings within each location example never
+  alias. Keeping this guard separate preserves the frozen full-corpus digest
+  while making a helper-refactor failure local to one factory and example.
   Recursive type tags distinguish tuple/list, bool/int/float, dataclass, set,
   and insertion-ordered dictionary values; hashes are therefore not based on
   lossy sorted JSON.
@@ -275,7 +283,8 @@ python -m unittest validation.replay.test_actor_contracts -v
 The classifier corpus is materialized from the frozen benchmark rather than
 shipped as a multi-megabyte duplicate fixture. Its independent reference
 digests and structural assertions live in `classifier_contracts.py`. Verify
-the full corpus and both unhashed and rehashed tamper rejection with:
+the full corpus plus the direct-factory guard, including unhashed and rehashed
+tamper rejection for each integrity domain, with:
 
 ```bash
 python validation/replay/classifier_contracts.py --tamper-self-test

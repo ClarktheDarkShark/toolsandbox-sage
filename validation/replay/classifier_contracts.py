@@ -54,6 +54,42 @@ EXPECTED_CONTRACT: dict[str, Any] = {
     "scalar_expected_type_count": 2,
     "duplicate_case_count": 8,
     "benchmark_collision_count": 726,
+    "factory_refactor_guards": {
+        "byte_count": 244_896,
+        "sha256": "029a38fa90af28c0c7d2a9066847e1303c8ad8d1fde8c8913509243216c961b2",
+    },
+    "direct_factory_count": 11,
+    "direct_factory_example_count": 38,
+    "location_non_alias_case_count": 9,
+}
+
+
+_FACTORY_REFACTOR_SPECS: tuple[tuple[str, str], ...] = (
+    ("service", "_external_service_answer_extraction_observation"),
+    ("service", "_address_answer_extraction_observation"),
+    ("service", "_currency_answer_extraction_observation"),
+    ("service", "_phone_answer_extraction_observation"),
+    ("service", "_distance_answer_extraction_observation"),
+    ("service", "_temperature_answer_extraction_observation"),
+    ("location", "_location_search_argument_observation"),
+    ("location", "_broad_location_search_argument_observation"),
+    ("search", "_prepare_upcoming_reminder_search_args_observation"),
+    ("search", "_prepare_message_recency_search_args_observation"),
+    ("search", "_prepare_past_reminder_recency_search_args_observation"),
+)
+
+_EXPECTED_FACTORY_MUTABLE_COUNTS: dict[str, int] = {
+    "_external_service_answer_extraction_observation": 28,
+    "_address_answer_extraction_observation": 12,
+    "_currency_answer_extraction_observation": 8,
+    "_phone_answer_extraction_observation": 8,
+    "_distance_answer_extraction_observation": 8,
+    "_temperature_answer_extraction_observation": 16,
+    "_location_search_argument_observation": 20,
+    "_broad_location_search_argument_observation": 16,
+    "_prepare_upcoming_reminder_search_args_observation": 9,
+    "_prepare_message_recency_search_args_observation": 9,
+    "_prepare_past_reminder_recency_search_args_observation": 9,
 }
 
 
@@ -191,6 +227,252 @@ def _mutable_ids(value: Any) -> set[int]:
 
     visit(value)
     return seen
+
+
+def _mutable_identity_topology(value: Any) -> dict[str, Any]:
+    """Describe repeated dict/list/set identities using deterministic paths."""
+
+    occurrences: dict[int, dict[str, Any]] = {}
+    active: set[int] = set()
+
+    def visit(item: Any, path: list[dict[str, Any]]) -> None:
+        if dataclasses.is_dataclass(item) and not isinstance(item, type):
+            for field in dataclasses.fields(item):
+                visit(
+                    getattr(item, field.name),
+                    [*path, {"kind": "field", "name": field.name}],
+                )
+            return
+
+        mutable = isinstance(item, (dict, list, set))
+        if mutable:
+            identity = id(item)
+            entry = occurrences.setdefault(
+                identity,
+                {"type": type(item).__name__, "paths": []},
+            )
+            entry["paths"].append(path)
+            if identity in active:
+                return
+            active.add(identity)
+
+        if isinstance(item, dict):
+            for index, (key, nested) in enumerate(item.items()):
+                visit(
+                    key,
+                    [*path, {"kind": "mapping_key", "index": index}],
+                )
+                visit(
+                    nested,
+                    [
+                        *path,
+                        {
+                            "kind": "mapping_value",
+                            "index": index,
+                            "key": _typed(key),
+                        },
+                    ],
+                )
+        elif isinstance(item, (list, tuple)):
+            for index, nested in enumerate(item):
+                visit(nested, [*path, {"kind": "sequence_item", "index": index}])
+        elif isinstance(item, (set, frozenset)):
+            ordered = sorted(item, key=lambda nested: _canonical_bytes(_typed(nested)))
+            for index, nested in enumerate(ordered):
+                visit(nested, [*path, {"kind": "set_item", "index": index}])
+
+        if mutable:
+            active.remove(id(item))
+
+    visit(value, [])
+    alias_groups = [entry for entry in occurrences.values() if len(entry["paths"]) > 1]
+    return {
+        "mutable_container_count": len(occurrences),
+        "mutable_container_occurrence_count": sum(
+            len(entry["paths"]) for entry in occurrences.values()
+        ),
+        "duplicate_mutable_identity_count": len(alias_groups),
+        "alias_groups": alias_groups,
+    }
+
+
+def _ordered_shape(value: Any) -> dict[str, Any]:
+    """Describe container shape and mapping-key order without hiding values."""
+
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {
+            "type": "dataclass",
+            "class": type(value).__name__,
+            "fields": [
+                [field.name, _ordered_shape(getattr(value, field.name))]
+                for field in dataclasses.fields(value)
+            ],
+        }
+    if isinstance(value, dict):
+        return {
+            "type": "dict",
+            "items": [
+                {
+                    "key": _typed(key),
+                    "value_shape": _ordered_shape(item),
+                }
+                for key, item in value.items()
+            ],
+        }
+    if isinstance(value, (list, tuple)):
+        return {
+            "type": type(value).__name__,
+            "items": [_ordered_shape(item) for item in value],
+        }
+    if isinstance(value, (set, frozenset)):
+        items = [_ordered_shape(item) for item in value]
+        items.sort(key=_canonical_bytes)
+        return {"type": type(value).__name__, "items": items}
+    typed = _typed(value)
+    return {
+        "type": typed["type"],
+        **({"class": typed["class"]} if "class" in typed else {}),
+    }
+
+
+def _example_shape(index: int, example: Any) -> dict[str, Any]:
+    """Localize exact example values separately from ordered container shape."""
+
+    return {
+        "index": index,
+        "held_out": example.held_out,
+        "negative_applicability": example.negative_applicability,
+        "inputs": _digest(example.inputs),
+        "input_shape": _ordered_shape(example.inputs),
+        "expected": _digest(example.expected),
+        "expected_shape": _ordered_shape(example.expected),
+    }
+
+
+def _direct_factory_guard(
+    classifier: Any,
+    *,
+    group: str,
+    factory_name: str,
+) -> dict[str, Any]:
+    """Characterize one factory and prove products have fresh mutable data."""
+
+    factory = getattr(classifier, factory_name)
+    scenario_name = f"replay_factory_guard:{factory_name}"
+    first = factory(scenario_name)
+    second = factory(scenario_name)
+    first_before = _digest(first)
+    second_before = _digest(second)
+    shared_before = _mutable_ids(first) & _mutable_ids(second)
+    if not first.validation_examples:
+        raise AssertionError(f"{factory_name} produced no validation examples")
+    first_example = first.validation_examples[0]
+    first_example.inputs["__factory_mutation_probe__"] = [factory_name]
+    if isinstance(first_example.expected, dict):
+        first_example.expected["__factory_mutation_probe__"] = {"first": True}
+    first_after = _digest(first)
+    second_after = _digest(second)
+    third = factory(scenario_name)
+    third_after = _digest(third)
+    return {
+        "group": group,
+        "factory_name": factory_name,
+        "scenario_name": scenario_name,
+        "canonical_key": second.canonical_key,
+        "example_count": len(second.validation_examples),
+        "factory_product": _digest(_static_factory_contract(second)),
+        "exact_observation": second_before,
+        "within_product_mutable_topology": _mutable_identity_topology(second),
+        "examples": [
+            _example_shape(index, example)
+            for index, example in enumerate(second.validation_examples)
+        ],
+        "freshness": {
+            "first_before": first_before,
+            "first_after": first_after,
+            "second_before": second_before,
+            "second_after": second_after,
+            "third_after": third_after,
+            "first_mutation_changed_first": first_before != first_after,
+            "first_mutation_left_second_unchanged": second_before == second_after,
+            "fresh_third_matches_unmutated_second": second_before == third_after,
+            "first_second_shared_mutable_count": len(shared_before),
+            "second_third_shared_mutable_count": len(
+                _mutable_ids(second) & _mutable_ids(third)
+            ),
+        },
+    }
+
+
+def _location_kwargs_non_alias_cases(
+    classifier: Any,
+) -> list[dict[str, Any]]:
+    """Prove paired location kwargs are distinct inside every example."""
+
+    cases: list[dict[str, Any]] = []
+    location_factories = (
+        "_location_search_argument_observation",
+        "_broad_location_search_argument_observation",
+    )
+    for factory_name in location_factories:
+        observation = getattr(classifier, factory_name)(
+            f"replay_location_alias_guard:{factory_name}"
+        )
+        for index, example in enumerate(observation.validation_examples):
+            expected = example.expected
+            if not isinstance(expected, dict):
+                raise AssertionError(
+                    f"{factory_name} example {index} expected a mapping"
+                )
+            search_kwargs = expected.get("search_location_kwargs")
+            downstream_kwargs = expected.get("downstream_tool_kwargs")
+            if not isinstance(search_kwargs, dict) or not isinstance(
+                downstream_kwargs, dict
+            ):
+                raise AssertionError(
+                    f"{factory_name} example {index} lacks location kwargs mappings"
+                )
+            search_before = _digest(search_kwargs)
+            downstream_before = _digest(downstream_kwargs)
+            shared_before = _mutable_ids(search_kwargs) & _mutable_ids(
+                downstream_kwargs
+            )
+            search_kwargs["__location_kwargs_alias_probe__"] = factory_name
+            search_after = _digest(search_kwargs)
+            downstream_after = _digest(downstream_kwargs)
+            cases.append(
+                {
+                    "factory_name": factory_name,
+                    "example_index": index,
+                    "search_before": search_before,
+                    "search_after": search_after,
+                    "downstream_before": downstream_before,
+                    "downstream_after": downstream_after,
+                    "same_object_before": search_kwargs is downstream_kwargs,
+                    "shared_mutable_count_before": len(shared_before),
+                    "search_mutation_changed_search": search_before != search_after,
+                    "search_mutation_left_downstream_unchanged": (
+                        downstream_before == downstream_after
+                    ),
+                }
+            )
+    return cases
+
+
+def _factory_refactor_guards(classifier: Any) -> dict[str, Any]:
+    factories = [
+        _direct_factory_guard(
+            classifier,
+            group=group,
+            factory_name=factory_name,
+        )
+        for group, factory_name in _FACTORY_REFACTOR_SPECS
+    ]
+    return {
+        "schema_version": 1,
+        "factories": factories,
+        "location_kwargs_non_alias": _location_kwargs_non_alias_cases(classifier),
+    }
 
 
 def _mutation_isolation(
@@ -666,12 +948,18 @@ def build_classifier_corpus() -> dict[str, Any]:
             "generic_service_fallback": _generic_service_fallback(classifier),
         },
     }
+    factory_refactor_guards = _factory_refactor_guards(classifier)
     corpus = dict(body)
-    corpus["integrity"] = {"body": _digest(body)}
+    corpus["factory_refactor_guards"] = factory_refactor_guards
+    corpus["integrity"] = {
+        "body": _digest(body),
+        "factory_refactor_guards": _digest(factory_refactor_guards),
+    }
     return corpus
 
 
 def _contract_projection(corpus: dict[str, Any]) -> dict[str, Any]:
+    factory_refactor_guards = corpus["factory_refactor_guards"]
     return {
         "body": corpus["integrity"]["body"],
         "task_count": corpus["task_count"],
@@ -686,14 +974,81 @@ def _contract_projection(corpus: dict[str, Any]) -> dict[str, Any]:
         "benchmark_collision_count": len(
             corpus["focused_contracts"]["benchmark_primary_family_collisions"]
         ),
+        "factory_refactor_guards": corpus["integrity"]["factory_refactor_guards"],
+        "direct_factory_count": len(factory_refactor_guards["factories"]),
+        "direct_factory_example_count": sum(
+            item["example_count"] for item in factory_refactor_guards["factories"]
+        ),
+        "location_non_alias_case_count": len(
+            factory_refactor_guards["location_kwargs_non_alias"]
+        ),
     }
 
 
+def _verify_factory_refactor_guards(factory_refactor_guards: dict[str, Any]) -> None:
+    actual_specs = [
+        (item["group"], item["factory_name"])
+        for item in factory_refactor_guards["factories"]
+    ]
+    if actual_specs != list(_FACTORY_REFACTOR_SPECS):
+        raise ValueError("classifier direct-factory guard order or membership changed")
+    for item in factory_refactor_guards["factories"]:
+        expected_mutable_count = _EXPECTED_FACTORY_MUTABLE_COUNTS[item["factory_name"]]
+        topology = item["within_product_mutable_topology"]
+        if not (
+            topology["mutable_container_count"] == expected_mutable_count
+            and topology["mutable_container_occurrence_count"] == expected_mutable_count
+            and topology["duplicate_mutable_identity_count"] == 0
+            and topology["alias_groups"] == []
+        ):
+            raise ValueError(
+                "classifier factory mutable identity topology changed: "
+                f"{item['factory_name']} expected_count={expected_mutable_count} "
+                f"actual={topology!r}"
+            )
+        freshness = item["freshness"]
+        if not (
+            freshness["first_mutation_changed_first"]
+            and freshness["first_mutation_left_second_unchanged"]
+            and freshness["fresh_third_matches_unmutated_second"]
+            and freshness["first_second_shared_mutable_count"] == 0
+            and freshness["second_third_shared_mutable_count"] == 0
+        ):
+            raise ValueError(
+                f"classifier factory {item['factory_name']} reuses mutable data"
+            )
+        if len(item["examples"]) != item["example_count"]:
+            raise ValueError(
+                f"classifier factory {item['factory_name']} example shapes are incomplete"
+            )
+    for item in factory_refactor_guards["location_kwargs_non_alias"]:
+        if not (
+            item["same_object_before"] is False
+            and item["shared_mutable_count_before"] == 0
+            and item["search_mutation_changed_search"]
+            and item["search_mutation_left_downstream_unchanged"]
+        ):
+            raise ValueError(
+                "classifier location kwargs alias within one validation example: "
+                f"{item['factory_name']}[{item['example_index']}]"
+            )
+
+
 def verify_classifier_corpus(corpus: dict[str, Any]) -> None:
-    body = {key: value for key, value in corpus.items() if key != "integrity"}
+    body = {
+        key: value
+        for key, value in corpus.items()
+        if key not in {"factory_refactor_guards", "integrity"}
+    }
     actual_integrity = _digest(body)
     if corpus.get("integrity", {}).get("body") != actual_integrity:
         raise ValueError("classifier corpus body digest does not match its contents")
+    factory_refactor_guards = corpus.get("factory_refactor_guards")
+    guard_integrity = _digest(factory_refactor_guards)
+    if corpus.get("integrity", {}).get("factory_refactor_guards") != guard_integrity:
+        raise ValueError(
+            "classifier factory-refactor guard digest does not match its contents"
+        )
     actual = _contract_projection(corpus)
     if not EXPECTED_CONTRACT:
         raise ValueError("classifier corpus expected contract has not been frozen")
@@ -702,6 +1057,8 @@ def verify_classifier_corpus(corpus: dict[str, Any]) -> None:
             "classifier corpus differs from its frozen reference contract: "
             f"expected={EXPECTED_CONTRACT!r}, actual={actual!r}"
         )
+
+    _verify_factory_refactor_guards(factory_refactor_guards)
 
     focused = corpus["focused_contracts"]
     isolation = focused["fresh_materialization_mutation_isolation"]
@@ -786,14 +1143,44 @@ def _tamper_self_test(corpus: dict[str, Any]) -> None:
         raise AssertionError("unhashed classifier corpus tamper was not rejected")
 
     forged = copy.deepcopy(tampered)
-    forged_body = {key: value for key, value in forged.items() if key != "integrity"}
-    forged["integrity"] = {"body": _digest(forged_body)}
+    forged_body = {
+        key: value
+        for key, value in forged.items()
+        if key not in {"factory_refactor_guards", "integrity"}
+    }
+    forged["integrity"]["body"] = _digest(forged_body)
     try:
         verify_classifier_corpus(forged)
     except ValueError:
         pass
     else:
         raise AssertionError("rehashed classifier corpus tamper was not rejected")
+
+    guard_tampered = copy.deepcopy(corpus)
+    guard_tampered["factory_refactor_guards"]["factories"][0]["examples"][0][
+        "input_shape"
+    ]["type"] = "tampered"
+    try:
+        verify_classifier_corpus(guard_tampered)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "unhashed classifier factory guard tamper was not rejected"
+        )
+
+    guard_forged = copy.deepcopy(guard_tampered)
+    guard_forged["integrity"]["factory_refactor_guards"] = _digest(
+        guard_forged["factory_refactor_guards"]
+    )
+    try:
+        verify_classifier_corpus(guard_forged)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "rehashed classifier factory guard tamper was not rejected"
+        )
 
 
 def main() -> int:
