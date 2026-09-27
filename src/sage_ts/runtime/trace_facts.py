@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from tool_sandbox.common.execution_context import DatabaseNamespace
 
@@ -47,3 +47,68 @@ class TraceFacts:
                     yield json.loads(str(item))
                 except json.JSONDecodeError:
                     continue
+
+
+@dataclass(frozen=True, slots=True)
+class OpenAITraceFacts:
+    """Immutable structural view over one OpenAI-format actor transcript."""
+
+    messages: tuple[Any, ...]
+
+    @classmethod
+    def from_messages(cls, messages: object) -> OpenAITraceFacts:
+        return cls(tuple(cast(Iterable[Any], messages)))
+
+    def user_texts(self) -> list[str]:
+        return [
+            str(message.get("content", "") or "")
+            for message in self.messages
+            if message.get("role") == "user"
+        ]
+
+    def first_user_text(self) -> str:
+        for message in self.messages:
+            if message.get("role") == "user":
+                return str(message.get("content", "") or "")
+        return ""
+
+    def latest_user_text(self) -> str:
+        for message in reversed(self.messages):
+            if message.get("role") == "user":
+                return str(message.get("content", "") or "")
+        return ""
+
+    def latest_user_index(self) -> int:
+        return self.last_index(lambda message: message.get("role") == "user")
+
+    def last_index(self, predicate: Callable[[Any], bool]) -> int:
+        latest = -1
+        for index, message in enumerate(self.messages):
+            if predicate(message):
+                latest = index
+        return latest
+
+    def tool_calls(
+        self,
+        *,
+        after_index: int = -1,
+        role: str | None = None,
+        list_only: bool = True,
+        dict_only: bool = False,
+    ) -> Iterator[tuple[int, Mapping[str, Any]]]:
+        """Yield raw tool calls while preserving each caller's container semantics."""
+
+        for index, message in enumerate(self.messages):
+            if index <= after_index:
+                continue
+            if role is not None and message.get("role") != role:
+                continue
+            tool_calls = message.get("tool_calls")
+            if list_only:
+                if not isinstance(tool_calls, list):
+                    continue
+            else:
+                tool_calls = tool_calls or []
+            for tool_call in tool_calls:
+                if isinstance(tool_call, dict if dict_only else Mapping):
+                    yield index, tool_call

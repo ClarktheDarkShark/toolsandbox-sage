@@ -26,6 +26,7 @@ from openai.types.chat import (
 from sage_ts.config.models import reasoning_effort_kwargs, resolve_model_name
 from sage_ts.config.openai_client import build_robust_openai_client
 from sage_ts.evaluation.llm_usage import record_chat_completion_usage
+from sage_ts.runtime.trace_facts import OpenAITraceFacts
 from tool_sandbox.common.execution_context import get_current_context
 from tool_sandbox.common.utils import all_logging_disabled
 from tool_sandbox.roles.openai_api_agent import OpenAIAPIAgent
@@ -384,20 +385,15 @@ def _message_already_called_tool(
     tool_name: str,
 ) -> bool:
     target_tool_name = _execution_facing_tool_name(tool_name)
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, dict):
-                continue
-            function = tool_call.get("function")
-            if (
-                isinstance(function, dict)
-                and _execution_facing_tool_name(str(function.get("name", "") or ""))
-                == target_tool_name
-            ):
-                return True
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for _index, tool_call in facts.tool_calls(dict_only=True):
+        function = tool_call.get("function")
+        if (
+            isinstance(function, dict)
+            and _execution_facing_tool_name(str(function.get("name", "") or ""))
+            == target_tool_name
+        ):
+            return True
     return False
 
 
@@ -557,11 +553,9 @@ def _helper_answer_completion_tool_free_turn(
 
 def _recent_device_status_lookup_completed(openai_messages: object) -> bool:
     """Return whether a device-status getter has already been answered."""
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    latest_user_index = -1
-    for index, message in enumerate(messages):
-        if message.get("role") == "user":
-            latest_user_index = index
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    messages = facts.messages
+    latest_user_index = facts.latest_user_index()
     if latest_user_index <= 0:
         return False
 
@@ -654,40 +648,32 @@ def _tool_schema_execution_name(tool: Mapping[str, Any]) -> str:
 def _last_tool_call_index(openai_messages: object, tool_name: str) -> int:
     target = _execution_facing_tool_name(tool_name)
     latest = -1
-    for index, message in enumerate(cast(Iterable[Mapping[str, Any]], openai_messages)):
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for index, tool_call in facts.tool_calls():
+        function = tool_call.get("function")
+        if not isinstance(function, Mapping):
             continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            function = tool_call.get("function")
-            if not isinstance(function, Mapping):
-                continue
-            called = _execution_facing_tool_name(str(function.get("name", "") or ""))
-            if called == target:
-                latest = index
+        called = _execution_facing_tool_name(str(function.get("name", "") or ""))
+        if called == target:
+            latest = index
     return latest
 
 
 def _latest_any_tool_message_index(openai_messages: object) -> int:
-    latest = -1
-    for index, message in enumerate(cast(Iterable[Mapping[str, Any]], openai_messages)):
-        if message.get("role") == "tool":
-            latest = index
-    return latest
+    return OpenAITraceFacts.from_messages(openai_messages).last_index(
+        lambda message: message.get("role") == "tool"
+    )
 
 
 def _last_tool_result_index(openai_messages: object, tool_name: str) -> int:
     target = _execution_facing_tool_name(tool_name)
-    latest = -1
-    for index, message in enumerate(cast(Iterable[Mapping[str, Any]], openai_messages)):
-        if message.get("role") != "tool":
-            continue
-        called = _execution_facing_tool_name(str(message.get("name", "") or ""))
-        if called == target:
-            latest = index
-    return latest
+    return OpenAITraceFacts.from_messages(openai_messages).last_index(
+        lambda message: (
+            message.get("role") == "tool"
+            and _execution_facing_tool_name(str(message.get("name", "") or ""))
+            == target
+        )
+    )
 
 
 def _generated_tool_new_information_since_call(
@@ -736,16 +722,8 @@ def _latest_declared_service_payload_ready(
     producers = set(_declared_service_answer_producers(openai_tools, tool_name))
     if not producers:
         return bool(_latest_service_answer_payload(openai_messages))
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    latest_user_index = max(
-        (
-            index
-            for index, message in enumerate(messages)
-            if message.get("role") == "user"
-        ),
-        default=-1,
-    )
-    for message in reversed(messages[latest_user_index + 1 :]):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for message in reversed(facts.messages[facts.latest_user_index() + 1 :]):
         if message.get("role") != "tool":
             continue
         producer = _execution_facing_tool_name(str(message.get("name", "") or ""))
@@ -1995,23 +1973,16 @@ def _message_called_generated_tool_after_index(
     generated_names = set(_generated_tool_names_execution_facing(openai_tools))
     if not generated_names:
         return False
-    for message_index, message in enumerate(
-        cast(Iterable[Mapping[str, Any]], openai_messages)
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for _message_index, tool_call in facts.tool_calls(
+        after_index=index,
     ):
-        if message_index <= index:
+        function = tool_call.get("function")
+        if not isinstance(function, Mapping):
             continue
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            function = tool_call.get("function")
-            if not isinstance(function, Mapping):
-                continue
-            tool_name = _execution_facing_tool_name(str(function.get("name", "") or ""))
-            if tool_name in generated_names:
-                return True
+        tool_name = _execution_facing_tool_name(str(function.get("name", "") or ""))
+        if tool_name in generated_names:
+            return True
     return False
 
 
@@ -2415,28 +2386,22 @@ def _message_called_execution_tool_after_tool(
     tool_name: str,
     after_tool_names: set[str],
 ) -> bool:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    latest_after_index = -1
-    for index, message in enumerate(messages):
-        if message.get("role") != "tool":
-            continue
-        if (
-            _execution_facing_tool_name(str(message.get("name", "") or ""))
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    latest_after_index = facts.last_index(
+        lambda message: (
+            message.get("role") == "tool"
+            and _execution_facing_tool_name(str(message.get("name", "") or ""))
             in after_tool_names
-        ):
-            latest_after_index = index
+        )
+    )
     if latest_after_index < 0:
         return False
-    for message in messages[latest_after_index + 1 :]:
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            name, _arguments = _tool_call_function_name_and_arguments(tool_call)
-            if _execution_facing_tool_name(name) == tool_name:
-                return True
+    for _index, tool_call in facts.tool_calls(
+        after_index=latest_after_index,
+    ):
+        name, _arguments = _tool_call_function_name_and_arguments(tool_call)
+        if _execution_facing_tool_name(name) == tool_name:
+            return True
     return False
 
 
@@ -4157,17 +4122,11 @@ def _latest_current_location_coordinates(
 
 
 def _latest_user_request_text(openai_messages: object) -> str:
-    for message in reversed(list(cast(Iterable[Mapping[str, Any]], openai_messages))):
-        if message.get("role") == "user":
-            return str(message.get("content", "") or "")
-    return ""
+    return OpenAITraceFacts.from_messages(openai_messages).latest_user_text()
 
 
 def _first_user_request_text(openai_messages: object) -> str:
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if message.get("role") == "user":
-            return str(message.get("content", "") or "")
-    return ""
+    return OpenAITraceFacts.from_messages(openai_messages).first_user_text()
 
 
 def _first_user_is_device_setting_without_message(openai_messages: object) -> bool:
@@ -4520,6 +4479,28 @@ def _tool_call_function_name_and_arguments(
     return name, arguments if isinstance(arguments, dict) else {}
 
 
+def _assistant_tool_calls_by_id(
+    facts: OpenAITraceFacts,
+    tool_names: set[str],
+    *,
+    list_only: bool,
+    normalize_without_id: bool = False,
+) -> dict[str, tuple[str, dict[str, Any]]]:
+    calls: dict[str, tuple[str, dict[str, Any]]] = {}
+    for _index, tool_call in facts.tool_calls(
+        role="assistant",
+        list_only=list_only,
+    ):
+        tool_id = str(tool_call.get("id", "") or "")
+        name, arguments = _tool_call_function_name_and_arguments(tool_call)
+        if not tool_id and not normalize_without_id:
+            continue
+        execution_name = _execution_facing_tool_name(name)
+        if tool_id and execution_name in tool_names:
+            calls[tool_id] = (execution_name, arguments)
+    return calls
+
+
 def _latest_successful_crud_tool_call(
     openai_messages: object,
 ) -> tuple[str, Mapping[str, Any]] | None:
@@ -4531,19 +4512,14 @@ def _latest_successful_crud_tool_call(
         "modify_reminder",
         "remove_reminder",
     }
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    tool_call_args_by_id: dict[str, tuple[str, Mapping[str, Any]]] = {}
-    for message in messages:
-        if message.get("role") == "assistant":
-            for tool_call in message.get("tool_calls") or []:
-                if not isinstance(tool_call, Mapping):
-                    continue
-                tool_id = str(tool_call.get("id", "") or "")
-                name, arguments = _tool_call_function_name_and_arguments(tool_call)
-                execution_name = _execution_facing_tool_name(name)
-                if tool_id and execution_name in crud_names:
-                    tool_call_args_by_id[tool_id] = (execution_name, arguments)
-    for message in reversed(messages):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    tool_call_args_by_id = _assistant_tool_calls_by_id(
+        facts,
+        crud_names,
+        list_only=False,
+        normalize_without_id=True,
+    )
+    for message in reversed(facts.messages):
         if message.get("role") != "tool":
             continue
         tool_id = str(message.get("tool_call_id", "") or "")
@@ -5062,21 +5038,13 @@ def _relationship_batch_request(openai_messages: object) -> dict[str, str] | Non
 
 def _called_tool_after_latest_user(openai_messages: object, tool_name: str) -> bool:
     target = _execution_facing_tool_name(tool_name)
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    latest_user_index = -1
-    for index, message in enumerate(messages):
-        if message.get("role") == "user":
-            latest_user_index = index
-    for message in messages[latest_user_index + 1 :]:
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            name, _arguments = _tool_call_function_name_and_arguments(tool_call)
-            if _execution_facing_tool_name(name) == target:
-                return True
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for _index, tool_call in facts.tool_calls(
+        after_index=facts.latest_user_index(),
+    ):
+        name, _arguments = _tool_call_function_name_and_arguments(tool_call)
+        if _execution_facing_tool_name(name) == target:
+            return True
     return False
 
 
@@ -6762,22 +6730,14 @@ def _latest_original_state_precondition_error(
 def _latest_non_setting_state_precondition_retry_call(
     openai_messages: object,
 ) -> tuple[str, Mapping[str, Any]] | None:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    tool_call_args_by_id: dict[str, tuple[str, Mapping[str, Any]]] = {}
-    for message in messages:
-        if message.get("role") != "assistant":
-            continue
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            tool_id = str(tool_call.get("id", "") or "")
-            name, arguments = _tool_call_function_name_and_arguments(tool_call)
-            execution_name = _execution_facing_tool_name(name)
-            if tool_id and execution_name in ORIGINAL_TOOLSANDBOX_TOOL_NAMES:
-                tool_call_args_by_id[tool_id] = (execution_name, arguments)
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    messages = facts.messages
+    tool_call_args_by_id = _assistant_tool_calls_by_id(
+        facts,
+        ORIGINAL_TOOLSANDBOX_TOOL_NAMES,
+        list_only=True,
+        normalize_without_id=True,
+    )
     start = max(0, len(messages) - 16)
     for index in range(len(messages) - 1, start - 1, -1):
         message = messages[index]
@@ -9022,17 +8982,11 @@ def _location_search_retry_after_state_actor_policy_message(
         )
     ):
         return None
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    for message in messages[setting_index + 1 :]:
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for tool_call in tool_calls:
-            if not isinstance(tool_call, Mapping):
-                continue
-            name, _arguments = _tool_call_function_name_and_arguments(tool_call)
-            if _execution_facing_tool_name(name) == "search_location_around_lat_lon":
-                return None
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    for _index, tool_call in facts.tool_calls(after_index=setting_index):
+        name, _arguments = _tool_call_function_name_and_arguments(tool_call)
+        if _execution_facing_tool_name(name) == "search_location_around_lat_lon":
+            return None
     payload = _latest_tool_payload_by_name_including_latest(
         openai_messages,
         location_arg_tool,
@@ -9485,22 +9439,13 @@ def _timestamp_to_datetime_info_for_timestamp(
     openai_messages: object,
     timestamp: float,
 ) -> dict[str, Any] | None:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    call_args_by_id: dict[str, Mapping[str, Any]] = {}
-    for message in messages:
-        if message.get("role") != "assistant":
-            continue
-        for tool_call in message.get("tool_calls") or []:
-            if not isinstance(tool_call, Mapping):
-                continue
-            tool_id = str(tool_call.get("id", "") or "")
-            name, arguments = _tool_call_function_name_and_arguments(tool_call)
-            if (
-                tool_id
-                and _execution_facing_tool_name(name) == "timestamp_to_datetime_info"
-            ):
-                call_args_by_id[tool_id] = arguments
-    for message in reversed(messages):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    call_args_by_id = _assistant_tool_calls_by_id(
+        facts,
+        {"timestamp_to_datetime_info"},
+        list_only=False,
+    )
+    for message in reversed(facts.messages):
         if message.get("role") != "tool":
             continue
         if (
@@ -9509,7 +9454,7 @@ def _timestamp_to_datetime_info_for_timestamp(
         ):
             continue
         tool_id = str(message.get("tool_call_id", "") or "")
-        args = call_args_by_id.get(tool_id, {})
+        _name, args = call_args_by_id.get(tool_id, ("", {}))
         try:
             called_timestamp = float(args.get("timestamp"))
         except (TypeError, ValueError):
@@ -9525,23 +9470,13 @@ def _latest_reminder_creation_args_for_abstain_reason(
     openai_messages: object,
     abstain_reason: str,
 ) -> dict[str, Any]:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    call_args_by_id: dict[str, Mapping[str, Any]] = {}
-    for message in messages:
-        if message.get("role") != "assistant":
-            continue
-        for tool_call in message.get("tool_calls") or []:
-            if not isinstance(tool_call, Mapping):
-                continue
-            tool_id = str(tool_call.get("id", "") or "")
-            name, arguments = _tool_call_function_name_and_arguments(tool_call)
-            if (
-                tool_id
-                and _execution_facing_tool_name(name)
-                == "prepare_reminder_creation_args"
-            ):
-                call_args_by_id[tool_id] = arguments
-    for message in reversed(messages):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    call_args_by_id = _assistant_tool_calls_by_id(
+        facts,
+        {"prepare_reminder_creation_args"},
+        list_only=False,
+    )
+    for message in reversed(facts.messages):
         if message.get("role") != "tool":
             continue
         if (
@@ -9553,7 +9488,7 @@ def _latest_reminder_creation_args_for_abstain_reason(
         if str(payload.get("abstain_reason") or "") != abstain_reason:
             continue
         tool_id = str(message.get("tool_call_id", "") or "")
-        args = call_args_by_id.get(tool_id, {})
+        _name, args = call_args_by_id.get(tool_id, ("", {}))
         return dict(args)
     return {}
 
@@ -10542,11 +10477,7 @@ def _shared_task_closure_actor_policy_message(
 
 
 def _all_user_texts(openai_messages: object) -> list[str]:
-    return [
-        str(message.get("content", "") or "")
-        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
-        if message.get("role") == "user"
-    ]
+    return OpenAITraceFacts.from_messages(openai_messages).user_texts()
 
 
 def _normalize_phone_for_search(raw: str) -> str:
@@ -10668,15 +10599,15 @@ def _contact_lookup_request(
 
 
 def _latest_tool_is(openai_messages: object, tool_name: str) -> bool:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
+    facts = OpenAITraceFacts.from_messages(openai_messages)
     latest_name = (
-        _execution_facing_tool_name(str(messages[-1].get("name", "") or ""))
-        if messages
+        _execution_facing_tool_name(str(facts.messages[-1].get("name", "") or ""))
+        if facts.messages
         else ""
     )
     return bool(
-        messages
-        and messages[-1].get("role") == "tool"
+        facts.messages
+        and facts.messages[-1].get("role") == "tool"
         and latest_name == _execution_facing_tool_name(tool_name)
     )
 
@@ -11467,14 +11398,14 @@ def _coerce_service_answer_payload(
 
 
 def _latest_service_answer_payload(openai_messages: object) -> dict[str, Any]:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    latest_user_text = _latest_user_request_text(openai_messages).lower()
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    latest_user_text = facts.latest_user_text().lower()
     conversation_distance_request = any(
         any(
             token in text.lower()
             for token in ("how far", "distance", "km", "kilometer", "mile")
         )
-        for text in _all_user_texts(openai_messages)
+        for text in facts.user_texts()
     )
     latest_user_requests_location_field = any(
         token in latest_user_text
@@ -11489,11 +11420,7 @@ def _latest_service_answer_payload(openai_messages: object) -> dict[str, Any]:
             "city",
         )
     )
-    latest_user_index = -1
-    for index, message in enumerate(messages):
-        if message.get("role") == "user":
-            latest_user_index = index
-    for message in reversed(messages[latest_user_index + 1 :]):
+    for message in reversed(facts.messages[facts.latest_user_index() + 1 :]):
         if message.get("role") != "tool":
             continue
         name = _execution_facing_tool_name(str(message.get("name", "") or ""))
@@ -11824,11 +11751,7 @@ def _location_query_is_specific(query: str) -> bool:
 
 
 def _latest_user_index(openai_messages: object) -> int:
-    latest = -1
-    for index, message in enumerate(cast(Iterable[Mapping[str, Any]], openai_messages)):
-        if message.get("role") == "user":
-            latest = index
-    return latest
+    return OpenAITraceFacts.from_messages(openai_messages).latest_user_index()
 
 
 def _latest_location_search_records(openai_messages: object) -> list[Mapping[str, Any]]:
@@ -12048,23 +11971,13 @@ def _text_contains_lat_lon_pair(text: str) -> bool:
 def _latest_successful_send_message_tool_call(
     openai_messages: object,
 ) -> Mapping[str, Any] | None:
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    tool_call_args_by_id: dict[str, Mapping[str, Any]] = {}
-    for message in messages:
-        if message.get("role") != "assistant":
-            continue
-        for tool_call in message.get("tool_calls") or []:
-            if not isinstance(tool_call, Mapping):
-                continue
-            tool_id = str(tool_call.get("id", "") or "")
-            name, arguments = _tool_call_function_name_and_arguments(tool_call)
-            if (
-                tool_id
-                and _execution_facing_tool_name(name)
-                == "send_message_with_phone_number"
-            ):
-                tool_call_args_by_id[tool_id] = arguments
-    for message in reversed(messages):
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    tool_call_args_by_id = _assistant_tool_calls_by_id(
+        facts,
+        {"send_message_with_phone_number"},
+        list_only=False,
+    )
+    for message in reversed(facts.messages):
         if message.get("role") != "tool":
             continue
         name = _execution_facing_tool_name(str(message.get("name", "") or ""))
@@ -12074,7 +11987,7 @@ def _latest_successful_send_message_tool_call(
         if any(token in content for token in ("error", "exception", "invalid")):
             continue
         tool_id = str(message.get("tool_call_id", "") or "")
-        return tool_call_args_by_id.get(tool_id, {})
+        return tool_call_args_by_id.get(tool_id, ("", {}))[1]
     return None
 
 
@@ -12084,16 +11997,16 @@ def _assistant_called_tool_after_index(
     index: int,
 ) -> bool:
     target = _execution_facing_tool_name(tool_name)
-    messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
-    for message in messages[index + 1 :]:
-        if message.get("role") != "assistant":
-            continue
-        for tool_call in message.get("tool_calls") or []:
-            if not isinstance(tool_call, Mapping):
-                continue
-            name, _arguments = _tool_call_function_name_and_arguments(tool_call)
-            if _execution_facing_tool_name(name) == target:
-                return True
+    facts = OpenAITraceFacts.from_messages(openai_messages)
+    start = slice(index + 1, None).indices(len(facts.messages))[0]
+    for _message_index, tool_call in facts.tool_calls(
+        after_index=start - 1,
+        role="assistant",
+        list_only=False,
+    ):
+        name, _arguments = _tool_call_function_name_and_arguments(tool_call)
+        if _execution_facing_tool_name(name) == target:
+            return True
     return False
 
 
