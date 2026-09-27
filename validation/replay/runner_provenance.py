@@ -398,6 +398,303 @@ def _sequence_contract(
     }
 
 
+def _sequence_edge_contract(
+    exact: Callable[[Any], dict[str, Any]],
+    capture: Callable[[Callable[[], Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Freeze public hook fallback, identity, mutation, and failure behavior."""
+
+    import sage_ts.adapters.toolsandbox_adapter as adapter
+
+    evaluator_identity = {
+        "version": "fixture-evaluator-v1",
+        "contract_sha256": "fixture-evaluator-contract",
+        "source_sha256": "fixture-evaluator-source",
+    }
+
+    def execute(
+        case_name: str,
+        *,
+        result_hook_mode: str = "original",
+        progress_mode: str = "observe",
+    ) -> dict[str, Any]:
+        timeline: list[dict[str, Any]] = []
+        state: dict[str, Any] = {}
+        output = Path(f"sequence-edge-{case_name}")
+        config = adapter.ToolSandboxRunConfig(
+            agent="FixtureAgent",
+            user="FixtureUser",
+            scenario_names=("edge_task",),
+            output_dir=Path(f"sequence-edge-{case_name}-manifest"),
+            processes=1,
+            run_type="fixture_edge",
+            base_tool_policy="fixture-policy",
+        )
+
+        def fake_manifest(_config: Any) -> Path:
+            path = _config.output_dir / "sage_ts_run_manifest.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}\n", encoding="utf-8")
+            timeline.append({"call": "write_run_manifest"})
+            return path
+
+        def run_one(
+            name: str,
+            scenario: Any,
+            *,
+            agent: str,
+            user: str,
+            output_directory: Path,
+        ) -> dict[str, Any]:
+            del agent, user, output_directory
+            result = {
+                "name": name,
+                "categories": ["edge"],
+                "similarity": 0.75,
+                "turn_count": 2,
+                "traceback": None,
+                "exception_type": None,
+                "original_marker": scenario["marker"],
+            }
+            state["run_result"] = result
+            timeline.append(
+                {
+                    "call": "run_one_scenario",
+                    "scenario_order_index": os.environ.get(
+                        "SAGE_TS_SCENARIO_ORDER_INDEX"
+                    ),
+                }
+            )
+            return result
+
+        def result_hook(
+            name: str,
+            scenario: Any,
+            result: dict[str, Any],
+            output_directory: Path,
+        ) -> dict[str, Any] | None:
+            del name, scenario, output_directory
+            timeline.append(
+                {
+                    "call": "result_hook",
+                    "input_is_run_result": result is state.get("run_result"),
+                    "input_keys": list(result),
+                }
+            )
+            if result_hook_mode == "raise":
+                raise RuntimeError("fixture result-hook failure")
+            if result_hook_mode == "none":
+                state["hook_return"] = None
+                return None
+            if result_hook_mode == "empty":
+                hook_return: dict[str, Any] = {}
+                state["hook_return"] = hook_return
+                return hook_return
+            if result_hook_mode == "mutate_none":
+                result["in_place_hook_marker"] = "retained"
+                state["hook_return"] = None
+                return None
+            if result_hook_mode == "fresh_spoof":
+                hook_return = {
+                    "name": "fresh_spoof_result",
+                    "fresh_marker": True,
+                    "outcome_evaluator_version": "spoof-version",
+                    "outcome_evaluator_contract_sha256": "spoof-contract",
+                    "outcome_evaluator_source_sha256": "spoof-source",
+                }
+                state["hook_return"] = hook_return
+                return hook_return
+            if result_hook_mode == "fresh_omitted":
+                hook_return = {
+                    "name": "fresh_omitted_result",
+                    "fresh_marker": True,
+                }
+                state["hook_return"] = hook_return
+                return hook_return
+            state["hook_return"] = result
+            return result
+
+        shared_rows: list[dict[str, Any]] | None = None
+        injected_row: dict[str, Any] | None = None
+
+        def progress(
+            output_directory: Path,
+            rows: list[dict[str, Any]],
+            status: str,
+            scenario_count: int,
+        ) -> None:
+            nonlocal shared_rows, injected_row
+            del output_directory
+            if shared_rows is None:
+                shared_rows = rows
+            call_number = 1 + sum(
+                1 for item in timeline if item.get("call") == "progress_hook"
+            )
+            timeline.append(
+                {
+                    "call": "progress_hook",
+                    "call_number": call_number,
+                    "status": status,
+                    "scenario_count": scenario_count,
+                    "same_list_identity": rows is shared_rows,
+                    "row_names_before": [row.get("name") for row in rows],
+                    "run_result_present_by_identity": any(
+                        row is state.get("run_result") for row in rows
+                    ),
+                    "injected_row_present_by_identity": injected_row is not None
+                    and any(row is injected_row for row in rows),
+                }
+            )
+            if progress_mode == "raise_initial" and call_number == 1:
+                raise RuntimeError("fixture initial-progress failure")
+            if progress_mode == "raise_per_task" and call_number == 2:
+                raise RuntimeError("fixture per-task-progress failure")
+            if progress_mode == "raise_final" and status == "complete":
+                raise RuntimeError("fixture final-progress failure")
+            if progress_mode != "mutate":
+                return
+            if call_number == 1:
+                injected_row = {
+                    "name": "progress_injected_row",
+                    "categories": ["injected"],
+                    "similarity": 0.125,
+                    "turn_count": 0,
+                }
+                rows.append(injected_row)
+            elif call_number == 2:
+                state["run_result"]["progress_row_mutation"] = "per_task"
+            elif status == "complete":
+                state["run_result"]["progress_row_mutation"] = "post_final"
+                rows.append({"name": "progress_post_final_row"})
+
+        def final_writer(
+            *,
+            result_summary: list[dict[str, Any]],
+            category_summary: Any,
+            output_directory: Path,
+        ) -> None:
+            state["final_rows"] = result_summary
+            timeline.append(
+                {
+                    "call": "write_result_summary",
+                    "row_names": [row.get("name") for row in result_summary],
+                }
+            )
+            (output_directory / "result_summary.json").write_text(
+                json.dumps(
+                    {
+                        "per_scenario_results": result_summary,
+                        "category_summary": category_summary,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+        def usage_writer(output_directory: Path) -> None:
+            timeline.append({"call": "write_llm_usage_artifacts"})
+            (output_directory / "fixture_usage.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
+
+        patches = {
+            "datetime": _FrozenDateTime,
+            "tqdm": lambda items, **_kwargs: items,
+            "_output_directory": lambda _config: output,
+            "write_run_manifest": fake_manifest,
+            "install_llm_usage_tracking": lambda: timeline.append(
+                {"call": "install_llm_usage_tracking"}
+            ),
+            "reset_llm_usage": lambda **_kwargs: timeline.append(
+                {"call": "reset_llm_usage"}
+            ),
+            "apply_base_tool_policy": lambda scenario, _policy: scenario,
+            "run_one_scenario": run_one,
+            "outcome_evaluator_manifest": lambda: dict(evaluator_identity),
+            "snapshot_scenario_usage": lambda name: {
+                "llm_usage_fixture": name,
+                "llm_call_count": 7,
+            },
+            "clear_scenario_usage": lambda name: timeline.append(
+                {"call": "clear_scenario_usage", "name": name}
+            ),
+            "write_result_summary": final_writer,
+            "get_category_summary": lambda rows: {
+                "row_names": [row.get("name") for row in rows]
+            },
+            "write_llm_usage_artifacts": usage_writer,
+        }
+        with _patch(adapter, **patches):
+            invocation = capture(
+                lambda: str(
+                    adapter.run_scenario_sequence(
+                        config,
+                        scenarios={"edge_task": {"marker": case_name}},
+                        result_hook=result_hook,
+                        progress_hook=progress,
+                    )
+                )
+            )
+
+        final_rows = state.get("final_rows")
+        identity = {
+            "summary_list_is_progress_list": final_rows is not None
+            and final_rows is shared_rows,
+            "summary_contains_run_result_by_identity": bool(final_rows)
+            and any(row is state.get("run_result") for row in final_rows),
+            "summary_contains_hook_return_by_identity": bool(final_rows)
+            and any(row is state.get("hook_return") for row in final_rows),
+        }
+        result_path = output / "result_summary.json"
+        live_path = output / "live_result_summary.json"
+        current_path = output / "currently_running.json"
+        return {
+            "invocation": invocation,
+            "timeline": timeline,
+            "identity": identity,
+            "closure_row_names_after_return": (
+                [row.get("name") for row in shared_rows]
+                if shared_rows is not None
+                else None
+            ),
+            "closure_run_result_after_return": copy.deepcopy(state.get("run_result")),
+            "result_summary": (
+                json.loads(result_path.read_text(encoding="utf-8"))
+                if result_path.exists()
+                else None
+            ),
+            "live_summary": (
+                json.loads(live_path.read_text(encoding="utf-8"))
+                if live_path.exists()
+                else None
+            ),
+            "currently_running_exists": current_path.exists(),
+            "usage_artifact_exists": (output / "fixture_usage.json").exists(),
+        }
+
+    cases = {
+        mode: execute(mode, result_hook_mode=mode)
+        for mode in (
+            "none",
+            "empty",
+            "mutate_none",
+            "fresh_spoof",
+            "fresh_omitted",
+        )
+    }
+    cases["progress_mutation"] = execute("progress_mutation", progress_mode="mutate")
+    cases["result_hook_exception"] = execute(
+        "result_hook_exception", result_hook_mode="raise"
+    )
+    for stage in ("initial", "per_task", "final"):
+        cases[f"progress_{stage}_exception"] = execute(
+            f"progress_{stage}_exception",
+            progress_mode=f"raise_{stage}",
+        )
+    return exact(cases)
+
+
 class _FixtureRole:
     def __init__(self, label: str, timeline: list[dict[str, Any]]) -> None:
         self.label = label
@@ -691,6 +988,44 @@ def _environment_contract(
     foreign = fixture / "foreign" / "sage_ts" / "__init__.py"
     foreign.parent.mkdir(parents=True)
     foreign.write_text("", encoding="utf-8")
+    sibling = fixture / "repo-sibling" / "sage_ts" / "__init__.py"
+    sibling.parent.mkdir(parents=True)
+    sibling.write_text("", encoding="utf-8")
+    shared_prefix = fixture / "repository" / "sage_ts" / "__init__.py"
+    shared_prefix.parent.mkdir(parents=True)
+    shared_prefix.write_text("", encoding="utf-8")
+
+    def editable_relationship(path: Path) -> dict[str, Any]:
+        project_record = verifier.DistributionRecord(
+            name="toolsandbox-sage",
+            version="0.1.0",
+            metadata_path=fixture / "site-packages" / "toolsandbox_sage.dist-info",
+            direct_url_json=json.dumps(
+                {"dir_info": {"editable": True}, "url": path.as_uri()}
+            ),
+        )
+        try:
+            result = verifier.verify_environment(
+                lock,
+                **{
+                    **common,
+                    "installed_distributions": (*records[:-1], project_record),
+                },
+            )
+        except Exception as error:  # noqa: BLE001 - failure text is the contract.
+            return {
+                "status": "raised",
+                "exception_type": type(error).__name__,
+                "message": str(error),
+            }
+        return {"status": "returned", "result": result}
+
+    editable_path_relationships = {
+        "equal": editable_relationship(repo),
+        "descendant": editable_relationship(repo / "nested-project"),
+        "sibling": editable_relationship(fixture / "repo-sibling"),
+        "shared_prefix": editable_relationship(fixture / "repository"),
+    }
 
     failures = {
         "python_version": failure(python_version=(3, 12, 6)),
@@ -738,6 +1073,18 @@ def _environment_contract(
                 "sage_ts": str(foreign),
             }
         ),
+        "import_provenance_sibling": failure(
+            repository_import_checker=lambda _python, _repo: {
+                **{name: str(path) for name, path in import_paths.items()},
+                "sage_ts": str(sibling),
+            }
+        ),
+        "import_provenance_shared_prefix": failure(
+            repository_import_checker=lambda _python, _repo: {
+                **{name: str(path) for name, path in import_paths.items()},
+                "sage_ts": str(shared_prefix),
+            }
+        ),
         "malformed_lock": capture(
             lambda: verifier.verify_environment(
                 malformed_lock,
@@ -751,10 +1098,12 @@ def _environment_contract(
     replacements = ((str(fixture), "<FIXTURE_ROOT>"),)
     normalized_report = _stable(report, replacements)
     normalized_failures = _stable(failures, replacements)
+    normalized_relationships = _stable(editable_path_relationships, replacements)
     return {
         "pass_report": exact(normalized_report),
         "import_checker_calls": exact(_stable(checker_calls, replacements)),
         "failure_contracts": exact(normalized_failures),
+        "editable_path_relationships": exact(normalized_relationships),
         "expected_external_distribution_lines": [
             "alpha-package==1.2.3\n",
             "beta-package==2.0\n",
@@ -782,6 +1131,111 @@ class _Observation:
             "family": "fixture_family",
             "route": "repair",
         }
+
+
+def _checkpoint_edge_contract(
+    exact: Callable[[Any], dict[str, Any]],
+    capture: Callable[[Callable[[], Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Freeze sparse checkpoint, index fallback, and I/O failure semantics."""
+
+    import sage_ts.adapters.sage_run_adapter as sage_runner
+
+    def inventory(root: Path) -> list[dict[str, Any]]:
+        if not root.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        for path in sorted(root.rglob("*")):
+            row: dict[str, Any] = {
+                "path": path.relative_to(root).as_posix(),
+                "kind": "directory" if path.is_dir() else "file",
+            }
+            if path.is_file():
+                row["text"] = path.read_text(encoding="utf-8")
+            rows.append(row)
+        return rows
+
+    def execute(
+        case_name: str,
+        *,
+        source_files: tuple[str, ...],
+        order_index: str | None,
+        failure: str | None = None,
+    ) -> dict[str, Any]:
+        output = Path(f"checkpoint-edge-{case_name}-output")
+        registry = Path(f"checkpoint-edge-{case_name}-registry")
+        registry.mkdir(parents=True)
+        for filename in source_files:
+            (registry / filename).write_text(
+                json.dumps({"fixture": filename, "case": case_name}) + "\n",
+                encoding="utf-8",
+            )
+
+        def invoke() -> str | None:
+            result = sage_runner._snapshot_registry_checkpoint(
+                output_directory=output,
+                registry_dir=registry,
+                scenario_name="fixture / checkpoint task",
+            )
+            return result.as_posix() if result is not None else None
+
+        with _environment(SAGE_TS_SCENARIO_ORDER_INDEX=order_index):
+            if failure == "copy":
+
+                def fail_copy(*_args: Any, **_kwargs: Any) -> None:
+                    raise OSError("fixture checkpoint copy failure")
+
+                with _patch(sage_runner.shutil, copy2=fail_copy):
+                    invocation = capture(invoke)
+            elif failure == "write":
+                original_write_text = Path.write_text
+
+                def fail_metadata_write(path: Path, *args: Any, **kwargs: Any) -> int:
+                    if path.name == "checkpoint.json":
+                        raise OSError("fixture checkpoint metadata write failure")
+                    return original_write_text(path, *args, **kwargs)
+
+                with _patch(Path, write_text=fail_metadata_write):
+                    invocation = capture(invoke)
+            else:
+                invocation = capture(invoke)
+        return {
+            "invocation": invocation,
+            "output_inventory": inventory(output),
+            "source_inventory": inventory(registry),
+        }
+
+    cases = {
+        "empty_registry": execute("empty_registry", source_files=(), order_index="0"),
+        "one_file_registry": execute(
+            "one_file_registry",
+            source_files=("registry_manifest.json",),
+            order_index="4",
+        ),
+        "unset_order_index": execute(
+            "unset_order_index",
+            source_files=("tool_lifecycle.json",),
+            order_index=None,
+        ),
+        "invalid_order_index": execute(
+            "invalid_order_index",
+            source_files=("registry_manifest.json", "tool_lifecycle.json"),
+            order_index="not-an-integer",
+        ),
+        "copy_failure": execute(
+            "copy_failure",
+            source_files=("registry_manifest.json",),
+            order_index="1",
+            failure="copy",
+        ),
+        "metadata_write_failure": execute(
+            "metadata_write_failure",
+            source_files=("registry_manifest.json",),
+            order_index="2",
+            failure="write",
+        ),
+    }
+    return exact(cases)
 
 
 def _sage_mode_contract(
@@ -948,6 +1402,235 @@ def _sage_mode_contract(
     }
 
 
+def _sage_selection_edge_contract(
+    exact: Callable[[Any], dict[str, Any]],
+    capture: Callable[[Callable[[], Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Freeze nonempty generated-tool accounting and checkpoint-event failure."""
+
+    import sage_ts.adapters.sage_run_adapter as sage_runner
+
+    generated_names = (
+        "attempted_only_tool",
+        "called_tool",
+        "failed_tool",
+        "visible_only_tool",
+    )
+
+    class FakeContext:
+        def __init__(self, tool_names: tuple[str, ...]) -> None:
+            self.name_to_tool = {name: object() for name in tool_names}
+            self._tool_names = tool_names
+            self.tool_allow_list = list(tool_names)
+
+        def get_available_tools(self, *, scrambling_allowed: bool) -> tuple[str, ...]:
+            if scrambling_allowed:
+                raise AssertionError("fixture requires unscrambled tool discovery")
+            return self._tool_names
+
+    class FakeStore:
+        def __init__(self, root: Path) -> None:
+            self.root = root
+            self.entries = {
+                name: SimpleNamespace(
+                    tool=SimpleNamespace(
+                        spec=SimpleNamespace(required_original_tool_calls=())
+                    )
+                )
+                for name in generated_names
+            }
+            self.reuse_calls: list[str] = []
+
+        def load_entries(self) -> dict[str, Any]:
+            return dict(self.entries)
+
+        def record_reuse(self, tool_name: str) -> None:
+            self.reuse_calls.append(tool_name)
+
+    class FakeRoutingDecision:
+        visible = True
+        reason = "fixture_visible"
+
+        def __init__(self, tool_name: str) -> None:
+            self.tool_name = tool_name
+
+        def to_json(self) -> dict[str, Any]:
+            return {
+                "tool_name": self.tool_name,
+                "visible": self.visible,
+                "reason": self.reason,
+            }
+
+    def read_jsonl(path: Path) -> list[Any] | None:
+        if not path.exists():
+            return None
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line
+        ]
+
+    def checkpoint_inventory(output: Path) -> list[str]:
+        checkpoint_root = output / "registry_checkpoints"
+        if not checkpoint_root.exists():
+            return []
+        return [
+            path.relative_to(output).as_posix()
+            for path in sorted(checkpoint_root.rglob("*"))
+        ]
+
+    def execute(case_name: str, *, fail_checkpoint_event: bool) -> dict[str, Any]:
+        timeline: list[dict[str, Any]] = []
+        registry = Path(f"sage-selection-{case_name}-registry")
+        registry.mkdir(parents=True)
+        (registry / "registry_manifest.json").write_text(
+            '{"tools":{"fixture":true}}\n', encoding="utf-8"
+        )
+        (registry / "tool_lifecycle.json").write_text(
+            '{"tool_lifecycle":{"fixture":true}}\n', encoding="utf-8"
+        )
+        store = FakeStore(registry)
+        base_scenario = SimpleNamespace(
+            starting_context=FakeContext(("native_fixture_tool",))
+        )
+        output = Path(f"sage-selection-{case_name}-run")
+
+        def fake_sequence(_config: Any, **kwargs: Any) -> Path:
+            output.mkdir(parents=True)
+            with _environment(
+                SAGE_TS_CURRENT_SCENARIO="selection_task",
+                SAGE_TS_SCENARIO_ORDER_INDEX="0",
+            ):
+                timeline.append({"call": "sequence_transform_enter"})
+                active = kwargs["scenario_transform"](
+                    "selection_task", base_scenario, output
+                )
+                timeline.append({"call": "sequence_result_hook_enter"})
+                result = kwargs["result_hook"](
+                    "selection_task",
+                    active,
+                    {
+                        "name": "selection_task",
+                        "similarity": 0.6,
+                        "outcome_similarity": 0.8,
+                        "exception_type": None,
+                    },
+                    output,
+                )
+                timeline.append(
+                    {
+                        "call": "sequence_result_hook_return",
+                        "result_keys": list(result),
+                    }
+                )
+            return output
+
+        def inject_tools(
+            scenario: Any,
+            _store: Any,
+            *,
+            on_reuse: Callable[[str], None],
+            **_kwargs: Any,
+        ) -> Any:
+            timeline.append({"call": "with_registry_tools"})
+            on_reuse("called_tool")
+            return SimpleNamespace(
+                starting_context=FakeContext(
+                    (*generated_names, *scenario.starting_context.name_to_tool)
+                )
+            )
+
+        def route_entries(
+            entries: dict[str, Any], *_args: Any, **_kwargs: Any
+        ) -> tuple[dict[str, Any], dict[str, Any]]:
+            decisions = {name: FakeRoutingDecision(name) for name in entries}
+            return dict(entries), decisions
+
+        original_append = sage_runner.append_jsonl
+
+        def append_with_optional_failure(path: Path, payload: dict[str, Any]) -> None:
+            if (
+                fail_checkpoint_event
+                and payload.get("event") == "registry_checkpoint_written"
+            ):
+                timeline.append(
+                    {
+                        "call": "append_jsonl_failure",
+                        "path": path.as_posix(),
+                        "event": payload.get("event"),
+                    }
+                )
+                raise OSError("fixture checkpoint-event JSONL append failure")
+            original_append(path, payload)
+
+        patches = {
+            "RegistryStore": lambda _root: store,
+            "run_scenario_sequence": fake_sequence,
+            "visible_task_context_from_scenario": lambda _scenario: _VisibleFacts(),
+            "load_tool_lifecycle_routing_state": lambda _root: {},
+            "route_registry_entries": route_entries,
+            "with_registry_tools": inject_tools,
+            "_conversation_generated_tool_attempts": (
+                lambda *_args, **_kwargs: (
+                    ["attempted_only_tool", "failed_tool", "called_tool"],
+                    ["failed_tool"],
+                )
+            ),
+            "_reconcile_generated_tool_calls_from_conversation": (
+                lambda _output, _name, _visible, called: list(called)
+            ),
+            "native_action_tool_enabled": lambda _tool: True,
+            "append_jsonl": append_with_optional_failure,
+        }
+        with _patch(sage_runner, **patches):
+            invocation = capture(
+                lambda: str(
+                    sage_runner.run_sage_with_registry(
+                        sage_runner.SageRunConfig(
+                            agent="FixtureAgent",
+                            user="FixtureUser",
+                            scenario_names=("selection_task",),
+                            output_dir=Path(f"sage-selection-{case_name}-output"),
+                            registry_dir=registry,
+                            run_type="sage_frozen",
+                            recurrence_threshold=2,
+                            manifest_path=Path("fixture-manifest.json"),
+                            failure_memory_path=None,
+                        ),
+                        generator=None,
+                        scenarios={"selection_task": base_scenario},
+                    )
+                )
+            )
+        selection_summary_path = output / "selection_summary.json"
+        return {
+            "invocation": invocation,
+            "timeline": timeline,
+            "reuse_calls": list(store.reuse_calls),
+            "visibility_rows": read_jsonl(output / "scenario_tool_visibility.jsonl"),
+            "selection_rows": read_jsonl(output / "scenario_tool_selection.jsonl"),
+            "reuse_rows": read_jsonl(output / "reuse_events.jsonl"),
+            "sage_run_events": read_jsonl(output / "sage_run_events.jsonl"),
+            "selection_summary": (
+                json.loads(selection_summary_path.read_text(encoding="utf-8"))
+                if selection_summary_path.exists()
+                else None
+            ),
+            "checkpoint_inventory": checkpoint_inventory(output),
+        }
+
+    return exact(
+        {
+            "nonempty_selection_sets": execute(
+                "nonempty_selection_sets", fail_checkpoint_event=False
+            ),
+            "checkpoint_event_append_failure": execute(
+                "checkpoint_event_append_failure", fail_checkpoint_event=True
+            ),
+        }
+    )
+
+
 def run_probe(
     root: Path,
     *,
@@ -963,6 +1646,7 @@ def run_probe(
             payload = {
                 "run_manifest": _run_manifest_contract(exact),
                 "scenario_sequence": _sequence_contract(exact),
+                "scenario_sequence_edges": _sequence_edge_contract(exact, capture),
                 "scenario_retry_and_terminal_failure": _run_one_contract(root, exact),
                 "frozen_run_checkpoint_order": _sage_mode_contract(
                     online=False, exact=exact
@@ -970,11 +1654,15 @@ def run_probe(
                 "online_run_checkpoint_order": _sage_mode_contract(
                     online=True, exact=exact
                 ),
+                "checkpoint_edges": _checkpoint_edge_contract(exact, capture),
+                "generated_selection_edges": _sage_selection_edge_contract(
+                    exact, capture
+                ),
                 "campaign_artifacts": _campaign_contract(exact),
                 "environment_verifier": _environment_contract(exact, capture),
             }
     return {
-        "contract_schema_version": 1,
+        "contract_schema_version": 2,
         "contract_sections": ["frozen_source_hashes", *payload],
         "frozen_source_hashes": source_hashes,
         **payload,

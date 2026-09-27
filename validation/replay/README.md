@@ -165,6 +165,16 @@ or suppress normalization rules.
   transform-failure fallback; result-hook timing; usage snapshot-before-clear;
   transient retry archives, terminal failure rows, and role teardown. Separate
   frozen and online fixtures preserve registry checkpoint and event order. The
+  adversarial cases freeze the exact `result_hook(...) or result` behavior for
+  `None`, an empty mapping, in-place mutation, and fresh mappings with omitted
+  or spoofed evaluator identity; evaluator identity reassertion; callback object
+  aliasing; row/list mutation timing; and propagated result/progress exceptions.
+  Sparse registry cases cover no files, one file, unset/invalid order indices,
+  copy failure, metadata-write failure, and checkpoint-event JSONL failure.
+  A nonempty selection case preserves visible, attempted, failed, called, and
+  not-called generated-tool sets and their summary counts. Environment cases
+  distinguish equal and descendant repository paths from sibling and
+  shared-prefix paths for editable metadata and import provenance. The
   probe also records exact campaign-status, task-plan, event-ledger, run-index,
   and registry-snapshot bytes; publication-environment pass output, distribution
   digest/order, isolated import provenance, and fail-closed error text. Finally,
@@ -172,6 +182,14 @@ or suppress normalization rules.
   `b40856762456913a70e60270f443b91c6c32c56d6ecd7975b8c196edc968b64c`
   and the shell entrypoint to
   `78811efa9f6c682c671c4664a4cf6249937591c94d4e6449df6b9ebd201f1183`.
+
+The runner probe intentionally does not simulate process termination during an
+operating-system write or copy, filesystem durability, concurrent writers, or
+provider/network failures. Those are infrastructure and fault-injection tests,
+not deterministic semantic-equivalence boundaries. A result hook has only a
+per-task call site in the selected implementation, so initial/final result-hook
+exceptions are structurally unreachable; the progress hook is exercised at all
+three stages.
 
 The behavior vectors are validation-only characterization fixtures. Outcome and
 classifier cases are drawn from the committed benchmark and the historical
