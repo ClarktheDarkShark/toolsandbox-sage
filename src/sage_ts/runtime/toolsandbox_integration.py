@@ -25,6 +25,7 @@ from sage_ts.runtime.routing_scorer import (
     RuntimeRoutingDecision,
     _is_insufficient_information_guard,
 )
+from sage_ts.runtime.trace_facts import TraceFacts
 from sage_ts.validation.output_normalization import normalize_generated_tool_output
 from sage_ts.validation.schema_check import compile_generated_tool
 from tool_sandbox.common import tool_conversion
@@ -203,94 +204,51 @@ def _invalid_input_abstain_result(
         raise error
 
 
+def _visible_trace_payloads(*, newest_first: bool) -> Iterable[Any]:
+    facts = TraceFacts.from_current_context(get_current_context)
+    return () if facts is None else facts.payloads(newest_first=newest_first)
+
+
 def _latest_generated_tool_result_with_key(key: str) -> dict[str, Any] | None:
     """Read the current message tool trace and return the newest result with key."""
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
-            continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            result = payload.get("result")
-            if isinstance(result, dict) and key in result:
-                return result
+    for payload in _visible_trace_payloads(newest_first=True):
+        result = payload.get("result")
+        if isinstance(result, dict) and key in result:
+            return result
     return None
 
 
 def _latest_single_original_search_record() -> dict[str, Any] | None:
     """Return the newest unambiguous record from an original search tool trace."""
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        tool_name = str(payload.get("tool_name", ""))
+        if not tool_name.startswith("search_"):
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            tool_name = str(payload.get("tool_name", ""))
-            if not tool_name.startswith("search_"):
-                continue
-            result = payload.get("result")
-            if (
-                isinstance(result, list)
-                and len(result) == 1
-                and isinstance(result[0], dict)
-            ):
-                return dict(result[0])
-            if isinstance(result, dict):
-                return dict(result)
+        result = payload.get("result")
+        if (
+            isinstance(result, list)
+            and len(result) == 1
+            and isinstance(result[0], dict)
+        ):
+            return dict(result[0])
+        if isinstance(result, dict):
+            return dict(result)
     return None
 
 
 def _latest_original_search_records() -> list[dict[str, Any]] | None:
     """Return the newest visible list of records from an original search trace."""
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        tool_name = str(payload.get("tool_name", ""))
+        if not tool_name.startswith(("search_", "find_", "get_")):
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            tool_name = str(payload.get("tool_name", ""))
-            if not tool_name.startswith(("search_", "find_", "get_")):
-                continue
-            result = payload.get("result")
-            if isinstance(result, list) and all(
-                isinstance(record, dict) for record in result
-            ):
-                return [dict(record) for record in result]
-            if isinstance(result, dict):
-                return [dict(result)]
+        result = payload.get("result")
+        if isinstance(result, list) and all(
+            isinstance(record, dict) for record in result
+        ):
+            return [dict(record) for record in result]
+        if isinstance(result, dict):
+            return [dict(result)]
     return None
 
 
@@ -301,65 +259,33 @@ def _latest_original_tool_payload(
     wanted = set(tool_names)
     if not wanted:
         return None
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        if str(payload.get("tool_name", "")) not in wanted:
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            if str(payload.get("tool_name", "")) not in wanted:
-                continue
-            result = payload.get("result")
-            if isinstance(result, dict):
-                return dict(result)
-            if isinstance(result, list):
-                first = next(
-                    (item for item in result if isinstance(item, dict) and item),
-                    None,
-                )
-                if isinstance(first, dict):
-                    return dict(first)
-            if isinstance(result, (str, int, float, bool)):
-                return {"result": result}
+        result = payload.get("result")
+        if isinstance(result, dict):
+            return dict(result)
+        if isinstance(result, list):
+            first = next(
+                (item for item in result if isinstance(item, dict) and item),
+                None,
+            )
+            if isinstance(first, dict):
+                return dict(first)
+        if isinstance(result, (str, int, float, bool)):
+            return {"result": result}
     return None
 
 
 def _latest_original_tool_scalar(tool_name: str) -> float | None:
     """Return the latest scalar result from a visible original tool trace."""
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        if str(payload.get("tool_name", "")) != tool_name:
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            if str(payload.get("tool_name", "")) != tool_name:
-                continue
-            try:
-                return float(payload.get("result"))
-            except (TypeError, ValueError):
-                return None
+        try:
+            return float(payload.get("result"))
+        except (TypeError, ValueError):
+            return None
     return None
 
 
@@ -369,36 +295,20 @@ def _latest_datetime_info_for_timestamp(timestamp_value: Any) -> dict[str, Any] 
         timestamp = float(timestamp_value)
     except (TypeError, ValueError):
         return None
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
     required = {"year", "month", "day", "hour", "minute", "second"}
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        if str(payload.get("tool_name", "")) != "timestamp_to_datetime_info":
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
+        arguments = payload.get("arguments")
+        if isinstance(arguments, dict) and "timestamp" in arguments:
             try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            if str(payload.get("tool_name", "")) != "timestamp_to_datetime_info":
-                continue
-            arguments = payload.get("arguments")
-            if isinstance(arguments, dict) and "timestamp" in arguments:
-                try:
-                    if abs(float(arguments.get("timestamp")) - timestamp) > 1.0:
-                        continue
-                except (TypeError, ValueError):
+                if abs(float(arguments.get("timestamp")) - timestamp) > 1.0:
                     continue
-            result = payload.get("result")
-            if isinstance(result, dict) and required <= set(result):
-                return dict(result)
+            except (TypeError, ValueError):
+                continue
+        result = payload.get("result")
+        if isinstance(result, dict) and required <= set(result):
+            return dict(result)
     return None
 
 
@@ -409,32 +319,16 @@ def _latest_original_tool_records(
     wanted = set(tool_names)
     if not wanted:
         return None
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return None
-    for row in reversed(sandbox.to_dicts()):
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=True):
+        if str(payload.get("tool_name", "")) not in wanted:
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in reversed(traces):
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            if str(payload.get("tool_name", "")) not in wanted:
-                continue
-            result = payload.get("result")
-            if isinstance(result, list) and all(
-                isinstance(record, dict) for record in result
-            ):
-                return [dict(record) for record in result]
-            if isinstance(result, dict):
-                return [dict(result)]
+        result = payload.get("result")
+        if isinstance(result, list) and all(
+            isinstance(record, dict) for record in result
+        ):
+            return [dict(record) for record in result]
+        if isinstance(result, dict):
+            return [dict(result)]
     return None
 
 
@@ -455,35 +349,19 @@ def _setting_trace_result_succeeded(result: Any) -> bool:
 
 def _visible_setting_state_summary_from_trace() -> str:
     """Summarize visible prior setting setters from SANDBOX tool traces only."""
-    try:
-        sandbox = get_current_context().get_database(
-            namespace=DatabaseNamespace.SANDBOX,
-            get_all_history_snapshots=True,
-        )
-    except Exception:
-        return ""
     latest_by_tool: dict[str, str] = {}
-    for row in sandbox.to_dicts():
-        existing = row.get("tool_trace")
-        if existing is None:
+    for payload in _visible_trace_payloads(newest_first=False):
+        tool_name = str(payload.get("tool_name", ""))
+        if tool_name not in SETTING_SETTER_TOOL_NAMES:
             continue
-        traces = existing.to_list() if hasattr(existing, "to_list") else list(existing)
-        for item in traces:
-            try:
-                payload = json.loads(str(item))
-            except json.JSONDecodeError:
-                continue
-            tool_name = str(payload.get("tool_name", ""))
-            if tool_name not in SETTING_SETTER_TOOL_NAMES:
-                continue
-            if not _setting_trace_result_succeeded(payload.get("result")):
-                continue
-            arguments = payload.get("arguments")
-            if not isinstance(arguments, dict) or "on" not in arguments:
-                continue
-            label = SETTING_STATE_LABELS[tool_name]
-            state = "on" if bool(arguments.get("on")) else "off"
-            latest_by_tool[tool_name] = f"{label} is {state}"
+        if not _setting_trace_result_succeeded(payload.get("result")):
+            continue
+        arguments = payload.get("arguments")
+        if not isinstance(arguments, dict) or "on" not in arguments:
+            continue
+        label = SETTING_STATE_LABELS[tool_name]
+        state = "on" if bool(arguments.get("on")) else "off"
+        latest_by_tool[tool_name] = f"{label} is {state}"
     return "; ".join(latest_by_tool[name] for name in sorted(latest_by_tool))
 
 
