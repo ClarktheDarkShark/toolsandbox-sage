@@ -33,6 +33,8 @@ DEFAULT_CONTRACT = Path(__file__).with_name("sage_frozen_behavior_contract_v1.js
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
 HISTORICAL_COHORT_ENV = "SAGE_HISTORICAL_COHORT_MANIFEST"
 LOCK_LINE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)$")
+ACTOR_POLICY_ROLE = "actor_policy"
+REPLAY_COMPARE_SOURCE = Path(__file__).resolve().parents[1] / "replay" / "compare.py"
 
 
 @dataclass
@@ -55,6 +57,26 @@ class VerificationReport:
             }
         )
         self.errors.append(f"{name}: expected {expected!r}, observed {observed!r}")
+
+    def waive(
+        self,
+        name: str,
+        observed: Any,
+        expected: Any,
+        *,
+        evidence: str,
+    ) -> None:
+        """Record an explicit, evidence-backed exception to one named check."""
+
+        self.checks.append(
+            {
+                "name": name,
+                "status": "waived",
+                "observed": observed,
+                "expected": expected,
+                "evidence": evidence,
+            }
+        )
 
     def equal(self, name: str, observed: Any, expected: Any) -> None:
         if observed == expected:
@@ -160,6 +182,239 @@ def _module_literal(path: Path, variable: str) -> Any:
     raise ValueError(f"Could not find top-level assignment {variable} in {path}")
 
 
+def _expected_replay_probes() -> list[str]:
+    """Read the complete current replay suite without importing the harness."""
+
+    probes = _module_literal(REPLAY_COMPARE_SOURCE, "DEFAULT_PROBES")
+    if (
+        not isinstance(probes, tuple)
+        or not probes
+        or any(not isinstance(item, str) or not item for item in probes)
+        or len(set(probes)) != len(probes)
+    ):
+        raise ValueError("DEFAULT_PROBES must be a non-empty tuple of unique names")
+    return list(probes)
+
+
+def _verify_actor_source_equivalence_report(
+    report_path: Path,
+    contract: dict[str, Any],
+    repo_root: Path,
+    actor_source: dict[str, Any],
+    report: VerificationReport,
+) -> bool:
+    """Validate exact replay evidence for the sole actor-source hash waiver."""
+
+    error_count = len(report.errors)
+    check_prefix = "actor_source_equivalence_report"
+    try:
+        evidence_path = report_path.expanduser().resolve()
+        payload = _load_object(evidence_path)
+        expected_probes = _expected_replay_probes()
+    except (OSError, ValueError) as exc:
+        report.fail(f"{check_prefix}.read", str(exc), "valid exact replay report")
+        return False
+
+    report.equal(f"{check_prefix}.schema_version", payload.get("schema_version"), 1)
+    report.equal(f"{check_prefix}.status", payload.get("status"), "equivalent")
+    difference_count = payload.get("difference_count")
+    report.condition(
+        f"{check_prefix}.difference_count",
+        type(difference_count) is int and difference_count == 0,
+        difference_count,
+        "integer 0",
+    )
+    report.equal(f"{check_prefix}.differences", payload.get("differences"), [])
+    report.equal(f"{check_prefix}.error", payload.get("error"), None)
+    report.equal(f"{check_prefix}.probes", payload.get("probes"), expected_probes)
+
+    normalizations = payload.get("approved_normalizations")
+    normalizations_valid = (
+        isinstance(normalizations, dict)
+        and isinstance(normalizations.get("reference"), list)
+        and isinstance(normalizations.get("candidate"), list)
+    )
+    report.condition(
+        f"{check_prefix}.approved_normalizations",
+        normalizations_valid,
+        normalizations,
+        "object containing reference and candidate lists",
+    )
+
+    actor_identity = payload.get("actor_source")
+    actor_identity_valid = isinstance(actor_identity, dict)
+    report.condition(
+        f"{check_prefix}.actor_source.structure",
+        actor_identity_valid,
+        actor_identity,
+        "object containing path and reference/candidate SHA-256 values",
+    )
+    reported_reference_actor_sha: Any = None
+    reported_candidate_actor_sha: Any = None
+    if actor_identity_valid:
+        report.equal(
+            f"{check_prefix}.actor_source.path",
+            actor_identity.get("path"),
+            actor_source["path"],
+        )
+        reported_reference_actor_sha = actor_identity.get("reference_sha256")
+        reported_candidate_actor_sha = actor_identity.get("candidate_sha256")
+        report.equal(
+            f"{check_prefix}.actor_source.reference_sha256",
+            reported_reference_actor_sha,
+            actor_source["sha256"],
+        )
+
+    candidate_root_value = payload.get("candidate_root")
+    reference_root_value = payload.get("reference_root")
+    candidate_root: Path | None = None
+    reference_root: Path | None = None
+    if isinstance(candidate_root_value, str) and candidate_root_value:
+        candidate_root = Path(candidate_root_value).expanduser().resolve()
+        report.equal(
+            f"{check_prefix}.candidate_root.canonical",
+            candidate_root_value,
+            str(candidate_root),
+        )
+        report.equal(
+            f"{check_prefix}.candidate_root",
+            str(candidate_root),
+            str(repo_root.resolve()),
+        )
+    else:
+        report.fail(
+            f"{check_prefix}.candidate_root",
+            candidate_root_value,
+            "absolute candidate checkout path",
+        )
+    if isinstance(reference_root_value, str) and reference_root_value:
+        reference_root = Path(reference_root_value).expanduser().resolve()
+        report.equal(
+            f"{check_prefix}.reference_root.canonical",
+            reference_root_value,
+            str(reference_root),
+        )
+        report.condition(
+            f"{check_prefix}.reference_root.directory",
+            reference_root.is_dir(),
+            str(reference_root),
+            "existing reference checkout directory",
+        )
+        report.condition(
+            f"{check_prefix}.roots_are_distinct",
+            candidate_root is None or reference_root != candidate_root,
+            {
+                "reference_root": str(reference_root),
+                "candidate_root": str(candidate_root) if candidate_root else None,
+            },
+            "distinct reference and candidate roots",
+        )
+    else:
+        report.fail(
+            f"{check_prefix}.reference_root",
+            reference_root_value,
+            "absolute immutable-reference checkout path",
+        )
+
+    frozen_commit = str(contract["reference_source"]["git_commit"])
+    reference_head: str | None = None
+    candidate_head: str | None = None
+    if reference_root is not None and reference_root.is_dir():
+        try:
+            reference_head = _git(reference_root, "rev-parse", "HEAD")
+            reference_status = _git(
+                reference_root, "status", "--porcelain", "--untracked-files=all"
+            )
+        except ValueError as exc:
+            report.fail(
+                f"{check_prefix}.reference_root.git_identity",
+                str(exc),
+                f"clean checkout at {frozen_commit}",
+            )
+        else:
+            report.equal(
+                f"{check_prefix}.reference_root.git_commit",
+                reference_head,
+                frozen_commit,
+            )
+            report.equal(
+                f"{check_prefix}.reference_root.worktree_status",
+                reference_status,
+                "",
+            )
+        try:
+            reference_actor_path = _repo_file(reference_root, str(actor_source["path"]))
+            reference_actor_sha = _sha256(reference_actor_path)
+        except (KeyError, OSError, ValueError) as exc:
+            report.fail(
+                f"{check_prefix}.reference_actor_source_sha256",
+                str(exc),
+                actor_source.get("sha256"),
+            )
+        else:
+            report.equal(
+                f"{check_prefix}.reference_actor_source_sha256",
+                reference_actor_sha,
+                actor_source["sha256"],
+            )
+            report.equal(
+                f"{check_prefix}.actor_source.reference_report_binding",
+                reported_reference_actor_sha,
+                reference_actor_sha,
+            )
+
+    try:
+        candidate_head = _git(repo_root, "rev-parse", "HEAD")
+    except ValueError as exc:
+        report.fail(
+            f"{check_prefix}.candidate_root.git_identity",
+            str(exc),
+            "resolvable candidate HEAD",
+        )
+
+    if "reference_commit" in payload:
+        report.equal(
+            f"{check_prefix}.reference_commit",
+            payload.get("reference_commit"),
+            reference_head or frozen_commit,
+        )
+    if "candidate_commit" in payload:
+        report.equal(
+            f"{check_prefix}.candidate_commit",
+            payload.get("candidate_commit"),
+            candidate_head,
+        )
+
+    try:
+        candidate_actor_path = _repo_file(repo_root, str(actor_source["path"]))
+        candidate_actor_sha = _sha256(candidate_actor_path)
+        evidence_mtime = evidence_path.stat().st_mtime_ns
+        candidate_actor_mtime = candidate_actor_path.stat().st_mtime_ns
+    except (KeyError, OSError, ValueError) as exc:
+        report.fail(
+            f"{check_prefix}.freshness",
+            str(exc),
+            "report created after current candidate actor source",
+        )
+    else:
+        report.equal(
+            f"{check_prefix}.actor_source.candidate_report_binding",
+            reported_candidate_actor_sha,
+            candidate_actor_sha,
+        )
+        report.condition(
+            f"{check_prefix}.freshness",
+            evidence_mtime >= candidate_actor_mtime,
+            {
+                "report_mtime_ns": evidence_mtime,
+                "candidate_actor_mtime_ns": candidate_actor_mtime,
+            },
+            "report mtime >= candidate actor source mtime",
+        )
+
+    return len(report.errors) == error_count
+
+
 def _verify_reference_identity(
     contract: dict[str, Any], repo_root: Path, report: VerificationReport
 ) -> None:
@@ -181,7 +436,9 @@ def _verify_reference_identity(
         return
     report.equal("reference_source.git_commit", resolved_commit, commit)
     report.equal("reference_source.git_tree", resolved_tree, source["git_tree"])
-    report.equal("reference_source.sage_runtime_tree", sage_tree, source["sage_runtime_tree"])
+    report.equal(
+        "reference_source.sage_runtime_tree", sage_tree, source["sage_runtime_tree"]
+    )
     report.equal(
         "reference_source.toolsandbox_runtime_tree",
         toolsandbox_tree,
@@ -211,6 +468,40 @@ def _verify_hash(
     return path
 
 
+def _verify_policy_source_hash(
+    repo_root: Path,
+    source: dict[str, Any],
+    report: VerificationReport,
+    *,
+    actor_source_equivalence_valid: bool,
+) -> Path | None:
+    """Verify a policy source, waiving only changed actor bytes after replay."""
+
+    role = str(source.get("role", ""))
+    name = f"policy_configuration.{role}.source_sha256"
+    try:
+        path = _repo_file(repo_root, str(source["path"]))
+        observed = _sha256(path)
+        expected = source["sha256"]
+    except (KeyError, OSError, ValueError) as exc:
+        report.fail(name, str(exc), source.get("sha256"))
+        return None
+    if (
+        role == ACTOR_POLICY_ROLE
+        and observed != expected
+        and actor_source_equivalence_valid
+    ):
+        report.waive(
+            name,
+            observed,
+            expected,
+            evidence="actor_source_equivalence_report",
+        )
+    else:
+        report.equal(name, observed, expected)
+    return path
+
+
 def _read_lock_entries(path: Path) -> dict[str, str]:
     entries: dict[str, str] = {}
     for line_number, raw_line in enumerate(
@@ -221,7 +512,9 @@ def _read_lock_entries(path: Path) -> dict[str, str]:
             continue
         match = LOCK_LINE.fullmatch(line)
         if match is None:
-            raise ValueError(f"invalid exact lock entry on line {line_number}: {line!r}")
+            raise ValueError(
+                f"invalid exact lock entry on line {line_number}: {line!r}"
+            )
         display_name, version = match.groups()
         canonical_name = re.sub(r"[-_.]+", "-", display_name).lower()
         if canonical_name in entries:
@@ -483,12 +776,8 @@ def _verify_historical_anchor(
                     else {}
                 )
                 primary = measurements.get("audited_current_all_tasks", {})
-                comparable = measurements.get(
-                    "paper_comparable_historical_subset", {}
-                )
-                prefix = (
-                    f"historical_selected_cohort.run_pair_{pair_index}.{arm_name}"
-                )
+                comparable = measurements.get("paper_comparable_historical_subset", {})
+                prefix = f"historical_selected_cohort.run_pair_{pair_index}.{arm_name}"
                 report.equal(
                     f"{prefix}.primary_evaluator_version",
                     primary.get("evaluator_version"),
@@ -517,7 +806,11 @@ def _verify_historical_anchor(
 
 
 def _verify_configuration_sources(
-    contract: dict[str, Any], repo_root: Path, report: VerificationReport
+    contract: dict[str, Any],
+    repo_root: Path,
+    report: VerificationReport,
+    *,
+    actor_source_equivalence_report: Path | None = None,
 ) -> None:
     model = contract["model_configuration"]
     model_path = _verify_hash(
@@ -526,12 +819,34 @@ def _verify_configuration_sources(
         model["model_config_source"],
         report,
     )
-    for source in contract["policy_configuration"]["source_hashes"]:
-        _verify_hash(
-            f"policy_configuration.{source['role']}.source_sha256",
+    policy_sources = contract["policy_configuration"]["source_hashes"]
+    actor_source_equivalence_valid = False
+    if actor_source_equivalence_report is not None:
+        actor_sources = [
+            source
+            for source in policy_sources
+            if source.get("role") == ACTOR_POLICY_ROLE
+        ]
+        if len(actor_sources) != 1:
+            report.fail(
+                "actor_source_equivalence_report.actor_source_record",
+                len(actor_sources),
+                "exactly one actor_policy source record",
+            )
+        else:
+            actor_source_equivalence_valid = _verify_actor_source_equivalence_report(
+                actor_source_equivalence_report,
+                contract,
+                repo_root,
+                actor_sources[0],
+                report,
+            )
+    for source in policy_sources:
+        _verify_policy_source_hash(
             repo_root,
             source,
             report,
+            actor_source_equivalence_valid=actor_source_equivalence_valid,
         )
     primary = contract["evaluator_configuration"]["primary"]
     primary_path = _verify_hash(
@@ -607,7 +922,9 @@ def _hypothesis(evidence: dict[str, Any], hypothesis_id: str) -> dict[str, Any]:
 
 
 def _verify_paper_anchors(
-    contract: dict[str, Any], evidence: dict[str, Any] | None, report: VerificationReport
+    contract: dict[str, Any],
+    evidence: dict[str, Any] | None,
+    report: VerificationReport,
 ) -> None:
     if evidence is None:
         return
@@ -905,7 +1222,9 @@ def _apply_results_gates(
             ("integrity_violation_count", "required_integrity_violation_count"),
         ):
             report.equal(
-                f"results.{field_name}", results.get(field_name), accounting[expected_key]
+                f"results.{field_name}",
+                results.get(field_name),
+                accounting[expected_key],
             )
         report.equal(
             "results.performance_based_exclusion_count",
@@ -1079,6 +1398,7 @@ def verify(
     *,
     historical_anchor: Path | None = None,
     results_path: Path | None = None,
+    actor_source_equivalence_report: Path | None = None,
 ) -> tuple[dict[str, Any], VerificationReport]:
     contract = _load_object(contract_path)
     report = VerificationReport()
@@ -1096,7 +1416,12 @@ def verify(
     _verify_reference_identity(contract, repo_root, report)
     evidence = _verify_frozen_inputs(contract, repo_root, report)
     _verify_historical_anchor(contract, historical_anchor, report)
-    _verify_configuration_sources(contract, repo_root, report)
+    _verify_configuration_sources(
+        contract,
+        repo_root,
+        report,
+        actor_source_equivalence_report=actor_source_equivalence_report,
+    )
     _verify_paper_anchors(contract, evidence, report)
     _verify_gate_formulas(contract, report)
     if results_path is not None:
@@ -1129,7 +1454,18 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional final validation summary to evaluate against the frozen gates.",
     )
-    parser.add_argument("--json", action="store_true", help="Emit the full JSON report.")
+    parser.add_argument(
+        "--actor-source-equivalence-report",
+        type=Path,
+        help=(
+            "Optional exact replay report permitting only the actor_policy source "
+            "SHA check to be marked waived. The report must prove a complete, "
+            "zero-difference replay against the immutable reference checkout."
+        ),
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Emit the full JSON report."
+    )
     return parser
 
 
@@ -1141,6 +1477,7 @@ def main() -> int:
             args.repo_root.resolve(),
             historical_anchor=args.historical_cohort_manifest,
             results_path=args.results,
+            actor_source_equivalence_report=args.actor_source_equivalence_report,
         )
     except (KeyError, OSError, TypeError, ValueError) as exc:
         print(f"frozen_contract_verification=failed\n{exc}", file=sys.stderr)

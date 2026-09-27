@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -25,6 +26,7 @@ else:
 HERE = Path(__file__).resolve().parent
 SNAPSHOT_SCRIPT = HERE / "snapshot.py"
 NORMALIZATION_RULES = HERE / "approved_nondeterminism.json"
+ACTOR_SOURCE_PATH = Path("src/sage_ts/adapters/openai_toolsandbox_roles.py")
 DEFAULT_PROBES = (
     "imports",
     "config",
@@ -203,6 +205,20 @@ def _write_report(path: Path | None, report: dict[str, Any]) -> None:
         path.write_text(rendered, encoding="utf-8")
 
 
+def _actor_source_identity(
+    reference_root: Path, candidate_root: Path
+) -> dict[str, str]:
+    """Bind a replay result to the exact actor source bytes it evaluated."""
+
+    reference_path = reference_root / ACTOR_SOURCE_PATH
+    candidate_path = candidate_root / ACTOR_SOURCE_PATH
+    return {
+        "path": ACTOR_SOURCE_PATH.as_posix(),
+        "reference_sha256": hashlib.sha256(reference_path.read_bytes()).hexdigest(),
+        "candidate_sha256": hashlib.sha256(candidate_path.read_bytes()).hexdigest(),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -255,6 +271,7 @@ def main() -> int:
             candidate, rules
         )
         differences = _diff(normalized_reference, normalized_candidate)
+        actor_source = _actor_source_identity(reference_root, candidate_root)
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
         report = {
             "schema_version": 1,
@@ -273,6 +290,7 @@ def main() -> int:
         "status": "equivalent" if not differences else "different",
         "reference_root": str(reference_root),
         "candidate_root": str(candidate_root),
+        "actor_source": actor_source,
         "probes": list(probes),
         "approved_normalizations": {
             "reference": _applied_payload(reference_normalizations),
