@@ -47,6 +47,7 @@ DEFAULT_PROBES = (
     "actor",
     "actor_model_inference",
     "actor_trace_facts",
+    "actor_tool_schema_contracts",
     "normalization",
     "validation",
     "routing",

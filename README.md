@@ -107,6 +107,55 @@ make package
 python scripts/verify_publication_environment.py
 ```
 
+## External actor schema refactor guard
+
+The validation worktree includes a black-box contract for the actor's routed
+tool-schema boundary. It freezes raw, agent-facing, and execution-facing names;
+input/output properties; category membership; schema and duplicate behavior;
+set-derived generated-tool ordering; mutation isolation; and malformed-input
+exception classes and `NOT_GIVEN` behavior. The branch corpus exercises 192
+independent positive alternatives and 169 near-misses, including exact-name
+case and raw-versus-execution-name boundaries and extra-field acceptance for
+subset and membership branches. A separate 1,064-probe matrix checks each
+predicate's field and normalization boundary across raw and execution names,
+descriptions, input properties, direct and nested output properties, arbitrary
+schema JSON, and lower-, upper-, and mixed-case spellings. That matrix includes
+cross-field phrase composition for every predicate that joins a raw name and
+description; leading, trailing, and every internal whitespace boundary on both
+fields; an explicit record of one behaviorally masked derived phrase; and
+JSON-schema type casing. It also freezes the native, side-effect, and
+service-producer constant inventories. It does not instrument the production
+runtime.
+
+The ordinary replay driver starts an additional non-isolated child interpreter
+with `PYTHONHASHSEED=0` for this probe. Its semantic-body digest canonicalizes
+unordered category and raw-name sets, while its exact ordering digest retains
+only generated-name order and set-derived duplicate-alias call-name receipts.
+Both are included in the snapshots, so the driver's outer `python -I` processes
+cannot silently randomize away schema-order versus set-order differences.
+
+Run its integrity and tamper checks against the immutable reference checkout:
+
+```bash
+REFERENCE_ROOT=/absolute/path/to/toolsandbox-sage-refactor-reference
+PYTHONHASHSEED=0 \
+  PYTHONPATH=".:${REFERENCE_ROOT}/src:${REFERENCE_ROOT}" \
+  python -m validation.replay.actor_tool_schema_contracts --tamper-self-test
+PYTHONHASHSEED=0 \
+  PYTHONPATH=".:${REFERENCE_ROOT}/src:${REFERENCE_ROOT}" \
+  python -m pytest validation/replay/test_actor_tool_schema_contracts.py -q
+```
+
+Compare the immutable reference and a candidate as independent processes:
+
+```bash
+python -m validation.replay.compare \
+  --reference-root /absolute/path/to/toolsandbox-sage-refactor-reference \
+  --candidate-root /absolute/path/to/toolsandbox-sage-public-release \
+  --probes actor_tool_schema_contracts \
+  --output /tmp/actor-tool-schema-comparison.json
+```
+
 ## Core architecture
 
 - `adapters/` — actor and ToolSandbox execution adapters
