@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import json
 import re
 import time
@@ -27,6 +26,7 @@ from sage_ts.generation.tool_spec import (
 from sage_ts.registry.manifest import RegistryEntry, has_current_validation_proof
 from sage_ts.registry.store import RegistryStore
 from sage_ts.reporting.artifact_io import append_sorted_jsonl as append_jsonl
+from sage_ts.validation.error_distance import validation_error_distance
 from sage_ts.validation.sandbox_validator import (
     ToolExample,
     ValidationResult,
@@ -457,60 +457,7 @@ def _validation_failure_score(validation: ValidationResult) -> int:
 
 
 def _validation_error_distance(error: str) -> int:
-    if error.startswith(
-        (
-            "syntax_error:",
-            "missing_generated_code",
-            "expected_exactly_one_function",
-            "function_count_mismatch:",
-            "compiled_function_count_mismatch:",
-            "function_name_mismatch:",
-            "missing_expected_function",
-            "compile_error:",
-            "denied_node:",
-            "denied_call:",
-            "denied_attribute_call:",
-        )
-    ):
-        return 10_000
-    mismatch_tokens = ("_mismatch:", "_native_action_arguments:")
-    mismatch_token = next((token for token in mismatch_tokens if token in error), "")
-    if not mismatch_token or "!=" not in error:
-        if "_native_action_count:" in error:
-            return 50
-        if "_native_action_execution_error:" in error:
-            return 100
-        return 20
-    try:
-        _, rest = error.split(mismatch_token, 1)
-        actual_text, expected_text = rest.split("!=", 1)
-        actual = ast.literal_eval(_literalize_validation_sentinels(actual_text))
-        expected = ast.literal_eval(_literalize_validation_sentinels(expected_text))
-    except Exception:
-        return 10
-    return _value_distance(actual, expected)
-
-
-def _literalize_validation_sentinels(value: str) -> str:
-    return value.replace("NOT_GIVEN", "'__NOT_GIVEN__'")
-
-
-def _value_distance(actual: Any, expected: Any) -> int:
-    if actual == expected:
-        return 0
-    if isinstance(actual, dict) and isinstance(expected, dict):
-        keys = set(actual) | set(expected)
-        return sum(_value_distance(actual.get(key), expected.get(key)) for key in keys)
-    if isinstance(actual, (list, tuple)) and isinstance(expected, (list, tuple)):
-        length = max(len(actual), len(expected))
-        return sum(
-            _value_distance(
-                actual[index] if index < len(actual) else None,
-                expected[index] if index < len(expected) else None,
-            )
-            for index in range(length)
-        )
-    return 1
+    return validation_error_distance(error)
 
 
 def _observation_family_key(observation: CapabilityObservation) -> str:
