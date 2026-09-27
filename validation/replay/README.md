@@ -51,6 +51,13 @@ or suppress normalization rules.
   Recursive type tags distinguish tuple/list, bool/int/float, dataclass, set,
   and insertion-ordered dictionary values; hashes are therefore not based on
   lossy sorted JSON.
+- `family_catalog`: freezes recursive Python types, values, and insertion order
+  for the duplicated generator family/original-call/output-enum maps, runtime
+  visible-context signals, online visible-routing families, native/actor tool
+  groups, setting-setter groups, service producer/extractor groups, coordinate
+  regex pattern/flags, and location-argument name precedence. It separately
+  exercises every declared runtime signal alone, all signals for each tool,
+  and an absent-signal context, while retaining missing-versus-empty lookups.
 - `actor`: feeds fixed model-boundary messages and routed schemas through the
   policy composer and every named-choice selector in production precedence
   order. It snapshots exact prompt text, original schema order, selected named
@@ -121,6 +128,16 @@ or suppress normalization rules.
   shallow-only null cleanup with survivor order. Recursive key order and exact
   compact bytes are part of every result, including fields appended during
   selection normalization.
+- `trajectory_runtime`: freezes the artifact-facing boundary for a future
+  trajectory-facts layer. It records tolerant and fail-fast JSON/JSONL loader
+  behavior, JSON-before-Python-literal tool-result parsing, conversation
+  sanitization, generated-call attempt/result ordering and reconciliation,
+  ToolSandbox trace reconstruction (including malformed non-null trace
+  suppression of fallback), conversation and trace next-tool semantics, and
+  every non-native helper side-effect follow-up branch. A compact synthetic
+  lifecycle path joins reuse logs, visible messages, execution traces,
+  failed-call removal, side-effect verification, and heuristic observation
+  without invoking a provider or enabling replay in a live run.
 - `generation_boundary`: records every exact `ChatRequest` byte stream and hash
   for ordinary generation, native-action generation, cached contract analysis,
   repair analysis, repeated repair, and strategy-specific repair. It also

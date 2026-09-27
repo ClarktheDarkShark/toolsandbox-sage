@@ -1260,6 +1260,24 @@ def probe_actor_trace_facts(root: Path) -> dict[str, Any]:
     return module.run_probe(root)
 
 
+def probe_family_catalog(root: Path) -> dict[str, Any]:
+    """Freeze cross-module family catalogs and signal-routing behavior."""
+
+    module_name = "_sage_replay_family_catalog_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "family_catalog_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load family catalog replay contracts: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(root)
+
+
 def _tool_spec(
     *,
     name: str,
@@ -4561,6 +4579,26 @@ def probe_trace_router_edges(_root: Path) -> dict[str, Any]:
     )
 
 
+def probe_trajectory_runtime(root: Path) -> dict[str, Any]:
+    """Freeze trajectory readers and generated-helper follow-up semantics."""
+
+    module_name = "_sage_replay_trajectory_runtime_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = (
+            Path(__file__).resolve().parent / "trajectory_runtime_contracts.py"
+        )
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load trajectory/runtime probes: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(root, exact=_exact_json_snapshot)
+
+
 def _probe_step5_contract(name: str) -> dict[str, Any]:
     """Load validation-only generation probes after the selected checkout."""
 
@@ -5591,6 +5629,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "trajectory": probe_trajectory,
     "classifier": probe_classifier,
     "classifier_corpus": probe_classifier_corpus,
+    "family_catalog": probe_family_catalog,
     "actor": probe_actor,
     "actor_model_inference": probe_actor_model_inference,
     "actor_trace_facts": probe_actor_trace_facts,
@@ -5599,6 +5638,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "routing": probe_routing,
     "runtime_contracts": probe_runtime_contracts,
     "trace_router_edges": probe_trace_router_edges,
+    "trajectory_runtime": probe_trajectory_runtime,
     "generation_boundary": probe_generation_boundary,
     "validation_distance": probe_validation_distance,
     "native_structural_cases": probe_native_structural_cases,
