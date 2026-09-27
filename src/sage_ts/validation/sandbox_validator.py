@@ -13,6 +13,7 @@ from sage_ts.generation.complete_tools import (
     COMPLETE_TOOLS_NATIVE_NAMES,
     native_action_tool_enabled,
     native_side_effect_tools,
+    visit_ranked_record_structural_negative_inputs,
 )
 from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily
 from sage_ts.validation.ast_safety import check_ast_safety
@@ -248,75 +249,24 @@ def _with_native_action_structural_negatives(
             example.expected
         ):
             continue
-        records = example.inputs.get("records")
-        if (
-            not isinstance(records, list)
-            or not records
-            or not all(isinstance(record, dict) for record in records)
-        ):
-            continue
-        timestamp_key = str(example.inputs.get("timestamp_key") or "").strip()
-        if not timestamp_key:
-            common_keys = set(records[0])
-            for record in records[1:]:
-                common_keys.intersection_update(record)
-            timestamp_key = next(
-                (
-                    key
-                    for key in sorted(common_keys)
-                    if key.endswith("_timestamp")
-                    and all(
-                        isinstance(record.get(key), (int, float)) for record in records
-                    )
-                ),
-                "",
-            )
-        if not timestamp_key or not any(timestamp_key in record for record in records):
-            continue
 
-        malformed_records = [dict(record) for record in records]
-        malformed_records[0].pop(timestamp_key, None)
-        malformed_inputs = dict(example.inputs)
-        malformed_inputs["records"] = malformed_records
-        serialized = json.dumps(malformed_inputs, sort_keys=True, default=str)
-        if serialized not in existing_inputs:
-            additions.append(
-                ToolExample(
-                    inputs=malformed_inputs,
-                    expected={},
-                    negative_applicability=True,
-                )
-            )
-            existing_inputs.add(serialized)
-
-        numeric_records = [
-            record
-            for record in records
-            if isinstance(record.get(timestamp_key), (int, float))
-        ]
-        if numeric_records:
-            mode = str(example.inputs.get("selection_mode") or "latest").lower()
-            selected = (
-                min(numeric_records, key=lambda record: record[timestamp_key])
-                if mode in {"oldest", "first", "oldest_by_time", "earliest"}
-                else max(numeric_records, key=lambda record: record[timestamp_key])
-            )
-            tied_inputs = dict(example.inputs)
-            tied_inputs["records"] = [
-                *[dict(record) for record in records],
-                dict(selected),
-            ]
-            serialized = json.dumps(tied_inputs, sort_keys=True, default=str)
+        def add_structural_case(case: tuple[str, dict[str, Any]]) -> None:
+            _, structural_inputs = case
+            serialized = json.dumps(structural_inputs, sort_keys=True, default=str)
             if serialized not in existing_inputs:
                 additions.append(
                     ToolExample(
-                        inputs=tied_inputs,
+                        inputs=structural_inputs,
                         expected={},
                         negative_applicability=True,
                     )
                 )
                 existing_inputs.add(serialized)
-        break
+
+        if visit_ranked_record_structural_negative_inputs(
+            example.inputs, add_structural_case
+        ):
+            break
     return (*examples, *additions)
 
 

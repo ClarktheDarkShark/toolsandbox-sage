@@ -14,6 +14,7 @@ from sage_ts.generation.complete_tools import (
     COMPLETE_TOOLS_NATIVE_NAMES,
     COMPLETE_TOOLS_PROMPT_CONSTRAINT,
     native_side_effect_tools,
+    visit_ranked_record_structural_negative_inputs,
 )
 from sage_ts.generation.tool_spec import (
     GeneratedTool,
@@ -885,57 +886,10 @@ def _native_action_validation_examples(
         inputs = item.get("inputs")
         if not isinstance(inputs, dict):
             continue
-        records = inputs.get("records")
-        if (
-            not isinstance(records, list)
-            or not records
-            or not all(isinstance(record, dict) for record in records)
+        if visit_ranked_record_structural_negative_inputs(
+            inputs, structural_negative_inputs.append
         ):
-            continue
-        timestamp_key = str(inputs.get("timestamp_key") or "").strip()
-        if not timestamp_key:
-            common_keys = set(records[0])
-            for record in records[1:]:
-                common_keys.intersection_update(record)
-            timestamp_key = next(
-                (
-                    key
-                    for key in sorted(common_keys)
-                    if key.endswith("_timestamp")
-                    and all(
-                        isinstance(record.get(key), (int, float)) for record in records
-                    )
-                ),
-                "",
-            )
-        if not timestamp_key or not any(timestamp_key in record for record in records):
-            continue
-
-        malformed_records = [dict(record) for record in records]
-        malformed_records[0].pop(timestamp_key, None)
-        malformed_inputs = dict(inputs)
-        malformed_inputs["records"] = malformed_records
-        structural_negative_inputs.append(("missing_rank_field", malformed_inputs))
-
-        numeric_records = [
-            record
-            for record in records
-            if isinstance(record.get(timestamp_key), (int, float))
-        ]
-        if numeric_records:
-            mode = str(inputs.get("selection_mode") or "latest").lower()
-            selected = (
-                min(numeric_records, key=lambda record: record[timestamp_key])
-                if mode in {"oldest", "first", "oldest_by_time", "earliest"}
-                else max(numeric_records, key=lambda record: record[timestamp_key])
-            )
-            tied_inputs = dict(inputs)
-            tied_inputs["records"] = [
-                *[dict(record) for record in records],
-                dict(selected),
-            ]
-            structural_negative_inputs.append(("tied_rank", tied_inputs))
-        break
+            break
 
     for index, (reason, inputs) in enumerate(structural_negative_inputs):
         projected.append(

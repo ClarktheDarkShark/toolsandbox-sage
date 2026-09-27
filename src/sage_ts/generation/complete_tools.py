@@ -25,6 +25,63 @@ COMPLETE_TOOLS_NATIVE_NAMES: tuple[str, ...] = (
 )
 
 
+def visit_ranked_record_structural_negative_inputs(
+    inputs: dict[str, Any],
+    emit: Callable[[tuple[str, dict[str, Any]]], None],
+) -> bool:
+    """Build malformed-field and tied-rank inputs for one ranked record set."""
+
+    records = inputs.get("records")
+    if (
+        not isinstance(records, list)
+        or not records
+        or not all(isinstance(record, dict) for record in records)
+    ):
+        return False
+    timestamp_key = str(inputs.get("timestamp_key") or "").strip()
+    if not timestamp_key:
+        common_keys = set(records[0])
+        for record in records[1:]:
+            common_keys.intersection_update(record)
+        timestamp_key = next(
+            (
+                key
+                for key in sorted(common_keys)
+                if key.endswith("_timestamp")
+                and all(isinstance(record.get(key), (int, float)) for record in records)
+            ),
+            "",
+        )
+    if not timestamp_key or not any(timestamp_key in record for record in records):
+        return False
+
+    malformed_records = [dict(record) for record in records]
+    malformed_records[0].pop(timestamp_key, None)
+    malformed_inputs = dict(inputs)
+    malformed_inputs["records"] = malformed_records
+    emit(("missing_rank_field", malformed_inputs))
+
+    numeric_records = [
+        record
+        for record in records
+        if isinstance(record.get(timestamp_key), (int, float))
+    ]
+    if numeric_records:
+        mode = str(inputs.get("selection_mode") or "latest").lower()
+        selected = (
+            min(numeric_records, key=lambda record: record[timestamp_key])
+            if mode in {"oldest", "first", "oldest_by_time", "earliest"}
+            else max(numeric_records, key=lambda record: record[timestamp_key])
+        )
+        tied_inputs = dict(inputs)
+        tied_inputs["records"] = [
+            *[dict(record) for record in records],
+            dict(selected),
+        ]
+        emit(("tied_rank", tied_inputs))
+    return True
+
+
 def native_action_names_for_tool(tool: Any) -> tuple[str, ...]:
     """Return the native actions explicitly declared by a generated tool."""
 
