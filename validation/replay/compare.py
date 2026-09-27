@@ -36,6 +36,7 @@ DEFAULT_PROBES = (
     "classifier_corpus",
     "actor",
     "actor_model_inference",
+    "actor_trace_facts",
     "normalization",
     "validation",
     "routing",

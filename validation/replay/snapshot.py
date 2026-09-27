@@ -345,9 +345,7 @@ def probe_outcomes(_root: Path) -> dict[str, Any]:
         {
             "id": "currency_exact_with_context",
             "scenario": "convert_currency",
-            "events": (
-                {"kind": "agent", "content": "The result is 13,988.46 CNY."},
-            ),
+            "events": ({"kind": "agent", "content": "The result is 13,988.46 CNY."},),
         },
         {
             "id": "currency_later_wrong_correction",
@@ -426,7 +424,7 @@ def probe_outcomes(_root: Path) -> dict[str, Any]:
                     "kind": "agent",
                     "content": (
                         "There are no records of a message with the content "
-                        "\"Good, keep me posted.\" in your text history."
+                        '"Good, keep me posted." in your text history.'
                     ),
                 },
             ),
@@ -441,9 +439,9 @@ def probe_outcomes(_root: Path) -> dict[str, Any]:
                 {
                     "kind": "agent",
                     "content": (
-                        "There are no records saying \"Good, keep me posted\"—"
+                        'There are no records saying "Good, keep me posted"—'
                         "correction: the latest message does say "
-                        "\"Good, keep me posted\"."
+                        '"Good, keep me posted".'
                     ),
                 },
             ),
@@ -505,7 +503,9 @@ def probe_trajectory(_root: Path) -> dict[str, Any]:
         fixture_module_path,
     )
     if fixture_spec is None or fixture_spec.loader is None:
-        raise RuntimeError(f"Cannot load trajectory fixture helper: {fixture_module_path}")
+        raise RuntimeError(
+            f"Cannot load trajectory fixture helper: {fixture_module_path}"
+        )
     fixture_module = importlib.util.module_from_spec(fixture_spec)
     fixture_spec.loader.exec_module(fixture_module)
     load_verified_fixture = fixture_module.load_verified_fixture
@@ -564,16 +564,12 @@ def probe_trajectory(_root: Path) -> dict[str, Any]:
             expected = {
                 "outcome_similarity": historical["outcome_similarity"],
                 "outcome_check_count": historical["outcome_check_count"],
-                "outcome_state_history_safe": historical[
-                    "outcome_state_history_safe"
-                ],
+                "outcome_state_history_safe": historical["outcome_state_history_safe"],
             }
             observed = {
                 "outcome_similarity": outcome.get("outcome_similarity"),
                 "outcome_check_count": outcome.get("outcome_check_count"),
-                "outcome_state_history_safe": outcome.get(
-                    "outcome_state_history_safe"
-                ),
+                "outcome_state_history_safe": outcome.get("outcome_state_history_safe"),
             }
             if observed != expected:
                 raise RuntimeError(
@@ -628,9 +624,7 @@ def probe_trajectory(_root: Path) -> dict[str, Any]:
         if previous_fixed_timestamp is None:
             os.environ.pop("TOOL_SANDBOX_FIXED_NOW_TIMESTAMP", None)
         else:
-            os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = (
-                previous_fixed_timestamp
-            )
+            os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = previous_fixed_timestamp
 
     return {
         "fixture": {
@@ -1246,6 +1240,24 @@ def probe_actor_model_inference(root: Path) -> dict[str, Any]:
         sys.modules[module_name] = module
         module_spec.loader.exec_module(module)
     return module.probe_actor_model_inference(root)
+
+
+def probe_actor_trace_facts(root: Path) -> dict[str, Any]:
+    """Freeze structural OpenAI-message scans independently of actor policy."""
+
+    module_name = "_sage_replay_actor_trace_contracts"
+    module = sys.modules.get(module_name)
+    if module is None:
+        module_path = Path(__file__).resolve().parent / "actor_trace_contracts.py"
+        module_spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if module_spec is None or module_spec.loader is None:
+            raise RuntimeError(
+                f"Could not load actor trace replay contracts: {module_path}"
+            )
+        module = importlib.util.module_from_spec(module_spec)
+        sys.modules[module_name] = module
+        module_spec.loader.exec_module(module)
+    return module.run_probe(root)
 
 
 def _tool_spec(
@@ -2083,7 +2095,10 @@ def _probe_normalization_contract_matrix() -> dict[str, Any]:
                 "requested_action": "search_messages",
                 "target_identifier": "",
                 "required_original_tools": [],
-                "available_original_tools": ["search_messages", "get_current_timestamp"],
+                "available_original_tools": [
+                    "search_messages",
+                    "get_current_timestamp",
+                ],
                 "visible_records_count": 0,
             },
         ),
@@ -2091,13 +2106,33 @@ def _probe_normalization_contract_matrix() -> dict[str, Any]:
 
     direct_state_vectors = (
         ("cellular_on", "turn on cellular", "set_cellular_service_status", True),
-        ("cellular_off", "disable cellular service", "set_cellular_service_status", False),
+        (
+            "cellular_off",
+            "disable cellular service",
+            "set_cellular_service_status",
+            False,
+        ),
         ("wifi_on", "enable wi-fi", "set_wifi_status", True),
         ("wifi_off", "turn wifi off", "set_wifi_status", False),
-        ("location_on", "enable location services", "set_location_service_status", True),
+        (
+            "location_on",
+            "enable location services",
+            "set_location_service_status",
+            True,
+        ),
         ("location_off", "turn off location", "set_location_service_status", False),
-        ("low_battery_on", "enable low battery mode", "set_low_battery_mode_status", True),
-        ("low_battery_off", "disable low battery mode", "set_low_battery_mode_status", False),
+        (
+            "low_battery_on",
+            "enable low battery mode",
+            "set_low_battery_mode_status",
+            True,
+        ),
+        (
+            "low_battery_off",
+            "disable low battery mode",
+            "set_low_battery_mode_status",
+            False,
+        ),
     )
     for case_id, request, _tool_name, _on in direct_state_vectors:
         cases.append(
@@ -2360,7 +2395,10 @@ def probe_validation(_root: Path) -> dict[str, Any]:
     """Run deterministic compile, safety, held-out, and negative validation."""
 
     from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
-    from sage_ts.validation.sandbox_validator import ToolExample, validate_generated_tool
+    from sage_ts.validation.sandbox_validator import (
+        ToolExample,
+        validate_generated_tool,
+    )
 
     canonical_spec = _tool_spec(
         name="canonicalize_connectivity_label",
@@ -2742,10 +2780,7 @@ def probe_routing(_root: Path) -> dict[str, Any]:
         location_helper("prepare_specific_location_search_args", broad=False),
         location_helper("prepare_broad_location_search_args", broad=True),
     )
-    entries = {
-        tool.spec.tool_name: _accepted_entry(tool)
-        for tool in tools
-    }
+    entries = {tool.spec.tool_name: _accepted_entry(tool) for tool in tools}
     proof = {
         name: has_current_validation_proof(entry)
         for name, entry in sorted(entries.items())
@@ -2862,9 +2897,7 @@ def probe_routing(_root: Path) -> dict[str, Any]:
             ),
             "family": "service_answer_extraction",
             "base_tools": {"search_weather_around_lat_lon"},
-            "lifecycle": {
-                "extract_temperature_result": {"decision": "parked"}
-            },
+            "lifecycle": {"extract_temperature_result": {"decision": "parked"}},
         },
         {
             "id": "clean_guard_overrides_coarse_route_repair",
@@ -2902,8 +2935,7 @@ def probe_routing(_root: Path) -> dict[str, Any]:
         results[str(case["id"])] = {
             "selected_in_schema_order": [item.tool.spec.tool_name for item in selected],
             "decisions": {
-                name: decision.to_json()
-                for name, decision in sorted(decisions.items())
+                name: decision.to_json() for name, decision in sorted(decisions.items())
             },
         }
     return _jsonable({"validation_proof": proof, "cases": results})
@@ -2948,7 +2980,9 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
         normalized_preserves = preserves
         normalized_required = required
         if family == ToolFamily.SEARCH_FILTER_RANKING_HELPER:
-            if not any(item.name in {"records", "candidates"} for item in normalized_inputs):
+            if not any(
+                item.name in {"records", "candidates"} for item in normalized_inputs
+            ):
                 normalized_inputs = (
                     ToolInput("records", "list", "Visible candidate records."),
                     *normalized_inputs,
@@ -2970,9 +3004,7 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
                     **normalized_output,
                     "downstream_tool_kwargs": mapping,
                 }
-            normalized_negative = normalized_negative or (
-                "insufficient_information",
-            )
+            normalized_negative = normalized_negative or ("insufficient_information",)
             normalized_abstain = (
                 normalized_abstain or "Abstain on insufficient_information."
             )
@@ -3168,7 +3200,9 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
         [
             one_case(
                 "location_reverse_geocode_suppression",
-                location_entry("prepare_specific_location_search_args", coordinates=False),
+                location_entry(
+                    "prepare_specific_location_search_args", coordinates=False
+                ),
                 (
                     "request=What is the address at latitude 37.3 longitude -122.0 "
                     "signals=location_phrase external_lookup"
@@ -3184,7 +3218,9 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
             ),
             one_case(
                 "specific_helper_rejects_broad_place",
-                location_entry("prepare_specific_location_search_args", coordinates=False),
+                location_entry(
+                    "prepare_specific_location_search_args", coordinates=False
+                ),
                 "request=Find weather in Boston signals=location_phrase external_lookup",
             ),
             one_case(
@@ -3194,7 +3230,9 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
             ),
             one_case(
                 "location_helper_requires_external_or_reminder_context",
-                location_entry("prepare_specific_location_search_args", coordinates=False),
+                location_entry(
+                    "prepare_specific_location_search_args", coordinates=False
+                ),
                 "request=Remember near 1 Market Street signals=location_phrase",
             ),
             one_case(
@@ -3536,7 +3574,10 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
     any_downstream = entry(
         "any_downstream_helper",
         output_properties={
-            "tool_name": {"type": "string", "enum": ["search_contacts", "search_messages"]},
+            "tool_name": {
+                "type": "string",
+                "enum": ["search_contacts", "search_messages"],
+            },
             "arguments": mapping,
         },
         positive=("downstream_signal",),
@@ -3695,9 +3736,7 @@ def _probe_routing_contract_matrix() -> dict[str, Any]:
         decision_payload = {
             name: decision.to_json() for name, decision in decisions.items()
         }
-        observed_reasons.update(
-            str(decision.reason) for decision in decisions.values()
-        )
+        observed_reasons.update(str(decision.reason) for decision in decisions.values())
         results[str(case["id"])] = {
             "entry_order": list(case["entries"]),
             "selected_in_schema_order": [
@@ -3842,9 +3881,7 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
         ) -> None:
             self.sandbox = sandbox
             self.tool_allow_list = tool_allow_list
-            self.name_to_tool = {
-                name: object() for name in (tool_allow_list or [])
-            }
+            self.name_to_tool = {name: object() for name in (tool_allow_list or [])}
 
         def get_database(self, *args: Any, **kwargs: Any) -> FakeSandbox:
             return self.sandbox
@@ -4158,7 +4195,10 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
             {
                 "visible_state_summary": "cellular service is on",
                 "available_tools": [
-                    {"type": "function", "function": {"name": "functions.get_wifi_status"}}
+                    {
+                        "type": "function",
+                        "function": {"name": "functions.get_wifi_status"},
+                    }
                 ],
             },
         )
@@ -4265,13 +4305,11 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
 
     for stage_name in stage_names:
         setattr(integration, stage_name, stage(stage_name))
-    integration.normalize_generated_tool_output = (
-        lambda _tool, value, *, inputs=None: {
-            "normalized": True,
-            "inner": value,
-            "input_keys": list((inputs or {}).keys()),
-        }
-    )
+    integration.normalize_generated_tool_output = lambda _tool, value, *, inputs=None: {
+        "normalized": True,
+        "inner": value,
+        "input_keys": list((inputs or {}).keys()),
+    }
     integration._current_tool_trace_count = lambda: 0  # type: ignore[assignment] # noqa: SLF001
     integration.native_action_tool_enabled = lambda _tool: False
 
@@ -4328,8 +4366,7 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
         raise RuntimeError("Generated-tool wrapper mutated caller-owned kwargs")
     if reuse_log != [wrapper_spec.tool_name]:
         raise RuntimeError(
-            "Generated-tool wrapper reuse callback contract changed: "
-            f"{reuse_log!r}"
+            f"Generated-tool wrapper reuse callback contract changed: {reuse_log!r}"
         )
 
     wrapper_stage_contract = {
@@ -4372,8 +4409,8 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
     trace_events: list[dict[str, Any]] = []
     reuse_events: list[str] = []
     integration._current_tool_trace_count = lambda: 0  # type: ignore[assignment] # noqa: SLF001
-    integration.add_tool_trace = (
-        lambda function, result, *args, **kwargs: trace_events.append(
+    integration.add_tool_trace = lambda function, result, *args, **kwargs: (
+        trace_events.append(
             {
                 "function": function.__name__,
                 "result": result,
@@ -4442,10 +4479,8 @@ def _probe_runtime_integration_contract_matrix() -> dict[str, Any]:
     native_reuse_events: list[str] = []
     trace_counts = iter((3, 4))
     integration._current_tool_trace_count = lambda: next(trace_counts)  # type: ignore[assignment] # noqa: SLF001
-    integration.add_tool_trace = (
-        lambda function, result, *args, **kwargs: native_trace_events.append(
-            {"function": function.__name__, "result": result}
-        )
+    integration.add_tool_trace = lambda function, result, *args, **kwargs: (
+        native_trace_events.append({"function": function.__name__, "result": result})
     )
     integration.native_action_tool_enabled = lambda _tool: True
     try:
@@ -4572,9 +4607,7 @@ def _probe_generator_validator_corpus(name: str) -> dict[str, Any]:
     module_name = "_sage_replay_generator_validator_corpus"
     module = sys.modules.get(module_name)
     if module is None:
-        module_path = (
-            Path(__file__).resolve().parent / "generator_validator_corpus.py"
-        )
+        module_path = Path(__file__).resolve().parent / "generator_validator_corpus.py"
         module_spec = importlib.util.spec_from_file_location(module_name, module_path)
         if module_spec is None or module_spec.loader is None:
             raise RuntimeError(
@@ -4773,9 +4806,7 @@ def probe_lifecycle(_root: Path) -> dict[str, Any]:
         return _jsonable(
             {
                 "final_state": state,
-                "registry_manifest_sha256": hashlib.sha256(
-                    registry_bytes
-                ).hexdigest(),
+                "registry_manifest_sha256": hashlib.sha256(registry_bytes).hexdigest(),
                 "registry_entries": {
                     name: entry.to_json()
                     for name, entry in sorted(store.load_entries().items())
@@ -4837,9 +4868,7 @@ def _reporting_value_snapshot(value: Any, temporary_root: Path) -> dict[str, Any
         "object_key_order": _reporting_key_order(sanitized),
         "canonical_json": canonical,
         "canonical_json_byte_count": len(canonical.encode("utf-8")),
-        "canonical_json_sha256": hashlib.sha256(
-            canonical.encode("utf-8")
-        ).hexdigest(),
+        "canonical_json_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
     }
 
 
@@ -4933,7 +4962,9 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
         fixture_module_path,
     )
     if fixture_spec is None or fixture_spec.loader is None:
-        raise RuntimeError(f"Cannot load reporting fixture helper: {fixture_module_path}")
+        raise RuntimeError(
+            f"Cannot load reporting fixture helper: {fixture_module_path}"
+        )
     fixture_module = importlib.util.module_from_spec(fixture_spec)
     fixture_spec.loader.exec_module(fixture_module)
     fixture, fixture_manifest = fixture_module.load_verified_fixture()
@@ -5075,7 +5106,12 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
         missing_candidate = variant_run(
             "missing",
             "candidate",
-            [row for row in candidate_rows if row["name"] not in {"beta_visible_not_called", "delta_runtime_failure"}],
+            [
+                row
+                for row in candidate_rows
+                if row["name"]
+                not in {"beta_visible_not_called", "delta_runtime_failure"}
+            ],
         )
         duplicate_control_rows = [
             copy.deepcopy(control_rows[0]),
@@ -5235,9 +5271,7 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
         )
         jsonl_readers["adapter_tolerant"] = {
             "reuse_matching_and_deduplicated": _capture_reporting_call(
-                lambda: adapter._reuse_log_tools(
-                    tolerant_adapter_root, "alpha_gain"
-                ),
+                lambda: adapter._reuse_log_tools(tolerant_adapter_root, "alpha_gain"),
                 temporary_root,
             ),
             "reuse_missing_scenario": _capture_reporting_call(
@@ -5321,9 +5355,7 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
                 temporary_root,
             ),
             "protocol_live_rejected_as_complete": _capture_reporting_call(
-                lambda: protocol._run_result_rows(
-                    live_fallback, require_complete=True
-                ),
+                lambda: protocol._run_result_rows(live_fallback, require_complete=True),
                 temporary_root,
             ),
         }
@@ -5380,9 +5412,7 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
                 [valid_alpha],
                 require_complete=False,
             ),
-            "missing_complete": uncached_case(
-                "missing_complete", [valid_alpha]
-            ),
+            "missing_complete": uncached_case("missing_complete", [valid_alpha]),
             "duplicate_expected_names": uncached_case(
                 "duplicate_expected_names",
                 [valid_alpha],
@@ -5512,9 +5542,7 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
                 "canonical_payload_sha256": fixture_manifest[
                     "canonical_payload_sha256"
                 ],
-                "paired_scenario_count": fixture_manifest[
-                    "paired_scenario_count"
-                ],
+                "paired_scenario_count": fixture_manifest["paired_scenario_count"],
                 "coverage": fixture["coverage"],
                 "provenance": fixture_manifest["provenance"],
             },
@@ -5565,6 +5593,7 @@ PROBES: dict[str, Callable[[Path], dict[str, Any]]] = {
     "classifier_corpus": probe_classifier_corpus,
     "actor": probe_actor,
     "actor_model_inference": probe_actor_model_inference,
+    "actor_trace_facts": probe_actor_trace_facts,
     "normalization": probe_normalization,
     "validation": probe_validation,
     "routing": probe_routing,
@@ -5614,9 +5643,7 @@ def main() -> int:
         # first resolution. Pin the historical clock before *any* selected-root
         # import/probe can resolve a scenario, not only inside probe_trajectory.
         fixture_path = (
-            Path(__file__).resolve().parent
-            / "fixtures"
-            / "full_trajectory_v1.json"
+            Path(__file__).resolve().parent / "fixtures" / "full_trajectory_v1.json"
         )
         fixture_metadata = json.loads(fixture_path.read_text(encoding="utf-8"))
         os.environ["TOOL_SANDBOX_FIXED_NOW_TIMESTAMP"] = str(

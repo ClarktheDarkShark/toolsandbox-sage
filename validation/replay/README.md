@@ -67,6 +67,9 @@ or suppress normalization rules.
   near misses. Thirteen cases are explicitly labeled adaptations of the 72
   historical actor tests; the others are deterministic reference
   characterizations. None is claimed to be an archived evidence-run request.
+- `actor_trace_facts`: freezes user-turn, tool-result, tool-call, payload,
+  malformed-value, name-normalization, and transcript-nonmutation behavior used
+  by the actor's structural message readers.
 - `normalization`: snapshots contract repair for state sequencing, ambiguous
   record selection, service-answer extraction, and safe abstention.
 - `validation`: snapshots accepted and rejected generated tools across AST
