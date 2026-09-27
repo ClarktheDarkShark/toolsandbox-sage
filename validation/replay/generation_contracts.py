@@ -651,6 +651,101 @@ def probe_native_structural_cases() -> dict[str, Any]:
                 identifier="r2",
             ),
         ),
+        "explicit_nonnumeric_adds_only_malformed": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": "one"},
+                    {"reminder_id": "r2", "created_timestamp": "two"},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "explicit_partial_field_preserves_noop_malformed": (
+            raw_example(
+                [
+                    {"reminder_id": "r1"},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "explicit_mixed_numeric_subset": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": "unknown"},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                    {"reminder_id": "r3", "created_timestamp": 1},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "explicit_key_absent_everywhere": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "other": 1},
+                    {"reminder_id": "r2", "other": 2},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "inferred_key_must_be_common": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 1},
+                    {"reminder_id": "r2"},
+                ],
+                identifier="r1",
+            ),
+        ),
+        "mode_case_folds_but_does_not_strip": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 1},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+                mode=" EARLIEST ",
+            ),
+        ),
+        "equal_extreme_duplicates_first_winner": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 2},
+                    {"reminder_id": "r2", "created_timestamp": 2},
+                ],
+                identifier="r1",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "nonfinite_numeric_values": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 0.0},
+                    {"reminder_id": "r2", "created_timestamp": float("inf")},
+                    {"reminder_id": "r3", "created_timestamp": float("-inf")},
+                ],
+                identifier="r2",
+                timestamp_key="created_timestamp",
+            ),
+        ),
+        "empty_records": (
+            raw_example([], identifier="none", timestamp_key="created_timestamp"),
+        ),
+        "mixed_record_shapes": (
+            raw_example(
+                [
+                    {"reminder_id": "r1", "created_timestamp": 1},
+                    None,  # type: ignore[list-item] - malformed replay boundary.
+                ],
+                identifier="r1",
+                timestamp_key="created_timestamp",
+            ),
+        ),
         "multiple_eligible_first_only": (
             raw_example(
                 [
