@@ -1149,6 +1149,17 @@ def _native_action_tool_input_contracts(
     return tuple(contracts)
 
 
+def _has_policy_marker(openai_messages: object, marker: str) -> bool:
+    return any(
+        marker in str(message.get("content", ""))
+        for message in cast(Iterable[Mapping[str, Any]], openai_messages)
+    )
+
+
+def _system_actor_message(content: str) -> dict[str, str]:
+    return {"role": "system", "content": content}
+
+
 def _native_action_tool_actor_policy_message(
     openai_messages: object,
     openai_tools: object,
@@ -1162,9 +1173,8 @@ def _native_action_tool_actor_policy_message(
     ]
     if not native_action_names:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if NATIVE_ACTION_TOOL_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, NATIVE_ACTION_TOOL_POLICY_SENTINEL):
+        return None
     input_contracts = _native_action_tool_input_contracts(
         openai_tools, native_action_names
     )
@@ -1173,45 +1183,42 @@ def _native_action_tool_actor_policy_message(
         if input_contracts
         else ""
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{NATIVE_ACTION_TOOL_POLICY_SENTINEL} Validated generated "
-            f"native-action tools are visible: {', '.join(native_action_names)}. "
-            "Unlike preparatory generated tools, a native-action tool may call "
-            "exactly one approved original state-changing tool, as declared by "
-            "its own description and schema. When its typed inputs are fully "
-            "available from the user request or visible tool results, call it "
-            "instead of separately repeating the final original action."
-            + input_contract_text
-            + " Do not omit a listed input. When the user supplies one or more "
-            "field changes and the generated tool declares an updates input, pass "
-            "those changes together in the updates mapping. Every updates key must "
-            "exactly match a writable parameter named by the generated-tool schema "
-            "and original native-action schema; do not copy role-prefixed record "
-            "field names into updates. When an input description requires complete "
-            "visible records, copy the matching original tool result intact; do "
-            "not synthesize, summarize, reorder, or substitute a different record "
-            "list. If that description mentions an is_self marker, use the visible "
-            "original result containing the record whose is_self field is true. "
-            "If the generated tool "
-            "reports missing_required_helper_inputs, correct the omitted arguments "
-            "on the next ordinary tool call; do not bypass it with the original "
-            "state-changing action. A "
-            "result with status='success', native_action, and native_result means "
-            "the state change is complete; confirm it without calling the "
-            "original action again. In that confirmation, preserve the user's "
-            "visible target description and every visible changed field value "
-            "from the native-action tool call; do not replace them with a generic "
-            "success statement. If the generated-tool call includes a semantic "
-            "selection_mode such as latest or oldest, describe the target by that "
-            "visible relationship to the user's request. Do not perform another "
-            "lookup solely to replace a semantically identified target with an "
-            "internal identifier or proper name. A result with status='abstain' means no "
-            "action occurred; respect the abstain_reason and do not invent "
-            "missing identifiers, records, or updates."
-        ),
-    }
+    return _system_actor_message(
+        f"{NATIVE_ACTION_TOOL_POLICY_SENTINEL} Validated generated "
+        f"native-action tools are visible: {', '.join(native_action_names)}. "
+        "Unlike preparatory generated tools, a native-action tool may call "
+        "exactly one approved original state-changing tool, as declared by "
+        "its own description and schema. When its typed inputs are fully "
+        "available from the user request or visible tool results, call it "
+        "instead of separately repeating the final original action."
+        + input_contract_text
+        + " Do not omit a listed input. When the user supplies one or more "
+        "field changes and the generated tool declares an updates input, pass "
+        "those changes together in the updates mapping. Every updates key must "
+        "exactly match a writable parameter named by the generated-tool schema "
+        "and original native-action schema; do not copy role-prefixed record "
+        "field names into updates. When an input description requires complete "
+        "visible records, copy the matching original tool result intact; do "
+        "not synthesize, summarize, reorder, or substitute a different record "
+        "list. If that description mentions an is_self marker, use the visible "
+        "original result containing the record whose is_self field is true. "
+        "If the generated tool "
+        "reports missing_required_helper_inputs, correct the omitted arguments "
+        "on the next ordinary tool call; do not bypass it with the original "
+        "state-changing action. A "
+        "result with status='success', native_action, and native_result means "
+        "the state change is complete; confirm it without calling the "
+        "original action again. In that confirmation, preserve the user's "
+        "visible target description and every visible changed field value "
+        "from the native-action tool call; do not replace them with a generic "
+        "success statement. If the generated-tool call includes a semantic "
+        "selection_mode such as latest or oldest, describe the target by that "
+        "visible relationship to the user's request. Do not perform another "
+        "lookup solely to replace a semantically identified target with an "
+        "internal identifier or proper name. A result with status='abstain' means no "
+        "action occurred; respect the abstain_reason and do not invent "
+        "missing identifiers, records, or updates."
+    )
 
 
 def _message_already_called_any_generated_tool(
@@ -4966,29 +4973,25 @@ def _selector_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in selectors):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SELECTOR_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, SELECTOR_ACTOR_POLICY_SENTINEL):
+        return None
     if not _messages_show_prior_candidate_records(openai_messages):
         return None
     selector_list = ", ".join(sorted(selectors))
-    return {
-        "role": "system",
-        "content": (
-            f"{SELECTOR_ACTOR_POLICY_SENTINEL} A deterministic visible-record "
-            f"selector tool is available: {selector_list}. If the previous "
-            "search/get/find result returned candidate records and the task "
-            "requires selecting one visible contact, message, reminder, or record "
-            "by user constraints before answering or taking a downstream action, "
-            "call the tool before manually choosing. Do not call it without "
-            "visible candidates, on insufficient-information tasks, or when its "
-            "negative triggers match. If the selector abstains or reports a tie, "
-            "do not guess before a side-effect action. If the selector returns "
-            "exact_final_answer, final_answer_recommendation, or selected_content "
-            "for an answer-only task, your next assistant message must include "
-            "that retrieved value without adding unrelated fields."
-        ),
-    }
+    return _system_actor_message(
+        f"{SELECTOR_ACTOR_POLICY_SENTINEL} A deterministic visible-record "
+        f"selector tool is available: {selector_list}. If the previous "
+        "search/get/find result returned candidate records and the task "
+        "requires selecting one visible contact, message, reminder, or record "
+        "by user constraints before answering or taking a downstream action, "
+        "call the tool before manually choosing. Do not call it without "
+        "visible candidates, on insufficient-information tasks, or when its "
+        "negative triggers match. If the selector abstains or reports a tie, "
+        "do not guess before a side-effect action. If the selector returns "
+        "exact_final_answer, final_answer_recommendation, or selected_content "
+        "for an answer-only task, your next assistant message must include "
+        "that retrieved value without adding unrelated fields."
+    )
 
 
 def _service_extractor_scalar_actor_instruction(
@@ -5101,9 +5104,8 @@ def _derived_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if DERIVED_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, DERIVED_ACTOR_POLICY_SENTINEL):
+        return None
     if not _messages_show_prior_structured_payload(openai_messages):
         return None
     helper_list = ", ".join(sorted(helpers))
@@ -5136,38 +5138,35 @@ def _derived_actor_policy_message(
                 "The generated tool completes any visible deterministic unit conversion "
                 "and returns the answer-ready value in one call."
             )
-    return {
-        "role": "system",
-        "content": (
-            f"{DERIVED_ACTOR_POLICY_SENTINEL} A deterministic extraction or "
-            f"normalization tool is available: {helper_list}. If a previous "
-            "ToolSandbox tool returned the raw payload or scalar needed by this "
-            "tool and the user asks for a scalar/normalized answer from that "
-            "payload, call the tool before manually copying or normalizing the "
-            "field. Pass the full prior tool payload when the generated tool expects a "
-            "dict/list payload input. If the prior original tool returned a "
-            "bare scalar such as a distance, converted number, or address string, pass a JSON "
-            "object wrapper like {'result': value} as the payload. If the "
-            "helper has a dict payload input, the runtime may "
-            "autofill that input from the latest original tool result; provide any "
-            "remaining scalar selector inputs such as requested_field, "
-            "requested_unit, or answer_subject. For Fahrenheit weather requests, "
-            "set requested_unit='Fahrenheit'. For distance requests, set "
-            "requested_unit='kilometers' unless the user requested a different "
-            "visible unit, and set answer_subject to the requested destination "
-            "or place name. For currency, weather, address, phone number, and "
-            "distance tasks, call the extraction helper after the original "
-            "lookup, distance, or conversion returns instead of manually copying the answer "
-            "field. If the generated tool returns should_call_downstream_tool=true, "
-            "call the named original ToolSandbox tool with downstream_tool_kwargs "
-            "unchanged before giving the final answer. "
-            "Do not call it before the original lookup/result tool has returned, "
-            "on unrelated tasks, or when required fields are absent."
-            f"{phone_subject_instruction}"
-            f"{temperature_subject_instruction}"
-            f"{scalar_instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{DERIVED_ACTOR_POLICY_SENTINEL} A deterministic extraction or "
+        f"normalization tool is available: {helper_list}. If a previous "
+        "ToolSandbox tool returned the raw payload or scalar needed by this "
+        "tool and the user asks for a scalar/normalized answer from that "
+        "payload, call the tool before manually copying or normalizing the "
+        "field. Pass the full prior tool payload when the generated tool expects a "
+        "dict/list payload input. If the prior original tool returned a "
+        "bare scalar such as a distance, converted number, or address string, pass a JSON "
+        "object wrapper like {'result': value} as the payload. If the "
+        "helper has a dict payload input, the runtime may "
+        "autofill that input from the latest original tool result; provide any "
+        "remaining scalar selector inputs such as requested_field, "
+        "requested_unit, or answer_subject. For Fahrenheit weather requests, "
+        "set requested_unit='Fahrenheit'. For distance requests, set "
+        "requested_unit='kilometers' unless the user requested a different "
+        "visible unit, and set answer_subject to the requested destination "
+        "or place name. For currency, weather, address, phone number, and "
+        "distance tasks, call the extraction helper after the original "
+        "lookup, distance, or conversion returns instead of manually copying the answer "
+        "field. If the generated tool returns should_call_downstream_tool=true, "
+        "call the named original ToolSandbox tool with downstream_tool_kwargs "
+        "unchanged before giving the final answer. "
+        "Do not call it before the original lookup/result tool has returned, "
+        "on unrelated tasks, or when required fields are absent."
+        f"{phone_subject_instruction}"
+        f"{temperature_subject_instruction}"
+        f"{scalar_instruction}"
+    )
 
 
 def _service_extractor_scalar_actor_policy_message(
@@ -5196,16 +5195,13 @@ def _service_extractor_scalar_actor_policy_message(
     )
     if not instruction:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{SERVICE_EXTRACTOR_SCALAR_POLICY_SENTINEL} A generated extraction "
-            "tool is visible and the latest original ToolSandbox result is the "
-            "raw scalar needed by that generated tool. Your next assistant "
-            "message must be a generated-tool call, not natural language."
-            f"{instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{SERVICE_EXTRACTOR_SCALAR_POLICY_SENTINEL} A generated extraction "
+        "tool is visible and the latest original ToolSandbox result is the "
+        "raw scalar needed by that generated tool. Your next assistant "
+        "message must be a generated-tool call, not natural language."
+        f"{instruction}"
+    )
 
 
 def _lookup_planner_actor_policy_message(
@@ -5218,55 +5214,51 @@ def _lookup_planner_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in planners):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL):
+        return None
     if _messages_show_prior_candidate_records(openai_messages):
         return None
     planner_list = ", ".join(sorted(planners))
-    return {
-        "role": "system",
-        "content": (
-            f"{LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL} A deterministic lookup "
-            f"query planner helper is available: {planner_list}. If the user "
-            "asks for a contact/message/record field and supplies a scalar "
-            "constraint such as name, phone number, relationship, content, or "
-            "id, call the helper before manually choosing original search "
-            "arguments. Also call it when the user asks for a side-effect action "
-            "such as modifying, removing, or messaging a record identified by a "
-            "scalar lookup constraint; the helper only prepares the lookup and "
-            "does not perform the side effect. Relationship phrases and "
-            "phone-number phrases count as scalar constraints for lookup "
-            "planning. "
-            "A relationship phrase supplied by the user is a valid lookup "
-            "constraint; do not ask for a person's name before searching by that "
-            "visible relationship constraint. For requests like 'what is the "
-            "name of my boss', call the helper with relationship='boss' and "
-            "requested_field='name'. For requests like 'what is my relationship "
-            "with +15550100', call it with the phone_number and "
-            "requested_field='relationship'; do not reject plus-prefixed digits "
-            "as placeholders. For delete/remove/update requests that identify a "
-            "contact by phone number, call it with that phone_number and "
-            "requested_field='person_id'. "
-            "When calling the lookup planner, pass only scalar constraints "
-            "explicitly supplied by the user or already visible in tool output. "
-            "If the user supplies only a phone number, pass the phone number and "
-            "requested field only; do not add relationship, is_self, name, or "
-            "other optional filters. The phrase 'my contact' means the user's "
-            "address book, not relationship='self' or is_self=true. "
-            "Use this helper instead of manually assembling search kwargs when "
-            "it exactly matches the lookup problem. "
-            "If it returns should_call_search_contacts or "
-            "should_call_tool with search_*_kwargs, call the original "
-            "ToolSandbox search tool next with exactly those kwargs; do not add "
-            "optional filters or extra ids that the helper did not return. Then "
-            "answer from the returned record, use a visible post-search "
-            "extractor, or use a visible post-selection action helper before "
-            "calling the original side-effect tool. Do not "
-            "call it when no scalar constraint is available, on unrelated "
-            "tasks, or on insufficient-information tasks."
-        ),
-    }
+    return _system_actor_message(
+        f"{LOOKUP_PLANNER_ACTOR_POLICY_SENTINEL} A deterministic lookup "
+        f"query planner helper is available: {planner_list}. If the user "
+        "asks for a contact/message/record field and supplies a scalar "
+        "constraint such as name, phone number, relationship, content, or "
+        "id, call the helper before manually choosing original search "
+        "arguments. Also call it when the user asks for a side-effect action "
+        "such as modifying, removing, or messaging a record identified by a "
+        "scalar lookup constraint; the helper only prepares the lookup and "
+        "does not perform the side effect. Relationship phrases and "
+        "phone-number phrases count as scalar constraints for lookup "
+        "planning. "
+        "A relationship phrase supplied by the user is a valid lookup "
+        "constraint; do not ask for a person's name before searching by that "
+        "visible relationship constraint. For requests like 'what is the "
+        "name of my boss', call the helper with relationship='boss' and "
+        "requested_field='name'. For requests like 'what is my relationship "
+        "with +15550100', call it with the phone_number and "
+        "requested_field='relationship'; do not reject plus-prefixed digits "
+        "as placeholders. For delete/remove/update requests that identify a "
+        "contact by phone number, call it with that phone_number and "
+        "requested_field='person_id'. "
+        "When calling the lookup planner, pass only scalar constraints "
+        "explicitly supplied by the user or already visible in tool output. "
+        "If the user supplies only a phone number, pass the phone number and "
+        "requested field only; do not add relationship, is_self, name, or "
+        "other optional filters. The phrase 'my contact' means the user's "
+        "address book, not relationship='self' or is_self=true. "
+        "Use this helper instead of manually assembling search kwargs when "
+        "it exactly matches the lookup problem. "
+        "If it returns should_call_search_contacts or "
+        "should_call_tool with search_*_kwargs, call the original "
+        "ToolSandbox search tool next with exactly those kwargs; do not add "
+        "optional filters or extra ids that the helper did not return. Then "
+        "answer from the returned record, use a visible post-search "
+        "extractor, or use a visible post-selection action helper before "
+        "calling the original side-effect tool. Do not "
+        "call it when no scalar constraint is available, on unrelated "
+        "tasks, or on insufficient-information tasks."
+    )
 
 
 def _latest_contact_lookup_plan_payload(
@@ -5291,9 +5283,8 @@ def _contact_lookup_answer_actor_policy_message(
     """Nudge the model to use the generated contact helper for final values."""
     if "plan_contact_lookup_query" not in _tool_names(openai_tools):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if CONTACT_LOOKUP_ANSWER_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, CONTACT_LOOKUP_ANSWER_POLICY_SENTINEL):
+        return None
     if not _latest_tool_is(openai_messages, "search_contacts"):
         return None
     plan_payload = _latest_contact_lookup_plan_payload(openai_messages)
@@ -5313,21 +5304,18 @@ def _contact_lookup_answer_actor_policy_message(
     visible_records = [record for record in records if isinstance(record, Mapping)]
     if len(visible_records) != 1:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_LOOKUP_ANSWER_POLICY_SENTINEL} A generated contact lookup "
-            "helper planned the search_contacts call, and the original "
-            "search_contacts tool has now returned one visible contact record. "
-            "Before giving the final answer, call plan_contact_lookup_query again "
-            "with the same scalar lookup constraints from the prior helper output, "
-            f"requested_field='{answer_field}', and selected_record set to the "
-            "visible contact record. If the helper returns a nonempty "
-            "final_answer_recommendation, answer from that value exactly and do "
-            "not add unrelated contact fields. Do not use this path for contact "
-            "mutation targets or when the search result is empty or ambiguous."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_LOOKUP_ANSWER_POLICY_SENTINEL} A generated contact lookup "
+        "helper planned the search_contacts call, and the original "
+        "search_contacts tool has now returned one visible contact record. "
+        "Before giving the final answer, call plan_contact_lookup_query again "
+        "with the same scalar lookup constraints from the prior helper output, "
+        f"requested_field='{answer_field}', and selected_record set to the "
+        "visible contact record. If the helper returns a nonempty "
+        "final_answer_recommendation, answer from that value exactly and do "
+        "not add unrelated contact fields. Do not use this path for contact "
+        "mutation targets or when the search result is empty or ambiguous."
+    )
 
 
 def _contact_remove_lookup_target(
@@ -5391,26 +5379,22 @@ def _contact_remove_lookup_handoff_actor_policy_message(
     target = _contact_remove_lookup_target(openai_messages, openai_tools)
     if target is None:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if CONTACT_REMOVE_LOOKUP_HANDOFF_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, CONTACT_REMOVE_LOOKUP_HANDOFF_POLICY_SENTINEL
+    ):
+        return None
     phone, person_id = target
     remove_tool_name = _tool_name_for_call(openai_tools, "remove_contact")
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_REMOVE_LOOKUP_HANDOFF_POLICY_SENTINEL} A generated contact "
-            "lookup tool planned the lookup for a remove-by-phone request, and "
-            "search_contacts returned exactly one visible non-self contact matching "
-            f"the requested phone number {phone}. The phrase 'my contact' means "
-            "the user's address book, not the user's self contact. Do not ask for "
-            "confirmation only because the matched record is not the self contact. "
-            f"Call original {remove_tool_name} next with exactly "
-            f"{json.dumps({'person_id': person_id}, sort_keys=True)}."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_REMOVE_LOOKUP_HANDOFF_POLICY_SENTINEL} A generated contact "
+        "lookup tool planned the lookup for a remove-by-phone request, and "
+        "search_contacts returned exactly one visible non-self contact matching "
+        f"the requested phone number {phone}. The phrase 'my contact' means "
+        "the user's address book, not the user's self contact. Do not ask for "
+        "confirmation only because the matched record is not the self contact. "
+        f"Call original {remove_tool_name} next with exactly "
+        f"{json.dumps({'person_id': person_id}, sort_keys=True)}."
+    )
 
 
 def _search_window_actor_policy_message(
@@ -5423,80 +5407,76 @@ def _search_window_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SEARCH_WINDOW_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, SEARCH_WINDOW_ACTOR_POLICY_SENTINEL):
+        return None
     helper_list = ", ".join(sorted(helpers))
-    return {
-        "role": "system",
-        "content": (
-            f"{SEARCH_WINDOW_ACTOR_POLICY_SENTINEL} A deterministic recency "
-            f"search-window helper is available: {helper_list}. If the user asks "
-            "for the latest, oldest, first, earliest, last, most recent, "
-            "yesterday, today, or "
-            "upcoming message/reminder/search result, prefer this helper before "
-            "manually constructing search criteria. First call get_current_timestamp "
-            "when a current timestamp is needed; then call the helper with the "
-            "visible recency phrase, target_domain ('message' or 'reminder'), "
-            "timestamp_intent, and direction; then call the original ToolSandbox "
-            "search tool in target_tool_name with search_kwargs. Never call "
-            "search_messages or search_reminder with blank strings, null values, "
-            "or no criteria when a recency phrase can be converted into bounds. "
-            "For reminder questions asking what todo/reminder/task/item was "
-            "made, created, or added yesterday, use timestamp_intent='creation' "
-            "and pass the visible user phrase with the object wording preserved, "
-            "such as 'todo item I made yesterday'. Do not rewrite a plain "
-            "reminder/todo request into 'made yesterday' or 'created yesterday' "
-            "unless the user used made/created/added wording. If the user asks "
-            "what todo/reminder they made, created, or added yesterday, do not "
-            "pass phrase='yesterday' with timestamp_intent='reminder'; that "
-            "searches due time instead of creation time. For reminders due "
-            "yesterday or upcoming, use timestamp_intent='reminder'. "
-            "For reminder/todo requests phrased as from yesterday, yesterday, "
-            "today, later today, upcoming, or something due later, use "
-            "timestamp_intent='reminder' unless the user explicitly says the "
-            "item was made, created, or added then. Do not use "
-            "timestamp_intent='message_creation' for reminder/todo searches. "
-            "Do not shorten a made/created reminder request to only 'yesterday'; "
-            "the generated tool needs the creation wording preserved in phrase "
-            "or timestamp_intent='creation' to search the correct timestamp "
-            "field. "
-            "For reminder actions phrased as latest, last, or most recent, use "
-            "target_domain='reminder', timestamp_intent='creation', and "
-            "direction='latest'; do not use timestamp_intent='message_creation' "
-            "for reminders. "
-            "For modify/remove actions targeting the latest, oldest, most recent, "
-            "or upcoming reminder/message, first use the helper to locate the "
-            "target record with a bounded original search, then call the original "
-            "side-effect tool only with the concrete visible id from that result. "
-            "For an upcoming reminder action, use current time as the lower bound "
-            "through resolve_search_window_or_bounds; do not search upcoming "
-            "reminders with reminder_timestamp_upperbound=current_timestamp. If "
-            "calling resolve_search_window_or_bounds for an upcoming reminder, "
-            "pass phrase='upcoming', target_domain='reminder', "
-            "timestamp_intent='reminder', and direction='upcoming'. Never pass "
-            "direction='latest' or timestamp_intent='creation' for a request "
-            "whose visible target is an upcoming due reminder. If "
-            "select_action_target_by_recency is called for an upcoming target, pass "
-            "selection_mode='upcoming', timestamp_key='reminder_timestamp', and "
-            "reference_timestamp from get_current_timestamp. "
-            "If that search returns multiple records and a visible-record selector "
-            "helper is also available, call the selector before answering; do not "
-            "manually pick the first returned record when the user asked for latest "
-            "or oldest. For latest message content questions, get the current "
-            "timestamp first when needed, search messages up to that timestamp, "
-            "then call the generated message-content selector with the non-empty "
-            "records. For oldest message content questions with no other user "
-            "filters, do not invent a timestamp bound; call search_messages with "
-            "empty arguments to gather the visible message records, then call the "
-            "generated message-content selector with selection_mode='oldest'. Do "
-            "not pass selection_mode, timestamp_key, or records to original "
-            "search_messages; those are generated-selector arguments only. Do "
-            "not call a selector with [] after a failed or empty search. Do not call "
-            "this helper on insufficient-information tasks "
-            "or when no time/recency search phrase is present."
-        ),
-    }
+    return _system_actor_message(
+        f"{SEARCH_WINDOW_ACTOR_POLICY_SENTINEL} A deterministic recency "
+        f"search-window helper is available: {helper_list}. If the user asks "
+        "for the latest, oldest, first, earliest, last, most recent, "
+        "yesterday, today, or "
+        "upcoming message/reminder/search result, prefer this helper before "
+        "manually constructing search criteria. First call get_current_timestamp "
+        "when a current timestamp is needed; then call the helper with the "
+        "visible recency phrase, target_domain ('message' or 'reminder'), "
+        "timestamp_intent, and direction; then call the original ToolSandbox "
+        "search tool in target_tool_name with search_kwargs. Never call "
+        "search_messages or search_reminder with blank strings, null values, "
+        "or no criteria when a recency phrase can be converted into bounds. "
+        "For reminder questions asking what todo/reminder/task/item was "
+        "made, created, or added yesterday, use timestamp_intent='creation' "
+        "and pass the visible user phrase with the object wording preserved, "
+        "such as 'todo item I made yesterday'. Do not rewrite a plain "
+        "reminder/todo request into 'made yesterday' or 'created yesterday' "
+        "unless the user used made/created/added wording. If the user asks "
+        "what todo/reminder they made, created, or added yesterday, do not "
+        "pass phrase='yesterday' with timestamp_intent='reminder'; that "
+        "searches due time instead of creation time. For reminders due "
+        "yesterday or upcoming, use timestamp_intent='reminder'. "
+        "For reminder/todo requests phrased as from yesterday, yesterday, "
+        "today, later today, upcoming, or something due later, use "
+        "timestamp_intent='reminder' unless the user explicitly says the "
+        "item was made, created, or added then. Do not use "
+        "timestamp_intent='message_creation' for reminder/todo searches. "
+        "Do not shorten a made/created reminder request to only 'yesterday'; "
+        "the generated tool needs the creation wording preserved in phrase "
+        "or timestamp_intent='creation' to search the correct timestamp "
+        "field. "
+        "For reminder actions phrased as latest, last, or most recent, use "
+        "target_domain='reminder', timestamp_intent='creation', and "
+        "direction='latest'; do not use timestamp_intent='message_creation' "
+        "for reminders. "
+        "For modify/remove actions targeting the latest, oldest, most recent, "
+        "or upcoming reminder/message, first use the helper to locate the "
+        "target record with a bounded original search, then call the original "
+        "side-effect tool only with the concrete visible id from that result. "
+        "For an upcoming reminder action, use current time as the lower bound "
+        "through resolve_search_window_or_bounds; do not search upcoming "
+        "reminders with reminder_timestamp_upperbound=current_timestamp. If "
+        "calling resolve_search_window_or_bounds for an upcoming reminder, "
+        "pass phrase='upcoming', target_domain='reminder', "
+        "timestamp_intent='reminder', and direction='upcoming'. Never pass "
+        "direction='latest' or timestamp_intent='creation' for a request "
+        "whose visible target is an upcoming due reminder. If "
+        "select_action_target_by_recency is called for an upcoming target, pass "
+        "selection_mode='upcoming', timestamp_key='reminder_timestamp', and "
+        "reference_timestamp from get_current_timestamp. "
+        "If that search returns multiple records and a visible-record selector "
+        "helper is also available, call the selector before answering; do not "
+        "manually pick the first returned record when the user asked for latest "
+        "or oldest. For latest message content questions, get the current "
+        "timestamp first when needed, search messages up to that timestamp, "
+        "then call the generated message-content selector with the non-empty "
+        "records. For oldest message content questions with no other user "
+        "filters, do not invent a timestamp bound; call search_messages with "
+        "empty arguments to gather the visible message records, then call the "
+        "generated message-content selector with selection_mode='oldest'. Do "
+        "not pass selection_mode, timestamp_key, or records to original "
+        "search_messages; those are generated-selector arguments only. Do "
+        "not call a selector with [] after a failed or empty search. Do not call "
+        "this helper on insufficient-information tasks "
+        "or when no time/recency search phrase is present."
+    )
 
 
 def _search_window_result_handoff_actor_policy_message(
@@ -5514,11 +5494,10 @@ def _search_window_result_handoff_actor_policy_message(
         return None
     if not _latest_tool_is(openai_messages, "search_reminder"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SEARCH_WINDOW_RESULT_HANDOFF_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, SEARCH_WINDOW_RESULT_HANDOFF_POLICY_SENTINEL
+    ):
+        return None
     records = list(_records_from_latest_reminder_search(openai_messages))
     if len(records) == 1:
         result_instruction = (
@@ -5552,16 +5531,13 @@ def _search_window_result_handoff_actor_policy_message(
             "If a generated selector is needed only to format a read-only answer, "
             "use action_type='answer_record', never a modify/remove action_type."
         )
-    return {
-        "role": "system",
-        "content": (
-            f"{SEARCH_WINDOW_RESULT_HANDOFF_POLICY_SENTINEL} A generated "
-            "recency search-window tool prepared the latest original "
-            f"search_reminder call. {result_instruction} This policy does not "
-            "complete the task from code; it requires the actor to use only the "
-            "visible ToolSandbox search result."
-        ),
-    }
+    return _system_actor_message(
+        f"{SEARCH_WINDOW_RESULT_HANDOFF_POLICY_SENTINEL} A generated "
+        "recency search-window tool prepared the latest original "
+        f"search_reminder call. {result_instruction} This policy does not "
+        "complete the task from code; it requires the actor to use only the "
+        "visible ToolSandbox search result."
+    )
 
 
 def _relative_time_actor_policy_message(
@@ -5574,25 +5550,21 @@ def _relative_time_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if RELATIVE_TIME_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, RELATIVE_TIME_ACTOR_POLICY_SENTINEL):
+        return None
     helper_list = ", ".join(sorted(helpers))
     creation_request = _relative_reminder_creation_request(openai_messages)
     if (
         creation_request is not None
         and not str(creation_request.get("content") or "").strip()
     ):
-        return {
-            "role": "system",
-            "content": (
-                f"{RELATIVE_TIME_ACTOR_POLICY_SENTINEL} The visible reminder "
-                "creation request includes a relative day and time but no reminder "
-                "content. Ask the user what the reminder should say before calling "
-                "a timestamp tool, generated reminder tool, or add_reminder. Do not "
-                "use the scheduling phrase itself as reminder content."
-            ),
-        }
+        return _system_actor_message(
+            f"{RELATIVE_TIME_ACTOR_POLICY_SENTINEL} The visible reminder "
+            "creation request includes a relative day and time but no reminder "
+            "content. Ask the user what the reminder should say before calling "
+            "a timestamp tool, generated reminder tool, or add_reminder. Do not "
+            "use the scheduling phrase itself as reminder content."
+        )
     current_timestamp_tool = _tool_name_for_call(openai_tools, "get_current_timestamp")
     datetime_info_tool = _tool_name_for_call(openai_tools, "timestamp_to_datetime_info")
     absolute_timestamp_tool = _tool_name_for_call(
@@ -5622,33 +5594,30 @@ def _relative_time_actor_policy_message(
             f"{datetime_info_tool} on that returned timestamp when visible, and "
             "then call the generated relative-time helper."
         )
-    return {
-        "role": "system",
-        "content": (
-            f"{RELATIVE_TIME_ACTOR_POLICY_SENTINEL} A deterministic relative "
-            f"day/time timestamp helper is available: {helper_list}. "
-            f"{route_instruction} Identify the generated "
-            "relative-time helper by schema when tool names are perturbed: it "
-            "accepts current_timestamp, day_offset, hour, minute, and optional "
-            "current_datetime_info. Do not call original "
-            f"{absolute_timestamp_tool}, or any original timestamp tool requiring "
-            "year/month/day/second, for a relative phrase such as tomorrow. Do "
-            "not call original offset/shift timestamp tools that add raw days or "
-            "hours for a local clock-time phrase; that changes tomorrow at 5 PM "
-            "into current time plus hours instead of preserving the requested "
-            "local clock time. Do not guess a timezone or fixed UTC offset. If "
-            "local datetime context is visible and the separate relative-time "
-            "helper is needed, pass that dictionary to the generated helper. Do not call the "
-            "helper when the user omitted the target day or time, when the current "
-            "timestamp is unavailable, or when the local offset cannot be inferred "
-            "from visible runtime context. For modify_reminder or remove_reminder, "
-            "this helper only prepares the new timestamp; it does not identify the "
-            "target reminder. Do not call the original side-effect tool until a "
-            "single reminder_id is visible and unambiguous, or the user explicitly "
-            "asked to update all matching reminders. This helper does not replace "
-            "the original reminder side-effect tool."
-        ),
-    }
+    return _system_actor_message(
+        f"{RELATIVE_TIME_ACTOR_POLICY_SENTINEL} A deterministic relative "
+        f"day/time timestamp helper is available: {helper_list}. "
+        f"{route_instruction} Identify the generated "
+        "relative-time helper by schema when tool names are perturbed: it "
+        "accepts current_timestamp, day_offset, hour, minute, and optional "
+        "current_datetime_info. Do not call original "
+        f"{absolute_timestamp_tool}, or any original timestamp tool requiring "
+        "year/month/day/second, for a relative phrase such as tomorrow. Do "
+        "not call original offset/shift timestamp tools that add raw days or "
+        "hours for a local clock-time phrase; that changes tomorrow at 5 PM "
+        "into current time plus hours instead of preserving the requested "
+        "local clock time. Do not guess a timezone or fixed UTC offset. If "
+        "local datetime context is visible and the separate relative-time "
+        "helper is needed, pass that dictionary to the generated helper. Do not call the "
+        "helper when the user omitted the target day or time, when the current "
+        "timestamp is unavailable, or when the local offset cannot be inferred "
+        "from visible runtime context. For modify_reminder or remove_reminder, "
+        "this helper only prepares the new timestamp; it does not identify the "
+        "target reminder. Do not call the original side-effect tool until a "
+        "single reminder_id is visible and unambiguous, or the user explicitly "
+        "asked to update all matching reminders. This helper does not replace "
+        "the original reminder side-effect tool."
+    )
 
 
 def _scheduling_timestamp_actor_policy_message(
@@ -5661,53 +5630,44 @@ def _scheduling_timestamp_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(openai_messages, SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL):
+        return None
     helper_list = ", ".join(sorted(helpers))
     creation_request = _weekday_reminder_creation_request(openai_messages)
     if (
         creation_request is not None
         and not str(creation_request.get("content") or "").strip()
     ):
-        return {
-            "role": "system",
-            "content": (
-                f"{SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL} The visible reminder "
-                "creation request includes a weekday and time but no reminder "
-                "content. Ask the user what the reminder should say before calling "
-                "a scheduling tool, generated reminder tool, or add_reminder. Do not "
-                "use the scheduling phrase itself as reminder content."
-            ),
-        }
-    return {
-        "role": "system",
-        "content": (
-            f"{SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL} Deterministic reminder "
-            f"scheduling timestamp helpers are available: {helper_list}. For "
-            "add_reminder or modify_reminder tasks whose requested time is based "
-            "on a week delta, weekday delta, or phrase like 'next Tuesday at 8 AM', "
-            "first call get_current_timestamp if the current time is needed, then "
-            "call timestamp_to_datetime_info on that exact current timestamp when "
-            "that original tool is visible, and pass the returned dictionary as "
-            "current_datetime_info to the matching helper. Do not guess a UTC "
-            "offset or timezone. Then use the helper result as reminder_timestamp "
-            "before calling "
-            "the original reminder side-effect tool. Use next_weekday_time_to_timestamp "
-            "for phrases like 'next Friday at 5 PM'; do not add an extra week for "
-            "the word 'next'. For exact whole-week offsets like 'next week at "
-            "5 PM' or 'in two weeks', use the visible whole-week helper "
-            "(for example relative_weeks_time_to_timestamp, "
-            "weeks_from_now_time_to_timestamp, or week_delta_time_to_timestamp) "
-            "instead of manually multiplying by seven days. Use "
-            "weekday_delta_time_to_timestamp only if no safer next-weekday helper "
-            "is visible. Do not call these helpers for reminder recency "
-            "search/selection tasks, insufficient-information tasks, or unrelated "
-            "contact/message/device-state tasks."
-        ),
-    }
+        return _system_actor_message(
+            f"{SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL} The visible reminder "
+            "creation request includes a weekday and time but no reminder "
+            "content. Ask the user what the reminder should say before calling "
+            "a scheduling tool, generated reminder tool, or add_reminder. Do not "
+            "use the scheduling phrase itself as reminder content."
+        )
+    return _system_actor_message(
+        f"{SCHEDULING_TIMESTAMP_ACTOR_POLICY_SENTINEL} Deterministic reminder "
+        f"scheduling timestamp helpers are available: {helper_list}. For "
+        "add_reminder or modify_reminder tasks whose requested time is based "
+        "on a week delta, weekday delta, or phrase like 'next Tuesday at 8 AM', "
+        "first call get_current_timestamp if the current time is needed, then "
+        "call timestamp_to_datetime_info on that exact current timestamp when "
+        "that original tool is visible, and pass the returned dictionary as "
+        "current_datetime_info to the matching helper. Do not guess a UTC "
+        "offset or timezone. Then use the helper result as reminder_timestamp "
+        "before calling "
+        "the original reminder side-effect tool. Use next_weekday_time_to_timestamp "
+        "for phrases like 'next Friday at 5 PM'; do not add an extra week for "
+        "the word 'next'. For exact whole-week offsets like 'next week at "
+        "5 PM' or 'in two weeks', use the visible whole-week helper "
+        "(for example relative_weeks_time_to_timestamp, "
+        "weeks_from_now_time_to_timestamp, or week_delta_time_to_timestamp) "
+        "instead of manually multiplying by seven days. Use "
+        "weekday_delta_time_to_timestamp only if no safer next-weekday helper "
+        "is visible. Do not call these helpers for reminder recency "
+        "search/selection tasks, insufficient-information tasks, or unrelated "
+        "contact/message/device-state tasks."
+    )
 
 
 def _absolute_reminder_timestamp_actor_policy_message(
@@ -5723,27 +5683,21 @@ def _absolute_reminder_timestamp_actor_policy_message(
         return None
     if _message_already_called_tool(openai_messages, "add_reminder"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(openai_messages, ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL):
+        return None
     request = _absolute_reminder_creation_request(openai_messages)
     if request is None:
         return None
     if not str(request.get("content") or "").strip():
-        return {
-            "role": "system",
-            "content": (
-                f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The user gave an "
-                "absolute reminder date and time, but the reminder content is "
-                "not visible yet. Do not call datetime_info_to_timestamp, "
-                "prepare_reminder_creation_args, or add_reminder yet. Ask the "
-                "user what the reminder should say. Do not use a timezone "
-                "clarification, a date/time phrase, or the generic phrase "
-                "'add a reminder' as the reminder content."
-            ),
-        }
+        return _system_actor_message(
+            f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The user gave an "
+            "absolute reminder date and time, but the reminder content is "
+            "not visible yet. Do not call datetime_info_to_timestamp, "
+            "prepare_reminder_creation_args, or add_reminder yet. Ask the "
+            "user what the reminder should say. Do not use a timezone "
+            "clarification, a date/time phrase, or the generic phrase "
+            "'add a reminder' as the reminder content."
+        )
     year = int(request["year"])
     month = int(request["month"])
     day = int(request["day"])
@@ -5755,39 +5709,33 @@ def _absolute_reminder_timestamp_actor_policy_message(
         is not None
     )
     if not datetime_tool_called:
-        return {
-            "role": "system",
-            "content": (
-                f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The user gave an "
-                "absolute reminder date and time. Do not manually calculate a Unix "
-                "timestamp. First call original datetime_info_to_timestamp with "
-                f"year={year}, month={month}, day={day}, hour={hour}, "
-                f"minute={minute}, second=0. After that original tool returns a "
-                "timestamp, call prepare_reminder_creation_args with the reminder "
-                "content and that returned timestamp as resolved_reminder_timestamp, "
-                "leave current_timestamp/day_offset/local_utc_offset_hours unset "
-                "or null for this absolute-date path, then call original "
-                "add_reminder with add_reminder_kwargs unchanged."
-            ),
-        }
+        return _system_actor_message(
+            f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The user gave an "
+            "absolute reminder date and time. Do not manually calculate a Unix "
+            "timestamp. First call original datetime_info_to_timestamp with "
+            f"year={year}, month={month}, day={day}, hour={hour}, "
+            f"minute={minute}, second=0. After that original tool returns a "
+            "timestamp, call prepare_reminder_creation_args with the reminder "
+            "content and that returned timestamp as resolved_reminder_timestamp, "
+            "leave current_timestamp/day_offset/local_utc_offset_hours unset "
+            "or null for this absolute-date path, then call original "
+            "add_reminder with add_reminder_kwargs unchanged."
+        )
     timestamp = _timestamp_from_latest_tool(
         openai_messages, "datetime_info_to_timestamp"
     )
     if timestamp is None:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The original "
-            f"datetime_info_to_timestamp tool returned {timestamp} for the user's "
-            "absolute reminder date/time. Do not replace it with model arithmetic. "
-            "Call prepare_reminder_creation_args with this value as "
-            "resolved_reminder_timestamp. This is an absolute-date path: do not "
-            "also pass that value as current_timestamp, and leave "
-            "current_timestamp/day_offset/local_utc_offset_hours unset or null. "
-            "Then call original add_reminder with add_reminder_kwargs unchanged."
-        ),
-    }
+    return _system_actor_message(
+        f"{ABSOLUTE_REMINDER_TIMESTAMP_POLICY_SENTINEL} The original "
+        f"datetime_info_to_timestamp tool returned {timestamp} for the user's "
+        "absolute reminder date/time. Do not replace it with model arithmetic. "
+        "Call prepare_reminder_creation_args with this value as "
+        "resolved_reminder_timestamp. This is an absolute-date path: do not "
+        "also pass that value as current_timestamp, and leave "
+        "current_timestamp/day_offset/local_utc_offset_hours unset or null. "
+        "Then call original add_reminder with add_reminder_kwargs unchanged."
+    )
 
 
 def _absolute_reminder_prepare_retry_args(
@@ -5882,19 +5830,16 @@ def _state_downstream_completion_actor_policy_message(
     elif latest_tool_name in {"add_contact", "modify_contact", "remove_contact"}:
         detail = " Report the contact action as complete using the visible tool call."
 
-    return {
-        "role": "system",
-        "content": (
-            f"{STATE_DOWNSTREAM_COMPLETION_POLICY_SENTINEL} A generated "
-            "device-state helper used continue_original_task only as an internal "
-            "marker to resume the user's downstream task. The latest original "
-            f"ToolSandbox downstream tool, {latest_tool_name}, has now succeeded. "
-            "Do not answer with continue_original_task, do not call the same "
-            "downstream tool again, and do not discuss the device setting unless "
-            "the user asks about it."
-            f"{detail}"
-        ),
-    }
+    return _system_actor_message(
+        f"{STATE_DOWNSTREAM_COMPLETION_POLICY_SENTINEL} A generated "
+        "device-state helper used continue_original_task only as an internal "
+        "marker to resume the user's downstream task. The latest original "
+        f"ToolSandbox downstream tool, {latest_tool_name}, has now succeeded. "
+        "Do not answer with continue_original_task, do not call the same "
+        "downstream tool again, and do not discuss the device setting unless "
+        "the user asks about it."
+        f"{detail}"
+    )
 
 
 def _state_action_actor_policy_message(
@@ -5964,36 +5909,30 @@ def _state_action_actor_policy_message(
                 continue
             if STATE_ACTION_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
                 return None
-        return {
-            "role": "system",
-            "content": (
-                f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state "
-                "action helper may be visible, but the latest user request is a "
-                "downstream task and no fresh original ToolSandbox state "
-                "precondition error is visible. Do not call a state-action helper "
-                "only to re-check or re-assert readiness. Continue the downstream "
-                "task with the relevant original ToolSandbox tools. If an original "
-                "tool later reports a wifi/cellular/location/low-battery "
-                "precondition error, then call the generated state-action helper "
-                "with that new error text and execute its returned original "
-                "setter sequence."
-            ),
-        }
+        return _system_actor_message(
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state "
+            "action helper may be visible, but the latest user request is a "
+            "downstream task and no fresh original ToolSandbox state "
+            "precondition error is visible. Do not call a state-action helper "
+            "only to re-check or re-assert readiness. Continue the downstream "
+            "task with the relevant original ToolSandbox tools. If an original "
+            "tool later reports a wifi/cellular/location/low-battery "
+            "precondition error, then call the generated state-action helper "
+            "with that new error text and execute its returned original "
+            "setter sequence."
+        )
     already_satisfied_response = _latest_setting_already_satisfied_response(
         openai_messages
     )
     if already_satisfied_response and already_called:
-        return {
-            "role": "system",
-            "content": (
-                f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The latest original "
-                "ToolSandbox setter reports that the requested state is already "
-                "satisfied. Do not retry the same setter, do not ask about a "
-                "different setting, and do not call the state-action helper again "
-                "for this already-satisfied result. For a direct setting request, "
-                f"answer exactly with: {already_satisfied_response}"
-            ),
-        }
+        return _system_actor_message(
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The latest original "
+            "ToolSandbox setter reports that the requested state is already "
+            "satisfied. Do not retry the same setter, do not ask about a "
+            "different setting, and do not call the state-action helper again "
+            "for this already-satisfied result. For a direct setting request, "
+            f"answer exactly with: {already_satisfied_response}"
+        )
     if latest_precondition_error_text:
         helper_list = ", ".join(sorted(helpers))
         structured_contract = any(
@@ -6022,24 +5961,21 @@ def _state_action_actor_policy_message(
                 "visible_state_summary. "
             )
         )
-        return {
-            "role": "system",
-            "content": (
-                f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The latest original "
-                "ToolSandbox state/action tool returned this precondition error: "
-                f"{latest_precondition_error_text!r}. Call the generated "
-                f"device-state helper again now: {helper_list}. The next assistant "
-                "message must be a tool call to that generated helper before any "
-                f"other status getter or setter. {contract_guidance}For example, "
-                "if set_low_battery_mode_status({'on': false}) already returned "
-                "None or an already-disabled message, include 'low battery mode "
-                "is off' so the generated helper can skip redundant low-battery "
-                "setter calls. Do not manually call get_low_battery_mode_status, "
-                "another status getter, or a state setter before rerunning the "
-                "generated helper; the helper should plan the required original "
-                "setter sequence."
-            ),
-        }
+        return _system_actor_message(
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The latest original "
+            "ToolSandbox state/action tool returned this precondition error: "
+            f"{latest_precondition_error_text!r}. Call the generated "
+            f"device-state helper again now: {helper_list}. The next assistant "
+            "message must be a tool call to that generated helper before any "
+            f"other status getter or setter. {contract_guidance}For example, "
+            "if set_low_battery_mode_status({'on': false}) already returned "
+            "None or an already-disabled message, include 'low battery mode "
+            "is off' so the generated helper can skip redundant low-battery "
+            "setter calls. Do not manually call get_low_battery_mode_status, "
+            "another status getter, or a state setter before rerunning the "
+            "generated helper; the helper should plan the required original "
+            "setter sequence."
+        )
     completion_policy = _state_action_sequence_completion_policy_message(
         openai_messages,
         openai_tools,
@@ -6058,12 +5994,8 @@ def _state_action_actor_policy_message(
         return clarification_policy
     if already_called and not latest_precondition_error:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if (
-            STATE_ACTION_ACTOR_POLICY_SENTINEL in str(message.get("content", ""))
-            and not latest_precondition_error
-        ):
-            return None
+    if _has_policy_marker(openai_messages, STATE_ACTION_ACTOR_POLICY_SENTINEL):
+        return None
     message_text = " ".join(
         str(message.get("content", ""))
         for message in cast(Iterable[Mapping[str, Any]], openai_messages)
@@ -6087,55 +6019,52 @@ def _state_action_actor_policy_message(
         if any(name.startswith("plan_device_state_action_sequence") for name in helpers)
         else ""
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A deterministic device-state "
-            f"action planner helper is available: {helper_list}.{preferred_helper} If the user asks "
-            "to turn wifi, cellular service, location service, or low battery mode "
-            "on/off, or a previous original tool reports a blocked wifi/cellular/"
-            "location precondition, call plan_device_state_action_sequence with "
-            "structured facts derived from that visible request/result: normalized "
-            "target_service, desired_on, whether low_battery_blocks_enable, whether "
-            "the original task must resume, and any additional visible service "
-            "requirements. For this generated contract, normalize target_service "
-            "to wifi, cellular, location, or low_battery. Remove a user-facing "
-            "service or mode suffix rather than passing location_service, "
-            "cellular_service, or low_battery_mode. Apply the same normalization "
-            "to additional_services_to_enable. Do not infer blockers that are not "
-            "visible. For "
-            "next_service_tool_call, pass the single "
-            "target_service plus visible service-state booleans. If the helper "
-            "returns should_call=true, call the original ToolSandbox setter calls "
-            "from action_sequence in order, one original setter call per assistant "
-            "turn; do not issue multiple state setters in the same tool-call "
-            "message because the execution order may not be preserved. When "
-            "action_sequence is absent, use the single returned tool_name and "
-            "arguments. If the helper returns "
-            "should_call=false with already_in_desired_state, do not call a "
-            "setter again; either continue the original downstream task or answer "
-            "with final_response_recommendation for a direct setting request. When the "
-            "request is a direct setting change, answer exactly with "
-            "final_response_recommendation after the setters succeed, with no extra "
-            "words. When the helper output says continue_original_task_after_sequence "
-            "is true, do not answer with the state message; after the setters succeed, "
-            "continue the user's original task. Also continue the original task after "
-            "clearing a wifi/cellular/location/low-battery precondition when the "
-            "conversation began as a reminder, message, contact, search, or answer "
-            "task, even if the helper's final_response_recommendation is only a "
-            "setting-status sentence. If a later original ToolSandbox tool reports "
-            "a new wifi/cellular/location/low-battery precondition after one "
-            "precondition was cleared, call the visible helper again with that new "
-            "error text and continue the original task after the returned original "
-            "setter succeeds. Do not call it on insufficient-"
-            "information tasks or unrelated contact/reminder/message selection tasks. "
-            "When an original setting setter returns None, that means the setter "
-            "succeeded; do not claim the action failed or that you cannot change "
-            "settings. When an original setting setter reports that the target is "
-            "already enabled or already disabled, treat that as the requested "
-            "state already being satisfied; do not retry the same setter."
-        ),
-    }
+    return _system_actor_message(
+        f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A deterministic device-state "
+        f"action planner helper is available: {helper_list}.{preferred_helper} If the user asks "
+        "to turn wifi, cellular service, location service, or low battery mode "
+        "on/off, or a previous original tool reports a blocked wifi/cellular/"
+        "location precondition, call plan_device_state_action_sequence with "
+        "structured facts derived from that visible request/result: normalized "
+        "target_service, desired_on, whether low_battery_blocks_enable, whether "
+        "the original task must resume, and any additional visible service "
+        "requirements. For this generated contract, normalize target_service "
+        "to wifi, cellular, location, or low_battery. Remove a user-facing "
+        "service or mode suffix rather than passing location_service, "
+        "cellular_service, or low_battery_mode. Apply the same normalization "
+        "to additional_services_to_enable. Do not infer blockers that are not "
+        "visible. For "
+        "next_service_tool_call, pass the single "
+        "target_service plus visible service-state booleans. If the helper "
+        "returns should_call=true, call the original ToolSandbox setter calls "
+        "from action_sequence in order, one original setter call per assistant "
+        "turn; do not issue multiple state setters in the same tool-call "
+        "message because the execution order may not be preserved. When "
+        "action_sequence is absent, use the single returned tool_name and "
+        "arguments. If the helper returns "
+        "should_call=false with already_in_desired_state, do not call a "
+        "setter again; either continue the original downstream task or answer "
+        "with final_response_recommendation for a direct setting request. When the "
+        "request is a direct setting change, answer exactly with "
+        "final_response_recommendation after the setters succeed, with no extra "
+        "words. When the helper output says continue_original_task_after_sequence "
+        "is true, do not answer with the state message; after the setters succeed, "
+        "continue the user's original task. Also continue the original task after "
+        "clearing a wifi/cellular/location/low-battery precondition when the "
+        "conversation began as a reminder, message, contact, search, or answer "
+        "task, even if the helper's final_response_recommendation is only a "
+        "setting-status sentence. If a later original ToolSandbox tool reports "
+        "a new wifi/cellular/location/low-battery precondition after one "
+        "precondition was cleared, call the visible helper again with that new "
+        "error text and continue the original task after the returned original "
+        "setter succeeds. Do not call it on insufficient-"
+        "information tasks or unrelated contact/reminder/message selection tasks. "
+        "When an original setting setter returns None, that means the setter "
+        "succeeded; do not claim the action failed or that you cannot change "
+        "settings. When an original setting setter reports that the target is "
+        "already enabled or already disabled, treat that as the requested "
+        "state already being satisfied; do not retry the same setter."
+    )
 
 
 def _latest_state_action_helper_payload(
@@ -6196,17 +6125,14 @@ def _state_action_sequence_completion_policy_message(
         arguments = next_action.get("arguments")
         if not tool_name or not isinstance(arguments, Mapping):
             return None
-        return {
-            "role": "system",
-            "content": (
-                f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state "
-                "helper returned an ordered action_sequence, and the prior "
-                "original setter succeeded. Continue the generated sequence "
-                f"by calling original {tool_name} next with exactly these "
-                f"arguments: {json.dumps(dict(arguments), sort_keys=True)}. "
-                "Do not answer yet and do not reorder the remaining setters."
-            ),
-        }
+        return _system_actor_message(
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state "
+            "helper returned an ordered action_sequence, and the prior "
+            "original setter succeeded. Continue the generated sequence "
+            f"by calling original {tool_name} next with exactly these "
+            f"arguments: {json.dumps(dict(arguments), sort_keys=True)}. "
+            "Do not answer yet and do not reorder the remaining setters."
+        )
     final_response = str(payload.get("final_response_recommendation") or "").strip()
     continue_original = bool(payload.get("continue_original_task_after_sequence"))
     if continue_original:
@@ -6224,35 +6150,29 @@ def _state_action_sequence_completion_policy_message(
                     "Do not ask the user again before retrying that blocked "
                     "original call."
                 )
-        return {
-            "role": "system",
-            "content": (
-                f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated device-state "
-                "helper's original setter sequence has succeeded. Because "
-                "continue_original_task_after_sequence is true, do not answer with "
-                "only a device-setting status. Continue the user's original task "
-                "using the relevant original ToolSandbox tools. If a generated "
-                "argument tool already prepared the downstream original call before "
-                "the state blocker, reuse that generated-tool contract instead of "
-                "asking again or manually reconstructing the call. For reminder "
-                "tasks with a resolved timestamp and visible location-search "
-                "result, continue through prepare_reminder_creation_args before "
-                "calling original add_reminder."
-                f"{retry_detail}"
-            ),
-        }
+        return _system_actor_message(
+            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated device-state "
+            "helper's original setter sequence has succeeded. Because "
+            "continue_original_task_after_sequence is true, do not answer with "
+            "only a device-setting status. Continue the user's original task "
+            "using the relevant original ToolSandbox tools. If a generated "
+            "argument tool already prepared the downstream original call before "
+            "the state blocker, reuse that generated-tool contract instead of "
+            "asking again or manually reconstructing the call. For reminder "
+            "tasks with a resolved timestamp and visible location-search "
+            "result, continue through prepare_reminder_creation_args before "
+            "calling original add_reminder."
+            f"{retry_detail}"
+        )
     if not final_response:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated device-state "
-            "helper's original setter sequence has succeeded and the direct "
-            "setting task is complete. Answer exactly with: "
-            f"{final_response} Do not invite further assistance, do not ask a "
-            "follow-up question, and do not call the helper or setter again."
-        ),
-    }
+    return _system_actor_message(
+        f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated device-state "
+        "helper's original setter sequence has succeeded and the direct "
+        "setting task is complete. Answer exactly with: "
+        f"{final_response} Do not invite further assistance, do not ask a "
+        "follow-up question, and do not call the helper or setter again."
+    )
 
 
 def _next_service_direct_completion_policy_message(
@@ -6262,17 +6182,14 @@ def _next_service_direct_completion_policy_message(
     if completion is None:
         return None
     latest_name, final_response = completion
-    return {
-        "role": "system",
-        "content": (
-            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated next_service_tool_call "
-            "planned the prerequisite device-state repair, and the target original "
-            f"setter {latest_name} has now succeeded. The direct setting task is "
-            f"complete. Answer exactly with: {final_response} Do not mention "
-            "intermediate prerequisite settings, do not invite further assistance, "
-            "and do not call another status getter, setter, or generated tool."
-        ),
-    }
+    return _system_actor_message(
+        f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} The generated next_service_tool_call "
+        "planned the prerequisite device-state repair, and the target original "
+        f"setter {latest_name} has now succeeded. The direct setting task is "
+        f"complete. Answer exactly with: {final_response} Do not mention "
+        "intermediate prerequisite settings, do not invite further assistance, "
+        "and do not call another status getter, setter, or generated tool."
+    )
 
 
 def _next_service_direct_completion_response(
@@ -6410,18 +6327,15 @@ def _state_action_completion_clarification_policy_message(
         return None
     if not _latest_user_reaffirms_completed_device_state(latest_user, payload):
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state helper "
-            "already completed the direct setting task, and the latest user message "
-            "is restating or clarifying that same target state rather than requiring "
-            "a new side effect. Preserve the completed generated-tool task boundary. "
-            "Answer exactly with: "
-            f"{final_response} Do not call a state setter or generated helper again, "
-            "and do not invite further assistance."
-        ),
-    }
+    return _system_actor_message(
+        f"{STATE_ACTION_ACTOR_POLICY_SENTINEL} A generated device-state helper "
+        "already completed the direct setting task, and the latest user message "
+        "is restating or clarifying that same target state rather than requiring "
+        "a new side effect. Preserve the completed generated-tool task boundary. "
+        "Answer exactly with: "
+        f"{final_response} Do not call a state setter or generated helper again, "
+        "and do not invite further assistance."
+    )
 
 
 def _latest_user_reaffirms_completed_device_state(
@@ -6579,9 +6493,8 @@ def _device_status_lookup_actor_policy_message(
     tool_names = _tool_names_execution_facing(openai_tools)
     if "plan_device_status_lookup" not in tool_names:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if DEVICE_STATUS_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, DEVICE_STATUS_ACTOR_POLICY_SENTINEL):
+        return None
     message_text = " ".join(
         str(message.get("content", ""))
         for message in cast(Iterable[Mapping[str, Any]], openai_messages)
@@ -6600,28 +6513,25 @@ def _device_status_lookup_actor_policy_message(
         )
     ):
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{DEVICE_STATUS_ACTOR_POLICY_SENTINEL} A generated read-only "
-            "device-status helper is visible: plan_device_status_lookup. For a "
-            "request that asks whether wifi, cellular service, location service, "
-            "or low battery mode is on/off/available, call this helper with the "
-            "user request and blank visible_state_result. If it returns "
-            "should_call=true, call the original ToolSandbox getter named in "
-            "tool_name with arguments. After the getter returns True/False, call "
-            "plan_device_status_lookup again with the same user_request and "
-            "visible_state_result set to the getter result. Then answer exactly "
-            "with final_answer_recommendation. If original end_conversation is "
-            "visible, close the completed status task immediately after that "
-            "exact answer by calling end_conversation with empty arguments; do "
-            "not leave the completed lookup open for unrelated diagnostics. Do "
-            "not manually paraphrase the getter result, and do not discuss "
-            "unavailable stability or internet tests unless the user asks a "
-            "separate follow-up question before the status task is complete. "
-            "This helper is read-only; do not use it for setting changes."
-        ),
-    }
+    return _system_actor_message(
+        f"{DEVICE_STATUS_ACTOR_POLICY_SENTINEL} A generated read-only "
+        "device-status helper is visible: plan_device_status_lookup. For a "
+        "request that asks whether wifi, cellular service, location service, "
+        "or low battery mode is on/off/available, call this helper with the "
+        "user request and blank visible_state_result. If it returns "
+        "should_call=true, call the original ToolSandbox getter named in "
+        "tool_name with arguments. After the getter returns True/False, call "
+        "plan_device_status_lookup again with the same user_request and "
+        "visible_state_result set to the getter result. Then answer exactly "
+        "with final_answer_recommendation. If original end_conversation is "
+        "visible, close the completed status task immediately after that "
+        "exact answer by calling end_conversation with empty arguments; do "
+        "not leave the completed lookup open for unrelated diagnostics. Do "
+        "not manually paraphrase the getter result, and do not discuss "
+        "unavailable stability or internet tests unless the user asks a "
+        "separate follow-up question before the status task is complete. "
+        "This helper is read-only; do not use it for setting changes."
+    )
 
 
 def _latest_generated_helper_payload(
@@ -6711,11 +6621,10 @@ def _generated_tool_abstain_continuation_actor_policy_message(
     if latest is None:
         return None
     tool_name, payload = latest
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if GENERATED_TOOL_ABSTAIN_CONTINUATION_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, GENERATED_TOOL_ABSTAIN_CONTINUATION_POLICY_SENTINEL
+    ):
+        return None
     reason = str(payload.get("abstain_reason") or "missing information").strip()
     visible_name = _tool_name_for_call(openai_tools, tool_name)
     prior_argument_names = sorted(
@@ -6728,19 +6637,16 @@ def _generated_tool_abstain_continuation_actor_policy_message(
         if prior_argument_names
         else " Preserve all still-valid inputs from the previous call."
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{GENERATED_TOOL_ABSTAIN_CONTINUATION_POLICY_SENTINEL} The previous "
-            f"{visible_name} call abstained because: {reason}. That abstention did "
-            "not complete the task. Re-evaluate the same generated tool using the "
-            "latest user-supplied information. If the missing input is now visible, "
-            f"call {visible_name} again on this ordinary user turn using its exact "
-            "schema field names."
-            f"{prior_note} Do not claim that a native action succeeded unless the "
-            "generated result explicitly returns status success."
-        ),
-    }
+    return _system_actor_message(
+        f"{GENERATED_TOOL_ABSTAIN_CONTINUATION_POLICY_SENTINEL} The previous "
+        f"{visible_name} call abstained because: {reason}. That abstention did "
+        "not complete the task. Re-evaluate the same generated tool using the "
+        "latest user-supplied information. If the missing input is now visible, "
+        f"call {visible_name} again on this ordinary user turn using its exact "
+        "schema field names."
+        f"{prior_note} Do not claim that a native action succeeded unless the "
+        "generated result explicitly returns status success."
+    )
 
 
 def _helper_output_handoff_actor_policy_message(
@@ -6754,15 +6660,12 @@ def _helper_output_handoff_actor_policy_message(
     )
     if latest is None:
         if pending_list_instruction:
-            return {
-                "role": "system",
-                "content": (
-                    f"{HELPER_OUTPUT_HANDOFF_POLICY_SENTINEL}"
-                    f"{pending_list_instruction} The generated tool planned "
-                    "the side effect, but only the original ToolSandbox tool "
-                    "performs it."
-                ),
-            }
+            return _system_actor_message(
+                f"{HELPER_OUTPUT_HANDOFF_POLICY_SENTINEL}"
+                f"{pending_list_instruction} The generated tool planned "
+                "the side effect, but only the original ToolSandbox tool "
+                "performs it."
+            )
         return None
     messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
     latest_helper_index = len(messages) - 1
@@ -7349,31 +7252,28 @@ def _helper_output_handoff_actor_policy_message(
                     f"count and the visible target label {holiday_label!r} in a "
                     "short declarative sentence without adding uncertainty."
                 )
-    return {
-        "role": "system",
-        "content": (
-            f"{HELPER_OUTPUT_HANDOFF_POLICY_SENTINEL} The latest generated "
-            f"helper result came from {helper_name} and contains these fields: "
-            f"{payload_keys}. Treat generated-helper output as a deterministic "
-            "plan or value, not as a completed side effect. If the helper output "
-            "contains should_call_tool, should_call_search, should_call, "
-            "should_call_add_reminder, or should_call_downstream_tool set to "
-            "true, then call the original "
-            "ToolSandbox tool named by downstream_tool_name, target_tool_name, "
-            "tool_name, or the matching *_kwargs field using the returned kwargs. "
-            "Ignore kwargs entries whose value is null/None, and do not invent "
-            "missing required arguments. If the helper returns an action_sequence "
-            "or downstream_tool_kwargs_list, execute only the original tool calls "
-            "listed there, in order, after checking that each named original tool "
-            "is visible. If the helper returns should_abstain, abstain_reason, "
-            "exact_final_answer, or final_answer_recommendation, and it has not "
-            "requested a remaining original tool call, answer from that field "
-            "without adding unsupported facts. Never treat the generated helper "
-            "itself as performing the original side effect."
-            f"{exact_next}"
-            f"{helper_specific}"
-        ),
-    }
+    return _system_actor_message(
+        f"{HELPER_OUTPUT_HANDOFF_POLICY_SENTINEL} The latest generated "
+        f"helper result came from {helper_name} and contains these fields: "
+        f"{payload_keys}. Treat generated-helper output as a deterministic "
+        "plan or value, not as a completed side effect. If the helper output "
+        "contains should_call_tool, should_call_search, should_call, "
+        "should_call_add_reminder, or should_call_downstream_tool set to "
+        "true, then call the original "
+        "ToolSandbox tool named by downstream_tool_name, target_tool_name, "
+        "tool_name, or the matching *_kwargs field using the returned kwargs. "
+        "Ignore kwargs entries whose value is null/None, and do not invent "
+        "missing required arguments. If the helper returns an action_sequence "
+        "or downstream_tool_kwargs_list, execute only the original tool calls "
+        "listed there, in order, after checking that each named original tool "
+        "is visible. If the helper returns should_abstain, abstain_reason, "
+        "exact_final_answer, or final_answer_recommendation, and it has not "
+        "requested a remaining original tool call, answer from that field "
+        "without adding unsupported facts. Never treat the generated helper "
+        "itself as performing the original side effect."
+        f"{exact_next}"
+        f"{helper_specific}"
+    )
 
 
 def _contact_relationship_batch_actor_policy_message(
@@ -7390,38 +7290,32 @@ def _contact_relationship_batch_actor_policy_message(
         openai_messages, "plan_contact_relationship_batch_update"
     ):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if CONTACT_RELATIONSHIP_BATCH_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(openai_messages, CONTACT_RELATIONSHIP_BATCH_POLICY_SENTINEL):
+        return None
     request = _relationship_batch_request(openai_messages)
     if request is None:
         return None
     source = request.get("source_relationship", "")
     target = request.get("target_relationship", "")
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_RELATIONSHIP_BATCH_POLICY_SENTINEL} A generated bulk "
-            "contact-relationship helper is visible. For this relationship "
-            "change request, call plan_contact_relationship_batch_update before "
-            "manual search_contacts or modify_contact. Use the relationship "
-            f"values parsed from the user request: source_relationship={source!r}, "
-            f"target_relationship={target!r}, and contacts=[]. If the helper "
-            "returns should_call_search_contacts, call original search_contacts "
-            "with search_contacts_kwargs unchanged; do not add is_self or "
-            "optional filters that the helper did not return. If "
-            f"source_relationship={_ALL_CONTACTS_RELATIONSHIP_SOURCE!r}, keep "
-            "that sentinel inside the generated helper arguments only; never "
-            "pass it as a relationship value to search_contacts. After visible "
-            "contacts are returned, call plan_contact_relationship_batch_update "
-            "again with contacts set to that result, then execute the returned "
-            "downstream_tool_kwargs_list using original modify_contact. The "
-            "helper prepares deterministic kwargs only; it does not perform the "
-            "side effects."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_RELATIONSHIP_BATCH_POLICY_SENTINEL} A generated bulk "
+        "contact-relationship helper is visible. For this relationship "
+        "change request, call plan_contact_relationship_batch_update before "
+        "manual search_contacts or modify_contact. Use the relationship "
+        f"values parsed from the user request: source_relationship={source!r}, "
+        f"target_relationship={target!r}, and contacts=[]. If the helper "
+        "returns should_call_search_contacts, call original search_contacts "
+        "with search_contacts_kwargs unchanged; do not add is_self or "
+        "optional filters that the helper did not return. If "
+        f"source_relationship={_ALL_CONTACTS_RELATIONSHIP_SOURCE!r}, keep "
+        "that sentinel inside the generated helper arguments only; never "
+        "pass it as a relationship value to search_contacts. After visible "
+        "contacts are returned, call plan_contact_relationship_batch_update "
+        "again with contacts set to that result, then execute the returned "
+        "downstream_tool_kwargs_list using original modify_contact. The "
+        "helper prepares deterministic kwargs only; it does not perform the "
+        "side effects."
+    )
 
 
 def _contact_relationship_batch_result_actor_policy_message(
@@ -7469,15 +7363,12 @@ def _contact_relationship_batch_result_actor_policy_message(
         )
         if completed_modify_calls < len(downstream):
             return None
-        return {
-            "role": "system",
-            "content": (
-                f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
-                "original modify_contact calls returned for the latest generated "
-                "relationship-batch plan have completed. Answer exactly with the "
-                f"generated final recommendation: {final}"
-            ),
-        }
+        return _system_actor_message(
+            f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
+            "original modify_contact calls returned for the latest generated "
+            "relationship-batch plan have completed. Answer exactly with the "
+            f"generated final recommendation: {final}"
+        )
     if latest_name == "plan_contact_relationship_batch_update":
         payload = _parse_mapping_payload(latest_message.get("content"))
         if payload.get("abstain_reason"):
@@ -7497,35 +7388,29 @@ def _contact_relationship_batch_result_actor_policy_message(
             ):
                 cleaned_search_kwargs.pop("relationship", None)
             search_tool_name = _tool_name_for_call(openai_tools, "search_contacts")
-            return {
-                "role": "system",
-                "content": (
-                    f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
-                    "latest generated plan is waiting for an original contact "
-                    f"search. Call {search_tool_name} next with exactly this "
-                    f"JSON: {json.dumps(cleaned_search_kwargs, sort_keys=True)}. "
-                    "Do not add is_self, name, phone_number, relationship, or "
-                    "any optional filter unless it is present in that JSON. "
-                    "After the original search returns visible contacts, call "
-                    "plan_contact_relationship_batch_update again with contacts "
-                    "set to that visible result."
-                ),
-            }
+            return _system_actor_message(
+                f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
+                "latest generated plan is waiting for an original contact "
+                f"search. Call {search_tool_name} next with exactly this "
+                f"JSON: {json.dumps(cleaned_search_kwargs, sort_keys=True)}. "
+                "Do not add is_self, name, phone_number, relationship, or "
+                "any optional filter unless it is present in that JSON. "
+                "After the original search returns visible contacts, call "
+                "plan_contact_relationship_batch_update again with contacts "
+                "set to that visible result."
+            )
         downstream = payload.get("downstream_tool_kwargs_list")
         if bool(payload.get("should_call_tools")) and isinstance(downstream, list):
             modify_tool_name = _tool_name_for_call(openai_tools, "modify_contact")
-            return {
-                "role": "system",
-                "content": (
-                    f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
-                    "latest generated plan returned a batch of original contact "
-                    f"updates. Call {modify_tool_name} once for each item in "
-                    "downstream_tool_kwargs_list, using each kwargs object "
-                    "unchanged. Do not update contacts outside that returned "
-                    "list, and do not treat the generated tool itself as the "
-                    "side effect."
-                ),
-            }
+            return _system_actor_message(
+                f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The "
+                "latest generated plan returned a batch of original contact "
+                f"updates. Call {modify_tool_name} once for each item in "
+                "downstream_tool_kwargs_list, using each kwargs object "
+                "unchanged. Do not update contacts outside that returned "
+                "list, and do not treat the generated tool itself as the "
+                "side effect."
+            )
         return None
     if latest_name != "search_contacts":
         return None
@@ -7536,20 +7421,17 @@ def _contact_relationship_batch_result_actor_policy_message(
     request = _relationship_batch_request(openai_messages)
     if request is None:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The latest "
-            "original search_contacts result is the visible record set for a "
-            "generated relationship-batch workflow. Call "
-            "plan_contact_relationship_batch_update again with "
-            f"source_relationship={request.get('source_relationship', '')!r}, "
-            f"target_relationship={request.get('target_relationship', '')!r}, "
-            "and contacts set exactly to the latest search_contacts result. "
-            "Do not call modify_contact until that generated tool returns "
-            "downstream_tool_kwargs_list."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_RELATIONSHIP_BATCH_RESULT_POLICY_SENTINEL} The latest "
+        "original search_contacts result is the visible record set for a "
+        "generated relationship-batch workflow. Call "
+        "plan_contact_relationship_batch_update again with "
+        f"source_relationship={request.get('source_relationship', '')!r}, "
+        f"target_relationship={request.get('target_relationship', '')!r}, "
+        "and contacts set exactly to the latest search_contacts result. "
+        "Do not call modify_contact until that generated tool returns "
+        "downstream_tool_kwargs_list."
+    )
 
 
 def _contact_remove_success_actor_policy_message(
@@ -7561,9 +7443,8 @@ def _contact_remove_success_actor_policy_message(
         return None
     if not _message_already_called_tool(openai_messages, "plan_contact_lookup_query"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if CONTACT_REMOVE_SUCCESS_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, CONTACT_REMOVE_SUCCESS_POLICY_SENTINEL):
+        return None
     latest_call = _latest_successful_crud_tool_call(openai_messages)
     if latest_call is None:
         return None
@@ -7574,16 +7455,13 @@ def _contact_remove_success_actor_policy_message(
     phone = _normalize_visible_phone(search_args.get("phone_number"))
     if not phone:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_REMOVE_SUCCESS_POLICY_SENTINEL} The generated lookup path "
-            f"used the visible phone number {phone}, and the original "
-            "remove_contact tool has succeeded. In the final answer, preserve "
-            "that user-requested identifier: state that the phone number was "
-            "removed from the contact. Do not answer only with the contact name."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_REMOVE_SUCCESS_POLICY_SENTINEL} The generated lookup path "
+        f"used the visible phone number {phone}, and the original "
+        "remove_contact tool has succeeded. In the final answer, preserve "
+        "that user-requested identifier: state that the phone number was "
+        "removed from the contact. Do not answer only with the contact name."
+    )
 
 
 def _reminder_location_completion_actor_policy_message(
@@ -7596,11 +7474,10 @@ def _reminder_location_completion_actor_policy_message(
         return None
     if _message_already_called_tool(openai_messages, "add_reminder"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if REMINDER_LOCATION_COMPLETION_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, REMINDER_LOCATION_COMPLETION_POLICY_SENTINEL
+    ):
+        return None
     payload = _latest_tool_payload_by_name(
         openai_messages, "prepare_reminder_creation_args"
     )
@@ -7646,24 +7523,21 @@ def _reminder_location_completion_actor_policy_message(
     if latest_user_index > latest_tool_index[0] and not confirmed:
         return None
     latitude, longitude = coords
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_LOCATION_COMPLETION_POLICY_SENTINEL} "
-            "prepare_reminder_creation_args previously paused because an optional "
-            "location lookup was pending. A visible location result with "
-            f"coordinates latitude={latitude}, longitude={longitude} is now "
-            "available and the user has not supplied a different location. Do "
-            "not ask for another confirmation loop. Call "
-            "prepare_reminder_creation_args again with the same reminder content "
-            "and resolved timestamp from the prior helper/timestamp result, set "
-            "location_available=true, location_lookup_failed=false, and pass "
-            "these latitude/longitude values. If it returns "
-            "should_call_add_reminder=true, call original add_reminder next with "
-            "add_reminder_kwargs unchanged. The generated helper prepares "
-            "arguments only; the original add_reminder performs the side effect."
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_LOCATION_COMPLETION_POLICY_SENTINEL} "
+        "prepare_reminder_creation_args previously paused because an optional "
+        "location lookup was pending. A visible location result with "
+        f"coordinates latitude={latitude}, longitude={longitude} is now "
+        "available and the user has not supplied a different location. Do "
+        "not ask for another confirmation loop. Call "
+        "prepare_reminder_creation_args again with the same reminder content "
+        "and resolved timestamp from the prior helper/timestamp result, set "
+        "location_available=true, location_lookup_failed=false, and pass "
+        "these latitude/longitude values. If it returns "
+        "should_call_add_reminder=true, call original add_reminder next with "
+        "add_reminder_kwargs unchanged. The generated helper prepares "
+        "arguments only; the original add_reminder performs the side effect."
+    )
 
 
 def _reminder_datetime_continuation_actor_policy_message(
@@ -7742,20 +7616,17 @@ def _reminder_datetime_continuation_actor_policy_message(
         openai_tools, "prepare_reminder_creation_args"
     ):
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_DATETIME_CONTINUATION_POLICY_SENTINEL} "
-            "timestamp_to_datetime_info has now returned the current timestamp "
-            "context requested by the generated reminder-preparation tool. The "
-            f"next tool call should be generated {reminder_tool_name} with these "
-            f"arguments: {json.dumps(retry_args, sort_keys=True)}. Do not call "
-            "datetime_info_to_timestamp or shift_timestamp for a relative phrase "
-            "unless the user supplied an explicit calendar date. If the generated "
-            "tool returns should_call_add_reminder=true, call original "
-            "add_reminder next with add_reminder_kwargs unchanged."
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_DATETIME_CONTINUATION_POLICY_SENTINEL} "
+        "timestamp_to_datetime_info has now returned the current timestamp "
+        "context requested by the generated reminder-preparation tool. The "
+        f"next tool call should be generated {reminder_tool_name} with these "
+        f"arguments: {json.dumps(retry_args, sort_keys=True)}. Do not call "
+        "datetime_info_to_timestamp or shift_timestamp for a relative phrase "
+        "unless the user supplied an explicit calendar date. If the generated "
+        "tool returns should_call_add_reminder=true, call original "
+        "add_reminder next with add_reminder_kwargs unchanged."
+    )
 
 
 def _reminder_current_datetime_actor_policy_message(
@@ -7768,9 +7639,8 @@ def _reminder_current_datetime_actor_policy_message(
         {"prepare_reminder_creation_args", "get_current_timestamp"} <= available_names
     ):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if REMINDER_CURRENT_DATETIME_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, REMINDER_CURRENT_DATETIME_POLICY_SENTINEL):
+        return None
     current_timestamp = _latest_current_timestamp(openai_messages)
     if current_timestamp is None:
         return None
@@ -7807,16 +7677,13 @@ def _reminder_current_datetime_actor_policy_message(
             "returns should_call_add_reminder=true."
         )
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_CURRENT_DATETIME_POLICY_SENTINEL} This reminder task uses "
-            "a relative local date/time such as tomorrow, next week, or a weekday, "
-            "and get_current_timestamp has already returned the visible current "
-            "timestamp. Call original timestamp_to_datetime_info on that exact "
-            f"current timestamp next. {continuation}"
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_CURRENT_DATETIME_POLICY_SENTINEL} This reminder task uses "
+        "a relative local date/time such as tomorrow, next week, or a weekday, "
+        "and get_current_timestamp has already returned the visible current "
+        "timestamp. Call original timestamp_to_datetime_info on that exact "
+        f"current timestamp next. {continuation}"
+    )
 
 
 def _reminder_location_batch_actor_policy_message(
@@ -7866,7 +7733,7 @@ def _reminder_location_batch_actor_policy_message(
         marker = f"{REMINDER_LOCATION_BATCH_POLICY_SENTINEL} {stage}"
         if emitted(stage):
             return None
-        return {"role": "system", "content": f"{marker} {content}"}
+        return _system_actor_message(f"{marker} {content}")
 
     current_timestamp = _latest_current_timestamp(openai_messages)
     current_info = (
@@ -8139,9 +8006,8 @@ def _helper_answer_retention_actor_policy_message(
     openai_tools: object | None = None,
 ) -> dict[str, str] | None:
     """Preserve final-answer-ready generated-tool output through closing turns."""
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if ANSWER_RETENTION_ACTOR_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, ANSWER_RETENTION_ACTOR_POLICY_SENTINEL):
+        return None
     status_followup = _latest_user_is_device_status_retention_followup(openai_messages)
     retention_followup = _latest_user_is_answer_retention_followup(openai_messages)
     phone_followup = _latest_user_is_phone_answer_retention_followup(openai_messages)
@@ -8176,17 +8042,14 @@ def _helper_answer_retention_actor_policy_message(
             "confidential",
         )
     ):
-        return {
-            "role": "system",
-            "content": (
-                f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} A generated tool already "
-                "supported the prior tool-backed answer. The user follow-up does "
-                "not introduce a new task; preserve the generated-tool answer as "
-                f"the final task answer. Answer exactly with: {answer} Do not call "
-                "another lookup, do not add a privacy acknowledgement, and do not "
-                "change the wording."
-            ),
-        }
+        return _system_actor_message(
+            f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} A generated tool already "
+            "supported the prior tool-backed answer. The user follow-up does "
+            "not introduce a new task; preserve the generated-tool answer as "
+            f"the final task answer. Answer exactly with: {answer} Do not call "
+            "another lookup, do not add a privacy acknowledgement, and do not "
+            "change the wording."
+        )
     status_instruction = (
         " If the user is asking a same-thread device-status follow-up, start "
         "from that generated-tool-supported status answer, then answer only from "
@@ -8194,20 +8057,17 @@ def _helper_answer_retention_actor_policy_message(
         if status_followup
         else ""
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} A generated tool already "
-            "supported the current tool-backed answer. The previous answer was: "
-            f"{answer} The user is acknowledging or closing that generated-tool-supported "
-            "lookup. Begin the next response with a concise recap that preserves "
-            "the concrete answer value. If the generated tool returned exact_final_answer "
-            "or final_answer_recommendation with copy_exactly, begin with that "
-            "answer exactly. Do not answer only with a generic acknowledgement, "
-            "and do not invent new "
-            f"facts.{status_instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{ANSWER_RETENTION_ACTOR_POLICY_SENTINEL} A generated tool already "
+        "supported the current tool-backed answer. The previous answer was: "
+        f"{answer} The user is acknowledging or closing that generated-tool-supported "
+        "lookup. Begin the next response with a concise recap that preserves "
+        "the concrete answer value. If the generated tool returned exact_final_answer "
+        "or final_answer_recommendation with copy_exactly, begin with that "
+        "answer exactly. Do not answer only with a generic acknowledgement, "
+        "and do not invent new "
+        f"facts.{status_instruction}"
+    )
 
 
 def _device_status_answer_retention_actor_policy_message(
@@ -8215,11 +8075,10 @@ def _device_status_answer_retention_actor_policy_message(
     openai_tools: object | None = None,
 ) -> dict[str, str] | None:
     """Preserve generated device-status answers through same-thread follow-ups."""
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if DEVICE_STATUS_RETENTION_ACTOR_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, DEVICE_STATUS_RETENTION_ACTOR_POLICY_SENTINEL
+    ):
+        return None
     answer = _recent_device_status_answer_from_tool(openai_messages)
     if not answer:
         return None
@@ -8230,20 +8089,17 @@ def _device_status_answer_retention_actor_policy_message(
         or _latest_user_is_answer_retention_followup(openai_messages)
     ):
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{DEVICE_STATUS_RETENTION_ACTOR_POLICY_SENTINEL} A generated "
-            "device-status helper returned this final answer recommendation: "
-            f"{answer} For this next response, begin exactly with: {answer} "
-            "Then, if the user asked a same-thread follow-up, answer it only "
-            "from visible tool results or facts the user supplied. If the user "
-            "is only acknowledging or closing the conversation, keep the recap "
-            "to one concise sentence. Do not answer only with a generic "
-            "acknowledgement, do not call a setter for a read-only status "
-            "lookup, and do not invent unsupported diagnostics."
-        ),
-    }
+    return _system_actor_message(
+        f"{DEVICE_STATUS_RETENTION_ACTOR_POLICY_SENTINEL} A generated "
+        "device-status helper returned this final answer recommendation: "
+        f"{answer} For this next response, begin exactly with: {answer} "
+        "Then, if the user asked a same-thread follow-up, answer it only "
+        "from visible tool results or facts the user supplied. If the user "
+        "is only acknowledging or closing the conversation, keep the recap "
+        "to one concise sentence. Do not answer only with a generic "
+        "acknowledgement, do not call a setter for a read-only status "
+        "lookup, and do not invent unsupported diagnostics."
+    )
 
 
 def _should_close_after_helper_answer(
@@ -8348,9 +8204,8 @@ def _helper_answer_completion_actor_policy_message(
     """Close acknowledgement loops after a generated helper produced the answer."""
     if openai_tools is None:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if HELPER_ANSWER_COMPLETION_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, HELPER_ANSWER_COMPLETION_POLICY_SENTINEL):
+        return None
     if (
         not _latest_user_is_closing_acknowledgement(openai_messages)
         and _latest_generated_tool_abstention_before_latest_user(
@@ -8412,26 +8267,23 @@ def _helper_answer_completion_actor_policy_message(
             "arguments now. If the API does not allow that tool call, the "
             "entire assistant message must still be exactly the answer text."
         )
-    return {
-        "role": "system",
-        "content": (
-            f"{HELPER_ANSWER_COMPLETION_POLICY_SENTINEL} A generated helper "
-            "already produced the task answer. The next assistant message must "
-            f"be exactly this answer and nothing else: {answer} The latest user "
-            "message is only acknowledging, closing, or drifting into a separate "
-            "task after the helper-backed task was completed. Do not say "
-            '"you\'re welcome", "thank you for confirming", "understood", '
-            '"glad", or any other acknowledgement; do not invite further '
-            "assistance. Do not call additional search, setter, messaging, "
-            "reminder, direction/navigation, or generated helper tools. If the "
-            "latest user asks to reverse a completed device setting change, "
-            "treat that as post-completion drift rather than the original task. "
-            f"Answer exactly with: {answer} "
-            "The entire assistant message must be exactly the answer text; do "
-            "not add a trailing period, greeting, acknowledgement, markdown, or "
-            f"any other words.{close_with_tool_instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{HELPER_ANSWER_COMPLETION_POLICY_SENTINEL} A generated helper "
+        "already produced the task answer. The next assistant message must "
+        f"be exactly this answer and nothing else: {answer} The latest user "
+        "message is only acknowledging, closing, or drifting into a separate "
+        "task after the helper-backed task was completed. Do not say "
+        '"you\'re welcome", "thank you for confirming", "understood", '
+        '"glad", or any other acknowledgement; do not invite further '
+        "assistance. Do not call additional search, setter, messaging, "
+        "reminder, direction/navigation, or generated helper tools. If the "
+        "latest user asks to reverse a completed device setting change, "
+        "treat that as post-completion drift rather than the original task. "
+        f"Answer exactly with: {answer} "
+        "The entire assistant message must be exactly the answer text; do "
+        "not add a trailing period, greeting, acknowledgement, markdown, or "
+        f"any other words.{close_with_tool_instruction}"
+    )
 
 
 def _contact_creation_completion_actor_policy_message(
@@ -8479,18 +8331,15 @@ def _contact_creation_completion_actor_policy_message(
     if not contact_name:
         return None
     confirmation = f"{contact_name} has been added to your contact."
-    return {
-        "role": "system",
-        "content": (
-            f"{CONTACT_CREATION_COMPLETION_POLICY_SENTINEL} The generated "
-            "prepare_add_contact_args tool prepared the add_contact arguments, "
-            "and original add_contact has now succeeded. Give a concise "
-            f"completion confirmation grounded only in that visible tool result: "
-            f"{confirmation} Do not add the phone number, optional fields, "
-            "greetings, or offers for more help unless the user explicitly asked "
-            "for those fields in the final response."
-        ),
-    }
+    return _system_actor_message(
+        f"{CONTACT_CREATION_COMPLETION_POLICY_SENTINEL} The generated "
+        "prepare_add_contact_args tool prepared the add_contact arguments, "
+        "and original add_contact has now succeeded. Give a concise "
+        f"completion confirmation grounded only in that visible tool result: "
+        f"{confirmation} Do not add the phone number, optional fields, "
+        "greetings, or offers for more help unless the user explicitly asked "
+        "for those fields in the final response."
+    )
 
 
 def _direct_contact_action_completion_actor_policy_message(
@@ -8509,11 +8358,10 @@ def _direct_contact_action_completion_actor_policy_message(
         is not None
     ):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if DIRECT_CONTACT_ACTION_COMPLETION_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, DIRECT_CONTACT_ACTION_COMPLETION_POLICY_SENTINEL
+    ):
+        return None
     messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
     if not messages:
         return None
@@ -8561,19 +8409,16 @@ def _direct_contact_action_completion_actor_policy_message(
 
     if not confirmation:
         return None
-    return {
-        "role": "system",
-        "content": (
-            f"{DIRECT_CONTACT_ACTION_COMPLETION_POLICY_SENTINEL} The generated "
-            "prepare_direct_contact_action_args tool prepared the exact "
-            f"arguments, and original {latest_name} has now succeeded. Give a "
-            "concise completion confirmation grounded only in the visible "
-            f"generated-tool and original-tool results: {confirmation} Do not "
-            "mention generated tools, do not add unrelated fields, greetings, "
-            "or offers for more help, and do not call another contact or "
-            "message tool unless the user explicitly asks for a new task."
-        ),
-    }
+    return _system_actor_message(
+        f"{DIRECT_CONTACT_ACTION_COMPLETION_POLICY_SENTINEL} The generated "
+        "prepare_direct_contact_action_args tool prepared the exact "
+        f"arguments, and original {latest_name} has now succeeded. Give a "
+        "concise completion confirmation grounded only in the visible "
+        f"generated-tool and original-tool results: {confirmation} Do not "
+        "mention generated tools, do not add unrelated fields, greetings, "
+        "or offers for more help, and do not call another contact or "
+        "message tool unless the user explicitly asks for a new task."
+    )
 
 
 def _message_contact_lookup_completion_actor_policy_message(
@@ -8588,11 +8433,10 @@ def _message_contact_lookup_completion_actor_policy_message(
         openai_messages, "plan_send_message_contact_lookup"
     ):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if MESSAGE_CONTACT_LOOKUP_COMPLETION_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, MESSAGE_CONTACT_LOOKUP_COMPLETION_POLICY_SENTINEL
+    ):
+        return None
     messages = list(cast(Iterable[Mapping[str, Any]], openai_messages))
     if not messages:
         return None
@@ -8622,20 +8466,17 @@ def _message_contact_lookup_completion_actor_policy_message(
     if not content:
         return None
     confirmation = f"Your message to {recipient} has been sent saying: {content}"
-    return {
-        "role": "system",
-        "content": (
-            f"{MESSAGE_CONTACT_LOOKUP_COMPLETION_POLICY_SENTINEL} The generated "
-            "plan_send_message_contact_lookup tool identified the named-recipient "
-            "message plan, and original send_message_with_phone_number has now "
-            "succeeded. Give the concise completion confirmation grounded only "
-            f"in those visible generated-tool and original-tool results: "
-            f"{confirmation} Do not mention generated tools, do not add the "
-            "phone number unless it is the only visible recipient identifier, "
-            "do not add greetings or offers for more help, and do not call "
-            "another tool unless the user asks for a new task."
-        ),
-    }
+    return _system_actor_message(
+        f"{MESSAGE_CONTACT_LOOKUP_COMPLETION_POLICY_SENTINEL} The generated "
+        "plan_send_message_contact_lookup tool identified the named-recipient "
+        "message plan, and original send_message_with_phone_number has now "
+        "succeeded. Give the concise completion confirmation grounded only "
+        f"in those visible generated-tool and original-tool results: "
+        f"{confirmation} Do not mention generated tools, do not add the "
+        "phone number unless it is the only visible recipient identifier, "
+        "do not add greetings or offers for more help, and do not call "
+        "another tool unless the user asks for a new task."
+    )
 
 
 def _safe_abstention_helper_actor_policy_message(
@@ -8671,71 +8512,63 @@ def _safe_abstention_helper_actor_policy_message(
             if payload and (
                 bool(payload.get("should_abstain")) or payload.get("abstain_reason")
             ):
-                for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-                    if SAFE_ABSTENTION_RESULT_POLICY_SENTINEL in str(
-                        message.get("content", "")
-                    ):
-                        return None
+                if _has_policy_marker(
+                    openai_messages, SAFE_ABSTENTION_RESULT_POLICY_SENTINEL
+                ):
+                    return None
                 recommendation = str(
                     payload.get("final_answer_recommendation") or ""
                 ).strip()
-                return {
-                    "role": "system",
-                    "content": (
-                        f"{SAFE_ABSTENTION_RESULT_POLICY_SENTINEL} A generated "
-                        f"safe-abstention helper ({name}) already reported that "
-                        "this action/search should not proceed safely. Unless the user "
-                        "has now supplied the missing concrete information named "
-                        "by the helper, do not retry the original action/search tool, do not "
-                        "guess a target id, and do not claim capabilities outside "
-                        "the visible tools. Restate the helper's abstention reason"
-                        + (
-                            f" or this recommendation: {recommendation}"
-                            if recommendation
-                            else "."
-                        )
-                    ),
-                }
+                return _system_actor_message(
+                    f"{SAFE_ABSTENTION_RESULT_POLICY_SENTINEL} A generated "
+                    f"safe-abstention helper ({name}) already reported that "
+                    "this action/search should not proceed safely. Unless the user "
+                    "has now supplied the missing concrete information named "
+                    "by the helper, do not retry the original action/search tool, do not "
+                    "guess a target id, and do not claim capabilities outside "
+                    "the visible tools. Restate the helper's abstention reason"
+                    + (
+                        f" or this recommendation: {recommendation}"
+                        if recommendation
+                        else "."
+                    )
+                )
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SAFE_ABSTENTION_HELPER_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
-    return {
-        "role": "system",
-        "content": (
-            f"{SAFE_ABSTENTION_HELPER_POLICY_SENTINEL} A generated "
-            f"safe-abstention helper is available: {helper_list}. Use it before "
-            "a side-effect action or record search when the request may be missing "
-            "a required original tool, concrete search criteria, a concrete visible "
-            "target id, or a unique visible target. For recency-only searches such "
-            "as latest, oldest, recent, upcoming, later, yesterday, today, or tomorrow "
-            "without a concrete record name, content phrase, or visible record "
-            "set, call this generated tool before repeating original searches. "
-            "For required_original_tools, pass semantic capability labels rather "
-            "than original side-effect tool names: contact_lookup, "
-            "contact_update, contact_removal, message_lookup, message_send, "
-            "reminder_lookup, reminder_update, reminder_removal, "
-            "reminder_creation, current_time, or location_lookup. Map original "
-            "get_current_timestamp to current_time. For available_original_tools, "
-            "use the same labels corresponding to visible original tools: "
-            f"{visible_original_tools or '(none)'}. For target_identifier, pass "
-            "a concrete id only if that id was supplied by the user or returned "
-            "by a visible tool/helper result; do not treat an arbitrary phone "
-            "number, name, ordinal phrase, or natural-language description as a "
-            "record id unless the target original tool schema accepts that exact "
-            "kind of scalar. If the helper says to abstain or provides a final "
-            "answer recommendation, do not perform the side effect. For a reminder "
-            "or message search whose meaning depends on yesterday, today, tomorrow, "
-            "upcoming, later, or another relative current-time anchor, include current_time "
-            "in required_original_tools. If current_time is absent from the visible "
-            "available_original_tools list, call this helper instead of inventing a "
-            "timestamp or manually constructing temporal search bounds. If "
-            "current_time is available, preserve the normal flow: call original "
-            "get_current_timestamp and then the relevant generated recency helper. "
-            "A blank target_identifier is valid for a read-only "
-            "relative_time_search and must not itself cause abstention."
-        ),
-    }
+    if _has_policy_marker(openai_messages, SAFE_ABSTENTION_HELPER_POLICY_SENTINEL):
+        return None
+    return _system_actor_message(
+        f"{SAFE_ABSTENTION_HELPER_POLICY_SENTINEL} A generated "
+        f"safe-abstention helper is available: {helper_list}. Use it before "
+        "a side-effect action or record search when the request may be missing "
+        "a required original tool, concrete search criteria, a concrete visible "
+        "target id, or a unique visible target. For recency-only searches such "
+        "as latest, oldest, recent, upcoming, later, yesterday, today, or tomorrow "
+        "without a concrete record name, content phrase, or visible record "
+        "set, call this generated tool before repeating original searches. "
+        "For required_original_tools, pass semantic capability labels rather "
+        "than original side-effect tool names: contact_lookup, "
+        "contact_update, contact_removal, message_lookup, message_send, "
+        "reminder_lookup, reminder_update, reminder_removal, "
+        "reminder_creation, current_time, or location_lookup. Map original "
+        "get_current_timestamp to current_time. For available_original_tools, "
+        "use the same labels corresponding to visible original tools: "
+        f"{visible_original_tools or '(none)'}. For target_identifier, pass "
+        "a concrete id only if that id was supplied by the user or returned "
+        "by a visible tool/helper result; do not treat an arbitrary phone "
+        "number, name, ordinal phrase, or natural-language description as a "
+        "record id unless the target original tool schema accepts that exact "
+        "kind of scalar. If the helper says to abstain or provides a final "
+        "answer recommendation, do not perform the side effect. For a reminder "
+        "or message search whose meaning depends on yesterday, today, tomorrow, "
+        "upcoming, later, or another relative current-time anchor, include current_time "
+        "in required_original_tools. If current_time is absent from the visible "
+        "available_original_tools list, call this helper instead of inventing a "
+        "timestamp or manually constructing temporal search bounds. If "
+        "current_time is available, preserve the normal flow: call original "
+        "get_current_timestamp and then the relevant generated recency helper. "
+        "A blank target_identifier is valid for a read-only "
+        "relative_time_search and must not itself cause abstention."
+    )
 
 
 def _location_search_retry_after_state_actor_policy_message(
@@ -8795,19 +8628,16 @@ def _location_search_retry_after_state_actor_policy_message(
     search_tool_name = _tool_name_for_call(
         openai_tools, "search_location_around_lat_lon"
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{LOCATION_SEARCH_RETRY_AFTER_STATE_POLICY_SENTINEL} A generated "
-            "location-search argument tool already prepared the original "
-            "search_location_around_lat_lon kwargs, and a later original setting "
-            "change succeeded after that search failed from a recoverable device "
-            "state issue. Retry the original "
-            f"{search_tool_name} call directly with exactly these arguments: "
-            f"{json.dumps(cleaned_kwargs, sort_keys=True)}. Do not call the "
-            "generated location-search argument tool again before this retry."
-        ),
-    }
+    return _system_actor_message(
+        f"{LOCATION_SEARCH_RETRY_AFTER_STATE_POLICY_SENTINEL} A generated "
+        "location-search argument tool already prepared the original "
+        "search_location_around_lat_lon kwargs, and a later original setting "
+        "change succeeded after that search failed from a recoverable device "
+        "state issue. Retry the original "
+        f"{search_tool_name} call directly with exactly these arguments: "
+        f"{json.dumps(cleaned_kwargs, sort_keys=True)}. Do not call the "
+        "generated location-search argument tool again before this retry."
+    )
 
 
 def _location_search_retry_after_coordinates_actor_policy_message(
@@ -8821,11 +8651,10 @@ def _location_search_retry_after_coordinates_actor_policy_message(
         return None
     if not ({location_arg_tool, "search_location_around_lat_lon"} <= available_names):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if LOCATION_SEARCH_RETRY_AFTER_COORDINATES_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, LOCATION_SEARCH_RETRY_AFTER_COORDINATES_POLICY_SENTINEL
+    ):
+        return None
     latest_prepare = _latest_tool_message_index(openai_messages, {location_arg_tool})
     latest_current_location = _latest_tool_message_index(
         openai_messages, {"get_current_location"}
@@ -8874,22 +8703,19 @@ def _location_search_retry_after_coordinates_actor_policy_message(
     if "longitude" in input_names:
         arguments["longitude"] = current_coordinates[1]
     location_tool_name = _tool_name_for_call(openai_tools, location_arg_tool)
-    return {
-        "role": "system",
-        "content": (
-            f"{LOCATION_SEARCH_RETRY_AFTER_COORDINATES_POLICY_SENTINEL} The "
-            "generated location-search argument tool previously abstained because "
-            "current coordinates were missing. A visible get_current_location "
-            "call has now returned coordinates in this same task, so retry the "
-            f"generated {location_tool_name} call before preparing or adding the "
-            "reminder. Use exactly these arguments: "
-            f"{json.dumps(arguments, sort_keys=True)}. Then call the returned "
-            "original search_location_around_lat_lon tool with "
-            "downstream_tool_kwargs unchanged. Do not call "
-            "prepare_reminder_creation_args or add_reminder again until visible "
-            "location-search coordinates have been returned for this task."
-        ),
-    }
+    return _system_actor_message(
+        f"{LOCATION_SEARCH_RETRY_AFTER_COORDINATES_POLICY_SENTINEL} The "
+        "generated location-search argument tool previously abstained because "
+        "current coordinates were missing. A visible get_current_location "
+        "call has now returned coordinates in this same task, so retry the "
+        f"generated {location_tool_name} call before preparing or adding the "
+        "reminder. Use exactly these arguments: "
+        f"{json.dumps(arguments, sort_keys=True)}. Then call the returned "
+        "original search_location_around_lat_lon tool with "
+        "downstream_tool_kwargs unchanged. Do not call "
+        "prepare_reminder_creation_args or add_reminder again until visible "
+        "location-search coordinates have been returned for this task."
+    )
 
 
 def _action_argument_helper_actor_policy_message(
@@ -8902,49 +8728,45 @@ def _action_argument_helper_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if ACTION_ARGUMENT_HELPER_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, ACTION_ARGUMENT_HELPER_POLICY_SENTINEL):
+        return None
     helper_list = ", ".join(sorted(helpers))
-    return {
-        "role": "system",
-        "content": (
-            f"{ACTION_ARGUMENT_HELPER_POLICY_SENTINEL} A generated action-argument "
-            f"helper is available: {helper_list}. If the user's request already "
-            "contains scalar values matching the helper inputs, call the helper "
-            "before asking for unrelated optional fields or manually assembling "
-            "an original side-effect call. The helper prepares arguments only; "
-            "it does not perform the side effect. After it returns "
-            "should_call_tool, should_call_add_reminder, or another true "
-            "should_call_* field with kwargs, call the named original ToolSandbox "
-            "tool with those kwargs, omitting null/None optional fields. If it "
-            "abstains, follow the abstain reason rather than guessing. For "
-            "prepare_reminder_creation_args, call it immediately before the "
-            "original add_reminder call after the reminder content and timestamp "
-            "are known. For relative local dates such as tomorrow at 5 PM, first "
-            "call get_current_timestamp, then call timestamp_to_datetime_info on "
-            "that timestamp when visible, and pass the returned dict as "
-            "current_datetime_info. Preserve day_offset, hour, and minute across "
-            "generated-tool retries; do not replace them with shift_timestamp, a "
-            "hand-built absolute date, or datetime_info_to_timestamp unless the "
-            "user gave an explicit calendar date. Do not guess "
-            "local_utc_offset_hours. If the user mentioned an optional location and a location "
-            "search tool is visible, resolve the location first, then call "
-            "prepare_reminder_creation_args with the visible coordinates. Use the "
-            "helper's add_reminder_kwargs unchanged for add_reminder; do not "
-            "replace its reminder_timestamp with an earlier helper value. For "
-            "prepare_location_search_args, call it before the original "
-            "search_location_around_lat_lon call when the user request contains "
-            "a place phrase; pass the full user request or exact place phrase, "
-            "then call the returned original search tool with downstream kwargs "
-            "unchanged. For broad place phrases without a street, neighborhood, "
-            "or venue qualifier, use get_current_location when it is visible, "
-            "then retry the generated location-search argument tool with the "
-            "visible coordinates; otherwise ask the user for that specific "
-            "qualifier before using device setting, time, or original "
-            "location-search tools."
-        ),
-    }
+    return _system_actor_message(
+        f"{ACTION_ARGUMENT_HELPER_POLICY_SENTINEL} A generated action-argument "
+        f"helper is available: {helper_list}. If the user's request already "
+        "contains scalar values matching the helper inputs, call the helper "
+        "before asking for unrelated optional fields or manually assembling "
+        "an original side-effect call. The helper prepares arguments only; "
+        "it does not perform the side effect. After it returns "
+        "should_call_tool, should_call_add_reminder, or another true "
+        "should_call_* field with kwargs, call the named original ToolSandbox "
+        "tool with those kwargs, omitting null/None optional fields. If it "
+        "abstains, follow the abstain reason rather than guessing. For "
+        "prepare_reminder_creation_args, call it immediately before the "
+        "original add_reminder call after the reminder content and timestamp "
+        "are known. For relative local dates such as tomorrow at 5 PM, first "
+        "call get_current_timestamp, then call timestamp_to_datetime_info on "
+        "that timestamp when visible, and pass the returned dict as "
+        "current_datetime_info. Preserve day_offset, hour, and minute across "
+        "generated-tool retries; do not replace them with shift_timestamp, a "
+        "hand-built absolute date, or datetime_info_to_timestamp unless the "
+        "user gave an explicit calendar date. Do not guess "
+        "local_utc_offset_hours. If the user mentioned an optional location and a location "
+        "search tool is visible, resolve the location first, then call "
+        "prepare_reminder_creation_args with the visible coordinates. Use the "
+        "helper's add_reminder_kwargs unchanged for add_reminder; do not "
+        "replace its reminder_timestamp with an earlier helper value. For "
+        "prepare_location_search_args, call it before the original "
+        "search_location_around_lat_lon call when the user request contains "
+        "a place phrase; pass the full user request or exact place phrase, "
+        "then call the returned original search tool with downstream kwargs "
+        "unchanged. For broad place phrases without a street, neighborhood, "
+        "or venue qualifier, use get_current_location when it is visible, "
+        "then retry the generated location-search argument tool with the "
+        "visible coordinates; otherwise ask the user for that specific "
+        "qualifier before using device setting, time, or original "
+        "location-search tools."
+    )
 
 
 def _add_contact_argument_actor_policy_message(
@@ -8959,9 +8781,8 @@ def _add_contact_argument_actor_policy_message(
         return None
     if _message_already_called_tool(openai_messages, "add_contact"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if ADD_CONTACT_ARGUMENT_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, ADD_CONTACT_ARGUMENT_POLICY_SENTINEL):
+        return None
     latest_user = _latest_user_request_text(openai_messages)
     all_user_text = " ".join(_all_user_texts(openai_messages)).strip()
     lower = f" {all_user_text.lower()} "
@@ -8974,22 +8795,19 @@ def _add_contact_argument_actor_policy_message(
     ):
         return None
     helper_name = _tool_name_for_call(openai_tools, "prepare_add_contact_args")
-    return {
-        "role": "system",
-        "content": (
-            f"{ADD_CONTACT_ARGUMENT_POLICY_SENTINEL} A generated add-contact "
-            "argument tool is visible and the user supplied a contact name plus "
-            "phone number. Call generated "
-            f"{helper_name} before asking for optional relationship or is_self "
-            "fields and before calling original add_contact. Pass user_request "
-            f"as {json.dumps(all_user_text or latest_user)} and leave relationship "
-            "empty unless the user explicitly supplied one. Omit is_self unless "
-            "the user explicitly says the new contact is themself; phrases like "
-            "'my contact' mean the user's address book. After the generated tool "
-            "returns should_call_downstream_tool=true, call original add_contact "
-            "with downstream_tool_kwargs unchanged."
-        ),
-    }
+    return _system_actor_message(
+        f"{ADD_CONTACT_ARGUMENT_POLICY_SENTINEL} A generated add-contact "
+        "argument tool is visible and the user supplied a contact name plus "
+        "phone number. Call generated "
+        f"{helper_name} before asking for optional relationship or is_self "
+        "fields and before calling original add_contact. Pass user_request "
+        f"as {json.dumps(all_user_text or latest_user)} and leave relationship "
+        "empty unless the user explicitly supplied one. Omit is_self unless "
+        "the user explicitly says the new contact is themself; phrases like "
+        "'my contact' mean the user's address book. After the generated tool "
+        "returns should_call_downstream_tool=true, call original add_contact "
+        "with downstream_tool_kwargs unchanged."
+    )
 
 
 def _location_search_argument_actor_policy_message(
@@ -9000,9 +8818,8 @@ def _location_search_argument_actor_policy_message(
     location_arg_tool = _location_search_arg_tool_execution_name(openai_tools)
     if not location_arg_tool:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL):
+        return None
     latest_prepare = _latest_tool_message_index(openai_messages, {location_arg_tool})
     if latest_prepare is not None:
         payload = _latest_tool_payload_by_name_including_latest(
@@ -9063,22 +8880,19 @@ def _location_search_argument_actor_policy_message(
                     openai_tools,
                     location_arg_tool,
                 )
-                return {
-                    "role": "system",
-                    "content": (
-                        f"{LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL} The generated "
-                        "location-search argument tool previously abstained because "
-                        "the reminder time was missing. A later visible user turn has "
-                        "now supplied reminder time information, so continue the "
-                        "generated-tool workflow before any add_reminder call. Call "
-                        f"generated {location_tool_name} with exactly these arguments: "
-                        f"{json.dumps(arguments, sort_keys=True)}. Then call the "
-                        "original location-search tool returned in downstream_tool_name "
-                        "with downstream_tool_kwargs unchanged. Use only visible "
-                        "coordinates returned by that original search when creating "
-                        "the reminder."
-                    ),
-                }
+                return _system_actor_message(
+                    f"{LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL} The generated "
+                    "location-search argument tool previously abstained because "
+                    "the reminder time was missing. A later visible user turn has "
+                    "now supplied reminder time information, so continue the "
+                    "generated-tool workflow before any add_reminder call. Call "
+                    f"generated {location_tool_name} with exactly these arguments: "
+                    f"{json.dumps(arguments, sort_keys=True)}. Then call the "
+                    "original location-search tool returned in downstream_tool_name "
+                    "with downstream_tool_kwargs unchanged. Use only visible "
+                    "coordinates returned by that original search when creating "
+                    "the reminder."
+                )
         return None
     all_user_text = " ".join(_all_user_texts(openai_messages)).strip()
     lower = f" {all_user_text.lower()} "
@@ -9089,29 +8903,26 @@ def _location_search_argument_actor_policy_message(
     ):
         return None
     location_tool_name = _tool_name_for_call(openai_tools, location_arg_tool)
-    return {
-        "role": "system",
-        "content": (
-            f"{LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL} A generated "
-            "location-search argument tool is visible for this reminder-location "
-            "task. Before calling original add_reminder, call generated "
-            f"{location_tool_name}. Use all user turns that describe the task, "
-            "not only the latest time-only follow-up; pass user_request as the "
-            "combined visible request text and location_phrase as the exact "
-            "visible place phrase when one has already been isolated. Then call "
-            "the original location-search tool returned in downstream_tool_name "
-            "with downstream_tool_kwargs unchanged. Use only visible coordinates "
-            "returned by that original tool. If prepare_reminder_creation_args is "
-            "also visible, call it after the location search and before "
-            "add_reminder so the side-effect arguments are prepared by generated "
-            "tools. If the place phrase is broad and lacks a street, "
-            "neighborhood, or venue qualifier, use get_current_location when it "
-            "is visible, then retry the generated location-search argument tool "
-            "with the visible coordinates; otherwise ask the user for that "
-            "specific qualifier before using device setting tools or original "
-            "location search."
-        ),
-    }
+    return _system_actor_message(
+        f"{LOCATION_SEARCH_ARGUMENT_POLICY_SENTINEL} A generated "
+        "location-search argument tool is visible for this reminder-location "
+        "task. Before calling original add_reminder, call generated "
+        f"{location_tool_name}. Use all user turns that describe the task, "
+        "not only the latest time-only follow-up; pass user_request as the "
+        "combined visible request text and location_phrase as the exact "
+        "visible place phrase when one has already been isolated. Then call "
+        "the original location-search tool returned in downstream_tool_name "
+        "with downstream_tool_kwargs unchanged. Use only visible coordinates "
+        "returned by that original tool. If prepare_reminder_creation_args is "
+        "also visible, call it after the location search and before "
+        "add_reminder so the side-effect arguments are prepared by generated "
+        "tools. If the place phrase is broad and lacks a street, "
+        "neighborhood, or venue qualifier, use get_current_location when it "
+        "is visible, then retry the generated location-search argument tool "
+        "with the visible coordinates; otherwise ask the user for that "
+        "specific qualifier before using device setting tools or original "
+        "location search."
+    )
 
 
 def _looks_like_street_or_place_phrase(value: str) -> bool:
@@ -9298,49 +9109,42 @@ def _post_selection_helper_actor_policy_message(
         return None
     if any(_message_already_called_tool(openai_messages, name) for name in helpers):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if POST_SELECTION_HELPER_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, POST_SELECTION_HELPER_POLICY_SENTINEL):
+        return None
     helper_list = ", ".join(sorted(helpers))
     if _messages_show_prior_candidate_records(openai_messages):
-        return {
-            "role": "system",
-            "content": (
-                f"{POST_SELECTION_HELPER_POLICY_SENTINEL} A generated "
-                f"post-selection action helper is available: {helper_list}. "
-                "Candidate records are now visible. If one record is selected "
-                "by the user's constraints, pass that visible record to the "
-                "helper before manually assembling the original side-effect "
-                "call. If the helper has an updates argument and the user "
-                "requested a modify/update action, pass updates as a dict of "
-                "the explicit fields to change, such as phone_number, name, "
-                "or relationship. Use updates={} only for remove/delete "
-                "actions. If multiple records are possible, use a visible "
-                "selector helper or ask for clarification; do not guess."
-            ),
-        }
-    return {
-        "role": "system",
-        "content": (
-            f"{POST_SELECTION_HELPER_POLICY_SENTINEL} A generated post-selection "
-            f"action helper is available: {helper_list}. This helper needs a "
-            "visible selected record before it can prepare the preserved original "
-            "side-effect call. If the user supplied a scalar lookup constraint "
-            "such as a phone number, name, relationship, reminder content, or "
-            "message content, first call a visible generated lookup planner if "
-            "one is available; otherwise call the appropriate original search "
-            "tool using only constraints actually supplied by the user or visible "
-            "tool output. When a lookup planner returns search kwargs, pass "
-            "exactly those kwargs to the original search tool. Do not add "
-            "optional filters such as is_self, sender id, recipient id, or "
-            "unrelated status fields unless the user supplied that constraint, "
-            "the helper returned it, or a visible tool result established it. "
-            "After the search returns records, call the generated helper with "
-            "the selected visible record. If no search tool is visible or no "
-            "unique record can be identified, abstain or ask rather than "
-            "guessing an id."
-        ),
-    }
+        return _system_actor_message(
+            f"{POST_SELECTION_HELPER_POLICY_SENTINEL} A generated "
+            f"post-selection action helper is available: {helper_list}. "
+            "Candidate records are now visible. If one record is selected "
+            "by the user's constraints, pass that visible record to the "
+            "helper before manually assembling the original side-effect "
+            "call. If the helper has an updates argument and the user "
+            "requested a modify/update action, pass updates as a dict of "
+            "the explicit fields to change, such as phone_number, name, "
+            "or relationship. Use updates={} only for remove/delete "
+            "actions. If multiple records are possible, use a visible "
+            "selector helper or ask for clarification; do not guess."
+        )
+    return _system_actor_message(
+        f"{POST_SELECTION_HELPER_POLICY_SENTINEL} A generated post-selection "
+        f"action helper is available: {helper_list}. This helper needs a "
+        "visible selected record before it can prepare the preserved original "
+        "side-effect call. If the user supplied a scalar lookup constraint "
+        "such as a phone number, name, relationship, reminder content, or "
+        "message content, first call a visible generated lookup planner if "
+        "one is available; otherwise call the appropriate original search "
+        "tool using only constraints actually supplied by the user or visible "
+        "tool output. When a lookup planner returns search kwargs, pass "
+        "exactly those kwargs to the original search tool. Do not add "
+        "optional filters such as is_self, sender id, recipient id, or "
+        "unrelated status fields unless the user supplied that constraint, "
+        "the helper returned it, or a visible tool result established it. "
+        "After the search returns records, call the generated helper with "
+        "the selected visible record. If no search tool is visible or no "
+        "unique record can be identified, abstain or ask rather than "
+        "guessing an id."
+    )
 
 
 def _reminder_missing_time_actor_policy_message(
@@ -9360,9 +9164,8 @@ def _reminder_missing_time_actor_policy_message(
         return None
     if _message_already_called_tool(openai_messages, "add_reminder"):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if REMINDER_MISSING_TIME_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, REMINDER_MISSING_TIME_POLICY_SENTINEL):
+        return None
 
     conversation_user_text = " ".join(
         str(message.get("content", ""))
@@ -9409,19 +9212,16 @@ def _reminder_missing_time_actor_policy_message(
         return None
 
     add_tool = _tool_name_for_call(openai_tools, "add_reminder")
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_MISSING_TIME_POLICY_SENTINEL} A generated reminder "
-            "timestamp or argument-preparation tool is visible, but the visible "
-            "user request does not contain a reminder date or time. Do not call "
-            f"original {add_tool} with current_timestamp, midnight, noon, or any "
-            "placeholder reminder_timestamp. Ask the user for the missing "
-            "reminder date/time. After the user supplies it, use the generated "
-            "timestamp or argument tool whose schema matches that visible time "
-            "phrase."
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_MISSING_TIME_POLICY_SENTINEL} A generated reminder "
+        "timestamp or argument-preparation tool is visible, but the visible "
+        "user request does not contain a reminder date or time. Do not call "
+        f"original {add_tool} with current_timestamp, midnight, noon, or any "
+        "placeholder reminder_timestamp. Ask the user for the missing "
+        "reminder date/time. After the user supplies it, use the generated "
+        "timestamp or argument tool whose schema matches that visible time "
+        "phrase."
+    )
 
 
 def _message_counterparty_search_actor_policy_message(
@@ -9435,41 +9235,35 @@ def _message_counterparty_search_actor_policy_message(
         openai_messages, "plan_message_counterparty_search"
     ):
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if MESSAGE_COUNTERPARTY_SEARCH_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
-    return {
-        "role": "system",
-        "content": (
-            f"{MESSAGE_COUNTERPARTY_SEARCH_POLICY_SENTINEL} A generated "
-            "message-counterparty search planner is available. When the user "
-            "identifies a contact through messages involving the current user "
-            "and a later generated selector/action helper needs message records "
-            "or self_person_id, make the next assistant action a "
-            "plan_message_counterparty_search call before manual search_messages "
-            "arguments. Use message_direction='sent' for messages the user sent "
-            "and message_direction='received' for messages the user received; do "
-            "not pass a slash-separated example string as the actual value. Do "
-            "not pass sender_person_id='self' or recipient_person_id="
-            "'self' directly to search_messages; use the generated planner to get "
-            "the concrete self person_id first. If it returns search_contacts_kwargs, "
-            "call original search_contacts with those kwargs, copy the visible "
-            "self contact person_id exactly, character-for-character, into a "
-            "second planner call, then call original search_messages with the "
-            "returned search_messages_kwargs. Then use "
-            "the visible generated selector/action helper before any original "
-            "modify_contact call. For contact modify/update requests, pass an "
-            "updates dict to that selector/action helper containing the explicit "
-            "fields the user asked to change, such as phone_number, name, or "
-            "relationship. If you call select_message_counterparty_for_contact_update "
-            "directly, include message_direction='sent' when the user asks for "
-            "the last person they sent a message to, and message_direction="
-            "'received' when the user asks for a person who sent them a message. "
-            "Do not omit updates for modify/update requests."
-        ),
-    }
+    if _has_policy_marker(openai_messages, MESSAGE_COUNTERPARTY_SEARCH_POLICY_SENTINEL):
+        return None
+    return _system_actor_message(
+        f"{MESSAGE_COUNTERPARTY_SEARCH_POLICY_SENTINEL} A generated "
+        "message-counterparty search planner is available. When the user "
+        "identifies a contact through messages involving the current user "
+        "and a later generated selector/action helper needs message records "
+        "or self_person_id, make the next assistant action a "
+        "plan_message_counterparty_search call before manual search_messages "
+        "arguments. Use message_direction='sent' for messages the user sent "
+        "and message_direction='received' for messages the user received; do "
+        "not pass a slash-separated example string as the actual value. Do "
+        "not pass sender_person_id='self' or recipient_person_id="
+        "'self' directly to search_messages; use the generated planner to get "
+        "the concrete self person_id first. If it returns search_contacts_kwargs, "
+        "call original search_contacts with those kwargs, copy the visible "
+        "self contact person_id exactly, character-for-character, into a "
+        "second planner call, then call original search_messages with the "
+        "returned search_messages_kwargs. Then use "
+        "the visible generated selector/action helper before any original "
+        "modify_contact call. For contact modify/update requests, pass an "
+        "updates dict to that selector/action helper containing the explicit "
+        "fields the user asked to change, such as phone_number, name, or "
+        "relationship. If you call select_message_counterparty_for_contact_update "
+        "directly, include message_direction='sent' when the user asks for "
+        "the last person they sent a message to, and message_direction="
+        "'received' when the user asks for a person who sent them a message. "
+        "Do not omit updates for modify/update requests."
+    )
 
 
 def _message_counterparty_direction_from_request(openai_messages: object) -> str:
@@ -9520,29 +9314,25 @@ def _message_counterparty_selector_setup_actor_policy_message(
     ):
         return None
     direction = _message_counterparty_direction_from_request(openai_messages)
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL
+    ):
+        return None
     selection_mode = _message_counterparty_selection_mode_from_request(openai_messages)
     self_person_id = _latest_self_person_id_from_contacts(openai_messages)
     if not self_person_id:
         if "search_contacts" not in available_names:
             return None
-        return {
-            "role": "system",
-            "content": (
-                f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} A "
-                "generated message-counterparty selector is visible for this "
-                "contact update. The selector needs the current user's concrete "
-                "self_person_id before message records can be selected. Do not "
-                "pass sender_person_id='self' or recipient_person_id='self' to "
-                "search_messages. First call the original search_contacts tool "
-                "with is_self=true, then use the visible person_id from that "
-                "result for the next original search_messages call."
-            ),
-        }
+        return _system_actor_message(
+            f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} A "
+            "generated message-counterparty selector is visible for this "
+            "contact update. The selector needs the current user's concrete "
+            "self_person_id before message records can be selected. Do not "
+            "pass sender_person_id='self' or recipient_person_id='self' to "
+            "search_messages. First call the original search_contacts tool "
+            "with is_self=true, then use the visible person_id from that "
+            "result for the next original search_messages call."
+        )
 
     latest_contacts = _latest_tool_message_index(openai_messages, {"search_contacts"})
     latest_messages = _latest_tool_message_index(openai_messages, {"search_messages"})
@@ -9568,20 +9358,17 @@ def _message_counterparty_selector_setup_actor_policy_message(
                 "recipient filters so the generated selector can identify the "
                 "non-self counterparty from complete visible records."
             )
-        return {
-            "role": "system",
-            "content": (
-                f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} The "
-                "original search_contacts result exposes the current user's "
-                f"person_id as {self_person_id!r}. {search_instruction} Do "
-                "not add a content or contact-name filter unless the user made "
-                "that filter part of the task. After search_messages returns "
-                "visible records, call select_message_counterparty_for_contact_update "
-                f"with records from that result, selection_mode={selection_mode!r}, "
-                "the explicit update fields from the user request, and "
-                f"self_person_id={self_person_id!r}."
-            ),
-        }
+        return _system_actor_message(
+            f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} The "
+            "original search_contacts result exposes the current user's "
+            f"person_id as {self_person_id!r}. {search_instruction} Do "
+            "not add a content or contact-name filter unless the user made "
+            "that filter part of the task. After search_messages returns "
+            "visible records, call select_message_counterparty_for_contact_update "
+            f"with records from that result, selection_mode={selection_mode!r}, "
+            "the explicit update fields from the user request, and "
+            f"self_person_id={self_person_id!r}."
+        )
 
     if not _messages_show_prior_candidate_records(openai_messages):
         return None
@@ -9591,19 +9378,16 @@ def _message_counterparty_selector_setup_actor_policy_message(
         if phone
         else "updates containing only fields explicitly requested by the user"
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} The latest "
-            "original search_messages result contains visible message records, "
-            "and a generated selector is available for choosing the safe contact "
-            "update target. Call select_message_counterparty_for_contact_update "
-            f"now with those records, selection_mode={selection_mode!r}, "
-            f"{update_note}, and self_person_id={self_person_id!r}. Do not "
-            "call modify_contact before the generated selector returns "
-            "downstream_tool_kwargs."
-        ),
-    }
+    return _system_actor_message(
+        f"{MESSAGE_COUNTERPARTY_SELECTOR_SETUP_POLICY_SENTINEL} The latest "
+        "original search_messages result contains visible message records, "
+        "and a generated selector is available for choosing the safe contact "
+        "update target. Call select_message_counterparty_for_contact_update "
+        f"now with those records, selection_mode={selection_mode!r}, "
+        f"{update_note}, and self_person_id={self_person_id!r}. Do not "
+        "call modify_contact before the generated selector returns "
+        "downstream_tool_kwargs."
+    )
 
 
 def _message_counterparty_update_completion_actor_policy_message(
@@ -9663,18 +9447,15 @@ def _message_counterparty_update_completion_actor_policy_message(
     else:
         subject = "the contact selected from the latest visible message"
     confirmation = f"The phone number of {subject} has been updated to {phone}."
-    return {
-        "role": "system",
-        "content": (
-            f"{MESSAGE_COUNTERPARTY_UPDATE_COMPLETION_POLICY_SENTINEL} The "
-            "generated message-counterparty selector prepared the modify_contact "
-            "arguments, and original modify_contact has now succeeded. Give a "
-            "concise completion confirmation grounded only in the visible user "
-            f"request and tool results: {confirmation} Include the updated phone "
-            "number exactly. Do not mention generated tools, add unrelated "
-            "fields, greetings, or offers for more help."
-        ),
-    }
+    return _system_actor_message(
+        f"{MESSAGE_COUNTERPARTY_UPDATE_COMPLETION_POLICY_SENTINEL} The "
+        "generated message-counterparty selector prepared the modify_contact "
+        "arguments, and original modify_contact has now succeeded. Give a "
+        "concise completion confirmation grounded only in the visible user "
+        f"request and tool results: {confirmation} Include the updated phone "
+        "number exactly. Do not mention generated tools, add unrelated "
+        "fields, greetings, or offers for more help."
+    )
 
 
 def _message_counterparty_self_lookup_handoff_actor_policy_message(
@@ -9731,25 +9512,21 @@ def _message_counterparty_self_lookup_handoff_actor_policy_message(
         if copied_fields
         else " Keep the previous message_direction and selection_mode values."
     )
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if MESSAGE_COUNTERPARTY_SELF_LOOKUP_HANDOFF_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
-    return {
-        "role": "system",
-        "content": (
-            f"{MESSAGE_COUNTERPARTY_SELF_LOOKUP_HANDOFF_POLICY_SENTINEL} The "
-            "generated message-counterparty planner requested a self-contact "
-            "lookup, and the original search_contacts result now shows the "
-            "current user's visible self contact. Do not manually construct "
-            "search_messages timestamp, phone-number, content, or relationship "
-            "filters. Call plan_message_counterparty_search again now, copying "
-            "the visible self contact person_id exactly into self_person_id."
-            f"{copied_note} Then call original search_messages with exactly the "
-            "search_messages_kwargs returned by that second generated-tool call."
-        ),
-    }
+    if _has_policy_marker(
+        openai_messages, MESSAGE_COUNTERPARTY_SELF_LOOKUP_HANDOFF_POLICY_SENTINEL
+    ):
+        return None
+    return _system_actor_message(
+        f"{MESSAGE_COUNTERPARTY_SELF_LOOKUP_HANDOFF_POLICY_SENTINEL} The "
+        "generated message-counterparty planner requested a self-contact "
+        "lookup, and the original search_contacts result now shows the "
+        "current user's visible self contact. Do not manually construct "
+        "search_messages timestamp, phone-number, content, or relationship "
+        "filters. Call plan_message_counterparty_search again now, copying "
+        "the visible self contact person_id exactly into self_person_id."
+        f"{copied_note} Then call original search_messages with exactly the "
+        "search_messages_kwargs returned by that second generated-tool call."
+    )
 
 
 def _generated_record_handoff_actor_policy_message(
@@ -9822,23 +9599,20 @@ def _generated_record_handoff_actor_policy_message(
                 "those prior generated-tool arguments; do not drop it when "
                 "adding messages."
             )
-    return {
-        "role": "system",
-        "content": (
-            f"{GENERATED_RECORD_HANDOFF_POLICY_SENTINEL} The latest original "
-            "search_messages call returned visible message records after a "
-            "generated-tool workflow. The next generated-tool call should be "
-            f"{visible_tool_name} with its {record_argument} argument set to the entire "
-            "latest search_messages result, preserving record dictionaries and "
-            "timestamps exactly as visible. Do not call this generated tool "
-            "again without messages, and do not restart search_messages only to "
-            "recover the same records."
-            f"{prior_instruction} If the generated tool returns answer_value, "
-            "exact_final_answer, final_answer, or final_answer_recommendation, "
-            "use that returned value directly for the final answer or the next "
-            "original side-effect tool."
-        ),
-    }
+    return _system_actor_message(
+        f"{GENERATED_RECORD_HANDOFF_POLICY_SENTINEL} The latest original "
+        "search_messages call returned visible message records after a "
+        "generated-tool workflow. The next generated-tool call should be "
+        f"{visible_tool_name} with its {record_argument} argument set to the entire "
+        "latest search_messages result, preserving record dictionaries and "
+        "timestamps exactly as visible. Do not call this generated tool "
+        "again without messages, and do not restart search_messages only to "
+        "recover the same records."
+        f"{prior_instruction} If the generated tool returns answer_value, "
+        "exact_final_answer, final_answer, or final_answer_recommendation, "
+        "use that returned value directly for the final answer or the next "
+        "original side-effect tool."
+    )
 
 
 def _reminder_recency_relative_modify_actor_policy_message(
@@ -9868,11 +9642,10 @@ def _reminder_recency_relative_modify_actor_policy_message(
     reminder_id = str((selected or {}).get("reminder_id") or "").strip()
     if not reminder_id:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if REMINDER_RECENCY_RELATIVE_MODIFY_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, REMINDER_RECENCY_RELATIVE_MODIFY_POLICY_SENTINEL
+    ):
+        return None
     hour, minute = requested_time
     current_timestamp = _latest_current_timestamp(openai_messages)
     current_info = (
@@ -9902,20 +9675,17 @@ def _reminder_recency_relative_modify_actor_policy_message(
             "current_datetime_info; do not call datetime_info_to_timestamp for "
             "this relative request."
         )
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_RECENCY_RELATIVE_MODIFY_POLICY_SENTINEL} A generated "
-            "selector has identified one reminder_id for a modify_reminder task, "
-            f"and the user requested tomorrow at {hour:02d}:{minute:02d}. "
-            f"{timestamp_instruction} Use day_offset=1, hour={hour}, "
-            f"minute={minute}, and the visible current timestamp. Do not guess "
-            "local_utc_offset_hours. Then call the original modify_reminder with "
-            "the selected reminder_id and the timestamp returned by "
-            "relative_day_time_to_timestamp. Do not invent an absolute calendar "
-            "date for a relative 'tomorrow' request."
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_RECENCY_RELATIVE_MODIFY_POLICY_SENTINEL} A generated "
+        "selector has identified one reminder_id for a modify_reminder task, "
+        f"and the user requested tomorrow at {hour:02d}:{minute:02d}. "
+        f"{timestamp_instruction} Use day_offset=1, hour={hour}, "
+        f"minute={minute}, and the visible current timestamp. Do not guess "
+        "local_utc_offset_hours. Then call the original modify_reminder with "
+        "the selected reminder_id and the timestamp returned by "
+        "relative_day_time_to_timestamp. Do not invent an absolute calendar "
+        "date for a relative 'tomorrow' request."
+    )
 
 
 def _reminder_recency_search_result_actor_policy_message(
@@ -9955,11 +9725,10 @@ def _reminder_recency_search_result_actor_policy_message(
         selector_name = "select_action_target_by_recency"
     if not selector_name:
         return None
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if REMINDER_RECENCY_SEARCH_RESULT_POLICY_SENTINEL in str(
-            message.get("content", "")
-        ):
-            return None
+    if _has_policy_marker(
+        openai_messages, REMINDER_RECENCY_SEARCH_RESULT_POLICY_SENTINEL
+    ):
+        return None
     selection_mode = (
         "oldest" if request in {"modify_upcoming", "remove_upcoming"} else "latest"
     )
@@ -10053,16 +9822,13 @@ def _reminder_recency_search_result_actor_policy_message(
             "the original modify_reminder with that selected reminder_id and the "
             "generated timestamp."
         )
-    return {
-        "role": "system",
-        "content": (
-            f"{REMINDER_RECENCY_SEARCH_RESULT_POLICY_SENTINEL} The latest "
-            "search_reminder result is for a recency-based reminder action. "
-            "Use the validated generated selector/action tool before manually "
-            "assembling the original state-changing call. "
-            f"{selector_instruction} {continuation_instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{REMINDER_RECENCY_SEARCH_RESULT_POLICY_SENTINEL} The latest "
+        "search_reminder result is for a recency-based reminder action. "
+        "Use the validated generated selector/action tool before manually "
+        "assembling the original state-changing call. "
+        f"{selector_instruction} {continuation_instruction}"
+    )
 
 
 def _with_selector_actor_policy(
@@ -10227,9 +9993,8 @@ def _shared_task_closure_actor_policy_message(
     openai_tools: object,
 ) -> dict[str, str] | None:
     """Apply the same task-completion discipline to baseline and SAGE arms."""
-    for message in cast(Iterable[Mapping[str, Any]], openai_messages):
-        if SHARED_TASK_CLOSURE_POLICY_SENTINEL in str(message.get("content", "")):
-            return None
+    if _has_policy_marker(openai_messages, SHARED_TASK_CLOSURE_POLICY_SENTINEL):
+        return None
     end_name = (
         _tool_name_for_call(openai_tools, "end_conversation")
         if "end_conversation" in _tool_names_execution_facing(openai_tools)
@@ -10247,26 +10012,23 @@ def _shared_task_closure_actor_policy_message(
             "short closing sentence."
         )
     )
-    return {
-        "role": "system",
-        "content": (
-            f"{SHARED_TASK_CLOSURE_POLICY_SENTINEL} Complete exactly the user's "
-            "current ToolSandbox task. Once you have the requested lookup value "
-            "or the requested state-changing tool succeeds, give only the concise "
-            "answer or completion confirmation. Do not invite further assistance, "
-            "do not introduce new tasks, and do not give general phone or app "
-            "instructions unless the user explicitly requested instructions. "
-            "For send-message tasks, if a successful visible "
-            "send_message_with_phone_number call includes message content, confirm "
-            "the recipient and include that same visible content in the completion "
-            "confirmation; do not omit it or replace it with a paraphrase. "
-            "For contact-update tasks, if a successful visible modify_contact "
-            "call updates a visible person_id, phone number, name, or relationship, "
-            "include the visible identifier or contact name and the updated visible "
-            "field value in the completion confirmation. "
-            f"{close_instruction}"
-        ),
-    }
+    return _system_actor_message(
+        f"{SHARED_TASK_CLOSURE_POLICY_SENTINEL} Complete exactly the user's "
+        "current ToolSandbox task. Once you have the requested lookup value "
+        "or the requested state-changing tool succeeds, give only the concise "
+        "answer or completion confirmation. Do not invite further assistance, "
+        "do not introduce new tasks, and do not give general phone or app "
+        "instructions unless the user explicitly requested instructions. "
+        "For send-message tasks, if a successful visible "
+        "send_message_with_phone_number call includes message content, confirm "
+        "the recipient and include that same visible content in the completion "
+        "confirmation; do not omit it or replace it with a paraphrase. "
+        "For contact-update tasks, if a successful visible modify_contact "
+        "call updates a visible person_id, phone number, name, or relationship, "
+        "include the visible identifier or contact name and the updated visible "
+        "field value in the completion confirmation. "
+        f"{close_instruction}"
+    )
 
 
 def _all_user_texts(openai_messages: object) -> list[str]:
