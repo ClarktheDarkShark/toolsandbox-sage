@@ -55,41 +55,256 @@ EXPECTED_CONTRACT: dict[str, Any] = {
     "duplicate_case_count": 8,
     "benchmark_collision_count": 726,
     "factory_refactor_guards": {
-        "byte_count": 244_896,
-        "sha256": "029a38fa90af28c0c7d2a9066847e1303c8ad8d1fde8c8913509243216c961b2",
+        "byte_count": 1_076_645,
+        "sha256": "8ed7b3704ba1074f66e2aa09d408bfb8d38ce5df3b0ee884d0147af6e6cdab21",
     },
-    "direct_factory_count": 11,
-    "direct_factory_example_count": 38,
+    "factory_guard_schema_version": 2,
+    "direct_factory_count": 33,
+    "direct_factory_example_count": 146,
+    "factory_topology_count": 33,
+    "intentional_alias_factory_count": 3,
+    "reminder_alias_equivalence_count": 1,
     "location_non_alias_case_count": 9,
 }
 
 
 _FACTORY_REFACTOR_SPECS: tuple[tuple[str, str], ...] = (
+    ("validation", "_safe_action_or_abstain_observation"),
+    ("device", "_device_status_lookup_observation"),
+    ("device", "_plan_device_state_action_sequence_observation"),
+    ("reminder", "_reminder_optional_location_argument_observation"),
+    ("location", "_location_search_argument_observation"),
+    ("location", "_broad_location_search_argument_observation"),
+    ("contact", "_add_contact_argument_observation"),
+    ("time", "_next_weekday_timestamp_observation"),
+    ("time", "_relative_day_time_timestamp_observation"),
+    ("search", "_prepare_upcoming_reminder_search_args_observation"),
+    ("search", "_prepare_message_recency_search_args_observation"),
+    ("search", "_prepare_past_reminder_recency_search_args_observation"),
+    ("search", "_resolve_search_window_or_bounds_observation"),
+    ("search", "_latest_record_selection_observation"),
+    ("search", "_message_content_by_recency_observation"),
+    ("time", "_days_between_timestamps_observation"),
+    ("time", "_holiday_search_args_observation"),
+    ("contact", "_contact_lookup_query_planner_observation"),
+    ("contact", "_send_message_contact_lookup_observation"),
+    ("contact", "_contact_relationship_batch_update_observation"),
+    ("contact", "_message_counterparty_contact_update_observation"),
+    ("contact", "_message_counterparty_search_plan_observation"),
+    ("contact", "_contact_update_by_id_observation"),
+    ("contact", "_direct_scalar_contact_action_observation"),
+    ("contact", "_recency_action_target_observation"),
+    ("service", "_stock_symbol_extraction_observation"),
     ("service", "_external_service_answer_extraction_observation"),
     ("service", "_address_answer_extraction_observation"),
     ("service", "_currency_answer_extraction_observation"),
     ("service", "_phone_answer_extraction_observation"),
     ("service", "_distance_answer_extraction_observation"),
     ("service", "_temperature_answer_extraction_observation"),
-    ("location", "_location_search_argument_observation"),
-    ("location", "_broad_location_search_argument_observation"),
-    ("search", "_prepare_upcoming_reminder_search_args_observation"),
-    ("search", "_prepare_message_recency_search_args_observation"),
-    ("search", "_prepare_past_reminder_recency_search_args_observation"),
+    ("device", "_single_device_state_action_observation"),
 )
 
-_EXPECTED_FACTORY_MUTABLE_COUNTS: dict[str, int] = {
-    "_external_service_answer_extraction_observation": 28,
-    "_address_answer_extraction_observation": 12,
-    "_currency_answer_extraction_observation": 8,
-    "_phone_answer_extraction_observation": 8,
-    "_distance_answer_extraction_observation": 8,
-    "_temperature_answer_extraction_observation": 16,
-    "_location_search_argument_observation": 20,
-    "_broad_location_search_argument_observation": 16,
-    "_prepare_upcoming_reminder_search_args_observation": 9,
-    "_prepare_message_recency_search_args_observation": 9,
-    "_prepare_past_reminder_recency_search_args_observation": 9,
+# Values are unique mutable containers, mutable occurrences, alias groups, and
+# the SHA-256 of the complete topology (including every intentional alias path).
+_EXPECTED_FACTORY_TOPOLOGIES: dict[str, tuple[int, int, int, str]] = {
+    "_safe_action_or_abstain_observation": (
+        34,
+        34,
+        0,
+        "501196030ddd692a4e96a7c10d155f2d31421efc45cffd1d8b2a6d55777bead9",
+    ),
+    "_device_status_lookup_observation": (
+        9,
+        9,
+        0,
+        "860905bfbc4c3e02e6f2a47f6e2ab6a961c2a30e5e057346cd7297d0259d1aa0",
+    ),
+    "_plan_device_state_action_sequence_observation": (
+        31,
+        48,
+        8,
+        "67e2ef08b687dc9ec8c7264a6e5455a48a530218e9a595022dd9e28017b13a2d",
+    ),
+    "_reminder_optional_location_argument_observation": (
+        24,
+        24,
+        0,
+        "0c0480a52be3817d6ba995b09086f1b21166f1d972126b74c58d302ed708ab8e",
+    ),
+    "_location_search_argument_observation": (
+        20,
+        20,
+        0,
+        "1dd20f9b07d3e4d4ea37d99b3e6e8598ec6f06f7dcb51666797f4fab2a1782d5",
+    ),
+    "_broad_location_search_argument_observation": (
+        16,
+        16,
+        0,
+        "c0605e258be41073748534100793520afdb85281a562ea37aceae3fb814b9320",
+    ),
+    "_add_contact_argument_observation": (
+        12,
+        12,
+        0,
+        "1e806642ebc207ec80c27144ecebb69405e3d39a663efffe0a5a25f6661208cf",
+    ),
+    "_next_weekday_timestamp_observation": (
+        12,
+        12,
+        0,
+        "1e806642ebc207ec80c27144ecebb69405e3d39a663efffe0a5a25f6661208cf",
+    ),
+    "_relative_day_time_timestamp_observation": (
+        10,
+        10,
+        0,
+        "c5e8d2a6a578a7b7a3cb629d58f9bdfbf5a203f3057f6d5640d9771708e79d9a",
+    ),
+    "_prepare_upcoming_reminder_search_args_observation": (
+        9,
+        9,
+        0,
+        "860905bfbc4c3e02e6f2a47f6e2ab6a961c2a30e5e057346cd7297d0259d1aa0",
+    ),
+    "_prepare_message_recency_search_args_observation": (
+        9,
+        9,
+        0,
+        "860905bfbc4c3e02e6f2a47f6e2ab6a961c2a30e5e057346cd7297d0259d1aa0",
+    ),
+    "_prepare_past_reminder_recency_search_args_observation": (
+        9,
+        9,
+        0,
+        "860905bfbc4c3e02e6f2a47f6e2ab6a961c2a30e5e057346cd7297d0259d1aa0",
+    ),
+    "_resolve_search_window_or_bounds_observation": (
+        21,
+        21,
+        0,
+        "28a5e4a839db4b660c6dba1eb9b00a41e1801f8e9b9f8c09b43b5ebae91e47d5",
+    ),
+    "_latest_record_selection_observation": (
+        24,
+        24,
+        0,
+        "0c0480a52be3817d6ba995b09086f1b21166f1d972126b74c58d302ed708ab8e",
+    ),
+    "_message_content_by_recency_observation": (
+        35,
+        35,
+        0,
+        "1c11d140daf4147eb08fd76c110ac73117ad5d9231434e2e742700393c956b84",
+    ),
+    "_days_between_timestamps_observation": (
+        6,
+        6,
+        0,
+        "fbbaebf9ce2642a363a4cbfc769fceb6069b8f5db06163aa97357377bc7f423a",
+    ),
+    "_holiday_search_args_observation": (
+        15,
+        15,
+        0,
+        "6d605ab3bebc16dc7a33a13864d65f96861206a1d64444e9dd2cc56cd08f2812",
+    ),
+    "_contact_lookup_query_planner_observation": (
+        30,
+        30,
+        0,
+        "4e77f627397346d9a34d5d806c4163da59ee2064c69895850f465506869c63b5",
+    ),
+    "_send_message_contact_lookup_observation": (
+        12,
+        12,
+        0,
+        "1e806642ebc207ec80c27144ecebb69405e3d39a663efffe0a5a25f6661208cf",
+    ),
+    "_contact_relationship_batch_update_observation": (
+        40,
+        40,
+        0,
+        "7051d502b92eaf433187b75559e270f0e0eb51319eab540f7f85be98de502fc3",
+    ),
+    "_message_counterparty_contact_update_observation": (
+        41,
+        48,
+        2,
+        "284ea11ddadcac12542fa0143cca7b5e9c6688541442898bbc27159cdf7e64a1",
+    ),
+    "_message_counterparty_search_plan_observation": (
+        34,
+        34,
+        0,
+        "501196030ddd692a4e96a7c10d155f2d31421efc45cffd1d8b2a6d55777bead9",
+    ),
+    "_contact_update_by_id_observation": (
+        9,
+        9,
+        0,
+        "860905bfbc4c3e02e6f2a47f6e2ab6a961c2a30e5e057346cd7297d0259d1aa0",
+    ),
+    "_direct_scalar_contact_action_observation": (
+        15,
+        15,
+        0,
+        "6d605ab3bebc16dc7a33a13864d65f96861206a1d64444e9dd2cc56cd08f2812",
+    ),
+    "_recency_action_target_observation": (
+        42,
+        42,
+        0,
+        "b97fa255f88e64d7f71974c997b5447f05e0d6e38f8f4378679119428195ab51",
+    ),
+    "_stock_symbol_extraction_observation": (
+        6,
+        6,
+        0,
+        "fbbaebf9ce2642a363a4cbfc769fceb6069b8f5db06163aa97357377bc7f423a",
+    ),
+    "_external_service_answer_extraction_observation": (
+        28,
+        28,
+        0,
+        "953a14d123ba5e8acf5d8230dbdb177e8d1ea32cf0fe6acff8658c95dc18bfba",
+    ),
+    "_address_answer_extraction_observation": (
+        12,
+        12,
+        0,
+        "1e806642ebc207ec80c27144ecebb69405e3d39a663efffe0a5a25f6661208cf",
+    ),
+    "_currency_answer_extraction_observation": (
+        8,
+        8,
+        0,
+        "b52d929873305f728db91c15b66dadbf05b346f7a4deec1ac6506db5e1f3b2bb",
+    ),
+    "_phone_answer_extraction_observation": (
+        8,
+        8,
+        0,
+        "b52d929873305f728db91c15b66dadbf05b346f7a4deec1ac6506db5e1f3b2bb",
+    ),
+    "_distance_answer_extraction_observation": (
+        8,
+        8,
+        0,
+        "b52d929873305f728db91c15b66dadbf05b346f7a4deec1ac6506db5e1f3b2bb",
+    ),
+    "_temperature_answer_extraction_observation": (
+        16,
+        16,
+        0,
+        "c0605e258be41073748534100793520afdb85281a562ea37aceae3fb814b9320",
+    ),
+    "_single_device_state_action_observation": (
+        17,
+        18,
+        1,
+        "018104e014a76b78f3604f5da3dbfb6df7dd8609cbfed803c585ec65a2ba0465",
+    ),
 }
 
 
@@ -374,6 +589,7 @@ def _direct_factory_guard(
     second_after = _digest(second)
     third = factory(scenario_name)
     third_after = _digest(third)
+    topology = _mutable_identity_topology(second)
     return {
         "group": group,
         "factory_name": factory_name,
@@ -382,7 +598,8 @@ def _direct_factory_guard(
         "example_count": len(second.validation_examples),
         "factory_product": _digest(_static_factory_contract(second)),
         "exact_observation": second_before,
-        "within_product_mutable_topology": _mutable_identity_topology(second),
+        "within_product_mutable_topology": topology,
+        "within_product_mutable_topology_digest": _digest(topology),
         "examples": [
             _example_shape(index, example)
             for index, example in enumerate(second.validation_examples)
@@ -401,6 +618,62 @@ def _direct_factory_guard(
                 _mutable_ids(second) & _mutable_ids(third)
             ),
         },
+    }
+
+
+def _reminder_factory_alias_equivalence(classifier: Any) -> dict[str, Any]:
+    """Prove the compatibility alias is equal but never shares mutable state."""
+
+    scenario_name = "replay_factory_alias:reminder_creation_finalizer"
+    optional = classifier._reminder_optional_location_argument_observation(
+        scenario_name
+    )
+    finalizer = classifier._reminder_creation_finalizer_observation(scenario_name)
+    optional_before = _digest(optional)
+    finalizer_before = _digest(finalizer)
+    equal_by_value_before = optional == finalizer
+    shared_before = _mutable_ids(optional) & _mutable_ids(finalizer)
+
+    optional_example = optional.validation_examples[0]
+    optional_example.inputs["__reminder_alias_mutation_probe__"] = ["optional"]
+    if isinstance(optional_example.expected, dict):
+        optional_example.expected["__reminder_alias_mutation_probe__"] = {
+            "optional": True
+        }
+
+    optional_after = _digest(optional)
+    finalizer_after = _digest(finalizer)
+    fresh_optional = classifier._reminder_optional_location_argument_observation(
+        scenario_name
+    )
+    fresh_finalizer = classifier._reminder_creation_finalizer_observation(scenario_name)
+    fresh_optional_digest = _digest(fresh_optional)
+    fresh_finalizer_digest = _digest(fresh_finalizer)
+    return {
+        "scenario_name": scenario_name,
+        "alias_factory": "_reminder_optional_location_argument_observation",
+        "canonical_factory": "_reminder_creation_finalizer_observation",
+        "equal_by_value_before_mutation": equal_by_value_before,
+        "same_object_before_mutation": optional is finalizer,
+        "shared_mutable_count_before_mutation": len(shared_before),
+        "optional_before": optional_before,
+        "optional_after": optional_after,
+        "finalizer_before": finalizer_before,
+        "finalizer_after": finalizer_after,
+        "optional_mutation_changed_optional": optional_before != optional_after,
+        "optional_mutation_left_finalizer_unchanged": (
+            finalizer_before == finalizer_after
+        ),
+        "fresh_optional": fresh_optional_digest,
+        "fresh_finalizer": fresh_finalizer_digest,
+        "fresh_products_equal_by_value": fresh_optional == fresh_finalizer,
+        "fresh_products_match_unmutated_value": (
+            fresh_optional_digest == optional_before
+            and fresh_finalizer_digest == finalizer_before
+        ),
+        "fresh_products_shared_mutable_count": len(
+            _mutable_ids(fresh_optional) & _mutable_ids(fresh_finalizer)
+        ),
     }
 
 
@@ -469,8 +742,11 @@ def _factory_refactor_guards(classifier: Any) -> dict[str, Any]:
         for group, factory_name in _FACTORY_REFACTOR_SPECS
     ]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "factories": factories,
+        "reminder_factory_alias_equivalence": (
+            _reminder_factory_alias_equivalence(classifier)
+        ),
         "location_kwargs_non_alias": _location_kwargs_non_alias_cases(classifier),
     }
 
@@ -975,9 +1251,21 @@ def _contract_projection(corpus: dict[str, Any]) -> dict[str, Any]:
             corpus["focused_contracts"]["benchmark_primary_family_collisions"]
         ),
         "factory_refactor_guards": corpus["integrity"]["factory_refactor_guards"],
+        "factory_guard_schema_version": factory_refactor_guards["schema_version"],
         "direct_factory_count": len(factory_refactor_guards["factories"]),
         "direct_factory_example_count": sum(
             item["example_count"] for item in factory_refactor_guards["factories"]
+        ),
+        "factory_topology_count": sum(
+            "within_product_mutable_topology_digest" in item
+            for item in factory_refactor_guards["factories"]
+        ),
+        "intentional_alias_factory_count": sum(
+            bool(item["within_product_mutable_topology"]["alias_groups"])
+            for item in factory_refactor_guards["factories"]
+        ),
+        "reminder_alias_equivalence_count": int(
+            bool(factory_refactor_guards["reminder_factory_alias_equivalence"])
         ),
         "location_non_alias_case_count": len(
             factory_refactor_guards["location_kwargs_non_alias"]
@@ -985,25 +1273,68 @@ def _contract_projection(corpus: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _verify_reminder_factory_alias_equivalence(contract: dict[str, Any]) -> None:
+    if (
+        contract["alias_factory"] != "_reminder_optional_location_argument_observation"
+        or contract["canonical_factory"] != "_reminder_creation_finalizer_observation"
+    ):
+        raise ValueError("classifier reminder factory alias membership changed")
+    if not (
+        contract["equal_by_value_before_mutation"]
+        and contract["same_object_before_mutation"] is False
+        and contract["shared_mutable_count_before_mutation"] == 0
+        and contract["optional_before"] == contract["finalizer_before"]
+        and contract["optional_mutation_changed_optional"]
+        and contract["optional_before"] != contract["optional_after"]
+        and contract["optional_mutation_left_finalizer_unchanged"]
+        and contract["finalizer_before"] == contract["finalizer_after"]
+        and contract["fresh_products_equal_by_value"]
+        and contract["fresh_products_match_unmutated_value"]
+        and contract["fresh_optional"] == contract["optional_before"]
+        and contract["fresh_finalizer"] == contract["finalizer_before"]
+        and contract["fresh_products_shared_mutable_count"] == 0
+    ):
+        raise ValueError(
+            "classifier reminder compatibility factories differ or share mutable data"
+        )
+
+
 def _verify_factory_refactor_guards(factory_refactor_guards: dict[str, Any]) -> None:
+    if factory_refactor_guards.get("schema_version") != 2:
+        raise ValueError("classifier direct-factory guard schema changed")
     actual_specs = [
         (item["group"], item["factory_name"])
         for item in factory_refactor_guards["factories"]
     ]
     if actual_specs != list(_FACTORY_REFACTOR_SPECS):
         raise ValueError("classifier direct-factory guard order or membership changed")
+    expected_names = [name for _group, name in _FACTORY_REFACTOR_SPECS]
+    if set(_EXPECTED_FACTORY_TOPOLOGIES) != set(expected_names):
+        raise ValueError("classifier topology expectation inventory is incomplete")
     for item in factory_refactor_guards["factories"]:
-        expected_mutable_count = _EXPECTED_FACTORY_MUTABLE_COUNTS[item["factory_name"]]
+        (
+            expected_unique_count,
+            expected_occurrence_count,
+            expected_alias_count,
+            expected_topology_sha256,
+        ) = _EXPECTED_FACTORY_TOPOLOGIES[item["factory_name"]]
         topology = item["within_product_mutable_topology"]
+        topology_digest = item["within_product_mutable_topology_digest"]
         if not (
-            topology["mutable_container_count"] == expected_mutable_count
-            and topology["mutable_container_occurrence_count"] == expected_mutable_count
-            and topology["duplicate_mutable_identity_count"] == 0
-            and topology["alias_groups"] == []
+            topology["mutable_container_count"] == expected_unique_count
+            and topology["mutable_container_occurrence_count"]
+            == expected_occurrence_count
+            and topology["duplicate_mutable_identity_count"] == expected_alias_count
+            and len(topology["alias_groups"]) == expected_alias_count
+            and topology_digest == _digest(topology)
+            and topology_digest["sha256"] == expected_topology_sha256
+            and (expected_alias_count > 0 or topology["alias_groups"] == [])
         ):
             raise ValueError(
                 "classifier factory mutable identity topology changed: "
-                f"{item['factory_name']} expected_count={expected_mutable_count} "
+                f"{item['factory_name']} expected="
+                f"({expected_unique_count}, {expected_occurrence_count}, "
+                f"{expected_alias_count}, {expected_topology_sha256}) "
                 f"actual={topology!r}"
             )
         freshness = item["freshness"]
@@ -1021,6 +1352,9 @@ def _verify_factory_refactor_guards(factory_refactor_guards: dict[str, Any]) -> 
             raise ValueError(
                 f"classifier factory {item['factory_name']} example shapes are incomplete"
             )
+    _verify_reminder_factory_alias_equivalence(
+        factory_refactor_guards["reminder_factory_alias_equivalence"]
+    )
     for item in factory_refactor_guards["location_kwargs_non_alias"]:
         if not (
             item["same_object_before"] is False

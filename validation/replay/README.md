@@ -48,13 +48,17 @@ or suppress normalization rules.
   insufficient-information versus nonterminal safe-abstention behavior, fresh
   factory materialization and mutation isolation, empty/malformed/temporal/
   precondition trace behavior, and the generic external-service fallback.
-  A separately hashed refactor guard directly calls the 11 service-answer,
-  specific/broad-location, and reminder/message search-argument factories. It
-  requires fresh mutable products from every call, freezes the total mutable
-  container count and zero within-product aliases for every factory, records
-  exact per-example values plus ordered recursive input/expected shapes, and
-  proves the two location kwargs mappings within each location example never
-  alias. Keeping this guard separate preserves the frozen full-corpus digest
+  A separately hashed schema-v2 refactor guard directly calls all 33 unique
+  concrete observation products and all 146 validation examples. It requires
+  fresh mutable products from every call and freezes each product's unique and
+  total mutable-container counts, alias-group count, and complete topology
+  digest. Three pre-existing products have intentional internal aliases; their
+  exact alias paths are frozen by the topology digest, while the other 30 must
+  remain alias-free. A separate compatibility contract proves
+  `_reminder_optional_location_argument_observation` equals
+  `_reminder_creation_finalizer_observation` by value for the same scenario but
+  shares no mutable graph. The original location-kwargs non-alias checks remain
+  in force. Keeping this guard separate preserves the frozen full-corpus digest
   while making a helper-refactor failure local to one factory and example.
   Recursive type tags distinguish tuple/list, bool/int/float, dataclass, set,
   and insertion-ordered dictionary values; hashes are therefore not based on
