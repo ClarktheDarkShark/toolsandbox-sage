@@ -4951,6 +4951,25 @@ def _write_reporting_jsonl(path: Path, rows: list[Any]) -> None:
     )
 
 
+def _reporting_file_bytes_snapshot(
+    path: Path,
+    temporary_root: Path,
+) -> dict[str, Any]:
+    """Record exact UTF-8 writer bytes after the existing path substitution."""
+
+    raw = path.read_bytes()
+    decoded = raw.decode("utf-8")
+    stable_text = decoded.replace(str(temporary_root), "<REPORTING_FIXTURE>")
+    stable_bytes = stable_text.encode("utf-8")
+    return {
+        "raw_utf8": stable_text,
+        "byte_count": len(stable_bytes),
+        "sha256": hashlib.sha256(stable_bytes).hexdigest(),
+        "terminal_newline": stable_bytes.endswith(b"\n"),
+        "round_trip": json.loads(stable_text),
+    }
+
+
 def _materialize_reporting_run(
     run_dir: Path,
     *,
@@ -5572,6 +5591,630 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
             ),
         }
 
+        def dashboard_case_run(
+            case_id: str,
+            arm: str,
+            rows: list[Any],
+            *,
+            artifacts: dict[str, Any] | None = None,
+        ) -> Path:
+            run_dir = (
+                temporary_root
+                / "dashboard_function_cases"
+                / case_id
+                / arm
+                / "run"
+            )
+            _materialize_reporting_run(
+                run_dir,
+                rows=copy.deepcopy(rows),
+                artifacts=copy.deepcopy(artifacts or {}),
+                started_at=started_at,
+                updated_at=updated_at,
+            )
+            return run_dir
+
+        duplicate_name_control = dashboard_case_run(
+            "scenario_duplicate_names",
+            "control",
+            [
+                copy.deepcopy(control_rows[0]),
+                copy.deepcopy(control_rows[1]),
+                {
+                    **copy.deepcopy(control_rows[0]),
+                    "similarity": "0.75",
+                    "categories": ["duplicate-last-control"],
+                },
+            ],
+        )
+        duplicate_name_candidate = dashboard_case_run(
+            "scenario_duplicate_names",
+            "candidate",
+            [
+                copy.deepcopy(candidate_rows[0]),
+                copy.deepcopy(candidate_rows[1]),
+                {
+                    **copy.deepcopy(candidate_rows[1]),
+                    "similarity": "0.125",
+                    "categories": ["duplicate-last-candidate"],
+                },
+            ],
+        )
+        reordered_name_control = dashboard_case_run(
+            "scenario_reordered_names",
+            "control",
+            copy.deepcopy(control_rows[:3]),
+        )
+        reordered_name_candidate = dashboard_case_run(
+            "scenario_reordered_names",
+            "candidate",
+            list(reversed(copy.deepcopy(candidate_rows[:3]))),
+        )
+        missing_name_control = dashboard_case_run(
+            "scenario_missing_names",
+            "control",
+            copy.deepcopy(control_rows[:2]),
+        )
+        missing_name_candidate = dashboard_case_run(
+            "scenario_missing_names",
+            "candidate",
+            [
+                copy.deepcopy(candidate_rows[3]),
+                copy.deepcopy(candidate_rows[0]),
+            ],
+            artifacts={
+                "reuse_events.jsonl": [
+                    {"scenario": "alpha_gain", "tool_name": "z_reused"},
+                    {"scenario": "alpha_gain", "tool_name": "a_reused"},
+                    {"scenario": "alpha_gain", "tool_name": "z_reused"},
+                    {"scenario": "", "tool_name": "ignored"},
+                    {"scenario": "delta_runtime_failure", "tool_name": ""},
+                ]
+            },
+        )
+        tolerant_metric_control_rows = [copy.deepcopy(control_rows[0])]
+        tolerant_metric_control_rows[0].pop("similarity")
+        tolerant_metric_control_rows[0]["outcome_similarity"] = {
+            "malformed": True
+        }
+        tolerant_metric_candidate_rows = [copy.deepcopy(candidate_rows[0])]
+        tolerant_metric_candidate_rows[0]["outcome_similarity"] = None
+        tolerant_metric_control = dashboard_case_run(
+            "scenario_tolerant_metrics",
+            "control",
+            tolerant_metric_control_rows,
+        )
+        tolerant_metric_candidate = dashboard_case_run(
+            "scenario_tolerant_metrics",
+            "candidate",
+            tolerant_metric_candidate_rows,
+        )
+        none_similarity_rows = [copy.deepcopy(control_rows[0])]
+        none_similarity_rows[0]["similarity"] = None
+        none_similarity_control = dashboard_case_run(
+            "scenario_none_similarity",
+            "control",
+            none_similarity_rows,
+        )
+        invalid_similarity_rows = [copy.deepcopy(candidate_rows[0])]
+        invalid_similarity_rows[0]["similarity"] = "invalid-similarity"
+        invalid_similarity_candidate = dashboard_case_run(
+            "scenario_invalid_similarity",
+            "candidate",
+            invalid_similarity_rows,
+        )
+        non_object_control = dashboard_case_run(
+            "scenario_non_object_row",
+            "control",
+            ["not-an-object"],
+        )
+        missing_field_control = dashboard_case_run(
+            "scenario_missing_name_field",
+            "control",
+            [{"similarity": 0.5, "outcome_similarity": 0.25}],
+        )
+        scenario_table_cases = {
+            "fixture_complete": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "fixture_dashboard",
+                    control_dir,
+                    candidate_dir,
+                ),
+                temporary_root,
+            ),
+            "duplicate_names_last_row_wins": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "duplicate_dashboard",
+                    duplicate_name_control,
+                    duplicate_name_candidate,
+                ),
+                temporary_root,
+            ),
+            "reordered_names_control_order_wins": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "reordered_dashboard",
+                    reordered_name_control,
+                    reordered_name_candidate,
+                ),
+                temporary_root,
+            ),
+            "missing_names_union_and_duplicate_reuse": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "missing_dashboard",
+                    missing_name_control,
+                    missing_name_candidate,
+                ),
+                temporary_root,
+            ),
+            "missing_similarity_and_invalid_outcome": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "metric_dashboard",
+                    tolerant_metric_control,
+                    tolerant_metric_candidate,
+                ),
+                temporary_root,
+            ),
+            "none_similarity": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "none_dashboard",
+                    none_similarity_control,
+                    None,
+                ),
+                temporary_root,
+            ),
+            "invalid_similarity": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root / "dashboard_function_cases" / "invalid_dashboard",
+                    None,
+                    invalid_similarity_candidate,
+                ),
+                temporary_root,
+            ),
+            "non_object_row": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root
+                    / "dashboard_function_cases"
+                    / "non_object_dashboard",
+                    non_object_control,
+                    None,
+                ),
+                temporary_root,
+            ),
+            "missing_name_stringified": _capture_reporting_call(
+                lambda: dashboard._scenario_table(
+                    temporary_root
+                    / "dashboard_function_cases"
+                    / "missing_field_dashboard",
+                    missing_field_control,
+                    None,
+                ),
+                temporary_root,
+            ),
+        }
+
+        balanced_pair_cases = {
+            "empty": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary([]), temporary_root
+            ),
+            "complete_running_and_cached_statuses": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary(
+                    [
+                        {
+                            "control": {
+                                "status": "complete",
+                                "similarity": 0.25,
+                                "outcome_similarity": "0.5",
+                                "control_cache_source": "cached",
+                            },
+                            "candidate": {
+                                "status": "complete",
+                                "similarity": "0.75",
+                                "outcome_similarity": 1,
+                            },
+                        },
+                        {
+                            "control": {"status": "complete", "similarity": 1},
+                            "candidate": {"status": "running", "similarity": 1},
+                        },
+                        {
+                            "control": {"status": "cached", "similarity": 1},
+                            "candidate": {"status": "complete", "similarity": 1},
+                        },
+                        {"control": None, "candidate": {"status": "complete"}},
+                    ]
+                ),
+                temporary_root,
+            ),
+            "zero_baseline": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary(
+                    [
+                        {
+                            "control": {
+                                "status": "complete",
+                                "similarity": 0,
+                                "outcome_similarity": 0,
+                            },
+                            "candidate": {
+                                "status": "complete",
+                                "similarity": 1,
+                                "outcome_similarity": 0.5,
+                            },
+                        }
+                    ]
+                ),
+                temporary_root,
+            ),
+            "invalid_and_none_metrics_are_skipped": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary(
+                    [
+                        {
+                            "control": {
+                                "status": "complete",
+                                "similarity": None,
+                                "outcome_similarity": "invalid",
+                            },
+                            "candidate": {
+                                "status": "complete",
+                                "similarity": {"bad": True},
+                                "outcome_similarity": None,
+                            },
+                        },
+                        {
+                            "control": {
+                                "status": "complete",
+                                "similarity": "0.5",
+                                "outcome_similarity": 0,
+                            },
+                            "candidate": {
+                                "status": "complete",
+                                "similarity": 1,
+                                "outcome_similarity": "1.0",
+                            },
+                        },
+                    ]
+                ),
+                temporary_root,
+            ),
+            "malformed_pair_members_are_ignored": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary(
+                    [
+                        {"control": [], "candidate": {}},
+                        {"control": {}, "candidate": "bad"},
+                        {},
+                    ]
+                ),
+                temporary_root,
+            ),
+            "non_object_pair_raises": _capture_reporting_call(
+                lambda: dashboard._balanced_pair_summary(["not-an-object"]),
+                temporary_root,
+            ),
+        }
+
+        tool_count_run = dashboard_case_run(
+            "live_tool_counts",
+            "candidate",
+            [],
+            artifacts={
+                "scenario_tool_visibility.jsonl": [
+                    {
+                        "scenario": "scenario_one",
+                        "generated_tools": [
+                            "visible_only",
+                            "shared_tool",
+                            "shared_tool",
+                            None,
+                            "",
+                        ],
+                    },
+                    {
+                        "scenario": "scenario_one",
+                        "generated_tools": ["visible_only"],
+                    },
+                    {
+                        "scenario": "scenario_two",
+                        "generated_tools": ["shared_tool"],
+                    },
+                    {
+                        "scenario": "",
+                        "generated_tools": ["ignored_empty_scenario"],
+                    },
+                ],
+                "scenario_tool_selection.jsonl": [
+                    {
+                        "scenario": "scenario_one",
+                        "generated_tools_visible": [
+                            "selection_visible_only",
+                            "shared_tool",
+                        ],
+                        "generated_tools_called": [
+                            "selection_only",
+                            "selection_only",
+                        ],
+                        "generated_tools_failed": ["selection_only"],
+                        "generated_tools_attempted": [
+                            "selection_only",
+                            "shared_tool",
+                            "shared_tool",
+                        ],
+                    },
+                    {
+                        "scenario": "scenario_two",
+                        "generated_tools_visible": [],
+                        "generated_tools_called": ["shared_tool"],
+                        "generated_tools_failed": ["failed_only"],
+                        "generated_tools_attempted": ["shared_tool"],
+                    },
+                    {
+                        "scenario": "scenario_two",
+                        "generated_tools_visible": ["selection_visible_only"],
+                        "generated_tools_called": [],
+                        "generated_tools_failed": [],
+                        "generated_tools_attempted": [],
+                    },
+                ],
+            },
+        )
+        malformed_visibility_run = dashboard_case_run(
+            "live_tool_counts_malformed_visibility",
+            "candidate",
+            [],
+            artifacts={"scenario_tool_visibility.jsonl": [["not-an-object"]]},
+        )
+        malformed_selection_run = dashboard_case_run(
+            "live_tool_counts_malformed_selection",
+            "candidate",
+            [],
+            artifacts={
+                "scenario_tool_selection.jsonl": [
+                    {
+                        "scenario": "bad_selection",
+                        "generated_tools_visible": [],
+                        "generated_tools_called": 7,
+                        "generated_tools_failed": [],
+                        "generated_tools_attempted": [],
+                    }
+                ]
+            },
+        )
+        live_tool_selection_cases = {
+            "visibility_selection_reuse_and_duplicates": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts(
+                    {
+                        "candidate": {"run_dir": str(tool_count_run)},
+                        "reuse_events": [
+                            {
+                                "scenario": "scenario_one",
+                                "tool_name": "reuse_only",
+                            },
+                            {
+                                "scenario": "scenario_one",
+                                "tool_name": "reuse_only",
+                            },
+                            {
+                                "scenario": "scenario_two",
+                                "tool_name": "reuse_only",
+                            },
+                            {
+                                "scenario": "scenario_three",
+                                "tool": "reuse_alias_only",
+                            },
+                            {"scenario": "", "tool_name": "ignored_no_scenario"},
+                            {"scenario": "scenario_four", "tool_name": ""},
+                        ],
+                    }
+                ),
+                temporary_root,
+            ),
+            "missing_candidate": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts({}), temporary_root
+            ),
+            "scalar_candidate": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts(
+                    {"candidate": "not-an-object"}
+                ),
+                temporary_root,
+            ),
+            "non_object_visibility_row": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts(
+                    {"candidate": {"run_dir": str(malformed_visibility_run)}}
+                ),
+                temporary_root,
+            ),
+            "non_iterable_selection_field": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts(
+                    {"candidate": {"run_dir": str(malformed_selection_run)}}
+                ),
+                temporary_root,
+            ),
+            "non_object_reuse_event": _capture_reporting_call(
+                lambda: dashboard._live_tool_selection_counts(
+                    {
+                        "candidate": {"run_dir": str(tool_count_run)},
+                        "reuse_events": ["not-an-object"],
+                    }
+                ),
+                temporary_root,
+            ),
+        }
+
+        called_tool_delta_cases = {
+            "mixed_metrics_duplicate_tools_and_rows": _capture_reporting_call(
+                lambda: dashboard._live_called_tool_delta_stats(
+                    {
+                        "scenarios": [
+                            {
+                                "scenario": "scenario_one",
+                                "reused_tools": [
+                                    "reuse_tool",
+                                    "duplicated_tool",
+                                    "duplicated_tool",
+                                ],
+                                "delta": "1.0",
+                                "outcome_delta": None,
+                            },
+                            {
+                                "scenario": "scenario_two",
+                                "reused_tools": ["reuse_tool"],
+                                "delta": -1,
+                                "outcome_delta": "0",
+                            },
+                            {
+                                "scenario": "scenario_two",
+                                "reused_tools": ["reuse_tool"],
+                                "delta": "invalid",
+                                "outcome_delta": 0.5,
+                            },
+                            {
+                                "scenario": "invalid_metrics",
+                                "reused_tools": ["skipped_tool"],
+                                "delta": {"bad": True},
+                                "outcome_delta": None,
+                            },
+                            {
+                                "scenario": "",
+                                "reused_tools": [None, ""],
+                                "delta": 0,
+                                "outcome_delta": 0,
+                            },
+                            {
+                                "scenario": "wrong_tools_type",
+                                "reused_tools": "not-a-list",
+                                "delta": 1,
+                                "outcome_delta": 1,
+                            },
+                            "not-an-object",
+                        ]
+                    }
+                ),
+                temporary_root,
+            ),
+            "none_scenarios": _capture_reporting_call(
+                lambda: dashboard._live_called_tool_delta_stats(
+                    {"scenarios": None}
+                ),
+                temporary_root,
+            ),
+            "mapping_scenarios_iterates_and_skips_keys": _capture_reporting_call(
+                lambda: dashboard._live_called_tool_delta_stats(
+                    {"scenarios": {"scenario_one": {"delta": 1}}}
+                ),
+                temporary_root,
+            ),
+            "non_iterable_scenarios": _capture_reporting_call(
+                lambda: dashboard._live_called_tool_delta_stats({"scenarios": 9}),
+                temporary_root,
+            ),
+            "non_object_data": _capture_reporting_call(
+                lambda: dashboard._live_called_tool_delta_stats(None),
+                temporary_root,
+            ),
+        }
+
+        writer_root = temporary_root / "protocol_dashboard_writer"
+        writer_control_dir = writer_root / "control" / "run"
+        writer_candidate_dir = writer_root / "candidate" / "run"
+        writer_registry_dir = writer_root / "registry"
+        _materialize_reporting_run(
+            writer_control_dir,
+            rows=copy.deepcopy(control_rows),
+            artifacts=copy.deepcopy(fixture["control_artifacts"]),
+            started_at=started_at,
+            updated_at=updated_at,
+        )
+        _materialize_reporting_run(
+            writer_candidate_dir,
+            rows=copy.deepcopy(candidate_rows),
+            artifacts=copy.deepcopy(fixture["candidate_artifacts"]),
+            started_at=started_at,
+            updated_at=updated_at,
+        )
+        _write_reporting_json(
+            writer_registry_dir / "registry_manifest.json",
+            copy.deepcopy(fixture["registry_manifest"]),
+        )
+        helper.write_helper_contribution_summary(
+            writer_control_dir,
+            writer_candidate_dir,
+            writer_root / "helper_contribution_summary.json",
+            registry_dir=writer_registry_dir,
+        )
+        (writer_root / "dashboard_started_at.txt").write_text(
+            started_at + "\n",
+            encoding="utf-8",
+        )
+
+        real_dashboard_datetime = dashboard.datetime
+        fixed_dashboard_datetime = real_dashboard_datetime.fromisoformat(updated_at)
+        real_latest_pointer_writer = dashboard._write_latest_pointer
+
+        class FrozenReportingDateTime:
+            @classmethod
+            def now(cls, tz: Any = None) -> Any:
+                if tz is None:
+                    return fixed_dashboard_datetime.replace(tzinfo=None)
+                return fixed_dashboard_datetime.astimezone(tz)
+
+        def write_frozen_protocol_dashboard() -> dict[str, Any]:
+            pointer_calls: list[dict[str, str]] = []
+
+            def capture_latest_pointer(index_path: Path, *, name: str) -> None:
+                pointer_calls.append(
+                    {"index_path": str(index_path), "name": name}
+                )
+
+            dashboard.datetime = FrozenReportingDateTime
+            dashboard._write_latest_pointer = capture_latest_pointer
+            try:
+                returned = dashboard.write_protocol_dashboard(
+                    writer_root,
+                    mode="frozen",
+                    status="complete",
+                    phase="reporting-replay",
+                    agent="validation-agent",
+                    user="validation-user",
+                    generation_enabled=True,
+                    base_tool_policy="fixture-policy",
+                    scenario_count=len(control_rows),
+                    control_dir=writer_control_dir,
+                    candidate_dir=writer_candidate_dir,
+                    registry_dir=writer_registry_dir,
+                    model_metadata={
+                        "comparison_key": "fixture-model-pair",
+                        "control": "fixture-control-model",
+                        "candidate": "fixture-candidate-model",
+                    },
+                    artifact_root=writer_root / "campaign_artifacts",
+                )
+            finally:
+                dashboard.datetime = real_dashboard_datetime
+                dashboard._write_latest_pointer = real_latest_pointer_writer
+
+            generated_files = {
+                name: _reporting_file_bytes_snapshot(
+                    writer_root / "dashboard" / name,
+                    temporary_root,
+                )
+                for name in (
+                    "data.json",
+                    "task_focus_data.json",
+                    "task_compare_data.json",
+                )
+            }
+            return {
+                "returned": str(returned),
+                "generated_files": generated_files,
+                "dashboard_file_names": sorted(
+                    path.name for path in (writer_root / "dashboard").iterdir()
+                ),
+                "latest_pointer_calls": pointer_calls,
+            }
+
+        protocol_dashboard_writer = _capture_reporting_call(
+            write_frozen_protocol_dashboard,
+            temporary_root,
+        )
+
         return {
             "fixture": {
                 "fixture_id": fixture["fixture_id"],
@@ -5592,6 +6235,13 @@ def probe_reporting(_root: Path) -> dict[str, Any]:
             "scenario_row_loading": scenario_loading,
             "uncached_result_validation": uncached_validation,
             "strict_fresh_report_validation": strict_fresh_reports,
+            "dashboard_private_functions": {
+                "scenario_table": scenario_table_cases,
+                "balanced_pair_summary": balanced_pair_cases,
+                "live_tool_selection_counts": live_tool_selection_cases,
+                "live_called_tool_delta_stats": called_tool_delta_cases,
+            },
+            "protocol_dashboard_writer": protocol_dashboard_writer,
         }
 
 

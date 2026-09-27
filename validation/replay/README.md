@@ -188,7 +188,20 @@ or suppress normalization rules.
   indented writer text and terminal newline. Separate cases freeze partial,
   reordered, missing, duplicate, non-object, and invalidly typed result rows;
   strict versus tolerant JSON/JSONL readers; final-summary precedence; live
-  fallback; uncached-run rejection reasons; and strict-fresh report checks.
+  fallback; uncached-run rejection reasons; and strict-fresh report checks. A
+  dashboard matrix separately freezes `_scenario_table`,
+  `_balanced_pair_summary`, `_live_tool_selection_counts`, and
+  `_live_called_tool_delta_stats`, including duplicate/reordered/missing names,
+  complete/running/cached states, zero baselines, invalid or absent metrics,
+  visibility-only/selection-only/reuse-only tools, duplicate ledger entries,
+  malformed containers, and exact exception type/message. A frozen-clock call
+  to `write_protocol_dashboard` records the exact indented UTF-8 text, byte
+  count, SHA-256, terminal newline, parsed value, and recursive object order for
+  `data.json`, `task_focus_data.json`, and `task_compare_data.json`. Only the
+  random probe-local temporary-root prefix is replaced by the existing
+  `<REPORTING_FIXTURE>` token before byte hashing; no comparison allowlist is
+  involved. Latest-pointer calls are captured without writing into either
+  production checkout.
 - `runner_provenance`: executes the real ToolSandbox sequence and SAGE runner
   boundaries over two tiny synthetic tasks with model/network calls replaced by
   deterministic fakes. It freezes run-manifest key order, compact semantic
@@ -364,11 +377,12 @@ order, registry state, decisions, outcomes, or evaluator identities.
 The reporting probe intentionally characterizes existing behavior rather than
 declaring every behavior desirable. In particular, it preserves reordered-row
 strict failures, duplicate-row quirks in `compare_runs`, lossy filtering of
-non-object protocol rows, and the current differences between strict and
+non-object protocol rows, dashboard duplicate-name overwrite behavior, malformed
+dashboard-field failures, and the current differences between strict and
 tolerant readers. It does not exercise concurrent writers, filesystem failures,
-permission errors, interrupted atomic replacement, resume-checkpoint mtimes, or
-the full dashboard HTML rendering path; those remain separate integration
-concerns.
+permission errors, interrupted atomic replacement, resume-checkpoint mtimes,
+dashboard HTML byte changes, or latest-pointer filesystem side effects; those
+remain separate integration concerns.
 
 The runner fixture does not start multiprocessing workers, open a browser, call
 an LLM, or reproduce signal/kill timing. It characterizes each worker's shared
