@@ -331,6 +331,106 @@ class RouterCollisionContractTests(unittest.TestCase):
             "lifecycle_suppressed_exact_harmful_called_scenario",
         )
 
+    def test_lifecycle_uses_task_family_key_and_short_circuits_without_it(
+        self,
+    ) -> None:
+        park = self.case("lifecycle_thresholds", "park_is_hidden")
+        parked = self.case("lifecycle_thresholds", "parked_is_hidden")
+        no_family = self.case(
+            "lifecycle_thresholds",
+            "absent_task_family_short_circuits_even_a_parked_row",
+        )
+        positional = self.case(
+            "lifecycle_thresholds",
+            "positional_scenario_name_does_not_drive_lifecycle_matching",
+        )
+        family_key = self.case(
+            "lifecycle_thresholds",
+            "task_family_key_drives_exact_lifecycle_matching",
+        )
+
+        for observed in (park, parked):
+            self.assertEqual(observed["selected_order"], [])
+            self.assertEqual(
+                observed["decisions"]["prepare_specific_location_search_args"][
+                    "reason"
+                ],
+                "lifecycle_suppressed_parked_tool",
+            )
+        self.assertEqual(
+            no_family["selected_order"],
+            ["prepare_specific_location_search_args"],
+        )
+        self.assertEqual(
+            positional["selected_order"],
+            ["prepare_specific_location_search_args"],
+        )
+        self.assertEqual(family_key["selected_order"], [])
+
+    def test_lifecycle_fallbacks_count_duplicates_and_exact_harm_wins_ties(
+        self,
+    ) -> None:
+        exact_tie = self.case(
+            "lifecycle_thresholds",
+            "exact_harm_beats_an_equal_helpful_family_count",
+        )
+        malformed_count = self.case(
+            "lifecycle_thresholds",
+            "malformed_harmful_count_falls_back_to_scenario_list_length",
+        )
+        duplicate_harm = self.case(
+            "lifecycle_thresholds",
+            "harmful_family_fallback_counts_duplicate_scenarios",
+        )
+        duplicate_tie = self.case(
+            "lifecycle_thresholds",
+            "helpful_family_fallback_counts_duplicates_and_ties_harm",
+        )
+
+        self.assertEqual(exact_tie["selected_order"], [])
+        self.assertEqual(malformed_count["selected_order"], [])
+        self.assertEqual(duplicate_harm["selected_order"], [])
+        self.assertEqual(
+            duplicate_tie["selected_order"],
+            ["prepare_specific_location_search_args"],
+        )
+
+    def test_count_coercion_quirks_differ_between_abstention_and_override(
+        self,
+    ) -> None:
+        malformed_abstention = self.case(
+            "lifecycle_thresholds",
+            "malformed_abstention_counts_are_treated_as_operationally_clean",
+        )
+        negative_abstention = self.case(
+            "lifecycle_thresholds",
+            "negative_abstention_counts_are_not_operationally_clean",
+        )
+        malformed_failed = self.case(
+            "lifecycle_thresholds",
+            "malformed_failed_count_blocks_visible_signal_override",
+        )
+        malformed_incident = self.case(
+            "lifecycle_thresholds",
+            "malformed_incident_count_blocks_visible_signal_override",
+        )
+        negative_override = self.case(
+            "lifecycle_thresholds",
+            "negative_failure_and_incident_counts_allow_visible_signal_override",
+        )
+
+        self.assertEqual(
+            malformed_abstention["selected_order"],
+            ["prepare_safe_action_or_abstain"],
+        )
+        self.assertEqual(negative_abstention["selected_order"], [])
+        self.assertEqual(malformed_failed["selected_order"], [])
+        self.assertEqual(malformed_incident["selected_order"], [])
+        self.assertEqual(
+            negative_override["selected_order"],
+            ["prepare_specific_location_search_args"],
+        )
+
     def test_guardrail_and_native_alternative_precedence(self) -> None:
         guard = self.case(
             "downstream_contracts",
@@ -355,6 +455,169 @@ class RouterCollisionContractTests(unittest.TestCase):
         )
         self.assertTrue(producer_and_action["visible"])
 
+    def test_downstream_schema_precedence_and_family_specific_any_rules(self) -> None:
+        enum_loses = self.case(
+            "downstream_contracts",
+            "downstream_tool_name_overrides_an_earlier_tool_name_enum",
+        )
+        preserved_action = self.case(
+            "downstream_contracts",
+            "downstream_tool_name_uses_preserved_action_after_enum_override",
+        )
+        derived_one = self.case(
+            "downstream_contracts",
+            "derived_multi_producer_requires_any_one",
+        )
+        derived_none = self.case(
+            "downstream_contracts",
+            "derived_multi_producer_is_hidden_when_none_are_available",
+        )
+
+        self.assertEqual(enum_loses["selected_order"], [])
+        self.assertEqual(
+            preserved_action["selected_order"],
+            ["enum_then_downstream_name_helper"],
+        )
+        self.assertEqual(
+            derived_one["selected_order"],
+            ["derived_any_producer_helper"],
+        )
+        self.assertEqual(derived_none["selected_order"], [])
+
+    def test_preserved_fallback_search_narrowing_and_available_none_boundary(
+        self,
+    ) -> None:
+        preserved_missing = self.case(
+            "downstream_contracts",
+            "empty_required_calls_fall_back_to_preserved_tools",
+        )
+        preserved_present = self.case(
+            "downstream_contracts",
+            "preserved_fallback_is_satisfied_when_preserved_tool_is_available",
+        )
+        search_union = self.case(
+            "downstream_contracts",
+            "search_helper_narrows_required_and_preserved_union_to_producers",
+        )
+        action_only = self.case(
+            "downstream_contracts",
+            "search_helper_rejects_an_action_without_any_producer",
+        )
+        none_base = self.case(
+            "downstream_contracts",
+            "none_available_base_tools_bypasses_downstream_validation",
+        )
+        empty_base = self.case(
+            "downstream_contracts",
+            "empty_available_base_tools_enforces_downstream_validation",
+        )
+
+        self.assertEqual(preserved_missing["selected_order"], [])
+        self.assertEqual(
+            preserved_present["selected_order"],
+            ["preserved_fallback_helper"],
+        )
+        self.assertEqual(
+            search_union["selected_order"],
+            ["select_search_union_helper"],
+        )
+        self.assertEqual(action_only["selected_order"], [])
+        self.assertEqual(none_base["selected_order"], ["all_required_helper"])
+        self.assertEqual(empty_base["selected_order"], [])
+
+    def test_single_native_action_and_insufficiency_bypass_boundaries(self) -> None:
+        single_missing = self.case(
+            "downstream_contracts",
+            "one_native_action_still_requires_every_dependency",
+        )
+        single_complete = self.case(
+            "downstream_contracts",
+            "one_native_action_and_its_producer_are_sufficient",
+        )
+        multiple_complete = self.case(
+            "downstream_contracts",
+            "native_alternative_rule_accepts_producer_plus_one_action",
+        )
+        bypass = self.case(
+            "downstream_contracts",
+            "insufficiency_guard_bypasses_missing_downstream_when_no_guard_matches",
+        )
+        no_tool_guard = self.case(
+            "downstream_contracts",
+            "guardrail_precedes_insufficiency_downstream_bypass",
+        )
+
+        self.assertEqual(single_missing["selected_order"], [])
+        self.assertEqual(
+            single_complete["selected_order"],
+            ["single_native_action_helper"],
+        )
+        self.assertEqual(
+            multiple_complete["selected_order"],
+            ["native_alternative_over_any_helper"],
+        )
+        self.assertEqual(
+            bypass["selected_order"],
+            ["prepare_safe_action_or_abstain"],
+        )
+        self.assertEqual(no_tool_guard["selected_order"], [])
+
+    def test_bundle_cap_composite_fill_and_registry_alias_order(self) -> None:
+        default_cap = self.case(
+            "ordering_and_budget",
+            "default_signature_value_five_is_clamped_to_four",
+        )
+        explicit_cap = self.case(
+            "ordering_and_budget",
+            "explicit_bundle_size_above_four_is_clamped_to_four",
+        )
+        composite_fill = self.case(
+            "subsumption_collisions",
+            "composite_suppression_happens_before_budget_fill",
+        )
+        alias_order = self.case(
+            "registry_identity_mismatches",
+            "registry_alias_controls_lexical_tie_break_not_spec_name",
+        )
+
+        expected_cap = [
+            "alpha_clamp",
+            "bravo_clamp",
+            "charlie_clamp",
+            "delta_clamp",
+        ]
+        self.assertEqual(default_cap["selected_order"], expected_cap)
+        self.assertEqual(explicit_cap["selected_order"], expected_cap)
+        self.assertEqual(
+            composite_fill["selected_order"],
+            [
+                "alpha_composite_helper",
+                "bravo_fill",
+                "charlie_fill",
+                "delta_fill",
+            ],
+        )
+        self.assertEqual(
+            composite_fill["decisions"]["lower_shared_helper"]["status"],
+            "deprioritized",
+        )
+        self.assertEqual(
+            composite_fill["decisions"]["echo_fill"]["reason"],
+            "blocked_by_context_budget",
+        )
+        self.assertEqual(
+            alias_order["input_entry_order"],
+            ["zeta_registry_alias", "alpha_registry_alias"],
+        )
+        self.assertEqual(
+            alias_order["decision_order"],
+            ["alpha_registry_alias", "zeta_registry_alias"],
+        )
+        self.assertEqual(
+            alias_order["selected_order"],
+            ["zeta_spec_name_selected_by_alpha_alias"],
+        )
+
     def test_composite_retains_evidence_while_budget_suppression_clears_it(
         self,
     ) -> None:
@@ -370,6 +633,52 @@ class RouterCollisionContractTests(unittest.TestCase):
         self.assertEqual(composite["matched_positive_triggers"], ["shared_signal"])
         self.assertEqual(budget["matched_positive_triggers"], [])
         self.assertEqual(budget["reason"], "blocked_by_context_budget")
+
+    def test_full_decision_evidence_is_preserved_only_for_composite_suppression(
+        self,
+    ) -> None:
+        composite = self.case(
+            "evidence_retention",
+            "composite_suppression_preserves_the_full_prior_decision_payload",
+        )["decisions"]["rich_lower_helper"]
+        budget = self.case(
+            "evidence_retention",
+            "budget_suppression_clears_the_full_prior_decision_payload",
+        )["decisions"]["zeta_rich_budget"]
+
+        self.assertEqual(
+            composite,
+            {
+                "tool_name": "rich_lower_helper",
+                "visible": False,
+                "status": "deprioritized",
+                "reason": (
+                    "more_specific_generated_tool_preferred_over_redundant_"
+                    "lower_level_tool:rich_composite_helper"
+                ),
+                "score": 8,
+                "matched_positive_triggers": ["rich_signal"],
+                "matched_negative_triggers": [],
+                "matched_task_families": ["rich_family"],
+                "fair_chance_candidate": False,
+                "fair_chance_reason": "",
+            },
+        )
+        self.assertEqual(
+            budget,
+            {
+                "tool_name": "zeta_rich_budget",
+                "visible": False,
+                "status": "deprioritized",
+                "reason": "blocked_by_context_budget",
+                "score": 8,
+                "matched_positive_triggers": [],
+                "matched_negative_triggers": [],
+                "matched_task_families": [],
+                "fair_chance_candidate": False,
+                "fair_chance_reason": "",
+            },
+        )
 
     def test_suppression_evidence_payloads_copy_or_drop_signals_exactly(self) -> None:
         copied = self.case(
@@ -412,7 +721,9 @@ class RouterCollisionContractTests(unittest.TestCase):
             },
         )
 
-    def test_registry_key_controls_routing_identity_when_spec_name_differs(self) -> None:
+    def test_registry_key_controls_routing_identity_when_spec_name_differs(
+        self,
+    ) -> None:
         visible = self.case(
             "registry_identity_mismatches",
             "registry_key_controls_decision_identity_but_spec_name_is_selected",
@@ -439,6 +750,31 @@ class RouterCollisionContractTests(unittest.TestCase):
             registry_lifecycle["decisions"]["registry_alias"]["reason"],
             "lifecycle_suppressed_parked_tool",
         )
+
+    def test_public_router_signature_module_and_adapter_import_identity(self) -> None:
+        observed = self.contracts["public_compatibility"]["value"]
+
+        self.assertEqual(
+            observed["runtime_module"],
+            "sage_ts.runtime.toolsandbox_integration",
+        )
+        self.assertEqual(observed["runtime_qualname"], "route_registry_entries")
+        self.assertEqual(observed["runtime_default_max_bundle_size"], 5)
+        self.assertEqual(
+            observed["runtime_parameter_order"],
+            [
+                "entries",
+                "scenario_name",
+                "max_bundle_size",
+                "available_base_tools",
+                "lifecycle_state",
+                "task_context_text",
+                "task_family_key",
+            ],
+        )
+        self.assertTrue(observed["adapter_import_is_runtime_object"])
+        self.assertTrue(observed["adapter_signature_matches_runtime"])
+        self.assertTrue(observed["module_attribute_is_imported_object"])
 
 
 class NormalizationBoundaryContractTests(unittest.TestCase):
@@ -591,6 +927,67 @@ class RouterAndNormalizerTamperTests(unittest.TestCase):
             "value/decisions/registry_alias/tool_name",
             paths,
         )
+
+    def test_detects_lifecycle_count_coercion_tamper(self) -> None:
+        reference = self.routing["lifecycle_thresholds"]
+        tampered = copy.deepcopy(reference)
+        case = tampered["value"][
+            "malformed_abstention_counts_are_treated_as_operationally_clean"
+        ]["value"]
+        case["selected_order"] = []
+        case["decisions"]["prepare_safe_action_or_abstain"]["visible"] = False
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/malformed_abstention_counts_are_treated_as_operationally_clean/"
+            "value/selected_order/0",
+            paths,
+        )
+        self.assertIn(
+            "/value/malformed_abstention_counts_are_treated_as_operationally_clean/"
+            "value/decisions/prepare_safe_action_or_abstain/visible",
+            paths,
+        )
+
+    def test_detects_downstream_precedence_tamper(self) -> None:
+        reference = self.routing["downstream_contracts"]
+        tampered = copy.deepcopy(reference)
+        decision = tampered["value"][
+            "downstream_tool_name_overrides_an_earlier_tool_name_enum"
+        ]["value"]["decisions"]["enum_then_downstream_name_helper"]
+        decision["reason"] = "visible_context_metadata_match"
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/downstream_tool_name_overrides_an_earlier_tool_name_enum/"
+            "value/decisions/enum_then_downstream_name_helper/reason",
+            paths,
+        )
+
+    def test_detects_composite_before_cap_tamper(self) -> None:
+        reference = self.routing["subsumption_collisions"]
+        tampered = copy.deepcopy(reference)
+        case = tampered["value"]["composite_suppression_happens_before_budget_fill"][
+            "value"
+        ]
+        case["selected_order"].remove("delta_fill")
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn(
+            "/value/composite_suppression_happens_before_budget_fill/"
+            "value/selected_order/3",
+            paths,
+        )
+
+    def test_detects_public_compatibility_tamper(self) -> None:
+        reference = self.routing["public_compatibility"]
+        tampered = copy.deepcopy(reference)
+        tampered["value"]["runtime_default_max_bundle_size"] = 4
+        tampered["value"]["adapter_import_is_runtime_object"] = False
+
+        paths = {difference["path"] for difference in _diff(reference, tampered)}
+        self.assertIn("/value/runtime_default_max_bundle_size", paths)
+        self.assertIn("/value/adapter_import_is_runtime_object", paths)
 
     def test_detects_coordinate_boundary_tamper(self) -> None:
         reference = self.normalization["reminder"]

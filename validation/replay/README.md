@@ -104,7 +104,11 @@ or suppress normalization rules.
   post-route activation, overlapping message-content/counterparty rules,
   negative and lifecycle precedence, no-tool guardrails, native-alternative
   versus generic any-of routing, exact evidence retention or loss under each
-  suppression shape, and registry-key/spec-name identity mismatches.
+  suppression shape, and registry-key/spec-name identity mismatches. The R2
+  vectors additionally pin lifecycle family/count coercion, downstream-schema
+  precedence and producer narrowing, `None` versus empty base inventories,
+  default/oversize bundle clamping, composite-before-cap behavior, registry
+  alias tie ordering, and the public router signature/import identity.
   Normalization boundaries include same- and cross-service state requests, zero
   versus smallest-positive coordinates and timestamps, 23:59, hour 24, and
   minute 60. Recursive key order and compact bytes are part of every result.
@@ -202,6 +206,23 @@ lifecycle vectors are deliberately minimal typed contracts and ordered
 feedback events, so they exercise policy without copying a mutable registry or
 invoking an LLM. No probe calls the network, current clock, model service, or an
 unseeded random source.
+
+The R2 router fixtures intentionally preserve several non-obvious current
+behaviors rather than endorsing them. Lifecycle matching uses
+`task_family_key`, not the positional `scenario_name`, and skips all lifecycle
+state (including `park`/`parked`) when that family key is absent. Duplicate
+harm/help rows count repeatedly; a malformed harmful-call count falls back to
+the harmful-scenario list length. For the abstention helper, malformed
+failure/incident counts become zero while negative counts are considered
+non-clean; the visible-signal override instead rejects malformed counts but
+allows negative ones because it blocks only values greater than zero. In
+downstream routing, a `tool_name` enum is evaluated before—and can be replaced
+by—`downstream_tool_name`; search helpers narrow the union of required and
+preserved tools to read producers; and `available_base_tools=None` disables
+the availability check whereas an empty set enforces it. Finally, the public
+default bundle size remains five but the runtime clamps both that default and
+larger explicit values to four, after composite suppression and before budget
+decisions. These quirks are exact compatibility boundaries for the refactor.
 
 The actor corpus is stored as readable Python data in `actor_fixture.py`; its
 line count, byte count, and SHA-256 are frozen in

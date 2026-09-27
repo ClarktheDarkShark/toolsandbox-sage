@@ -9,6 +9,7 @@ selected checkout has been placed on ``sys.path``.
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 from dataclasses import replace
 from types import SimpleNamespace
@@ -1081,6 +1082,8 @@ def _routing_contracts(
     exact: Callable[[Any], dict[str, Any]],
 ) -> dict[str, Any]:
     from sage_ts.generation.tool_spec import GeneratedTool, ToolFamily, ToolInput
+    import sage_ts.adapters.sage_run_adapter as sage_run_adapter
+    import sage_ts.runtime.toolsandbox_integration as integration
     from sage_ts.runtime.toolsandbox_integration import route_registry_entries
 
     string = {"type": "string"}
@@ -1181,23 +1184,38 @@ def _routing_contracts(
         result = accepted_entry(generated)
         return replace(result, retired=True) if retired else result
 
+    use_family = object()
+    use_default_cap = object()
+
     def route(
         entries: dict[str, Any],
         *,
         context: str | None,
         family: str = "edge_family",
+        scenario_name: str | None | object = use_family,
+        task_family_key: str | None | object = use_family,
         base_tools: set[str] | None = None,
         lifecycle: dict[str, dict[str, Any]] | None = None,
-        cap: int = 4,
+        cap: int | object = use_default_cap,
     ) -> dict[str, Any]:
+        resolved_scenario_name = (
+            family if scenario_name is use_family else scenario_name
+        )
+        resolved_task_family_key = (
+            family if task_family_key is use_family else task_family_key
+        )
+        kwargs: dict[str, Any] = {
+            "available_base_tools": base_tools,
+            "lifecycle_state": lifecycle,
+            "task_context_text": context,
+            "task_family_key": resolved_task_family_key,
+        }
+        if cap is not use_default_cap:
+            kwargs["max_bundle_size"] = cap
         selected, decisions = route_registry_entries(
             entries,
-            scenario_name=family,
-            max_bundle_size=cap,
-            available_base_tools=base_tools,
-            lifecycle_state=lifecycle,
-            task_context_text=context,
-            task_family_key=family,
+            resolved_scenario_name,
+            **kwargs,
         )
         return exact(
             {
@@ -1209,6 +1227,30 @@ def _routing_contracts(
                 },
             }
         )
+
+    route_signature = inspect.signature(route_registry_entries)
+    adapter_route = sage_run_adapter.route_registry_entries
+    compatibility_contract = exact(
+        {
+            "runtime_module": route_registry_entries.__module__,
+            "runtime_qualname": route_registry_entries.__qualname__,
+            "runtime_signature": str(route_signature),
+            "runtime_parameter_order": list(route_signature.parameters),
+            "runtime_parameter_kinds": {
+                name: parameter.kind.name
+                for name, parameter in route_signature.parameters.items()
+            },
+            "runtime_default_max_bundle_size": route_signature.parameters[
+                "max_bundle_size"
+            ].default,
+            "adapter_import_is_runtime_object": adapter_route is route_registry_entries,
+            "adapter_import_module": adapter_route.__module__,
+            "adapter_signature_matches_runtime": inspect.signature(adapter_route)
+            == route_signature,
+            "module_attribute_is_imported_object": integration.route_registry_entries
+            is route_registry_entries,
+        }
+    )
 
     equal_entries = {
         name: entry(name, positive=("equal_signal",))
@@ -1222,6 +1264,17 @@ def _routing_contracts(
         "bravo_low": entry("bravo_low", positive=("one",)),
         "alpha_high": entry("alpha_high", positive=("one", "two", "three")),
     }
+    clamped_entries = {
+        name: entry(name, positive=("clamp_signal",))
+        for name in (
+            "foxtrot_clamp",
+            "echo_clamp",
+            "delta_clamp",
+            "charlie_clamp",
+            "bravo_clamp",
+            "alpha_clamp",
+        )
+    }
     order_cases = {
         "equal_score_uses_lexical_name_order": route(
             equal_entries,
@@ -1233,6 +1286,17 @@ def _routing_contracts(
             context="request=test signals=one two three",
             base_tools=set(),
             cap=4,
+        ),
+        "default_signature_value_five_is_clamped_to_four": route(
+            clamped_entries,
+            context="request=test signals=clamp_signal",
+            base_tools=set(),
+        ),
+        "explicit_bundle_size_above_four_is_clamped_to_four": route(
+            clamped_entries,
+            context="request=test signals=clamp_signal",
+            base_tools=set(),
+            cap=99,
         ),
     }
 
@@ -1271,8 +1335,7 @@ def _routing_contracts(
                 )
             },
             context=(
-                "request=Summarize the visible result "
-                "tools=unstripped_tool_token"
+                "request=Summarize the visible result " "tools=unstripped_tool_token"
             ),
             base_tools=set(),
         ),
@@ -1387,6 +1450,20 @@ def _routing_contracts(
         preserves=("search_location_around_lat_lon",),
         required=("search_location_around_lat_lon",),
     )
+    abstention_life_entry = entry(
+        "prepare_safe_action_or_abstain",
+        family=ToolFamily.VALIDATION_ABSTENTION_HELPER,
+        output_properties={
+            "should_abstain": {"type": "boolean"},
+            "missing_information": {"type": "array"},
+            "safe_next_action": string,
+            "final_answer_recommendation": string,
+            "abstain_reason": string,
+        },
+        positive=("safe_abstain_needed",),
+        preserves=("search_contacts", "remove_contact"),
+        required=("search_contacts", "remove_contact"),
+    )
     lifecycle_context = (
         "request=Find weather near 1 Market Street "
         "signals=location_phrase external_lookup"
@@ -1408,6 +1485,181 @@ def _routing_contracts(
             context=lifecycle_context,
             base_tools=lifecycle_base_tools,
             lifecycle={lifecycle_tool_name: {"decision": "parked"}},
+        ),
+        "park_is_hidden": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            base_tools=lifecycle_base_tools,
+            lifecycle={lifecycle_tool_name: {"decision": "park"}},
+        ),
+        "absent_task_family_short_circuits_even_a_parked_row": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            scenario_name="positional_scenario_still_present",
+            task_family_key=None,
+            base_tools=lifecycle_base_tools,
+            lifecycle={lifecycle_tool_name: {"decision": "parked"}},
+        ),
+        "positional_scenario_name_does_not_drive_lifecycle_matching": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            scenario_name="positional_harmful_scenario",
+            task_family_key="edge_family_all_tools",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "harmful_called_scenarios": ["positional_harmful_scenario"],
+                }
+            },
+        ),
+        "task_family_key_drives_exact_lifecycle_matching": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            scenario_name="unrelated_positional_scenario",
+            task_family_key="edge_family_all_tools",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "harmful_called_scenarios": ["edge_family_all_tools"],
+                }
+            },
+        ),
+        "exact_harm_beats_an_equal_helpful_family_count": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            family="edge_family_all_tools",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "harmful_called_scenarios": ["edge_family_all_tools"],
+                    "helpful_called_families": ["edge_family"],
+                }
+            },
+        ),
+        "malformed_harmful_count_falls_back_to_scenario_list_length": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            family="malformed_count_family",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "needs_repair",
+                    "harmful_called_count": "not-an-integer",
+                    "harmful_called_scenarios": ["other_one", "other_two"],
+                    "harmful_called_families": ["malformed_count_family"],
+                }
+            },
+        ),
+        "harmful_family_fallback_counts_duplicate_scenarios": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            family="edge_family_arg_type_scrambled",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_scenarios": [
+                        "edge_family_all_tools",
+                        "edge_family_all_tools",
+                    ],
+                    "failed_count": 1,
+                }
+            },
+        ),
+        "helpful_family_fallback_counts_duplicates_and_ties_harm": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            family="edge_family_arg_type_scrambled",
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_scenarios": [
+                        "edge_family_all_tools",
+                        "edge_family_all_tools",
+                    ],
+                    "helpful_called_scenarios": [
+                        "edge_family_tool_name_scrambled",
+                        "edge_family_tool_name_scrambled",
+                    ],
+                    "failed_count": 1,
+                }
+            },
+        ),
+        "malformed_abstention_counts_are_treated_as_operationally_clean": route(
+            {"prepare_safe_action_or_abstain": abstention_life_entry},
+            context="request=test signals=safe_abstain_needed",
+            family="abstention_edge_family",
+            base_tools={"search_contacts", "remove_contact"},
+            lifecycle={
+                "prepare_safe_action_or_abstain": {
+                    "decision": "retain_with_route_repair",
+                    "harmful_called_scenarios": ["abstention_edge_family"],
+                    "failed_count": "malformed",
+                    "side_effect_incident_count": "malformed",
+                }
+            },
+        ),
+        "negative_abstention_counts_are_not_operationally_clean": route(
+            {"prepare_safe_action_or_abstain": abstention_life_entry},
+            context="request=test signals=safe_abstain_needed",
+            family="abstention_edge_family",
+            base_tools={"search_contacts", "remove_contact"},
+            lifecycle={
+                "prepare_safe_action_or_abstain": {
+                    "decision": "retain_with_route_repair",
+                    "harmful_called_scenarios": ["abstention_edge_family"],
+                    "failed_count": -1,
+                    "side_effect_incident_count": -1,
+                }
+            },
+        ),
+        "malformed_failed_count_blocks_visible_signal_override": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_families": ["edge_family", "edge_family"],
+                    "failed_count": "malformed",
+                    "side_effect_incident_count": 0,
+                }
+            },
+        ),
+        "malformed_incident_count_blocks_visible_signal_override": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_families": ["edge_family", "edge_family"],
+                    "failed_count": 0,
+                    "side_effect_incident_count": "malformed",
+                }
+            },
+        ),
+        "negative_failure_and_incident_counts_allow_visible_signal_override": route(
+            {lifecycle_tool_name: life_entry},
+            context=lifecycle_context,
+            base_tools=lifecycle_base_tools,
+            lifecycle={
+                lifecycle_tool_name: {
+                    "decision": "retain_with_route_repair",
+                    "route_repair_families": ["edge_family"],
+                    "harmful_called_families": ["edge_family", "edge_family"],
+                    "failed_count": -1,
+                    "side_effect_incident_count": -2,
+                }
+            },
         ),
         "one_family_harm_is_below_repair_threshold": route(
             {lifecycle_tool_name: life_entry},
@@ -1586,6 +1838,56 @@ def _routing_contracts(
         preserves=("search_contacts", "remove_contact", "modify_contact"),
         required=("search_contacts", "remove_contact", "modify_contact"),
     )
+    enum_and_downstream_name = entry(
+        "enum_then_downstream_name_helper",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        output_properties={
+            "tool_name": {
+                "type": "string",
+                "enum": ["search_contacts"],
+            },
+            "downstream_tool_name": string,
+            "downstream_tool_kwargs": mapping,
+            "abstain_reason": string,
+        },
+        positive=("downstream_signal",),
+        preserves=("remove_contact",),
+        required=("missing_static_requirement",),
+    )
+    derived_any_producer = entry(
+        "derived_any_producer_helper",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        output_properties={"value": string},
+        positive=("downstream_signal",),
+        preserves=("search_contacts", "search_messages"),
+        required=("search_contacts", "search_messages"),
+    )
+    preserved_fallback = entry(
+        "preserved_fallback_helper",
+        family=ToolFamily.DERIVED_VALUE_CALCULATOR,
+        output_properties={"value": string},
+        positive=("downstream_signal",),
+        preserves=("search_contacts",),
+        required=(),
+    )
+    search_union = entry(
+        "select_search_union_helper",
+        family=ToolFamily.SEARCH_FILTER_RANKING_HELPER,
+        inputs=(
+            ToolInput("records", "list", "Visible records."),
+            ToolInput("selection_mode", "str", "Visible selection mode."),
+        ),
+        positive=("downstream_signal",),
+        preserves=("search_messages", "remove_contact"),
+        required=("search_contacts", "modify_contact"),
+    )
+    single_native_action = entry(
+        "single_native_action_helper",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        positive=("downstream_signal",),
+        preserves=("search_contacts", "remove_contact"),
+        required=("search_contacts", "remove_contact"),
+    )
     downstream_cases = {
         "all_required_missing_one": route(
             {"all_required_helper": all_required},
@@ -1644,6 +1946,74 @@ def _routing_contracts(
             {"native_alternative_over_any_helper": (native_alternative_over_any)},
             context="request=test signals=downstream_signal",
             base_tools={"search_contacts", "modify_contact"},
+        ),
+        "downstream_tool_name_overrides_an_earlier_tool_name_enum": route(
+            {"enum_then_downstream_name_helper": enum_and_downstream_name},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_contacts"},
+        ),
+        "downstream_tool_name_uses_preserved_action_after_enum_override": route(
+            {"enum_then_downstream_name_helper": enum_and_downstream_name},
+            context="request=test signals=downstream_signal",
+            base_tools={"remove_contact"},
+        ),
+        "derived_multi_producer_requires_any_one": route(
+            {"derived_any_producer_helper": derived_any_producer},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_messages"},
+        ),
+        "derived_multi_producer_is_hidden_when_none_are_available": route(
+            {"derived_any_producer_helper": derived_any_producer},
+            context="request=test signals=downstream_signal",
+            base_tools=set(),
+        ),
+        "empty_required_calls_fall_back_to_preserved_tools": route(
+            {"preserved_fallback_helper": preserved_fallback},
+            context="request=test signals=downstream_signal",
+            base_tools=set(),
+        ),
+        "preserved_fallback_is_satisfied_when_preserved_tool_is_available": route(
+            {"preserved_fallback_helper": preserved_fallback},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_contacts"},
+        ),
+        "search_helper_narrows_required_and_preserved_union_to_producers": route(
+            {"select_search_union_helper": search_union},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_messages"},
+        ),
+        "search_helper_rejects_an_action_without_any_producer": route(
+            {"select_search_union_helper": search_union},
+            context="request=test signals=downstream_signal",
+            base_tools={"modify_contact"},
+        ),
+        "one_native_action_still_requires_every_dependency": route(
+            {"single_native_action_helper": single_native_action},
+            context="request=test signals=downstream_signal",
+            base_tools={"remove_contact"},
+        ),
+        "one_native_action_and_its_producer_are_sufficient": route(
+            {"single_native_action_helper": single_native_action},
+            context="request=test signals=downstream_signal",
+            base_tools={"search_contacts", "remove_contact"},
+        ),
+        "insufficiency_guard_bypasses_missing_downstream_when_no_guard_matches": route(
+            {"prepare_safe_action_or_abstain": insufficiency_guard},
+            context=(
+                "request=unknown operation "
+                "signals=insufficient_information safe_abstain_needed"
+            ),
+            base_tools=set(),
+        ),
+        "none_available_base_tools_bypasses_downstream_validation": route(
+            {"all_required_helper": all_required},
+            context="request=test signals=downstream_signal",
+            base_tools=None,
+        ),
+        "empty_available_base_tools_enforces_downstream_validation": route(
+            {"all_required_helper": all_required},
+            context="request=test signals=downstream_signal",
+            base_tools=set(),
         ),
     }
 
@@ -1737,6 +2107,18 @@ def _routing_contracts(
         preserves=("search_contacts",),
         required=("search_contacts",),
     )
+    fill_entries = {
+        name: entry(
+            name,
+            positive=("shared_signal",),
+        )
+        for name in (
+            "bravo_fill",
+            "charlie_fill",
+            "delta_fill",
+            "echo_fill",
+        )
+    }
     subsumption_cases = {
         "lexically_first_composite_suppresses_lower_level": route(
             {
@@ -1746,8 +2128,39 @@ def _routing_contracts(
             },
             context="request=test signals=shared_signal",
             base_tools={"search_contacts"},
-        )
+        ),
+        "composite_suppression_happens_before_budget_fill": route(
+            {
+                "lower_shared_helper": lower,
+                "alpha_composite_helper": composite_alpha,
+                **fill_entries,
+            },
+            context="request=test signals=shared_signal",
+            base_tools={"search_contacts"},
+            cap=4,
+        ),
     }
+    rich_lower = entry(
+        "rich_lower_helper",
+        family=ToolFamily.CANONICALIZER,
+        inputs=(ToolInput("value", "str", "Visible value."),),
+        positive=("rich_signal",),
+        negative=("unmatched_negative",),
+        output_properties={"value": string},
+        required=("search_contacts",),
+        applicable=("rich_family",),
+    )
+    rich_composite = entry(
+        "rich_composite_helper",
+        family=ToolFamily.COMPOSITE_WORKFLOW_HELPER,
+        inputs=(ToolInput("value", "str", "Visible value."),),
+        output_properties={"value": string, "abstain_reason": string},
+        positive=("rich_signal",),
+        negative=("unmatched_negative",),
+        preserves=("search_contacts",),
+        required=("search_contacts",),
+        applicable=("rich_family",),
+    )
     evidence_cases = {
         "composite_suppression_preserves_prior_match_evidence": route(
             {
@@ -1801,16 +2214,56 @@ def _routing_contracts(
                 )
             },
             context=(
-                "request=Select the latest visible contact "
-                "signals=recency_action"
+                "request=Select the latest visible contact " "signals=recency_action"
             ),
             base_tools={"search_reminder"},
+        ),
+        "composite_suppression_preserves_the_full_prior_decision_payload": route(
+            {
+                "rich_lower_helper": rich_lower,
+                "rich_composite_helper": rich_composite,
+            },
+            context="request=test signals=rich_signal rich_family",
+            family="rich_family",
+            base_tools={"search_contacts"},
+        ),
+        "budget_suppression_clears_the_full_prior_decision_payload": route(
+            {
+                "alpha_rich_budget": entry(
+                    "alpha_rich_budget",
+                    positive=("rich_signal",),
+                    negative=("unmatched_negative",),
+                    output_properties={"value": string},
+                    required=("search_contacts",),
+                    applicable=("rich_family",),
+                ),
+                "zeta_rich_budget": entry(
+                    "zeta_rich_budget",
+                    positive=("rich_signal",),
+                    negative=("unmatched_negative",),
+                    output_properties={"value": string},
+                    required=("search_contacts",),
+                    applicable=("rich_family",),
+                ),
+            },
+            context="request=test signals=rich_signal rich_family",
+            family="rich_family",
+            base_tools={"search_contacts"},
+            cap=1,
         ),
     }
 
     mismatched_entry = entry(
         "spec_identity_helper",
         positive=("mismatch_signal",),
+    )
+    alias_first_spec = entry(
+        "zeta_spec_name_selected_by_alpha_alias",
+        positive=("alias_order_signal",),
+    )
+    alias_second_spec = entry(
+        "alpha_spec_name_hidden_by_zeta_alias",
+        positive=("alias_order_signal",),
     )
     identity_cases = {
         "registry_key_controls_decision_identity_but_spec_name_is_selected": route(
@@ -1830,6 +2283,15 @@ def _routing_contracts(
             base_tools=set(),
             lifecycle={"registry_alias": {"decision": "parked"}},
         ),
+        "registry_alias_controls_lexical_tie_break_not_spec_name": route(
+            {
+                "zeta_registry_alias": alias_second_spec,
+                "alpha_registry_alias": alias_first_spec,
+            },
+            context="request=test signals=alias_order_signal",
+            base_tools=set(),
+            cap=1,
+        ),
     }
 
     return {
@@ -1841,6 +2303,7 @@ def _routing_contracts(
         "subsumption_collisions": exact(subsumption_cases),
         "evidence_retention": exact(evidence_cases),
         "registry_identity_mismatches": exact(identity_cases),
+        "public_compatibility": compatibility_contract,
     }
 
 
