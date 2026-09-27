@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Callable, Iterator
 
 from sage_ts.facts import TaskFacts
 from sage_ts.generation.complete_tools import COMPLETE_TOOLS_NATIVE_NAMES
@@ -5190,6 +5191,161 @@ def _sanitize_visible_observation_text(text: str) -> str:
     return sanitized
 
 
+@dataclass(frozen=True)
+class _VisibleRoute:
+    factory: Callable[[str], CapabilityObservation]
+    family: str
+    reason: str
+    uses_context_label: bool = False
+
+
+def _route(
+    key: str,
+    family: str,
+    *,
+    visible: bool = True,
+    context_label: bool = False,
+) -> _VisibleRoute:
+    reason = f"visible_{key}" if visible else key
+    return _VisibleRoute(_ROUTE_FACTORIES[key], family, reason, context_label)
+
+
+_counterparty_plan_factory = _message_counterparty_search_plan_observation
+_counterparty_update_factory = _message_counterparty_contact_update_observation
+_past_reminder_factory = _prepare_past_reminder_recency_search_args_observation
+_ROUTE_FACTORIES = MappingProxyType(
+    {
+        "insufficient_information_guard": _safe_action_or_abstain_observation,
+        "read_only_device_status": _device_status_lookup_observation,
+        "single_device_state_action": _single_device_state_action_observation,
+        "device_or_precondition_action": _plan_device_state_action_sequence_observation,
+        "reminder_creation": _reminder_optional_location_argument_observation,
+        "relative_time": _relative_day_time_timestamp_observation,
+        "weekday_time": _next_weekday_timestamp_observation,
+        "broad_location_phrase": _broad_location_search_argument_observation,
+        "location_phrase": _location_search_argument_observation,
+        "relative_time_for_reminder_update": _relative_day_time_timestamp_observation,
+        "weekday_time_for_reminder_update": _next_weekday_timestamp_observation,
+        "add_contact_request": _add_contact_argument_observation,
+        "contact_update_by_id": _contact_update_by_id_observation,
+        "scalar_contact_or_message_action": _direct_scalar_contact_action_observation,
+        "contact_lookup_constraint": _contact_lookup_query_planner_observation,
+        "named_message_recipient": _send_message_contact_lookup_observation,
+        "relationship_batch_update": _contact_relationship_batch_update_observation,
+        "message_counterparty_update_search_plan": _counterparty_plan_factory,
+        "message_counterparty_update": _counterparty_update_factory,
+        "message_counterparty_lookup": _counterparty_plan_factory,
+        "upcoming_reminder_search": _prepare_upcoming_reminder_search_args_observation,
+        "message_recency_search": _prepare_message_recency_search_args_observation,
+        "past_reminder_recency_search": _past_reminder_factory,
+        "recency_search": _resolve_search_window_or_bounds_observation,
+        "recency_selection": _latest_record_selection_observation,
+        "message_recency_answer": _message_content_by_recency_observation,
+        "recency_side_effect_target": _recency_action_target_observation,
+        "external_broad_location_phrase": _broad_location_search_argument_observation,
+        "external_location_phrase": _location_search_argument_observation,
+        "holiday_lookup": _holiday_search_args_observation,
+        "calendar_distance": _days_between_timestamps_observation,
+        "stock_lookup": _stock_symbol_extraction_observation,
+        "address_service_answer": _address_answer_extraction_observation,
+        "currency_service_answer": _currency_answer_extraction_observation,
+        "phone_service_answer": _phone_answer_extraction_observation,
+        "distance_service_answer": _distance_answer_extraction_observation,
+        "temperature_service_answer": _temperature_answer_extraction_observation,
+        "service_answer": _external_service_answer_extraction_observation,
+    }
+)
+
+_CONTACT_ROUTES = (
+    ("add_contact", "add_contact_request"),
+    ("contact_update_by_id", "contact_update_by_id"),
+    ("direct_contact_action", "scalar_contact_or_message_action"),
+    ("contact_lookup", "contact_lookup_constraint"),
+    ("named_message_recipient", "named_message_recipient"),
+    ("relationship_batch_update", "relationship_batch_update"),
+    ("message_counterparty_update", "message_counterparty_update_search_plan"),
+    ("message_counterparty_update", "message_counterparty_update"),
+    ("message_counterparty_lookup", "message_counterparty_lookup"),
+)
+
+
+def _reminder_routes(
+    signals: set[str], context: VisibleTaskContext
+) -> Iterator[_VisibleRoute]:
+    argument_gap = bool(
+        signals
+        & {
+            "relative_time",
+            "location_phrase",
+            "state_precondition_possible",
+            "device_state_action",
+        }
+    )
+    if "reminder_create" in signals:
+        if argument_gap:
+            yield _route("reminder_creation", "reminder_create")
+        if "relative_time" in signals and "weekday_time" not in signals:
+            yield _route("relative_time", "relative_time")
+        if "weekday_time" in signals:
+            yield _route("weekday_time", "weekday_time")
+        if "location_phrase" in signals:
+            yield _location_route(context, external=False)
+    if "reminder_modify" in signals:
+        if "relative_time" in signals and "weekday_time" not in signals:
+            yield _route("relative_time_for_reminder_update", "relative_time")
+        if "weekday_time" in signals:
+            yield _route("weekday_time_for_reminder_update", "weekday_time")
+
+
+def _location_route(context: VisibleTaskContext, *, external: bool) -> _VisibleRoute:
+    broad = _visible_broad_location_phrase_requested(context.user_request.lower())
+    prefix = "external_" if external else ""
+    location_kind = "broad_location_phrase" if broad else "location_phrase"
+    return _route(f"{prefix}{location_kind}", "location_phrase")
+
+
+def _recency_routes(signals: set[str]) -> Iterator[_VisibleRoute]:
+    if "recency_search" not in signals:
+        return
+    if "upcoming_reminder_search" in signals:
+        yield _route("upcoming_reminder_search", "upcoming_reminder_search")
+    elif "message_recency_search" in signals:
+        yield _route("message_recency_search", "message_recency_search")
+    elif "past_reminder_recency_search" in signals:
+        key = "past_reminder_recency_search"
+        yield _route(key, key)
+    else:
+        yield _route("recency_search", "recency_search")
+    yield _route("recency_selection", "recency_search")
+    if "message_recency" in signals:
+        yield _route("message_recency_answer", "message_recency")
+
+
+def _service_route(signals: set[str], text: str) -> _VisibleRoute:
+    if _visible_reverse_geocode_request(text):
+        key = "address_service_answer"
+    elif "currency_lookup" in signals:
+        key = "currency_service_answer"
+    elif "phone number" in text:
+        key = "phone_service_answer"
+    elif _has_any(
+        text,
+        ("how far", "distance", "how many km", "how many miles", "km to", "miles to"),
+    ):
+        key = "distance_service_answer"
+    elif _has_any(
+        text, ("temperature", "temp", "weather", "forecast", "celsius", "fahrenheit")
+    ):
+        key = "temperature_service_answer"
+    else:
+        key = "service_answer"
+    return _route(key, "service_answer_extraction")
+
+
+def _device_route(key: str) -> _VisibleRoute:
+    return _route(key, "device_state_action", context_label=True)
+
+
 def classify_visible_task_observations(
     scenario_name: str,
     scenario: Scenario,
@@ -5200,279 +5356,48 @@ def classify_visible_task_observations(
     signals = set(context.signals)
     observations: list[CapabilityObservation] = []
 
-    def add(
-        observation: CapabilityObservation,
-        task_family_key: str,
-        reason: str,
-    ) -> None:
+    def add(route: _VisibleRoute) -> None:
+        factory_label = (
+            context.generation_label() if route.uses_context_label else scenario_name
+        )
+        observation = route.factory(factory_label)
         observations.append(
-            _visible_observation(observation, context, task_family_key, reason)
+            _visible_observation(observation, context, route.family, route.reason)
         )
 
-    if "insufficient_information" in signals or "safe_abstain_needed" in signals:
-        add(
-            _safe_action_or_abstain_observation(scenario_name),
-            "safe_abstain",
-            "insufficient_information_guard",
-        )
+    if signals & {"insufficient_information", "safe_abstain_needed"}:
+        add(_route("insufficient_information_guard", "safe_abstain", visible=False))
         if "insufficient_information" in signals:
             return tuple(observations)
     if "device_status_read" in signals:
-        add(
-            _device_status_lookup_observation(scenario_name),
-            "device_status_read",
-            "read_only_device_status",
-        )
+        add(_route("read_only_device_status", "device_status_read", visible=False))
     if "device_state_action" in signals:
-        add(
-            _single_device_state_action_observation(context.generation_label()),
-            "device_state_action",
-            "visible_single_device_state_action",
-        )
-    if "device_state_action" in signals or "state_precondition_possible" in signals:
-        add(
-            _plan_device_state_action_sequence_observation(context.generation_label()),
-            "device_state_action",
-            "visible_device_or_precondition_action",
-        )
-    reminder_argument_gap = bool(
-        "relative_time" in signals
-        or "location_phrase" in signals
-        or "state_precondition_possible" in signals
-        or "device_state_action" in signals
-    )
-    if "reminder_create" in signals and reminder_argument_gap:
-        add(
-            _reminder_optional_location_argument_observation(scenario_name),
-            "reminder_create",
-            "visible_reminder_creation",
-        )
-    if "reminder_create" in signals:
-        if "relative_time" in signals and "weekday_time" not in signals:
-            add(
-                _relative_day_time_timestamp_observation(scenario_name),
-                "relative_time",
-                "visible_relative_time",
-            )
-        if "weekday_time" in signals:
-            add(
-                _next_weekday_timestamp_observation(scenario_name),
-                "weekday_time",
-                "visible_weekday_time",
-            )
-        if "location_phrase" in signals:
-            if _visible_broad_location_phrase_requested(context.user_request.lower()):
-                add(
-                    _broad_location_search_argument_observation(scenario_name),
-                    "location_phrase",
-                    "visible_broad_location_phrase",
-                )
-            else:
-                add(
-                    _location_search_argument_observation(scenario_name),
-                    "location_phrase",
-                    "visible_location_phrase",
-                )
-    if "reminder_modify" in signals:
-        if "relative_time" in signals and "weekday_time" not in signals:
-            add(
-                _relative_day_time_timestamp_observation(scenario_name),
-                "relative_time",
-                "visible_relative_time_for_reminder_update",
-            )
-        if "weekday_time" in signals:
-            add(
-                _next_weekday_timestamp_observation(scenario_name),
-                "weekday_time",
-                "visible_weekday_time_for_reminder_update",
-            )
-    if "add_contact" in signals:
-        add(
-            _add_contact_argument_observation(scenario_name),
-            "add_contact",
-            "visible_add_contact_request",
-        )
-    if "contact_update_by_id" in signals:
-        add(
-            _contact_update_by_id_observation(scenario_name),
-            "contact_update_by_id",
-            "visible_contact_update_by_id",
-        )
-    if "direct_contact_action" in signals:
-        add(
-            _direct_scalar_contact_action_observation(scenario_name),
-            "direct_contact_action",
-            "visible_scalar_contact_or_message_action",
-        )
-    if "contact_lookup" in signals:
-        add(
-            _contact_lookup_query_planner_observation(scenario_name),
-            "contact_lookup",
-            "visible_contact_lookup_constraint",
-        )
-    if "named_message_recipient" in signals:
-        add(
-            _send_message_contact_lookup_observation(scenario_name),
-            "named_message_recipient",
-            "visible_named_message_recipient",
-        )
-    if "relationship_batch_update" in signals:
-        add(
-            _contact_relationship_batch_update_observation(scenario_name),
-            "relationship_batch_update",
-            "visible_relationship_batch_update",
-        )
-    if "message_counterparty_update" in signals:
-        add(
-            _message_counterparty_search_plan_observation(scenario_name),
-            "message_counterparty_update",
-            "visible_message_counterparty_update_search_plan",
-        )
-        add(
-            _message_counterparty_contact_update_observation(scenario_name),
-            "message_counterparty_update",
-            "visible_message_counterparty_update",
-        )
-    if "message_counterparty_lookup" in signals:
-        add(
-            _message_counterparty_search_plan_observation(scenario_name),
-            "message_counterparty_lookup",
-            "visible_message_counterparty_lookup",
-        )
-    if "recency_search" in signals:
-        if "upcoming_reminder_search" in signals:
-            add(
-                _prepare_upcoming_reminder_search_args_observation(scenario_name),
-                "upcoming_reminder_search",
-                "visible_upcoming_reminder_search",
-            )
-        elif "message_recency_search" in signals:
-            add(
-                _prepare_message_recency_search_args_observation(scenario_name),
-                "message_recency_search",
-                "visible_message_recency_search",
-            )
-        elif "past_reminder_recency_search" in signals:
-            add(
-                _prepare_past_reminder_recency_search_args_observation(scenario_name),
-                "past_reminder_recency_search",
-                "visible_past_reminder_recency_search",
-            )
-        else:
-            add(
-                _resolve_search_window_or_bounds_observation(scenario_name),
-                "recency_search",
-                "visible_recency_search",
-            )
-        add(
-            _latest_record_selection_observation(scenario_name),
-            "recency_search",
-            "visible_recency_selection",
-        )
-        if "message_recency" in signals:
-            add(
-                _message_content_by_recency_observation(scenario_name),
-                "message_recency",
-                "visible_message_recency_answer",
-            )
-    message_recency_visible = (
-        "message_recency" in signals or "message_search_followup_possible" in signals
-    )
-    if message_recency_visible and "recency_search" not in signals:
-        add(
-            _message_content_by_recency_observation(scenario_name),
-            "message_recency",
-            "visible_message_recency_answer",
-        )
+        add(_device_route("single_device_state_action"))
+    if signals & {"device_state_action", "state_precondition_possible"}:
+        add(_device_route("device_or_precondition_action"))
+    for route in _reminder_routes(signals, context):
+        add(route)
+    for signal, key in _CONTACT_ROUTES:
+        if signal in signals:
+            add(_route(key, signal))
+    for route in _recency_routes(signals):
+        add(route)
+    message_visible = signals & {"message_recency", "message_search_followup_possible"}
+    if message_visible and "recency_search" not in signals:
+        add(_route("message_recency_answer", "message_recency"))
     if "recency_action" in signals:
-        add(
-            _recency_action_target_observation(scenario_name),
-            "recency_action",
-            "visible_recency_side_effect_target",
+        add(_route("recency_side_effect_target", "recency_action"))
+    if {"location_phrase", "external_lookup"} <= signals:
+        add(_location_route(context, external=True))
+    if "holiday" in signals:
+        key = (
+            "calendar_distance" if "calendar_distance" in signals else "holiday_lookup"
         )
-    if "location_phrase" in signals and "external_lookup" in signals:
-        if _visible_broad_location_phrase_requested(context.user_request.lower()):
-            add(
-                _broad_location_search_argument_observation(scenario_name),
-                "location_phrase",
-                "visible_external_broad_location_phrase",
-            )
-        else:
-            add(
-                _location_search_argument_observation(scenario_name),
-                "location_phrase",
-                "visible_external_location_phrase",
-            )
-    if "holiday" in signals and "calendar_distance" not in signals:
-        add(
-            _holiday_search_args_observation(scenario_name),
-            "holiday_lookup",
-            "visible_holiday_lookup",
-        )
-    if "holiday" in signals and "calendar_distance" in signals:
-        add(
-            _days_between_timestamps_observation(scenario_name),
-            "calendar_distance",
-            "visible_calendar_distance",
-        )
+        add(_route(key, key))
     if "stock_lookup" in signals:
-        add(
-            _stock_symbol_extraction_observation(scenario_name),
-            "stock_lookup",
-            "visible_stock_lookup",
-        )
+        add(_route("stock_lookup", "stock_lookup"))
     if "service_answer_extraction" in signals:
-        text = context.user_request.lower()
-        if _visible_reverse_geocode_request(text):
-            add(
-                _address_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_address_service_answer",
-            )
-        elif "currency_lookup" in signals:
-            add(
-                _currency_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_currency_service_answer",
-            )
-        elif "phone number" in text:
-            add(
-                _phone_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_phone_service_answer",
-            )
-        elif _has_any(
-            text,
-            (
-                "how far",
-                "distance",
-                "how many km",
-                "how many miles",
-                "km to",
-                "miles to",
-            ),
-        ):
-            add(
-                _distance_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_distance_service_answer",
-            )
-        elif _has_any(
-            text,
-            ("temperature", "temp", "weather", "forecast", "celsius", "fahrenheit"),
-        ):
-            add(
-                _temperature_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_temperature_service_answer",
-            )
-        else:
-            add(
-                _external_service_answer_extraction_observation(scenario_name),
-                "service_answer_extraction",
-                "visible_service_answer",
-            )
-
+        add(_service_route(signals, context.user_request.lower()))
     return tuple(observations)
 
 
