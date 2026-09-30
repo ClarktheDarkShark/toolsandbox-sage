@@ -626,8 +626,9 @@ def build_evolution_evidence_data(
                 "non-learning AI agent on matched benchmark tasks."
             ),
             "evidence_label": (
-                "Ten independent online-build runs compare SAGE with a fresh "
-                "matched control on the same 1,032 benchmark tasks."
+                "Ten independent SAGE runs with tool generation and repair "
+                "enabled compare SAGE with a fresh matched control on the same "
+                "1,032 benchmark tasks."
             ),
             "detail_id": "hypothesis:h1",
         }
@@ -694,12 +695,11 @@ def build_evolution_evidence_data(
                 ]
             ),
             "note": (
-                "A repair entrant has repair_attempted=true, recorded initial "
-                "validation errors, and at least one autonomous repair attempt. "
-                "Later reuse requires an invocation on a task whose recorded order "
-                "is after the tool's actual JIT birth task. The executed artifacts "
-                "contain as many as seven repair attempts; that observed behavior, "
-                "rather than a lower prose description, governs these counts."
+                "A repair entrant has recorded initial validation errors and at "
+                "least one autonomous repair attempt. Later reuse requires an "
+                "invocation on a task whose recorded order is after the task that "
+                "triggered tool creation. The saved records contain as many as "
+                "seven repair attempts, and those records govern these counts."
             ),
         },
         {
@@ -788,8 +788,8 @@ def build_evolution_evidence_data(
             "and at least 90% of those repaired tools will be invoked on a later task."
         ),
         "evidence_label": (
-            "Birth and validation ledgers establish repair admission; ordered JIT "
-            "birth, task-feedback, and invocation ledgers establish later reuse."
+            "Validation, repair, tool-creation, task-result, and invocation records "
+            "establish repair admission and later reuse."
         ),
         "observed_label": (
             f"Repair {_percent(repair_rate)} · reuse {_percent(repaired_reuse_rate)}"
@@ -826,10 +826,10 @@ def build_evolution_evidence_data(
                 ]
             ),
             "note": (
-                "The triggering family is the base_family of the actual JIT "
-                "birth scenario. A transfer requires a later invocation in a task "
-                "with a different base_family. The generated capability's own "
-                "family label is not used as the birth family."
+                "The triggering family is the benchmark task family of the task "
+                "that caused the tool to be created. A transfer requires later use "
+                "in a different benchmark task family. The generated capability's "
+                "own tool-family label is not used."
             ),
         },
         {
@@ -897,8 +897,8 @@ def build_evolution_evidence_data(
             "semantic task family different from the family that triggered their creation."
         ),
         "evidence_label": (
-            "The actual JIT birth task supplies the origin family; ordered later "
-            "invocation tasks supply destination families."
+            "The task that triggered tool creation supplies the origin family; "
+            "ordered later invocation tasks supply destination families."
         ),
         "observed_label": f"Observed {_percent(cross_rate)}",
         "threshold_label": "Target > 50%",
@@ -964,7 +964,7 @@ def build_evolution_evidence_data(
             ),
             definition=(
                 "Admitted repaired tools with an invocation on a benchmark task "
-                "ordered after their actual JIT birth task."
+                "ordered after the task that triggered their creation."
             ),
             rows=[
                 ("Admitted repaired tools", totals["repaired_accepted"]),
@@ -977,8 +977,8 @@ def build_evolution_evidence_data(
             label="Cross-family transfers",
             value_label=f"{totals['cross_family_tools']} / {totals['accepted_tools']}",
             definition=(
-                "Accepted generated-tool instances invoked after birth in at least "
-                "one semantic task family different from the triggering task family."
+                "Accepted generated-tool instances invoked after creation in at "
+                "least one semantic task family different from the triggering task family."
             ),
             rows=[
                 ("Accepted tools", totals["accepted_tools"]),
@@ -998,7 +998,7 @@ def build_evolution_evidence_data(
     )
     campaign["hypothesis_section_description"] = ""
     campaign["study_design_notice"] = ""
-    campaign["replication_chart_subtitle"] = "Audited v9 all-task mean and H1 threshold"
+    campaign["replication_chart_subtitle"] = "Primary all-task mean and H1 threshold"
     campaign["replication_chart_threshold_label"] = "H1 threshold: 10%"
     campaign["replication_chart_threshold_percent"] = H1_OUTCOME_LIFT_THRESHOLD_PERCENT
     campaign["lower_section_title"] = (

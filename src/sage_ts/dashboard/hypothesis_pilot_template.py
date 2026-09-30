@@ -259,7 +259,7 @@ HYPOTHESIS_PILOT_HTML = r"""<!doctype html>
       q('generated-at').textContent = `Rendered ${data.generated_at || '—'}`;
       q('pilot-subtitle').textContent = `${data.pilot_id || 'Unnamed pilot'} · ${data.study_label || 'one complete run'}`;
       setStatus('overall-status', data.status, data.integrity_status);
-      const stages = ['Protocol locked', 'Online build + control', 'Blind audit', 'Randomized frozen test', 'Exploratory split-half alternate'];
+      const stages = ['Protocol locked', 'SAGE tool generation + control', 'Blind audit', 'Randomized frozen test', 'Exploratory split-half alternate'];
       const stage = Number.isInteger(data.progress_stage) ? data.progress_stage : 0;
       q('progress').innerHTML = stages.map((name, i) => `<div class="${i < stage ? 'done' : i === stage && data.status === 'running' ? 'active' : ''}">${i + 1}. ${name}</div>`).join('');
 

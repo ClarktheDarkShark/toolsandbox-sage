@@ -1293,22 +1293,22 @@
   </header>
 
   <main class="page">
-    <section class="run-strip" aria-label="Evidence campaign progress">
+    <section class="run-strip" aria-label="Ten-run study progress">
       <div>
-        <div class="eyebrow">Evidence campaign</div>
-        <div class="run-name" id="runName">Loading campaign data...</div>
+        <div class="eyebrow">Ten-run study</div>
+        <div class="run-name" id="runName">Loading study results...</div>
       </div>
       <div>
         <div class="progress-track" aria-hidden="true">
           <div class="progress-value" id="progressValue" style="width:0"></div>
         </div>
         <div class="progress-meta">
-          <span id="progressLabel">Waiting for run artifacts</span>
+          <span id="progressLabel">Waiting for saved run records</span>
           <span>Matched task order</span>
         </div>
       </div>
       <div class="paired-count">
-        <div class="eyebrow">Audited v9 / paper v1 pairs</div>
+        <div class="eyebrow">All-task / historical-comparison task pairs</div>
         <strong id="pairedCount">0</strong>
       </div>
     </section>
@@ -1317,7 +1317,7 @@
 
     <div class="section-head">
       <h2>Hypothesis Evidence</h2>
-      <p id="hypothesisSectionDescription">Hypothesis definitions and evidence load from the selected campaign artifacts.</p>
+      <p id="hypothesisSectionDescription">Hypothesis definitions and evidence load from the selected study records.</p>
     </div>
     <section class="hypothesis-grid" id="hypothesisGrid"></section>
 
@@ -1329,26 +1329,26 @@
     <section class="tool-row" id="toolMetrics" aria-label="Generated tool metrics"></section>
 
     <div class="section-head">
-      <h2 id="lowerSectionTitle">Replication Stability And Called-Task Association</h2>
+      <h2 id="lowerSectionTitle">Replication Stability And Outcomes When Generated Tools Were Used</h2>
       <p id="lowerSectionDescription">Run-level variation remains visible instead of being hidden by the aggregate.</p>
     </div>
     <section class="lower-grid">
       <article class="panel">
         <div class="panel-title">
           <strong>Outcome Lift Across Full Runs</strong>
-          <span id="replicationChartSubtitle">Audited v9 all-task mean and primary threshold</span>
+          <span id="replicationChartSubtitle">Primary all-task outcome mean and threshold</span>
         </div>
         <div id="replicationChart"></div>
       </article>
       <article class="panel">
         <div class="panel-title">
-          <strong>Top Generated-Tool Called-Task Results</strong>
-          <span>Selection-conditioned; descriptive only</span>
+          <strong>Outcomes When Generated Tools Were Used</strong>
+          <span>Descriptive association, not causal</span>
         </div>
         <div id="toolTable"></div>
       </article>
     </section>
-    <div class="footer-note" id="footerNote">Dashboard values refresh from preserved run artifacts.</div>
+    <div class="footer-note" id="footerNote">Dashboard values refresh from saved study data.</div>
   </main>
 
   <div class="drawer-overlay" id="drawerOverlay" aria-hidden="true">
@@ -1377,7 +1377,7 @@
     <section class="paper-footer-grid">
       <article class="paper-footer-panel">
         <div class="paper-footer-heading">
-          <strong>H1 outcome lift across independent registry runs</strong>
+          <strong>H1 outcome lift across independent SAGE runs</strong>
           <span id="paperRunSummary">Loading run-level evidence...</span>
         </div>
         <div class="paper-run-bars" id="paperRunBars"></div>
@@ -1385,7 +1385,7 @@
       <article class="paper-footer-panel">
         <div class="paper-footer-heading">
           <strong>Evidence basis</strong>
-          <span>Preserved campaign artifacts</span>
+          <span>Ten-run study records</span>
         </div>
         <div class="paper-evidence-facts" id="paperEvidenceFacts"></div>
       </article>
@@ -1516,15 +1516,15 @@
         !campaign.hypothesis_section_description;
       document.getElementById("lowerSectionTitle").textContent =
         campaign.lower_section_title ||
-        "Replication Stability And Called-Task Association";
+        "Replication Stability And Outcomes When Generated Tools Were Used";
       document.getElementById("lowerSectionDescription").textContent =
         campaign.lower_section_description ||
         "Run-level variation remains visible instead of being hidden by the aggregate.";
       document.getElementById("replicationChartSubtitle").textContent =
         campaign.replication_chart_subtitle ||
-        "Audited v9 all-task mean and primary threshold";
+        "Primary all-task outcome mean and threshold";
       document.getElementById("footerNote").textContent =
-        `Updated ${campaign.updated_at_label}. Baseline cache provenance, run configuration, and statistical definitions are available in the metric drilldowns.`;
+        `Updated ${campaign.updated_at_label}. Select any metric to view how the control results were obtained and how the analysis was calculated.`;
 
       const select = document.getElementById("runSelect");
       select.innerHTML = '<option value="">Aggregate evidence</option>';
@@ -1579,7 +1579,7 @@
       [performance, audited, paper, statistics, integrity].forEach(registerDetail);
       document.getElementById("evidenceGrid").innerHTML = `
         <button class="panel metric-button" data-detail="${escapeHtml(audited.detail_id)}">
-          <div class="panel-title"><strong>Audited Current Outcome</strong><span>v9 · all 1,032 tasks per run</span></div>
+          <div class="panel-title"><strong>Primary All-Task Outcome</strong><span>final evaluator · all 1,032 tasks per run</span></div>
           <div class="outcome-pair">
             <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(audited.baseline)}</strong></div>
             <div class="arrow">-&gt;</div>
@@ -1591,7 +1591,7 @@
           </div>
         </button>
         <button class="panel metric-button" data-detail="${escapeHtml(paper.detail_id)}">
-          <div class="panel-title"><strong>Paper-Comparable Outcome</strong><span>v1 · exact ordered 800-task subset</span></div>
+          <div class="panel-title"><strong>Historical 800-Task Comparison</strong><span>earlier evaluator · exact ordered subset</span></div>
           <div class="outcome-pair">
             <div class="outcome-value"><span>Fresh baseline</span><strong>${fmt(paper.baseline)}</strong></div>
             <div class="arrow">-&gt;</div>
@@ -1603,11 +1603,11 @@
           </div>
         </button>
         <button class="panel metric-button" data-detail="${escapeHtml(statistics.detail_id)}">
-          <div class="panel-title"><strong>Cluster-Aware Statistical Evidence</strong><span>Audited v9 · all tasks</span></div>
+          <div class="panel-title"><strong>Cluster-Aware Statistical Evidence</strong><span>primary outcome · all tasks</span></div>
           <ul class="stat-list">
             <li>
               <span class="row-copy">
-                <span class="metric-name">Mean audited-v9 difference</span>
+                <span class="metric-name">Mean all-task outcome difference</span>
                 <span class="metric-help">Average outcome gain for SAGE over baseline; the ${escapeHtml(primaryHypothesisId)} test below evaluates the 10% target directly.</span>
               </span>
               <strong>${escapeHtml(statistics.mean_delta_label)}</strong>
@@ -1622,13 +1622,13 @@
             <li>
               <span class="row-copy">
                 <span class="metric-name">Run-level target sign-flip test</span>
-                <span class="metric-help">Tests the 10% target contrast across independent registry replications.</span>
+                <span class="metric-help">Tests the 10% target contrast across independent SAGE replications.</span>
               </span>
               <strong>${escapeHtml(statistics.p_label)}</strong>
             </li>
             <li>
               <span class="row-copy">
-                <span class="metric-name">Audited-v9 full successes B / S</span>
+                <span class="metric-name">Full-score successes, Baseline / SAGE</span>
                 <span class="metric-help">Count across all 1,032 tasks per run: baseline first, then SAGE.</span>
               </span>
               <strong>${escapeHtml(statistics.successes_label)}</strong>
@@ -1636,7 +1636,7 @@
           </ul>
         </button>
         <button class="panel metric-button" data-detail="${escapeHtml(integrity.detail_id)}">
-          <div class="panel-title"><strong>Evidence Validity Checks</strong><span>Shortcut audit</span></div>
+          <div class="panel-title"><strong>Study Validity Checks</strong><span>Safeguards against shortcuts</span></div>
           <ul class="integrity-list">
             ${(integrity.items || []).map((item) =>
               `<li>
@@ -1653,13 +1653,13 @@
 
     function integrityHelp(label) {
       const explanations = {
-        "Same SAGE settings across runs": "Confirms completed runs used the approved claim-grade configuration.",
+        "Same SAGE settings across runs": "Confirms completed runs used the predefined study configuration.",
         "Benchmark-metadata shortcut checks": "Confirms SAGE did not use scenario names to create or route tools.",
-        "Code-based answer shortcut checks": "Confirms the bridge did not complete tasks using code rules.",
-        "Diagnostic tool-call override checks": "Confirms no ad hoc diagnostic override was used; named choices from the declared production actor policy remain part of SAGE.",
+        "Code-based answer shortcut checks": "Confirms no rule-based mechanism completed tasks by bypassing the task-solving model.",
+        "Diagnostic tool-call override checks": "Confirms no development-only tool-call override was used; selections made by the documented SAGE hybrid policy remain part of SAGE.",
         "Tool side-effect audit flags": "Reports validated tool calls flagged for side-effect review.",
       };
-      return explanations[label] || "Validity check count for the completed claim runs.";
+      return explanations[label] || "Validity check count for the completed study runs.";
     }
 
     function renderToolMetrics(data) {
@@ -1678,7 +1678,7 @@
       );
       if (!runs.length) {
         document.getElementById("replicationChart").innerHTML =
-          '<div class="empty-state">Run-level audited-v9 outcome lift appears as full runs complete.</div>';
+          '<div class="empty-state">Run-level primary outcome lift appears as full runs complete.</div>';
         return;
       }
       runs.forEach(registerDetail);
@@ -1692,11 +1692,11 @@
         const x = runs.length === 1 ? 50 : 5 + (index / (runs.length - 1)) * 90;
         const y = Math.max(0, Math.min(100, Number(run.audited_current_outcome_lift_percent) / chartMax * 100));
         return `<button class="chart-dot" style="--x:${x}%;--y:${y}%" data-detail="${escapeHtml(run.detail_id)}"
-          aria-label="${escapeHtml(run.label)} audited v9 outcome lift ${pct(run.audited_current_outcome_lift_percent, true)}"></button>`;
+          aria-label="${escapeHtml(run.label)} primary outcome lift ${pct(run.audited_current_outcome_lift_percent, true)}"></button>`;
       }).join("");
       const labels = runs.map((run) => `<span>${escapeHtml(run.short_label)}</span>`).join("");
       document.getElementById("replicationChart").innerHTML = `
-        <div class="replication-chart" aria-label="Run-level audited v9 outcome lift chart">
+        <div class="replication-chart" aria-label="Run-level primary outcome lift chart">
           <div class="axis-labels">
             <span>${chartMax}%</span><span>${Math.round(chartMax * .75)}%</span>
             <span>${Math.round(chartMax * .5)}%</span><span>${Math.round(chartMax * .25)}%</span><span>0%</span>
@@ -1715,12 +1715,12 @@
       tools.forEach(registerDetail);
       if (!tools.length) {
         document.getElementById("toolTable").innerHTML =
-          '<div class="empty-state">Generated-tool contribution appears as online-build runs complete.</div>';
+          '<div class="empty-state">Generated-tool contribution appears as SAGE runs complete.</div>';
         return;
       }
       document.getElementById("toolTable").innerHTML = `
         <table class="contribution-table">
-          <thead><tr><th>Generated tool</th><th>Later calls</th><th>Outcome delta</th><th>G / R</th></tr></thead>
+          <thead><tr><th>Generated tool</th><th>Later calls</th><th>Outcome delta</th><th>Improved / worsened tasks</th></tr></thead>
           <tbody>${tools.slice(0, 8).map((tool) => `
             <tr class="metric-button" data-detail="${escapeHtml(tool.detail_id)}" tabindex="0" role="button">
               <td>${escapeHtml(tool.name)}</td>
@@ -1730,7 +1730,7 @@
             </tr>`).join("")}
           </tbody>
         </table>
-        <div class="footer-note">G / R reports called-task gains and regressions on the post-treatment subset where the production actor policy called a generated tool. This is descriptive association, not causal attribution. Select a row for validation, reuse, and provenance details.</div>`;
+        <div class="footer-note">Results are shown for later tasks on which SAGE selected a generated tool. This association does not prove that the tool caused the score change. Select a row for validation, reuse, and source details.</div>`;
     }
 
     function detailValue(item, label) {
@@ -1760,9 +1760,9 @@
       document.getElementById("paperSubtitle").textContent =
         `${campaign.model || "Model"} · ${Number(campaign.tasks_per_run || 0).toLocaleString()} matched tasks per run · route-independent outcome scoring`;
       document.getElementById("paperCampaignSummary").innerHTML = `
-        <div class="paper-campaign-stat"><span>Registries</span><strong>${campaign.completed_online_runs || 0}</strong></div>
+        <div class="paper-campaign-stat"><span>SAGE runs</span><strong>${campaign.completed_online_runs || 0}</strong></div>
         <div class="paper-campaign-stat"><span>Task pairs</span><strong>${Number(campaign.audited_current_matched_observations || 0).toLocaleString()}</strong></div>
-        <div class="paper-campaign-stat"><span>Decisions</span><strong>${hypotheses.filter((item) => item.status === "supported").length} / ${hypotheses.length}</strong></div>`;
+        <div class="paper-campaign-stat"><span>Hypotheses supported</span><strong>${hypotheses.filter((item) => item.status === "supported").length} / ${hypotheses.length}</strong></div>`;
 
       const cards = [
         {
@@ -1789,7 +1789,7 @@
           item: h3,
           value: h3.value_label,
           context: `${detailValue(h3, "Used in a different task family")} / ${detailValue(h3, "Accepted generated-tool instances")}`,
-          label: "Accepted tools invoked in a semantic family different from their birth family.",
+          label: "Accepted tools invoked in a semantic family different from the family that triggered their creation.",
           fact1Label: "95% confidence interval",
           fact1Value: detailValue(h3, "Run-cluster bootstrap 95% CI"),
           fact2Label: "Decision threshold",

@@ -335,12 +335,12 @@ def test_write_protocol_dashboard_exports_paired_data(tmp_path: Path) -> None:
     assert "Baseline Outcome" in task_focus_html
     assert "Canonical Audit" in task_focus_html
     assert "Baseline Score" not in task_focus_html
-    assert "Total Time B / S" in task_compare_html
-    assert "LLM Calls B / S" in task_compare_html
-    assert "Tokens B / S" in task_compare_html
-    assert "provider-prefix cached" in task_compare_html
+    assert "Total Time, Baseline / SAGE" in task_compare_html
+    assert "LLM Calls, Baseline / SAGE" in task_compare_html
+    assert "Tokens, Baseline / SAGE" in task_compare_html
+    assert "cached prompt tokens" in task_compare_html
     assert "Baseline Outcome" in task_compare_html
-    assert "Canonical Audit Movement" in task_compare_html
+    assert "Route-Match Change" in task_compare_html
     assert "Score Lift" not in task_compare_html
     assert "Score Contribution" not in task_compare_html
     assert not (index.parent / "custom_task.html").exists()

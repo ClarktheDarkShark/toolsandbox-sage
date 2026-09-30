@@ -291,7 +291,7 @@ def _claim_safeguards(campaign: dict) -> str:
     safeguards = campaign.get("claim_safeguards") or {}
     labels = []
     if safeguards.get("synthetic_bridge_completions_disabled"):
-        labels.append("bridge off")
+        labels.append("completion shortcut off")
     if safeguards.get("scenario_name_birth_disabled") and safeguards.get(
         "scenario_name_routing_disabled"
     ):
@@ -477,18 +477,16 @@ def build_tables(data: dict) -> list[dict]:
         h1_threshold = _threshold(h1["threshold_percent"])
         replication_table = {
             "filename": "table_4_2_replication_results.png",
-            "title": (
-                "Table 4.2 - Replication-Level Online-Build And Frozen-Registry Results"
-            ),
+            "title": ("Table 4.2 - SAGE and Frozen-Registry Results"),
             "subtitle": (
                 f"Each row is a complete {campaign['tasks_per_run']:,}-task "
-                "replication with paired online-build and frozen-registry evidence."
+                "replication with paired tool-generating and frozen-registry evidence."
             ),
             "columns": [
                 "Run",
                 "Baseline",
-                "Online SAGE",
-                "Online lift",
+                "SAGE, generation enabled",
+                "SAGE lift",
                 "Frozen SAGE",
                 "Retained",
             ],
@@ -516,7 +514,7 @@ def build_tables(data: dict) -> list[dict]:
             ],
             "caption": (
                 "Only inference-eligible paired runs are included. Frozen-registry "
-                "runs reused the registry from their paired online-build run with "
+                "runs reused the registry from their paired tool-generating SAGE run with "
                 "generation and repair disabled."
             ),
             "compact": True,
@@ -525,7 +523,7 @@ def build_tables(data: dict) -> list[dict]:
             "filename": "table_4_3_h1_frozen_registry_retention.png",
             "title": "Table 4.3 - Hypothesis 1 Evidence",
             "subtitle": (
-                "Reusable generated tools preserve online-build gains after tool "
+                "Reusable generated tools preserve SAGE gains after tool "
                 "creation stops."
             ),
             "columns": [
@@ -566,7 +564,7 @@ def build_tables(data: dict) -> list[dict]:
                     "Replication design",
                     f"{h1['sample_size']:,} paired online/frozen runs",
                     "Complete pairs only",
-                    "Each frozen run reused tools born in the matched online-build run.",
+                    "Each frozen run reused tools created in the matched SAGE run.",
                 ],
                 [
                     "Generation during reuse",
@@ -583,10 +581,10 @@ def build_tables(data: dict) -> list[dict]:
     else:
         replication_table = {
             "filename": "table_4_2_replication_results.png",
-            "title": "Table 4.2 - Replication-Level Online-Build Results",
+            "title": "Table 4.2 - SAGE Replication Results",
             "subtitle": (
                 f"Each row is a complete {campaign['tasks_per_run']:,}-task "
-                "online-build replication."
+                "SAGE replication with tool generation and repair enabled."
             ),
             "columns": ["Run", "Baseline", "SAGE", "Outcome lift"],
             "widths": [0.16, 0.25, 0.25, 0.34],
@@ -618,7 +616,7 @@ def build_tables(data: dict) -> list[dict]:
             [
                 "H1",
                 "Generated tools remain useful when reused from a frozen registry.",
-                f"{h1_threshold} of online-build gain retained",
+                f"{h1_threshold} of the SAGE gain retained",
                 (
                     f"{_percent(h1['estimate_percent'])} retained; 95% CI "
                     f"{_percent_interval(h1['confidence_interval']).replace('+', '')}"
@@ -664,8 +662,8 @@ def build_tables(data: dict) -> list[dict]:
     return [
         {
             "filename": "table_4_1_evidence_campaign.png",
-            "title": "Table 4.1 - Evidence Campaign Configuration",
-            "subtitle": "Claim-grade Chapter 4 evidence run settings used for the final SAGE analysis.",
+            "title": "Table 4.1 - Study Configuration",
+            "subtitle": "Chapter 4 run settings used for the final SAGE analysis.",
             "columns": ["Configuration item", "Final setting", "Purpose"],
             "widths": [0.24, 0.31, 0.45],
             "rows": [
@@ -677,7 +675,7 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Model",
                     campaign["model"],
-                    "Same model family for actor, user, and generation.",
+                    "Same model family for the task-solving agent, simulated user, and tool generator.",
                 ],
                 [
                     "Evidence set",
@@ -761,14 +759,14 @@ def build_tables(data: dict) -> list[dict]:
                     f"p < {statistics['significance_alpha']:.2f}".replace("0.", "."),
                 ],
                 [
-                    "Full-outcome successes B / S",
+                    "Full-outcome successes, Baseline / SAGE",
                     "",
                     "",
                     statistics["successes_label"],
                     "SAGE count exceeds baseline",
                 ],
             ],
-            "caption": "Outcome/task completion is the sole performance endpoint. H2 is supported only when the point lift reaches 10%, both the two-way run/task and run-cluster 95% lower bounds for SAGE - 1.10 x baseline exceed zero, and the two-sided run-level sign-flip p-value is below .05. Task-IID inference is descriptive only; canonical/reference similarity is not a performance criterion.",
+            "caption": "Outcome/task completion is the sole performance endpoint. H2 is supported only when the point lift reaches 10%, both the two-way run/task and run-cluster 95% lower bounds for SAGE - 1.10 x baseline exceed zero, and the two-sided run-level sign-flip p-value is below .05. The task-level analysis that treats tasks as independent and identically distributed is descriptive only; canonical/reference similarity is not a performance criterion.",
         },
         {
             "filename": "table_4_5_h3_generated_tool_attribution.png",
@@ -786,7 +784,7 @@ def build_tables(data: dict) -> list[dict]:
                     "Called-task subset",
                     f"{h3['sample_size']:,} observations",
                     "Generated tool selected by SAGE policy",
-                    "Post-treatment, policy-selected subset; diagnostic overrides remain disabled.",
+                    "Tasks where the evaluated hybrid policy selected a generated tool; development-only overrides remained disabled.",
                 ],
                 [
                     "Baseline outcome on subset",
@@ -840,7 +838,7 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Policy-directed tool calls",
                     metric_value(metrics, "Policy-directed tool calls"),
-                    "Scenarios where the production SAGE actor policy selected and called a generated tool, without diagnostic overrides.",
+                    "Scenarios where the documented SAGE policy selected and called a generated tool, without diagnostic overrides.",
                 ],
                 [
                     "Called-task gains",
@@ -891,7 +889,7 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Same SAGE settings across runs",
                     f"{integrity['configuration_mismatches']:,} mismatches",
-                    "All completed claim runs used the same claim-grade SAGE configuration.",
+                    "All completed study runs used the same predefined SAGE configuration.",
                 ],
                 [
                     "Benchmark-metadata shortcut checks",
@@ -901,12 +899,12 @@ def build_tables(data: dict) -> list[dict]:
                 [
                     "Code-based answer shortcut checks",
                     f"{integrity['bridge_shortcut_violations']:,} violations",
-                    "Synthetic bridge completions were disabled and did not solve tasks for SAGE.",
+                    "The code-based completion shortcut was disabled and did not solve tasks for SAGE.",
                 ],
                 [
                     "Diagnostic tool-call override checks",
                     f"{integrity['forced_call_violations']:,} violations",
-                    "No ad hoc diagnostic override was used; named choices from the declared production actor policy are part of the intervention.",
+                    "No ad hoc diagnostic override was used; named choices from the documented SAGE policy are part of the intervention.",
                 ],
                 [
                     "Tool side-effect audit flags",

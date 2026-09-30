@@ -256,14 +256,19 @@ DASHBOARD_HTML = r"""<!doctype html>
         `cached / fresh · ${source} · ${mode}${missText ? " · " + missText : ""}${hash}${seeded}`
       );
     }
+    function modeDisplayName(value) {
+      const mode = String(value || "");
+      if (mode.startsWith("online_build_")) return "Autonomous tool generation enabled";
+      return mode || "run";
+    }
     function render(data) {
       state = data;
-      document.title = `ToolSandbox SAGE · ${data.mode || "run"}`;
+      document.title = `ToolSandbox SAGE · ${modeDisplayName(data.mode)}`;
       const model = data.model_metadata?.agent?.resolved_model || data.agent || "";
       const modelLabel = data.model_metadata?.agent?.requested_model && data.model_metadata.agent.requested_model !== model
         ? `${data.model_metadata.agent.requested_model} → ${model}`
         : model;
-      document.getElementById("subtitle").textContent = `${data.mode || "run"} · ${data.status || "unknown"} · ${modelLabel} · ${data.base_tool_policy || ""}`;
+      document.getElementById("subtitle").textContent = `${modeDisplayName(data.mode)} · ${data.status || "unknown"} · ${modelLabel} · ${data.base_tool_policy || ""}`;
       const c = data.control || {};
       const s = data.candidate || {};
       const d = data.comparison || {};

@@ -54,7 +54,9 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
 
     evolution_runs = evolution["runs"]
     if len(evolution_runs) != 10:
-        raise ValueError("Chapter 4 evolution tables require ten online-build runs.")
+        raise ValueError(
+            "Chapter 4 evolution tables require ten tool-generating SAGE runs."
+        )
 
     baseline_mean = sum(float(run["baseline_outcome"]) for run in runs) / len(runs)
     sage_mean = sum(float(run["online_sage_outcome"]) for run in runs) / len(runs)
@@ -78,7 +80,7 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         {
             "filename": "table_4_1_evidence_campaign.png",
-            "title": "Table 4.1 - Evidence Campaign",
+            "title": "Table 4.1 - Study Configuration",
             "subtitle": "Final benchmark and analysis settings.",
             "columns": ["Configuration item", "Final setting", "Purpose"],
             "widths": [0.26, 0.29, 0.45],
@@ -91,12 +93,12 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     "Model",
                     campaign["model"],
-                    "Same model for the actor, simulated user, and tool generator.",
+                    "Same model for the task-solving agent, simulated user, and tool generator.",
                 ],
                 [
-                    "Online-build evidence",
+                    "Tool-generation evidence",
                     "10 independent runs",
-                    "Each SAGE run began with an empty run-local registry.",
+                    "Each SAGE run began with its own empty tool registry.",
                 ],
                 [
                     "Frozen-registry evidence",
@@ -112,23 +114,23 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     ),
                 ],
                 [
-                    "Application replay caches",
+                    "Previously stored application responses",
                     "Disabled",
                     "Every matched-control task was executed live.",
                 ],
             ],
-            "caption": "Final Chapter 4 evidence campaign configuration.",
+            "caption": "Final Chapter 4 study configuration.",
             "compact": True,
         },
         {
             "filename": "table_4_2_replication_results.png",
             "title": "Table 4.2 - Replication Results",
-            "subtitle": "Online-build performance and supporting frozen-registry reuse.",
+            "subtitle": "SAGE performance and supporting frozen-registry reuse.",
             "columns": [
                 "Run",
                 "Control",
-                "Online SAGE",
-                "Online lift",
+                "SAGE",
+                "SAGE lift",
                 "Frozen SAGE",
                 "Gain retained",
             ],
@@ -154,7 +156,7 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     _percent(frozen_retention),
                 ]
             ],
-            "caption": "Complete results for the ten independent registry runs.",
+            "caption": "Complete results for the ten independent SAGE runs.",
             "compact": True,
         },
         {
@@ -215,7 +217,10 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     "p < .05",
                 ],
             ],
-            "caption": "Hypothesis 1 evidence from the ten online-build runs.",
+            "caption": (
+                "Hypothesis 1 evidence from the ten SAGE runs with tool "
+                "generation and repair enabled."
+            ),
         },
         {
             "filename": "table_4_4_h2_repair_and_reuse.png",
@@ -259,10 +264,10 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     str(totals["max_repair_attempts_observed"]),
                     "",
                     "",
-                    "Reported from run ledgers",
+                    "Reported from preserved run records",
                 ],
             ],
-            "caption": "Hypothesis 2 evidence from validation, repair, birth, and later-invocation records.",
+            "caption": "Hypothesis 2 evidence from validation, repair, tool-creation, and later-use records.",
         },
         {
             "filename": "table_4_5_h3_cross_family_use.png",
@@ -302,7 +307,7 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     "p < .05",
                 ],
             ],
-            "caption": "Hypothesis 3 evidence from actual tool-birth and later-invocation task families.",
+            "caption": "Hypothesis 3 evidence from the task family that triggered tool creation and the families of later use.",
         },
         {
             "filename": "table_4_6_hypothesis_summary.png",
@@ -355,17 +360,17 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     "Accepted generated-tool instances",
                     metric_value(metrics, "Accepted tools"),
-                    "Tools that passed validation and entered a run-local registry.",
+                    "Tools that passed validation and entered the registry for that run.",
                 ],
                 [
                     "Accepted tools invoked on a later task",
                     metric_value(metrics, "Reused on later tasks"),
-                    "Later-task use across the ten online-build runs.",
+                    "Later-task use across the ten independent SAGE runs.",
                 ],
                 [
                     "Accepted-tool later-reuse rate",
                     metric_value(metrics, "Tool reuse rate"),
-                    "Most accepted tool instances were not one-task artifacts.",
+                    "Most accepted tool instances were not tools created for only one task.",
                 ],
                 [
                     "Frozen-registry gain retained",
@@ -398,14 +403,14 @@ def build_tables(data: dict[str, Any]) -> list[dict[str, Any]]:
                     f"Distributed across {len(failed_tools) - 1} generated tools.",
                 ],
                 [
-                    "Side-effect audit flags",
+                    "Possible side-effect flags",
                     str(integrity_counts["side_effect_flags"]),
                     "Retained in the evidence record for review.",
                 ],
                 [
-                    "Runtime exceptions in selected runs",
+                    "Runtime exceptions in the ten SAGE runs",
                     str(integrity_counts["runtime_exceptions"]),
-                    "All selected runs passed the runtime integrity gate.",
+                    "No runtime exceptions were recorded in the ten SAGE runs.",
                 ],
             ],
             "caption": "Generated-tool failure and integrity results.",

@@ -1475,7 +1475,7 @@ def _tool_records(
                         ),
                     },
                     {
-                        "heading": "Generation and validation provenance",
+                        "heading": "Generation and validation records",
                         "rows": _rows(
                             [
                                 (
@@ -1505,7 +1505,7 @@ def _tool_records(
                         ),
                         "note": (
                             "Distinct hashes preserve evidence that model-authored "
-                            "tool code can vary across independent online-build runs."
+                            "tool code can vary across independent SAGE runs."
                         ),
                     },
                 ],
@@ -1525,8 +1525,8 @@ def _tool_records(
         "reused_tools": reused_tool_total,
         "reuse_events": reuse_events,
         # Keep the historical key for evidence-file compatibility; these calls
-        # were selected by the production actor policy, not naturally by the
-        # base model.
+        # were selected by the documented SAGE hybrid policy, not by an
+        # unconstrained base-model decision.
         "natural_calls": policy_directed_calls,
         "policy_directed_calls": policy_directed_calls,
         "gains": gains,
@@ -1594,9 +1594,9 @@ def _run_detail(
             * 100.0
         )
     status_label = (
-        "Online + frozen complete"
+        "SAGE + frozen-registry complete"
         if online_inference_eligible and frozen_inference_eligible
-        else "Online complete"
+        else "SAGE complete"
         if online_inference_eligible
         else "Excluded from inference"
         if (online and online.complete) or (frozen and frozen.complete)
@@ -1610,7 +1610,7 @@ def _run_detail(
             "rows": _rows(
                 [
                     (
-                        "Online-build task completion",
+                        "SAGE task completion",
                         f"{online.completed_tasks}/{online.scenario_count}"
                         if online
                         else "not started",
@@ -1622,12 +1622,12 @@ def _run_detail(
                         else "-",
                     ),
                     (
-                        "Online-build SAGE outcome",
+                        "SAGE outcome, generation enabled",
                         f"{online.candidate_outcome:.3f}"
                         if online and online.candidate_outcome is not None
                         else "-",
                     ),
-                    ("Online-build outcome lift", _percent(online_lift, signed=True)),
+                    ("SAGE outcome lift", _percent(online_lift, signed=True)),
                     (
                         "Frozen-registry SAGE outcome",
                         f"{frozen.candidate_outcome:.3f}"
@@ -1639,7 +1639,7 @@ def _run_detail(
             ),
         },
         {
-            "heading": "Paper-comparable endpoint (v1, exact 800-task subset)",
+            "heading": "Paper-comparable endpoint (historical 800-task subset)",
             "rows": _rows(
                 [
                     (
@@ -1649,7 +1649,7 @@ def _run_detail(
                         else "-",
                     ),
                     (
-                        "Online-build SAGE outcome",
+                        "SAGE outcome, generation enabled",
                         f"{online.paper_candidate_outcome:.3f}"
                         if online and online.paper_candidate_outcome is not None
                         else "-",
@@ -1662,9 +1662,9 @@ def _run_detail(
                 ]
             ),
             "note": (
-                "This v1 subset is used only for an apples-to-apples descriptive "
-                "comparison with the archived paper campaign. It is not mixed "
-                "with the v9 all-task hypothesis analysis."
+                "This historical subset is used only for a direct descriptive "
+                "comparison with the previously reported study results. It is not "
+                "mixed with the primary all-task hypothesis analysis."
             ),
         },
         {
@@ -1692,7 +1692,7 @@ def _run_detail(
             "heading": "Run configuration",
             "rows": _rows(
                 [
-                    ("Actor model", protocol.get("agent") or "-"),
+                    ("Task-solving model", protocol.get("agent") or "-"),
                     ("User model", protocol.get("user") or "-"),
                     (
                         "Generation model",
@@ -1713,7 +1713,7 @@ def _run_detail(
                         "enabled" if native_action_enabled else "disabled",
                     ),
                     (
-                        "Synthetic bridge completions",
+                        "Code-based completion shortcut",
                         (
                             "enabled"
                             if protocol.get(
@@ -1723,7 +1723,7 @@ def _run_detail(
                         ),
                     ),
                     (
-                        "Scenario-name birth/routing",
+                        "Scenario-name generation/selection",
                         (
                             "disabled / disabled"
                             if not scenario_name_birth_enabled
@@ -1747,9 +1747,7 @@ def _run_detail(
     ]
     links: list[dict[str, str]] = []
     if online and online.dashboard_url:
-        links.append(
-            {"label": "Open online-build Task Compare", "href": online.dashboard_url}
-        )
+        links.append({"label": "Open SAGE Task Compare", "href": online.dashboard_url})
     if frozen and frozen.dashboard_url:
         links.append(
             {
@@ -2395,7 +2393,7 @@ def build_evidence_data(
     hypotheses = [
         {
             "id": "Hypothesis 1",
-            "title": "Reusable generated tools preserve online-build gains",
+            "title": "Reusable generated tools preserve SAGE gains",
             "analysis_role": (
                 ADAPTIVE_SELECTION_CONDITIONED_ANALYSIS_ROLE
                 if adaptive_sample_distribution
@@ -2425,8 +2423,8 @@ def build_evidence_data(
                 "registry."
             ),
             "evidence_label": (
-                "Uses the audited v9 all-1,032-task endpoint to compare each "
-                "online-build run with a paired frozen-registry run where "
+                "Uses the final audited all-1,032-task outcome evaluator to compare each "
+                "tool-generating SAGE run with a paired frozen-registry run where "
                 "generation and repair are disabled."
             ),
             "observed_label": f"Observed {_percent(retention)}",
@@ -2444,7 +2442,7 @@ def build_evidence_data(
                             [
                                 (
                                     "Formula",
-                                    "(frozen SAGE - baseline) / (online SAGE - baseline)",
+                                    "(frozen-registry SAGE - baseline) / (tool-generating SAGE - baseline)",
                                 ),
                                 ("Observed retention", _percent(retention)),
                                 (
@@ -2459,8 +2457,8 @@ def build_evidence_data(
                             ]
                         ),
                         "note": (
-                            "Each frozen run receives a copy of the registry born "
-                            "in its paired online-build run. Tool generation and "
+                            "Each frozen run receives a copy of the registry created "
+                            "in its paired tool-generating SAGE run. Tool generation and "
                             "candidate repair are disabled."
                         ),
                     },
@@ -2526,7 +2524,7 @@ def build_evidence_data(
                 "same LLM agent without autonomous tool generation."
             ),
             "evidence_label": (
-                "Compares audited v9 baseline and SAGE outcomes for the same "
+                "Compares final audited baseline and SAGE outcomes for the same "
                 "1,032-task order across all complete replications."
             ),
             "observed_label": f"Observed {_percent(overall_outcome_lift, signed=True)}",
@@ -2536,7 +2534,7 @@ def build_evidence_data(
             "status": h2_status,
             **_detail(
                 "hypothesis:h2",
-                "Hypothesis 2: Audited v9 all-task outcome lift",
+                "Hypothesis 2: Final all-task outcome lift",
                 [
                     {
                         "heading": "Definition and result",
@@ -2609,17 +2607,17 @@ def build_evidence_data(
                         ),
                     },
                     {
-                        "heading": "Descriptive task-IID analysis",
+                        "heading": "Descriptive task-level analysis",
                         "rows": _rows(
                             [
-                                ("Task-IID difference CI", _interval(task_iid_ci)),
-                                ("Task-IID sign flip", _p_label(task_p)),
+                                ("Task-level difference CI", _interval(task_iid_ci)),
+                                ("Task-level sign flip", _p_label(task_p)),
                                 (
-                                    "Task-IID target-contrast CI",
+                                    "Task-level target-contrast CI",
                                     _interval(task_iid_threshold_contrast_ci),
                                 ),
                                 (
-                                    "Task-IID target-contrast sign flip",
+                                    "Task-level target-contrast sign flip",
                                     _p_label(task_threshold_p),
                                 ),
                                 (
@@ -2673,9 +2671,9 @@ def build_evidence_data(
                 "SAGE actor policy selected and called a generated tool."
             ),
             "evidence_label": (
-                "Uses audited v9 outcomes on generated-tool-called tasks under "
+                "Uses final audited outcomes on tasks where a generated tool was called under "
                 "the declared production policy; diagnostic overrides, "
-                "scenario-name routing, and synthetic bridge completions are disabled. "
+                "scenario-name selection, and the code-based completion shortcut are disabled. "
                 "It does not establish causal attribution."
             ),
             "observed_label": f"Observed {_percent(called_lift, signed=True)}",
@@ -2864,9 +2862,10 @@ def build_evidence_data(
                         ]
                     ),
                     "note": (
-                        "The archived campaign remains provenance-invalid for final "
-                        "inference. This is a descriptive comparison under the same "
-                        "v1 evaluator and exact ordered 800-task subset."
+                        "The archived study did not meet the source-verification "
+                        "requirements for final inference. This is a descriptive "
+                        "comparison under the same historical evaluator and exact "
+                        "ordered 800-task subset."
                     ),
                 },
             ],
@@ -2896,7 +2895,7 @@ def build_evidence_data(
             "Overall matched performance",
             [
                 {
-                    "heading": "Audited v9 outcome (all 1,032 tasks per run)",
+                    "heading": "Final audited outcome (all 1,032 tasks per run)",
                     "rows": _rows(
                         [
                             (
@@ -3044,7 +3043,7 @@ def build_evidence_data(
                     "heading": "Descriptive analyses (not decision criteria)",
                     "rows": _rows(
                         [
-                            ("Independent online-build runs", len(completed_online)),
+                            ("Independent SAGE runs", len(completed_online)),
                             (
                                 "Two-way raw-difference 95% CI",
                                 _interval(two_way_delta_ci, 4),
@@ -3114,7 +3113,7 @@ def build_evidence_data(
                         "columns": [
                             "Run",
                             "Visible-context routing",
-                            "Bridge disabled",
+                            "Code-based completion shortcut disabled",
                             "Diagnostic override variables",
                             "SAGE digests",
                             "Runtime exceptions",
@@ -3124,7 +3123,7 @@ def build_evidence_data(
                     },
                     "note": (
                         "A configuration violation is counted when a completed "
-                        "online-build run does not preserve the claim-grade safeguards."
+                        "SAGE run does not preserve the required safeguards."
                     ),
                 }
             ],
@@ -3144,7 +3143,7 @@ def build_evidence_data(
             "Reused on later tasks",
             f"{tool_totals['reused_tools']:,}",
             "green",
-            "Accepted tool instances with at least one registry reuse event after birth.",
+            "Accepted tool instances with at least one registry reuse event after creation.",
         ),
         (
             "reuse_rate",
@@ -3158,7 +3157,7 @@ def build_evidence_data(
             "Policy-directed tool calls",
             f"{tool_totals['policy_directed_calls']:,}",
             "",
-            "Matched task scenarios containing a generated-tool call selected by the production actor policy, with diagnostic overrides disabled.",
+            "Matched task scenarios containing a generated-tool call selected by the documented SAGE hybrid policy, with diagnostic overrides disabled.",
         ),
         (
             "gains",
@@ -3186,7 +3185,7 @@ def build_evidence_data(
             "Tool-call failure scenarios",
             f"{tool_totals['runtime_failures']:,}",
             "green" if tool_totals["runtime_failures"] == 0 else "amber",
-            "Matched scenarios containing at least one recorded failed generated-tool call across completed online-build runs.",
+            "Matched scenarios containing at least one recorded failed generated-tool call across completed SAGE runs.",
         ),
     ]
     tool_metrics = []
@@ -3206,7 +3205,7 @@ def build_evidence_data(
                                 [
                                     ("Observed value", value_label),
                                     (
-                                        "Completed online-build runs",
+                                        "Completed SAGE runs",
                                         len(completed_online),
                                     ),
                                 ]
@@ -3269,12 +3268,12 @@ def build_evidence_data(
             else ""
         ),
         "hypothesis_section_description": (
-            "All ten runs are aggregated, but rep01 was selected after passing the "
-            "release gate. H1/H2 estimates and uncertainty are adaptive, "
-            "selection-conditioned descriptions—not preregistered inference."
+            "All ten runs are aggregated, but Replication 01 was selected after "
+            "passing predefined technical checks. H1 and H2 are descriptive in "
+            "this case because the selection was adaptive rather than preregistered."
             if adaptive_sample_distribution
-            else "H1 and H2 use audited v9 confirmatory analyses on all 1,032 tasks. "
-            "The called-task analysis is selection-conditioned and descriptive; v1 "
+            else "H1 and H2 use the final audited outcome analysis on all 1,032 tasks. "
+            "The called-task analysis is descriptive rather than causal; the historical evaluator "
             "on the exact 800-task subset is historical comparison only."
         ),
         "manifest_status": manifest_status,

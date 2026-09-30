@@ -278,11 +278,17 @@ TASK_FOCUS_HTML = r"""<!doctype html>
     }
 
     /* ── Top metrics ── */
+    function modeDisplayName(value) {
+      const mode = String(value || "");
+      if (mode.startsWith("online_build_")) return "Autonomous tool generation enabled";
+      return mode || "run";
+    }
+
     function renderTop() {
       const s = data?.summary || {};
       const model = data?.model_metadata?.agent?.resolved_model || data?.agent;
       document.getElementById("subtitle").textContent =
-        [data?.mode, data?.phase, data?.status, model].filter(Boolean).join(" · ");
+        [modeDisplayName(data?.mode), data?.phase, data?.status, model].filter(Boolean).join(" · ");
       document.querySelectorAll(".arm-btn").forEach(b => b.classList.toggle("active", b.dataset.arm === arm));
 
       let cards;

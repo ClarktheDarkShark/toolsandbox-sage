@@ -1098,6 +1098,79 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       color: var(--blue);
       text-decoration: none;
     }
+    html.paper-view body {
+      min-width: 1200px;
+      overflow-y: hidden;
+    }
+    html.paper-view header {
+      padding: 14px 22px 16px;
+    }
+    html.paper-view .dashboard-switch,
+    html.paper-view .runtime-line,
+    html.paper-view .cache-panel,
+    html.paper-view .live-tool-panel,
+    html.paper-view main,
+    html.paper-view .drawer {
+      display: none !important;
+    }
+    html.paper-view .sage-thinking-box {
+      height: 90px;
+      min-height: 90px;
+      max-height: 90px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    html.paper-view .header-dashboard-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    html.paper-view .summary-stack,
+    html.paper-view .metrics {
+      max-width: none;
+    }
+    html.paper-view .metrics {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    html.paper-view .tool-metrics {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    html.paper-view .metric {
+      min-height: 92px;
+    }
+    html.paper-view .label {
+      font-size: 13px;
+    }
+    html.paper-view .value {
+      font-size: 28px;
+    }
+    html.paper-view .hint {
+      font-size: 14px;
+    }
+    html.paper-view .sage-status-stack {
+      width: 100%;
+    }
+    html.paper-view .tool-generation-card {
+      width: 100%;
+      min-height: 64px;
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr);
+      align-items: center;
+      gap: 14px;
+      cursor: default;
+    }
+    html.paper-view .tool-gen-status-main {
+      font-size: 24px;
+    }
+    html.paper-view .tool-gen-purpose,
+    html.paper-view .tool-gen-step-row,
+    html.paper-view .tool-gen-timeline,
+    html.paper-view .tool-gen-status-pill,
+    html.paper-view .tool-gen-meta,
+    html.paper-view .tool-gen-kicker {
+      display: none;
+    }
     @media (max-width: 1100px) {
       .metrics { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
     }
@@ -1125,6 +1198,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       .header-row { flex-direction: column; }
     }
   </style>
+  <script>
+    document.documentElement.classList.toggle(
+      "paper-view",
+      new URLSearchParams(window.location.search).get("view") === "paper",
+    );
+  </script>
 </head>
 <body>
   <header>
@@ -1230,6 +1309,12 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       if (normalized.includes("toolsandbox")) return "ToolSandbox";
       if (normalized.includes("minigrid")) return "MiniGrid";
       return raw ? raw.replaceAll("-", " ") : "ToolSandbox";
+    }
+
+    function modeDisplayName(value) {
+      const mode = String(value || "");
+      if (mode.startsWith("online_build_")) return "Autonomous tool generation enabled";
+      return mode || "run";
     }
     const finite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
     const pct = (v) => finite(v) ? (Number(v) * 100).toFixed(1) + "%" : "-";
@@ -1419,14 +1504,17 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const cached = cache.cached_control_tasks ?? rowCached;
       const fresh = cache.fresh_control_tasks ?? (rowCached ? rowFresh : (total || completed || 0));
       const mode = cache.mode || (rowCached ? "use-if-eligible" : "off");
+      const modeLabel = mode === "use-if-eligible"
+        ? "use a stored result only when eligible"
+        : mode === "off" ? "disabled" : mode;
       const source = cache.control_source || cache.source || (rowCached ? "cached row summaries" : "fresh baseline");
       document.getElementById("cachePanel").innerHTML = [
-        cachePill("Control cache", `${cached} cached / ${fresh} fresh`),
-        cachePill("Mode", mode),
+        cachePill("Stored baseline results", `${cached} stored / ${fresh} fresh`),
+        cachePill("Policy", modeLabel),
         cachePill("Source", source),
         cachePill("Misses", missText),
-        cachePill("Manifest", hash),
-	        cache.live_dashboard_seeded_from_preflight ? cachePill("Live note", "seeded from preflight until runner finalizes report") : "",
+        cachePill("Record ID", hash),
+	        cache.live_dashboard_seeded_from_preflight ? cachePill("Live note", "initial run summary; final report pending") : "",
 	      ].filter(Boolean).join("");
 	    }
 
@@ -1964,7 +2052,8 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const tileChoice = chooseToolTileLifecycleEvent({liveStatus, latestRunEvent, latestBirth, latestReuse});
       const actionLatest = actionChoice.event;
       const latest = tileChoice.event;
-      const state = tileChoice.state;
+      const runComplete = ["complete", "completed"].includes(String(payload?.status || "").toLowerCase());
+      const state = runComplete ? "complete" : tileChoice.state;
       const displayScenario = latest?.scenario || latest?.birth_scenario || current?.scenario || "";
       const toolName = toolNameForLifecycleEvent(latest);
       const stage = humanToolStage(latest);
@@ -1974,14 +2063,20 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const thinking = sageThinkingMessage(actionChoice.state, actionLatest, current, actionToolName);
       const timeline = timelineRowsForLifecycle(latest, state);
       const currentTimeline = timeline.find((row) => row.status === "current") || timeline.find((row) => row.status === "next") || timeline[timeline.length - 1];
-      const purpose = readableGapPurpose(latest, current);
+      const purpose = runComplete
+        ? "Why: All planned tasks are complete, so no generated tool is active."
+        : readableGapPurpose(latest, current);
       const statusHeadline = lifecycleStatusHeadline(latest, state);
       const bodyParts = [];
-      if (latest?.observation_reason) bodyParts.push(String(latest.observation_reason).replace("visible_task_context:", ""));
-      if (latest?.canonical_key) bodyParts.push(`Gap: ${latest.canonical_key}`);
-      if (latest?.event === "generated_tool_invoked" && latest?.tool_name) bodyParts.push(`Calling ${latest.tool_name}`);
-      if (!bodyParts.length && latest?.replacement_strategy) bodyParts.push(latest.replacement_strategy);
-      if (!bodyParts.length) bodyParts.push("Waiting for the next generated-tool lifecycle event.");
+      if (runComplete) {
+        bodyParts.push("All planned tasks completed. Final paired metrics and generated-tool evidence are available.");
+      } else {
+        if (latest?.observation_reason) bodyParts.push(String(latest.observation_reason).replace("visible_task_context:", ""));
+        if (latest?.canonical_key) bodyParts.push(`Gap: ${latest.canonical_key}`);
+        if (latest?.event === "generated_tool_invoked" && latest?.tool_name) bodyParts.push(`Calling ${latest.tool_name}`);
+        if (!bodyParts.length && latest?.replacement_strategy) bodyParts.push(latest.replacement_strategy);
+        if (!bodyParts.length) bodyParts.push("Waiting for the next generated-tool lifecycle event.");
+      }
       const code = await loadToolCodeForEvent(latest, candidateDir);
       toolGenerationStatus = {
         state,
@@ -1990,14 +2085,14 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         title: toolName ? compactToolName(toolName) : "No active generated tool",
         body: bodyParts.join(" · "),
         purpose,
-        currentStep: currentTimeline ? `Current step: ${currentTimeline.label}` : `Current step: ${stage}`,
-        nextStep: nextStepForState(state, latest),
+        currentStep: runComplete ? "Current step: Run complete" : currentTimeline ? `Current step: ${currentTimeline.label}` : `Current step: ${stage}`,
+        nextStep: runComplete ? "Next: review the final paired metrics and generated-tool evidence." : nextStepForState(state, latest),
         timeline,
         thinkingText: throttledAgentActionText(thinking.text, actionChoice.state === "complete"),
         meta: [
           `scenario ${current?.completed_count ?? payload?.summary?.candidate_completed ?? 0}/${current?.scenario_count ?? payload?.summary?.scenario_count ?? 0}`,
           `${acceptedCount} accepted · ${rejectedCount} rejected`,
-          latest?.event ? String(latest.event).replaceAll("_", " ") : "no active birth event",
+          latest?.event ? String(latest.event).replaceAll("_", " ") : "no active tool-generation event",
         ],
         details: [
           ["Current status", statusHeadline],
@@ -2144,24 +2239,24 @@ TASK_COMPARE_HTML = r"""<!doctype html>
         ? `live ${intNum(s.control_llm_live_call_count)} / ${intNum(s.candidate_llm_live_call_count)} · stored-response replays ${intNum(s.control_llm_cached_call_count)} / ${intNum(s.candidate_llm_cached_call_count)}`
         : "usage not recorded in this run";
       const llmTokensHint = controlUsageRecorded || candidateUsageRecorded
-        ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · provider-prefix cached ${tokenNum(s.control_llm_provider_cached_prompt_tokens)} / ${tokenNum(s.candidate_llm_provider_cached_prompt_tokens)} · provider metadata ${intNum(s.control_llm_provider_cached_prompt_tokens_available_count)} / ${intNum(s.candidate_llm_provider_cached_prompt_tokens_available_count)} calls · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
+        ? `prompt ${tokenNum(s.control_llm_prompt_tokens)} / ${tokenNum(s.candidate_llm_prompt_tokens)} · cached prompt tokens ${tokenNum(s.control_llm_provider_cached_prompt_tokens)} / ${tokenNum(s.candidate_llm_provider_cached_prompt_tokens)} · cache metadata available for ${intNum(s.control_llm_provider_cached_prompt_tokens_available_count)} / ${intNum(s.candidate_llm_provider_cached_prompt_tokens_available_count)} calls · completion ${tokenNum(s.control_llm_completion_tokens)} / ${tokenNum(s.candidate_llm_completion_tokens)}`
         : "OpenAI usage metadata unavailable";
       document.getElementById("runProgress").innerHTML = `<span class="label">Run Progress</span><strong>${matched || 0}/${totalTasks || 0}</strong><span>baseline ${baselineDone}/${totalTasks || 0} ${esc(baselineProgress.status)} · SAGE ${sageDone}/${totalTasks || 0} ${esc(sageProgress.status)}</span>`;
       document.getElementById("metrics").innerHTML = [
         metric("Baseline Outcome", num(baselineOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("SAGE Outcome", num(sageOutcome), `${paired.outcomeCount || 0} paired outcome tasks`),
         metric("Outcome Lift", liftPct(outcomeLift, approxZeroBaselineLift(outcomeDelta, baselineOutcome)), liftHint(outcomeDelta, baselineOutcome, "outcome"), cls(outcomeDelta)),
-        metric("Baseline Canonical Audit", num(baselineScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
-        metric("SAGE Canonical Audit", num(sageScore), `${paired.scoreCount || matched || 0} descriptive route-match tasks`),
-        metric("Canonical Audit Movement", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), `${liftHint(scoreDelta, baselineScore, "route-match")} · descriptive only`),
-        metric("Total Time B / S", totalTimePairValue(s), totalTimeHint(s)),
-        metric("LLM Calls B / S", llmCallsValue, llmCallsHint),
-        metric("Tokens B / S", llmTokensValue, llmTokensHint),
+        metric("Baseline Route-Match Check", num(baselineScore), `${paired.scoreCount || matched || 0} descriptive tasks`),
+        metric("SAGE Route-Match Check", num(sageScore), `${paired.scoreCount || matched || 0} descriptive tasks`),
+        metric("Route-Match Change", liftPct(scoreLift, approxZeroBaselineLift(scoreDelta, baselineScore)), `${liftHint(scoreDelta, baselineScore, "route-match")} · descriptive only`),
+        metric("Total Time, Baseline / SAGE", totalTimePairValue(s), totalTimeHint(s)),
+        metric("LLM Calls, Baseline / SAGE", llmCallsValue, llmCallsHint),
+        metric("Tokens, Baseline / SAGE", llmTokensValue, llmTokensHint),
       ].join("");
 	      document.getElementById("toolMetrics").innerHTML = metric(
-	        "New Tools / Called",
+	        "Tools Created / Used",
 	        `${bornEvents} / ${used}`,
-	        `${total} registry tools present · ${contributionTools} contribution tools; click for contribution`,
+	        `${total} accepted tools available · ${contributionTools} included in the contribution analysis; select for details`,
 	        bornEvents > 0 ? "good" : "warn",
 	        true,
 	      );
@@ -2569,13 +2664,13 @@ TASK_COMPARE_HTML = r"""<!doctype html>
             <div class="mini"><div class="label">Baseline Outcome</div><div class="value">${pct(outcome(control))}</div></div>
             <div class="mini"><div class="label">SAGE Outcome</div><div class="value">${pct(outcome(candidate))}</div></div>
             <div class="mini"><div class="label">Outcome Lift</div><div class="value ${cls(d.outcomeDelta)}">${liftPct(relLift(d.outcomeDelta, outcome(control)), approxZeroBaselineLift(d.outcomeDelta, outcome(control)))}</div><div class="hint">${approxZeroBaselineLift(d.outcomeDelta, outcome(control)) ? liftHint(d.outcomeDelta, outcome(control), "outcome") : `${num(outcome(control))} -> ${num(outcome(candidate))}; delta ${signedNum(d.outcomeDelta)}`}</div></div>
-            <div class="mini"><div class="label">Baseline Canonical Audit</div><div class="value">${pct(control.similarity)}</div><div class="hint">descriptive route match</div></div>
-            <div class="mini"><div class="label">SAGE Canonical Audit</div><div class="value">${pct(candidate.similarity)}</div><div class="hint">descriptive route match</div></div>
-            <div class="mini"><div class="label">Canonical Audit Movement</div><div class="value">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "route-match")} · descriptive only</div></div>
-            <div class="mini"><div class="label">Turns B / S</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
-            <div class="mini"><div class="label">LLM Calls B / S</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
-            <div class="mini"><div class="label">Tokens B / S</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))} · provider-prefix cached ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens, candidate.llm_provider_cached_prompt_tokens, tokenNum))} · provider metadata ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens_available_count, candidate.llm_provider_cached_prompt_tokens_available_count, intNum))} calls</div></div>
-            <div class="mini"><div class="label">Control Cache</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
+            <div class="mini"><div class="label">Baseline Route-Match Check</div><div class="value">${pct(control.similarity)}</div><div class="hint">descriptive only</div></div>
+            <div class="mini"><div class="label">SAGE Route-Match Check</div><div class="value">${pct(candidate.similarity)}</div><div class="hint">descriptive only</div></div>
+            <div class="mini"><div class="label">Route-Match Change</div><div class="value">${liftPct(relLift(d.scoreDelta, control.similarity), approxZeroBaselineLift(d.scoreDelta, control.similarity))}</div><div class="hint">${liftHint(d.scoreDelta, control.similarity, "route-match")} · descriptive only</div></div>
+            <div class="mini"><div class="label">Turns, Baseline / SAGE</div><div class="value">${esc(control.turn_count ?? "-")} / ${esc(candidate.turn_count ?? "-")}</div></div>
+            <div class="mini"><div class="label">LLM Calls, Baseline / SAGE</div><div class="value">${esc(llmPairValue(control.llm_call_count, candidate.llm_call_count, intNum))}</div><div class="hint">live ${esc(llmPairValue(control.llm_live_call_count, candidate.llm_live_call_count, intNum))}</div></div>
+            <div class="mini"><div class="label">Tokens, Baseline / SAGE</div><div class="value">${esc(llmPairValue(control.llm_total_tokens, candidate.llm_total_tokens, tokenNum))}</div><div class="hint">prompt ${esc(llmPairValue(control.llm_prompt_tokens, candidate.llm_prompt_tokens, tokenNum))} · cached prompt tokens ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens, candidate.llm_provider_cached_prompt_tokens, tokenNum))} · cache metadata available for ${esc(llmPairValue(control.llm_provider_cached_prompt_tokens_available_count, candidate.llm_provider_cached_prompt_tokens_available_count, intNum))} calls</div></div>
+            <div class="mini"><div class="label">Baseline Result Source</div><div class="value">${esc(control.control_cache_source || "-")}</div></div>
             <div class="mini"><div class="label">SAGE Tool Events</div><div class="value">${esc(toolEvents(pair).length)}</div></div>
           </div>
         </div>
@@ -2611,9 +2706,9 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const rows = tools.tools || [];
       const visibilityKnown = Boolean(tools.visibility_known ?? rows.some((tool) => tool.visible_count !== null && tool.visible_count !== undefined));
       const contributionKnown = Boolean(tools.contribution_known ?? rows.some((tool) => tool.called_subset_mean_outcome_delta !== null && tool.called_subset_mean_outcome_delta !== undefined));
-      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} called naturally in this run.${visibilityKnown ? "" : " Visibility counts are pending until live selection artifacts are available."}${contributionKnown ? "" : " Contribution columns are pending until completed paired called-tool tasks are available."}`;
+      document.getElementById("toolDrawerSub").textContent = `${rows.length} tools; ${tools.called_tool_count || 0} used in this run.${visibilityKnown ? "" : " Visibility counts are pending until tool-selection records are available."}${contributionKnown ? "" : " Contribution columns are pending until completed paired tasks with generated-tool use are available."}`;
       document.getElementById("toolTable").innerHTML = `<table>
-        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Called</th><th>VNC</th><th>Outcome Contribution</th><th>Canonical Audit Contribution</th><th>Safety</th></tr></thead>
+        <thead><tr><th>Tool</th><th>Origin</th><th>Visible</th><th>Used</th><th>Visible, not selected</th><th>Outcome Contribution</th><th>Route-Match Contribution</th><th>Safety</th></tr></thead>
         <tbody>${rows.map((tool) => `<tr>
           <td><strong>${toolNameButton(tool)}</strong><div class="small">${esc(tool.decision || "")}</div></td>
           <td>${esc(tool.origin || "-")}</td>
@@ -2763,7 +2858,7 @@ TASK_COMPARE_HTML = r"""<!doctype html>
       const startedAt = payload.started_at ? new Date(payload.started_at).toLocaleString() : "unknown start";
       document.title = `Task Compare - ${environmentName} - SAGE`;
       document.getElementById("envBadge").textContent = environmentName;
-      document.getElementById("subtitle").textContent = `${payload.mode || "run"} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · started ${startedAt} · refreshed ${new Date().toLocaleTimeString()}`;
+      document.getElementById("subtitle").textContent = `${modeDisplayName(payload.mode)} · ${payload.status || "unknown"} · ${payload.agent || ""} · ${matchedText} · started ${startedAt} · refreshed ${new Date().toLocaleTimeString()}`;
       document.getElementById("runtimeLine").textContent = formatRuntimeLine();
       if (selected >= pairs.length) selected = Math.max(0, pairs.length - 1);
       renderMetrics();
